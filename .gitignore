@@ -1,5 +1,6 @@
 .DS_Store
 *.log
+*.err
 *.zip
 *.tar.gz
 *.dmg
@@ -15,10 +16,19 @@ _BACKUPS/
 **/_backups*/
 **/_backups_godot/
 **/_safety*/
+*backup*
+*Backup*
+*BACKUP*
 **/*backup*/
 **/*Backup*/
 **/*BAK*
+*.backup*
 **/*.bak*
+**/*.SAFE*
+**/*.safe*
+**/*.broken*
+**/*_before_*
+audit_*.txt
 **/backups/
 **/excluded_from_web_build/
 **/_trash_audio_backup_EXCLUDED_FROM_WEB/
