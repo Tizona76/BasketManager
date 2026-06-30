@@ -1,0 +1,34 @@
+.DS_Store
+*.log
+*.zip
+*.tar.gz
+*.dmg
+*.app
+*.exe
+
+# Godot generated/cache
+**/.godot/
+*.tmp
+
+# Basket Manager backups / safety copies / exports
+_BACKUPS/
+**/_backups*/
+**/_backups_godot/
+**/_safety*/
+**/*backup*/
+**/*Backup*/
+**/*BAK*
+**/*.bak*
+**/backups/
+**/excluded_from_web_build/
+**/_trash_audio_backup_EXCLUDED_FROM_WEB/
+**/audio_mp3_EXCLUDED_FROM_WEB/
+
+# Web/Desktop exports
+client/web/
+client/web_debug/
+client/web_release/
+client/web_release_backup_*/
+client/web_safari_nothreads/
+desktop/itch.io/
+desktop/EXPORT_WINDOWS/

@@ -1,0 +1,43 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/ui/UnlockCapsule.gd" id="ext_script"]
+[ext_resource type="Texture2D" path="res://assets/images/token.png" id="ext_token"]
+
+[node name="UnlockCapsule" type="Control"]
+custom_minimum_size = Vector2(190, 36)
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("ext_script")
+
+[node name="BtnUnlock" type="Button" parent="."]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 190.0
+offset_bottom = 36.0
+theme_override_font_sizes/font_size = 22
+text = ""
+alignment = 0
+vertical_alignment = 1
+
+[node name="LblAmount" type="Label" parent="."]
+layout_mode = 0
+offset_left = 85.0
+offset_top = 3.0
+offset_right = 117.0
+offset_bottom = 25.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "10"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ImgToken" type="TextureRect" parent="."]
+layout_mode = 0
+offset_left = 123.0
+offset_top = 2.0
+offset_right = 155.0
+offset_bottom = 34.0
+texture = ExtResource("ext_token")
+expand_mode = 1
+stretch_mode = 5

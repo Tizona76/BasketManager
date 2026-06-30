@@ -1,0 +1,429 @@
+[gd_scene load_steps=7 format=3 uid="uid://fxn21inpmheg"]
+
+[ext_resource type="Texture2D" uid="uid://d0yeeoiusf744" path="res://assets/images/coachs/coach1.png" id="ext_coach1"]
+[ext_resource type="Texture2D" uid="uid://bw5vhsrri5qdw" path="res://assets/images/coachs/coach2.png" id="ext_coach2"]
+[ext_resource type="Texture2D" uid="uid://bu55i2medp0uf" path="res://assets/images/coachs/coach3.png" id="ext_coach3"]
+[ext_resource type="Script" uid="uid://ducftq7auporm" path="res://scenes/Coachs.gd" id="ext_script"]
+[ext_resource type="Texture2D" uid="uid://bhcorbec5ks2x" path="res://assets/images/token.png" id="ext_token"]
+[ext_resource type="PackedScene" path="res://scenes/ui/UnlockCapsule.tscn" id="ext_unlock_capsule"]
+
+[node name="Coachs" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("ext_script")
+
+[node name="Bg" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Overlay" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.38)
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -320.0
+offset_top = 20.0
+offset_right = 320.0
+offset_bottom = 90.0
+grow_horizontal = 2
+tooltip_text = "coach.title.tooltip"
+mouse_filter = 0
+theme_override_colors/font_color = Color(0.45, 0.78, 1, 1)
+theme_override_colors/font_outline_color = Color(0.05, 0.22, 0.55, 0.95)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 40
+text = "STAFF / COACHS"
+horizontal_alignment = 1
+
+[node name="TitleHover" type="Control" parent="."]
+anchors_preset = 0
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -320.0
+offset_top = 20.0
+offset_right = 320.0
+offset_bottom = 90.0
+
+[node name="TitleTooltipPanel" type="Panel" parent="."]
+visible = false
+z_index = 50
+layout_mode = 0
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -360.0
+offset_top = 96.0
+offset_right = 360.0
+offset_bottom = 210.0
+mouse_filter = 2
+
+[node name="TitleTooltipLabel" type="Label" parent="TitleTooltipPanel"]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 14.0
+offset_right = 702.0
+offset_bottom = 96.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+autowrap_mode = 3
+
+[node name="LblIntro" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -320.0
+offset_top = 82.0
+offset_right = 320.0
+offset_bottom = 122.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 22
+text = "Choose a coach"
+horizontal_alignment = 1
+
+[node name="ScrollCoachs" type="ScrollContainer" parent="."]
+layout_mode = 0
+offset_left = 180.0
+offset_top = 175.0
+offset_right = 1145.0
+offset_bottom = 750.0
+follow_focus = true
+horizontal_scroll_mode = 0
+
+[node name="Content" type="Control" parent="ScrollCoachs"]
+custom_minimum_size = Vector2(1020, 940)
+layout_mode = 2
+
+[node name="ImgCoachJunior" type="TextureRect" parent="ScrollCoachs/Content"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 227.0
+offset_bottom = 296.0
+texture = ExtResource("ext_coach1")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BtnCoachJunior" type="Button" parent="ScrollCoachs/Content"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 227.0
+offset_bottom = 296.0
+flat = true
+
+[node name="LblCoachJunior" type="Label" parent="ScrollCoachs/Content"]
+layout_mode = 0
+offset_left = 240.0
+offset_top = 30.0
+offset_right = 610.0
+offset_bottom = 250.0
+theme_override_font_sizes/font_size = 22
+text = "Contract: 2 seasons
+Euros: 100 000 / season
+Unlock : 10
+Payment: euros / tokens / mix"
+autowrap_mode = 3
+
+[node name="QuoteCoachJunior" type="RichTextLabel" parent="ScrollCoachs/Content"]
+layout_mode = 0
+offset_left = 570.0
+offset_top = 30.0
+offset_right = 1040.0
+offset_bottom = 250.0
+theme_override_font_sizes/normal_font_size = 28
+bbcode_enabled = true
+scroll_active = false
+
+[node name="ImgCoachConfirme" type="TextureRect" parent="ScrollCoachs/Content"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 380.0
+offset_right = 227.0
+offset_bottom = 656.0
+texture = ExtResource("ext_coach2")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BtnCoachConfirme" type="Button" parent="ScrollCoachs/Content"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 380.0
+offset_right = 227.0
+offset_bottom = 656.0
+flat = true
+
+[node name="LblCoachConfirme" type="Label" parent="ScrollCoachs/Content"]
+layout_mode = 0
+offset_left = 240.0
+offset_top = 390.0
+offset_right = 610.0
+offset_bottom = 610.0
+theme_override_font_sizes/font_size = 22
+text = "Contract: 3 seasons
+Euros: 200 000 / season
+Unlock : 20
+Payment: euros / tokens / mix"
+autowrap_mode = 3
+
+[node name="QuoteCoachConfirme" type="RichTextLabel" parent="ScrollCoachs/Content"]
+layout_mode = 0
+offset_left = 570.0
+offset_top = 390.0
+offset_right = 1040.0
+offset_bottom = 610.0
+theme_override_font_sizes/normal_font_size = 28
+bbcode_enabled = true
+scroll_active = false
+
+[node name="ImgCoachElite" type="TextureRect" parent="ScrollCoachs/Content"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 680.0
+offset_right = 227.0
+offset_bottom = 956.0
+texture = ExtResource("ext_coach3")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BtnCoachElite" type="Button" parent="ScrollCoachs/Content"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 680.0
+offset_right = 227.0
+offset_bottom = 956.0
+flat = true
+
+[node name="LblCoachElite" type="Label" parent="ScrollCoachs/Content"]
+layout_mode = 0
+offset_left = 240.0
+offset_top = 730.0
+offset_right = 610.0
+offset_bottom = 950.0
+theme_override_font_sizes/font_size = 22
+text = "Contract: 2 seasons
+Euros: 350 000 / season
+Unlock : 30
+Payment: euros / tokens / mix"
+autowrap_mode = 3
+
+[node name="QuoteCoachElite" type="RichTextLabel" parent="ScrollCoachs/Content"]
+layout_mode = 0
+offset_left = 570.0
+offset_top = 730.0
+offset_right = 1040.0
+offset_bottom = 950.0
+theme_override_font_sizes/normal_font_size = 28
+bbcode_enabled = true
+scroll_active = false
+
+[node name="LblCoachJuniorTop" type="Label" parent="ScrollCoachs/Content"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = -10.0
+offset_right = 227.0
+offset_bottom = 18.0
+theme_override_colors/font_color = Color(0.95, 0.77, 0.28, 1)
+theme_override_font_sizes/font_size = 24
+text = "COACH TEDDY"
+horizontal_alignment = 1
+
+[node name="LblCoachConfirmeTop" type="Label" parent="ScrollCoachs/Content"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 345.0
+offset_right = 227.0
+offset_bottom = 333.0
+theme_override_colors/font_color = Color(0.95, 0.77, 0.28, 1)
+theme_override_font_sizes/font_size = 24
+text = "COACH JAMES"
+horizontal_alignment = 1
+
+[node name="LblCoachEliteTop" type="Label" parent="ScrollCoachs/Content"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 680.0
+offset_right = 227.0
+offset_bottom = 648.0
+theme_override_colors/font_color = Color(0.95, 0.77, 0.28, 1)
+theme_override_font_sizes/font_size = 24
+text = "COACH ALAN"
+horizontal_alignment = 1
+
+[node name="UnlockJunior" parent="ScrollCoachs/Content" instance=ExtResource("ext_unlock_capsule")]
+layout_mode = 0
+offset_left = 240.0
+offset_top = 96.0
+offset_right = 410.0
+offset_bottom = 132.0
+amount = 5
+
+[node name="UnlockConfirme" parent="ScrollCoachs/Content" instance=ExtResource("ext_unlock_capsule")]
+layout_mode = 0
+offset_left = 240.0
+offset_top = 456.0
+offset_right = 410.0
+offset_bottom = 492.0
+
+[node name="UnlockElite" parent="ScrollCoachs/Content" instance=ExtResource("ext_unlock_capsule")]
+layout_mode = 0
+offset_left = 240.0
+offset_top = 796.0
+offset_right = 410.0
+offset_bottom = 832.0
+amount = 20
+
+[node name="InfoPanel" type="Panel" parent="."]
+visible = false
+custom_minimum_size = Vector2(760, 320)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -380.0
+offset_top = -160.0
+offset_right = 380.0
+offset_bottom = 160.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LblInfo" type="Label" parent="InfoPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 20.0
+offset_right = -24.0
+offset_bottom = -84.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 24
+text = "Select a coach to view details"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="LblInfoUnlock" type="Label" parent="InfoPanel"]
+layout_mode = 0
+offset_left = 282.0
+offset_top = 164.0
+offset_right = 384.0
+offset_bottom = 196.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "Unlock"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="LblInfoTokens" type="Label" parent="InfoPanel"]
+layout_mode = 0
+offset_left = 318.0
+offset_top = 164.0
+offset_right = 430.0
+offset_bottom = 196.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "5"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="LblTokensAvailable" type="Label" parent="InfoPanel"]
+layout_mode = 0
+offset_left = 260.0
+offset_top = 200.0
+offset_right = 500.0
+offset_bottom = 232.0
+theme_override_font_sizes/font_size = 24
+horizontal_alignment = 1
+
+[node name="ImgInfoToken" type="TextureRect" parent="InfoPanel"]
+layout_mode = 0
+offset_left = 436.5
+offset_top = 164.5
+offset_right = 467.5
+offset_bottom = 195.5
+texture = ExtResource("ext_token")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ImgTokensAvailable" type="TextureRect" parent="InfoPanel"]
+layout_mode = 0
+offset_left = 458.8
+offset_top = 200.8
+offset_right = 485.2
+offset_bottom = 227.2
+texture = ExtResource("ext_token")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LblInfoError" type="Label" parent="InfoPanel"]
+visible = false
+layout_mode = 0
+offset_left = 220.0
+offset_top = 228.0
+offset_right = 540.0
+offset_bottom = 258.0
+theme_override_colors/font_color = Color(0.92, 0.22, 0.22, 1)
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+
+[node name="BtnBuyCoach" type="Button" parent="InfoPanel"]
+custom_minimum_size = Vector2(140, 48)
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -70.0
+offset_top = -62.0
+offset_right = 70.0
+offset_bottom = -14.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_font_sizes/font_size = 18
+text = "Hire coach"
+
+[node name="BtnCloseInfoPanel" type="Button" parent="InfoPanel"]
+layout_mode = 0
+offset_left = 710.0
+offset_top = 10.0
+offset_right = 746.0
+offset_bottom = 46.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "×"
+
+[node name="BtnBack" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 34.0
+offset_top = -62.0
+offset_right = 240.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+text = "Back"

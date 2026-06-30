@@ -1,0 +1,200 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/TournoiIntermediaire.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/images/backgrounds/tournoi.png" id="2_bg"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes/btn_back_red.tres" id="3_back_red"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_match_normal.tres" id="4_match_normal"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_match_hover.tres" id="5_match_hover"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_match_pressed.tres" id="6_match_pressed"]
+
+[node name="TournoiA" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="BG" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_bg")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="UI" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LblTitle" type="Label" parent="UI"]
+layout_mode = 1
+anchors_preset = 10
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -320.0
+offset_top = 30.0
+offset_right = 320.0
+offset_bottom = 80.0
+grow_horizontal = 2
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+theme_override_colors/font_outline_color = Color(0.20, 0.55, 0.95, 0.95)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.22)
+theme_override_constants/outline_size = 2
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 3
+theme_override_font_sizes/font_size = 32
+
+[node name="BracketWrap" type="Control" parent="UI"]
+layout_mode = 0
+offset_left = 150.0
+offset_top = 95.0
+offset_right = 1220.0
+offset_bottom = 620.0
+
+[node name="BracketMargin" type="MarginContainer" parent="UI/BracketWrap"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
+
+[node name="RoundsRow" type="HBoxContainer" parent="UI/BracketWrap/BracketMargin"]
+layout_mode = 2
+theme_override_constants/separation = 34
+alignment = 1
+
+[node name="ColRound1" type="VBoxContainer" parent="UI/BracketWrap/BracketMargin/RoundsRow"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="LblRound1Title" type="Label" parent="UI/BracketWrap/BracketMargin/RoundsRow/ColRound1"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+theme_override_colors/font_outline_color = Color(0.18, 0.52, 0.92, 0.88)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.18)
+theme_override_constants/outline_size = 1
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 24
+horizontal_alignment = 1
+text = "Round 1"
+
+[node name="LblRound1" type="RichTextLabel" parent="UI/BracketWrap/BracketMargin/RoundsRow/ColRound1"]
+custom_minimum_size = Vector2(220, 540)
+layout_mode = 2
+theme_override_colors/default_color = Color(0, 0, 0, 1)
+bbcode_enabled = true
+scroll_active = false
+fit_content = false
+theme_override_font_sizes/normal_font_size = 24
+
+[node name="ColRound2" type="VBoxContainer" parent="UI/BracketWrap/BracketMargin/RoundsRow"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="LblRound2Title" type="Label" parent="UI/BracketWrap/BracketMargin/RoundsRow/ColRound2"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+theme_override_colors/font_outline_color = Color(0.18, 0.52, 0.92, 0.88)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.18)
+theme_override_constants/outline_size = 1
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 24
+horizontal_alignment = 1
+text = "Round 2"
+
+[node name="LblRound2" type="RichTextLabel" parent="UI/BracketWrap/BracketMargin/RoundsRow/ColRound2"]
+custom_minimum_size = Vector2(220, 540)
+layout_mode = 2
+theme_override_colors/default_color = Color(0, 0, 0, 1)
+bbcode_enabled = true
+scroll_active = false
+fit_content = false
+theme_override_font_sizes/normal_font_size = 24
+
+[node name="ColRound3" type="VBoxContainer" parent="UI/BracketWrap/BracketMargin/RoundsRow"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="LblRound3Title" type="Label" parent="UI/BracketWrap/BracketMargin/RoundsRow/ColRound3"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+theme_override_colors/font_outline_color = Color(0.18, 0.52, 0.92, 0.88)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.18)
+theme_override_constants/outline_size = 1
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 24
+horizontal_alignment = 1
+text = "Round 3"
+
+[node name="LblRound3" type="RichTextLabel" parent="UI/BracketWrap/BracketMargin/RoundsRow/ColRound3"]
+custom_minimum_size = Vector2(220, 540)
+layout_mode = 2
+theme_override_colors/default_color = Color(0, 0, 0, 1)
+bbcode_enabled = true
+scroll_active = false
+fit_content = false
+theme_override_font_sizes/normal_font_size = 24
+
+[node name="ColWinner" type="VBoxContainer" parent="UI/BracketWrap/BracketMargin/RoundsRow"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="LblWinnerTitle" type="Label" parent="UI/BracketWrap/BracketMargin/RoundsRow/ColWinner"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+theme_override_colors/font_outline_color = Color(0.18, 0.52, 0.92, 0.88)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.18)
+theme_override_constants/outline_size = 1
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 24
+horizontal_alignment = 1
+text = "Winner"
+
+[node name="LblWinner" type="RichTextLabel" parent="UI/BracketWrap/BracketMargin/RoundsRow/ColWinner"]
+custom_minimum_size = Vector2(180, 540)
+layout_mode = 2
+theme_override_colors/default_color = Color(0, 0, 0, 1)
+bbcode_enabled = true
+scroll_active = false
+fit_content = false
+theme_override_font_sizes/normal_font_size = 24
+
+[node name="BtnSimulerTour" type="Button" parent="UI"]
+layout_mode = 0
+offset_left = 690.0
+offset_top = 675.0
+offset_right = 990.0
+offset_bottom = 743.0
+theme_override_colors/font_color = Color(0.05, 0.06, 0.08, 1)
+theme_override_font_sizes/font_size = 26
+theme_override_styles/normal = ExtResource("4_match_normal")
+theme_override_styles/hover = ExtResource("5_match_hover")
+theme_override_styles/pressed = ExtResource("6_match_pressed")
+text = "Lancer ce tour"
+
+[node name="BtnRetour" type="Button" parent="UI"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 678.0
+offset_right = 220.0
+offset_bottom = 738.0
+theme_override_styles/normal = ExtResource("3_back_red")
+text = "Retour"

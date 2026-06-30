@@ -1,0 +1,280 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/Mercato.gd" id="1_mercato"]
+[ext_resource type="Texture2D" path="res://assets/images/backgrounds/mercato.png" id="2_bg"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes/btn_back_red.tres" id="3_back_red"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/btn_back_pressed.tres" id="4_back_red_pressed"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_match_normal.tres" id="5_match_blue_normal"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_match_hover.tres" id="6_match_blue_hover"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_match_pressed.tres" id="7_match_blue_pressed"]
+
+[node name="Mercato" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_mercato")
+
+[node name="BG" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_bg")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Veil" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.22)
+
+[node name="UI" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Title" type="Label" parent="UI"]
+layout_mode = 0
+offset_left = 60.0
+offset_top = 28.0
+offset_right = 620.0
+offset_bottom = 82.0
+theme_override_colors/font_color = Color(0.92, 0.97, 1.0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.45)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 3
+theme_override_font_sizes/font_size = 32
+text = "Mercato"
+
+[node name="LblNewSalariesTotal" type="Label" parent="UI"]
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -560.0
+offset_top = 30.0
+offset_right = -40.0
+offset_bottom = 78.0
+theme_override_colors/font_color = Color(0.95, 0.98, 1.0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.35)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 24
+text = "New salaries: 0 €"
+horizontal_alignment = 2
+
+[node name="Panel" type="PanelContainer" parent="UI"]
+layout_mode = 0
+offset_left = 50.0
+offset_top = 90.0
+offset_right = 1330.0
+offset_bottom = 690.0
+
+[node name="Margin" type="MarginContainer" parent="UI/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
+
+[node name="VBox" type="VBoxContainer" parent="UI/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HeaderRow" type="HBoxContainer" parent="UI/Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="HdrNom" type="Label" parent="UI/Panel/Margin/VBox/HeaderRow"]
+custom_minimum_size = Vector2(320, 34)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.88, 1.0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.35)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 20
+text = "Nom"
+
+[node name="HdrPoste" type="Label" parent="UI/Panel/Margin/VBox/HeaderRow"]
+custom_minimum_size = Vector2(95, 34)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.88, 1.0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.35)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 20
+text = "Poste"
+horizontal_alignment = 1
+
+[node name="HdrAge" type="Label" parent="UI/Panel/Margin/VBox/HeaderRow"]
+custom_minimum_size = Vector2(60, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.78, 0.88, 1.0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.35)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 20
+text = "Âge"
+horizontal_alignment = 1
+
+[node name="HdrFitness" type="Label" parent="UI/Panel/Margin/VBox/HeaderRow"]
+custom_minimum_size = Vector2(60, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.78, 0.88, 1.0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.35)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 20
+text = "Fitness"
+horizontal_alignment = 1
+
+[node name="HdrTir" type="Label" parent="UI/Panel/Margin/VBox/HeaderRow"]
+custom_minimum_size = Vector2(60, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.78, 0.88, 1.0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.35)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 20
+text = "Tir"
+horizontal_alignment = 1
+
+[node name="HdrMotivation" type="Label" parent="UI/Panel/Margin/VBox/HeaderRow"]
+custom_minimum_size = Vector2(72, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.78, 0.88, 1.0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.35)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 20
+text = "Motivation"
+horizontal_alignment = 1
+
+[node name="HdrPerf" type="Label" parent="UI/Panel/Margin/VBox/HeaderRow"]
+custom_minimum_size = Vector2(72, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.78, 0.88, 1.0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.35)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 20
+text = "Performance"
+horizontal_alignment = 1
+
+[node name="HdrSalaire" type="Label" parent="UI/Panel/Margin/VBox/HeaderRow"]
+custom_minimum_size = Vector2(110, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.78, 0.88, 1.0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.35)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 20
+text = "Salaire"
+horizontal_alignment = 1
+
+[node name="HdrAction" type="Label" parent="UI/Panel/Margin/VBox/HeaderRow"]
+custom_minimum_size = Vector2(170, 34)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = ""
+horizontal_alignment = 1
+
+[node name="Scroll" type="ScrollContainer" parent="UI/Panel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 470)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Rows" type="VBoxContainer" parent="UI/Panel/Margin/VBox/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="BtnRetour" type="Button" parent="UI"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 720.0
+offset_right = 240.0
+offset_bottom = 780.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("3_back_red")
+theme_override_styles/pressed = ExtResource("4_back_red_pressed")
+text = "Retour"
+
+[node name="LblTeamFullWarning" type="Label" parent="UI"]
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -520.0
+offset_top = 682.0
+offset_right = -40.0
+offset_bottom = 714.0
+theme_override_colors/font_color = Color(1, 0.55, 0.55, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.35)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 24
+text = ""
+horizontal_alignment = 2
+visible = false
+
+[node name="BtnConfirmerMercato" type="Button" parent="UI"]
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -280.0
+offset_top = 720.0
+offset_right = -40.0
+offset_bottom = 780.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("5_match_blue_normal")
+theme_override_styles/hover = ExtResource("6_match_blue_hover")
+theme_override_styles/pressed = ExtResource("7_match_blue_pressed")
+text = "Confirmer"
+visible = false
+
+
+[node name="BgLicensedPlayers" type="ColorRect" parent="UI"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = -190.0
+offset_right = 190.0
+offset_top = -46.0
+offset_bottom = -4.0
+color = Color(1, 1, 1, 0.92)
+
+[node name="LblLicensedPlayers" type="Label" parent="UI"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = -150.0
+offset_right = 150.0
+offset_top = -40.0
+offset_bottom = -10.0
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 24

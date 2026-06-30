@@ -1,0 +1,1009 @@
+extends Control
+
+# BM_PLAYERLIFE_PRELOAD_V1 (avoid class_name resolution order)
+const PlayerLife := preload("res://scripts/PlayerLife.gd")
+
+
+@onready var screen_root: Node = _resolve_screen_root()
+@onready var lbl: Label = $UI/Status
+@onready var btn: Button = $UI/BtnClick
+
+@onready var screen_root_parent: Node = get_node_or_null("ScreenRoot")
+@onready var screen_root_ui: Node = screen_root_parent.find_child("UI", true, false) if screen_root_parent != null else null
+
+# BG du "main.tscn" (optionnel). On le récupère en safe.
+@onready var bg_layer: CanvasItem = get_node_or_null("BG_LAYER") as CanvasItem
+
+var accueil_ps: PackedScene = null
+var _accueil_inst: Node = null
+
+var stadium_ps: PackedScene = null
+var menu_ps: PackedScene = null
+
+const FILE_SAVEGAME := "user://savegame.json"
+const FILE_NEW_CLUB_PENDING_CLOUD := "user://new_club_pending_cloud.txt"
+const Save := preload("res://scripts/Save.gd")
+const SaveSvc := preload("res://scripts/Save.gd")
+
+
+
+var _intro_transition_started: bool = false
+var _audio_unlocked := false
+
+var team_name_ps: PackedScene = null
+var login_ps: PackedScene = null
+var _pending_team_name: String = ""
+var _pending_locale: String = ""
+
+var _teamname_submitted: bool = false
+var _last_submitted_team_name: String = ""
+var _team_name_written: bool = false
+
+var selection_ps: PackedScene = null
+var _selection_inst: Node = null
+
+var _current_lang: String = "en"
+
+
+func _bm_is_mobile_layout() -> bool:
+	var vp := get_viewport_rect().size
+	var win := DisplayServer.window_get_size()
+	if OS.has_feature("android") or OS.has_feature("ios") or minf(vp.x, float(win.x)) < 900.0:
+		return true
+	if OS.has_feature("web"):
+		var js_mobile: Variant = JavaScriptBridge.eval("(window.innerWidth < 900) || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)", true)
+		return bool(js_mobile)
+	return false
+
+
+const SFX_MP3 := {
+	"click": "res://audio/sfx/click.mp3",
+	"basket": "res://audio/sfx/basket.mp3",
+	"whistle": "res://audio/sfx/whistle.mp3",
+	"victory_jingle": "res://audio/sfx/victory_jingle.mp3",
+	"victory": "res://audio/sfx/victory.mp3",
+	"defeat": "res://audio/sfx/defeat.mp3",
+	"playoffs": "res://audio/sfx/playoffs.mp3"
+}
+
+const MUSIC_MP3 := {
+	"menu": "res://audio/music/menu.mp3",
+	"menu2": "res://audio/music/menu2.mp3",
+	"match": "res://audio/music/match.mp3",
+	"finance": "res://audio/music/finance.mp3",
+	"staff": "res://audio/music/staff.mp3",
+	"tournois": "res://audio/music/tournois.mp3",
+	"tournois2": "res://audio/music/tournois2.mp3",
+	"po": "res://audio/music/po.mp3",
+	"playoffs": "res://audio/music/playoffs.mp3",
+	"defeat": "res://audio/music/defeat.mp3",
+	"victory2": "res://audio/music/victory2.mp3",
+	"victory_jingle": "res://audio/music/victory_jingle.mp3",
+	"victory_long": "res://audio/music/victory_long.mp3"
+}
+
+const SFX_OGG := {}
+const MUSIC_OGG := {}
+
+func _apply_language(code: String) -> void:
+	TranslationServer.set_locale(code)
+	I18nSvc.apply_all()
+	get_tree().root.propagate_notification(NOTIFICATION_TRANSLATION_CHANGED)
+
+
+func _bind_language_buttons(root: Node) -> void:
+	if root == null:
+		return
+	_bind_lang_btn(root, "BtnLangFR", "fr")
+	_bind_lang_btn(root, "BtnLangEN", "en")
+	_bind_lang_btn(root, "BtnLangES", "es")
+	_bind_lang_btn(root, "BtnLangIT", "it")
+	_bind_lang_btn(root, "BtnLangPT", "pt")
+
+func _bind_lang_btn(root: Node, node_name: String, code: String) -> void:
+	var b := root.find_child(node_name, true, false)
+	if b == null:
+		return
+	if b.has_signal("pressed"):
+		var cb := Callable(self, "_on_lang_pressed").bind(code)
+		if not b.is_connected("pressed", cb):
+			b.connect("pressed", cb)
+
+func _on_lang_pressed(code: String) -> void:
+	_apply_language(code)
+
+
+var _web_guest_auth_pending: bool = false
+var _web_team_name_requested: bool = false
+
+
+func _ready() -> void:
+	TranslationServer.set_locale("en")
+
+	# BM_GUEST_AUTO_HOOK (web only, no UI impact)
+	if OS.has_feature("web"):
+		_load_session_local_for_resume()
+		ProfileManager.ensure_exists()
+		if str(Session.profile_uuid).strip_edges() != "":
+			print("[PROFILE RESTORE] uuid=", Session.profile_uuid)
+			ProfileManager.add_profile(Session.profile_uuid, Session.profile_uuid)
+			ProfileManager.activate_profile(Session.profile_uuid)
+			print("[PROFILE RESTORE] active=", ProfileManager.get_active_profile_id())
+		else:
+			ProfileManager.activate_profile(ProfileManager.get_active_profile_id())
+			if str(Session.refresh_token).strip_edges() == "" and str(Session.access_token).strip_edges().length() < 20:
+				_web_guest_auth_pending = true
+				_try_guest_auth_silent()
+	else:
+		ProfileManager.ensure_exists()
+		ProfileManager.activate_profile(ProfileManager.get_active_profile_id())
+	var env_profile: String = str(OS.get_environment("BM_PROFILE")).strip_edges()
+	if env_profile == "list":
+		print("[PROFILE] LIST active_id=", ProfileManager.get_active_profile_id())
+		# continue boot normally (no activate)
+		env_profile = ""
+	if env_profile != "":
+		print("[PROFILE] BM_PROFILE=", env_profile, " -> activate")
+		ProfileManager.activate_profile(env_profile)
+		ProfileManager.add_profile(env_profile, env_profile)
+
+	accueil_ps = load("res://scenes/Accueil.tscn")
+	if accueil_ps == null:
+		push_error("[BOOT] Missing res://scenes/Accueil.tscn in export")
+
+	menu_ps = load("res://scenes/Menu.tscn")
+	if menu_ps == null:
+		push_error("[BOOT] Missing res://scenes/Menu.tscn in export")
+
+	# --- Chargements "export-safe" (évite preload qui peut casser si ressource pas packée) ---
+	team_name_ps = load("res://scenes/TeamName.tscn")
+	login_ps = load("res://scenes/Login.tscn")
+	if login_ps == null:
+		push_error("[BOOT] Missing res://scenes/Login.tscn in export")
+	if team_name_ps == null:
+		push_error("[BOOT] Missing res://scenes/TeamName.tscn in export")
+
+	selection_ps = load("res://scenes/Selection.tscn")
+	if selection_ps == null:
+		push_error("[BOOT] Missing res://scenes/Selection.tscn in export")
+
+	# --- Logs boot web ---
+	print("WEB_BOOT_MARK: scripts/Main.gd _ready() reached")
+	print("[CHK] web? ", OS.has_feature("web"))
+	print("[CHK] selection exists=", ResourceLoader.exists("res://scenes/Selection.tscn"))
+	print("[CHK] menu exists=", ResourceLoader.exists("res://scenes/Menu.tscn"))
+	print("[CHK] accueil exists=", ResourceLoader.exists("res://scenes/Accueil.tscn"))
+
+	# --- UI boot ---
+	lbl.text = "Status: ready"
+	btn.text = "Click to start"
+	if _bm_is_mobile_layout():
+		var ui_box: Control = $UI as Control
+		ui_box.set_anchors_preset(Control.PRESET_CENTER)
+		ui_box.offset_left = -220.0
+		ui_box.offset_right = 220.0
+		ui_box.offset_top = -85.0
+		ui_box.offset_bottom = 85.0
+		ui_box.alignment = BoxContainer.ALIGNMENT_CENTER
+		btn.custom_minimum_size = Vector2(360, 96)
+		btn.add_theme_font_size_override("font_size", 32)
+		btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		btn.scale = Vector2(2.04, 2.04)
+	else:
+		btn.custom_minimum_size = Vector2(195, 60)
+		btn.add_theme_font_size_override("font_size", 24)
+		btn.scale = Vector2(1.5, 1.5)
+	btn.disabled = false
+	btn.visible = true
+	_apply_click_button_shop_green_style()
+
+	# ✅ double-safe connect (web)
+	var cb := Callable(self, "_on_click")
+	if not btn.pressed.is_connected(cb):
+		btn.pressed.connect(cb)
+
+	$UI.visible = true
+	_set_bg_visible(true)
+
+	# ✅ IMPORTANT: on instancie Accueil dès le boot
+	_show_accueil()
+
+
+func _resolve_screen_root() -> Node:
+	var sr := get_node_or_null("ScreenRoot")
+	if sr == null:
+		push_error("[Main] ScreenRoot missing")
+		return self
+
+	var sri := sr.get_node_or_null("UI")
+	if sri != null:
+		print("[Main] resolved screen_root = ScreenRoot/UI")
+		return sri
+
+	print("[Main] resolved screen_root = ScreenRoot")
+	return sr
+
+
+func _show_accueil() -> void:
+	$UI.visible = true
+	btn.visible = true
+	if _bm_is_mobile_layout():
+		btn.custom_minimum_size = Vector2(366, 113)
+		btn.add_theme_font_size_override("font_size", 45)
+		btn.scale = Vector2(3.375, 3.375)
+	else:
+		btn.scale *= 1.2
+	btn.disabled = false
+	
+	if accueil_ps == null:
+		push_error("[MAIN] accueil_ps is null")
+		return
+
+	_clear_screen()
+	_accueil_inst = accueil_ps.instantiate()
+	screen_root.add_child(_accueil_inst)
+	move_child($UI, get_child_count() - 1)
+
+	# ✅ ROUTAGE LANGUE (clic drapeau -> Main._apply_language)
+	# Ne casse rien si les signaux n'existent pas; mais si l'écran drapeaux les émet, tout se met à jour instantanément.
+	if _accueil_inst != null:
+		var cb_lang := Callable(self, "_apply_language")
+		if _accueil_inst.has_signal("language_selected") and not _accueil_inst.is_connected("language_selected", cb_lang):
+			_accueil_inst.connect("language_selected", cb_lang)
+		if _accueil_inst.has_signal("lang_selected") and not _accueil_inst.is_connected("lang_selected", cb_lang):
+			_accueil_inst.connect("lang_selected", cb_lang)
+		if _accueil_inst.has_signal("locale_selected") and not _accueil_inst.is_connected("locale_selected", cb_lang):
+			_accueil_inst.connect("locale_selected", cb_lang)
+		if _accueil_inst.has_signal("flag_selected") and not _accueil_inst.is_connected("flag_selected", cb_lang):
+			_accueil_inst.connect("flag_selected", cb_lang)
+
+	I18nSvc.apply_all()
+
+
+func _set_bg_visible(v: bool) -> void:
+	if bg_layer != null:
+		bg_layer.visible = v
+		if bg_layer is Control:
+			(bg_layer as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+func _apply_click_button_shop_green_style() -> void:
+	if btn == null:
+		return
+	btn.modulate = Color(1, 1, 1, 1)
+	btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
+	btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
+
+	var sb_n := StyleBoxFlat.new()
+	sb_n.bg_color = Color(0.12, 0.70, 0.25, 1.0)
+	sb_n.corner_radius_top_left = 10
+	sb_n.corner_radius_top_right = 10
+	sb_n.corner_radius_bottom_left = 10
+	sb_n.corner_radius_bottom_right = 10
+	sb_n.content_margin_left = 18
+	sb_n.content_margin_right = 18
+	sb_n.content_margin_top = 10
+	sb_n.content_margin_bottom = 10
+	sb_n.border_width_left = 2
+	sb_n.border_width_right = 2
+	sb_n.border_width_top = 2
+	sb_n.border_width_bottom = 2
+	sb_n.border_color = Color(0.08, 0.55, 0.18, 1.0)
+	sb_n.shadow_size = 6
+	sb_n.shadow_offset = Vector2(0, 4)
+	sb_n.shadow_color = Color(0, 0, 0, 0.35)
+
+	var sb_h := sb_n.duplicate() as StyleBoxFlat
+	sb_h.bg_color = Color(0.16, 0.80, 0.30, 1.0)
+	sb_h.shadow_size = 14
+	sb_h.shadow_offset = Vector2(0, 0)
+	sb_h.shadow_color = Color(0.20, 1.00, 0.40, 0.55)
+
+	var sb_p := sb_n.duplicate() as StyleBoxFlat
+	sb_p.bg_color = Color(0.10, 0.60, 0.20, 1.0)
+	sb_p.shadow_size = 2
+	sb_p.shadow_offset = Vector2(0, 1)
+
+	btn.add_theme_stylebox_override("normal", sb_n)
+	btn.add_theme_stylebox_override("hover", sb_h)
+	btn.add_theme_stylebox_override("pressed", sb_p)
+
+
+func _on_click() -> void:
+	print("[DBG] CLICK(btn)")
+
+	var p_click := _pick_audio_path("sfx", "click")
+	var p_menu := _pick_audio_path("music", "menu")
+
+	print("[CHK] click exists=", ResourceLoader.exists(p_click), " path=", p_click)
+	print("[CHK] menu  exists=", ResourceLoader.exists(p_menu),  " path=", p_menu)
+
+	_set_bg_visible(false)
+
+	if not _audio_unlocked:
+		_audio_unlocked = true
+		AudioManager.unlock_from_user_gesture(p_click)
+
+	AudioManager.play_music(p_menu, true)
+	lbl.text = ""
+
+	btn.disabled = true
+	btn.visible = false
+	# IMPORTANT: on ne cache pas $UI, car ScreenRoot peut être en dessous.
+	# $UI.visible = false
+
+
+	if _accueil_inst != null and _accueil_inst.has_method("start_intro"):
+		_accueil_inst.call("start_intro")
+	else:
+		push_error("[Main] Accueil instance missing or has no start_intro()")
+
+	if not _intro_transition_started:
+		_intro_transition_started = true
+		print("[MAIN] creating intro timer")
+		var t := get_tree().create_timer(3.0)
+		t.timeout.connect(func():
+			print("[MAIN] intro timer fired")
+			_show_team_name()
+		)
+
+
+# BM_SINGLE_PLAY_INSTANTLY_GATE_V1
+func _show_single_play_instantly() -> void:
+	_clear_screen()
+	_set_bg_visible(true)
+
+	var btn_single := Button.new()
+	btn_single.name = "BtnSinglePlayInstantly"
+	btn_single.text = "Play Instantly"
+	btn_single.custom_minimum_size = Vector2(360, 86)
+	btn_single.add_theme_font_size_override("font_size", 30)
+
+	btn_single.set_anchors_preset(Control.PRESET_CENTER)
+	btn_single.offset_left = -180.0
+	btn_single.offset_top = -43.0
+	btn_single.offset_right = 180.0
+	btn_single.offset_bottom = 43.0
+
+	screen_root.add_child(btn_single)
+	btn_single.pressed.connect(_on_single_play_instantly_pressed)
+
+
+func _on_single_play_instantly_pressed() -> void:
+	if _bm_main_has_real_team_name():
+		_load_session_local_for_resume()
+		_show_menu()
+	else:
+		_show_team_name()
+
+
+func _goto_stadium() -> void:
+	_clear_screen()
+	_set_bg_visible(true)
+	_hide_texture_by_name("fond_compositionequipe.png")
+	if stadium_ps == null:
+		stadium_ps = load("res://scenes/Stadium.tscn")
+		if stadium_ps == null:
+			push_error("[MAIN] Missing res://scenes/Stadium.tscn")
+			return
+	var st := stadium_ps.instantiate()
+	screen_root.add_child(st)
+	
+	_bind_language_buttons(st)
+
+
+	I18nSvc.apply_all()
+	if st.has_signal("action_requested"):
+		# ✅ évite double connexion si reload / re-instanciation
+		var cb := Callable(self, "_on_stadium_action")
+		if not st.is_connected("action_requested", cb):
+			st.connect("action_requested", cb)
+
+
+# BM_SMART_PLAY_INSTANTLY_V1
+func _bm_main_has_real_team_name() -> bool:
+	var d: Dictionary = PlayerLife.load_savegame()
+
+	var tn := str(d.get("team_name", "")).strip_edges()
+	var cn := str(d.get("club_name", "")).strip_edges()
+
+	var club_name := ""
+	if d.has("club") and typeof(d["club"]) == TYPE_DICTIONARY:
+		club_name = str((d["club"] as Dictionary).get("name", "")).strip_edges()
+
+	return (
+		(tn != "" and tn != "BM Club")
+		or
+		(cn != "" and cn != "BM Club")
+		or
+		(club_name != "" and club_name != "BM Club")
+	)
+
+
+func _on_stadium_action(action: String) -> void:
+	print("[MAIN] stadium action =", action)
+	
+	if action == "signup":
+		print("[MAIN] routing signup -> _show_login()")
+		_show_login()
+		return
+
+	if action == "play_instantly":
+		print("[SMART_PLAY] action=play_instantly")
+		print("[SMART_PLAY] has_team=", _bm_main_has_real_team_name())
+		if _bm_main_has_real_team_name():
+			print("[MAIN] routing play_instantly -> existing team -> _show_menu()")
+			_load_session_local_for_resume()
+			_show_menu()
+		else:
+			print("[MAIN] routing play_instantly -> no team -> _show_team_name()")
+			_show_team_name()
+		return
+
+	if action == "resume":
+		_load_session_local_for_resume()
+		_show_menu()
+		return
+
+
+var _menu_inst: Node = null
+
+
+func _save_session_local_from_main() -> void:
+	var d := {
+		"profile_uuid": str(Session.profile_uuid),
+		"refresh_token": str(Session.refresh_token),
+		"access_token": str(Session.access_token),
+		"token_type": str(Session.token_type)
+	}
+	var f := FileAccess.open("user://session.json", FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_string(JSON.stringify(d, "\t"))
+	f.close()
+
+
+func _load_session_local_for_resume() -> void:
+	var session_path := "user://session.json"
+	if not FileAccess.file_exists(session_path):
+		print("[MAIN][SESSION] no session file:", session_path)
+		return
+	var f := FileAccess.open(session_path, FileAccess.READ)
+	if f == null:
+		print("[MAIN][SESSION] cannot open:", session_path)
+		return
+	var txt := f.get_as_text()
+	f.close()
+	var parsed: Variant = JSON.parse_string(txt)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		print("[MAIN][SESSION] invalid json")
+		return
+	var d := parsed as Dictionary
+	var puid := str(d.get("profile_uuid", "")).strip_edges()
+	var rt := str(d.get("refresh_token", "")).strip_edges()
+	if puid != "":
+		Session.profile_uuid = puid
+	if rt != "":
+		Session.refresh_token = rt
+	print("[MAIN][SESSION] loaded resume profile_uuid=", str(Session.profile_uuid), " refresh_len=", str(str(Session.refresh_token).strip_edges().length()))
+
+func _show_menu() -> void:
+	$UI.visible = false
+	_set_bg_visible(false)
+	_clear_screen()
+	_menu_inst = menu_ps.instantiate()
+	# --- ROUTING: Menu signals -> navigation
+	if _menu_inst != null and _menu_inst.has_signal("go_match") and not _menu_inst.go_match.is_connected(_on_menu_go_match):
+		_menu_inst.go_match.connect(_on_menu_go_match)
+	if _menu_inst != null and _menu_inst.has_signal("go_my_team") and not _menu_inst.go_my_team.is_connected(_on_menu_go_my_team):
+		_menu_inst.go_my_team.connect(_on_menu_go_my_team)
+	screen_root.add_child(_menu_inst)
+	
+	
+	I18nSvc.apply_all()
+	if accueil_ps == null:
+		push_error("[MAIN] accueil_ps is null")
+		return
+
+func _show_menu_after_selection() -> void:
+	SeasonState.early_flow_post_selection_hide_menu_buttons = true
+	_show_menu()
+
+
+func _on_menu_go_my_team() -> void:
+	_clear_screen()
+	var ps := load("res://scenes/MyTeam.tscn")
+	if ps == null:
+		push_error("[MAIN] missing res://scenes/MyTeam.tscn")
+		return
+	var v = ps.instantiate()
+	if v != null and v.has_signal("back_requested") and not v.back_requested.is_connected(_show_menu):
+		v.back_requested.connect(_show_menu)
+	screen_root.add_child(v)
+	I18nSvc.apply_all()
+
+
+func _reset_local_savegame() -> void:
+	ProfileManager.reset_active_profile()
+
+
+func _clear_screen() -> void:
+
+	if screen_root_parent != null:
+		for c in screen_root_parent.get_children():
+			if screen_root_ui != null and c == screen_root_ui:
+				continue
+			if c is CanvasItem:
+				(c as CanvasItem).visible = false
+			screen_root_parent.remove_child(c)
+			c.queue_free()
+
+	if screen_root_ui != null:
+		for c2 in screen_root_ui.get_children():
+			if c2 is CanvasItem:
+				(c2 as CanvasItem).visible = false
+			screen_root_ui.remove_child(c2)
+			c2.queue_free()
+
+	if screen_root != null and screen_root != screen_root_parent and screen_root != screen_root_ui:
+		for c3 in screen_root.get_children():
+			if c3 is CanvasItem:
+				(c3 as CanvasItem).visible = false
+			screen_root.remove_child(c3)
+			c3.queue_free()
+
+
+func _show_login() -> void:
+	_clear_screen()
+	_set_bg_visible(true)
+
+	if login_ps == null:
+		push_error("[MAIN] login_ps is null (missing in export?)")
+		return
+
+	var l := login_ps.instantiate()
+	screen_root.add_child(l)
+
+	I18nSvc.apply_all()
+
+	if l.has_signal("auth_success"):
+		l.connect("auth_success", Callable(self, "_on_auth_success"))
+	if l.has_signal("cancel_requested"):
+		l.connect("cancel_requested", Callable(self, "_on_login_cancel_requested"))
+
+
+func _on_login_cancel_requested() -> void:
+	if FileAccess.file_exists("user://save_cloud_signup_return_menu.txt"):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path("user://save_cloud_signup_return_menu.txt"))
+		_show_menu()
+		return
+	_show_team_name()
+
+
+func _on_auth_success() -> void:
+	if FileAccess.file_exists("user://save_cloud_signup_return_menu.txt"):
+		print("[MAIN] auth_success from Save Cloud -> _show_menu()")
+		_show_menu()
+		return
+
+	print("[MAIN] auth_success -> _show_team_name()")
+	_show_team_name()
+
+
+func _show_team_name() -> void:
+	if OS.has_feature("web") and _web_guest_auth_pending:
+		_web_team_name_requested = true
+		return
+	_clear_screen()
+	_set_bg_visible(true)
+
+
+	_teamname_submitted = false
+	_last_submitted_team_name = ""
+	_team_name_written = false
+	_pending_team_name = ""
+
+	if team_name_ps == null:
+		push_error("[MAIN] team_name_ps is null (missing in export?)")
+		return
+
+	var t := team_name_ps.instantiate()
+	screen_root.add_child(t)
+	print("[MAIN] TeamName added to tree")
+	print("[MAIN] TeamName has submit_team_name signal? ", t.has_signal("submit_team_name"))
+
+
+	I18nSvc.apply_all()
+	if t.has_signal("submit_team_name"):
+		t.connect("submit_team_name", Callable(self, "_on_submit_team_name"))
+	if t.has_signal("back_requested"):
+		t.connect("back_requested", Callable(self, "_goto_stadium"))
+	if t.has_signal("action_requested"):
+		t.connect("action_requested", Callable(self, "_on_stadium_action"))
+
+
+func _on_submit_team_name(team_name: String) -> void:
+	print("[MAIN] RECEIVED submit_team_name =", team_name)
+	if _teamname_submitted:
+		print("[MAIN] submit_team_name ignored (already submitted) arg=", team_name)
+		return
+
+	_teamname_submitted = true
+	_last_submitted_team_name = team_name
+	_team_name_written = false
+
+	print("[MAIN] submit team_name =", team_name)
+
+	_pending_locale = TranslationServer.get_locale()
+	# _reset_local_savegame() # ⚠️ ne pas effacer la save lors du choix du nom
+	_pending_team_name = team_name
+
+	SeasonState.early_flow_post_selection_hide_menu_buttons = true
+	_show_menu()
+	call_deferred("_apply_pending_team_name")
+
+
+func _pick_audio_path(kind: String, id: String) -> String:
+	var prefer_ogg := OS.has_feature("web")
+
+	if kind == "sfx":
+		if prefer_ogg and SFX_OGG.has(id):
+			var p_ogg := String(SFX_OGG[id])
+			if ResourceLoader.exists(p_ogg):
+				return p_ogg
+		if SFX_MP3.has(id):
+			return String(SFX_MP3[id])
+		return "res://audio/sfx/click.mp3"
+
+	if prefer_ogg and MUSIC_OGG.has(id):
+		var m_ogg := String(MUSIC_OGG[id])
+		if ResourceLoader.exists(m_ogg):
+			return m_ogg
+
+	if MUSIC_MP3.has(id):
+		return String(MUSIC_MP3[id])
+
+	return "res://audio/music/menu.mp3"
+
+
+func _show_selection() -> void:
+	$UI.visible = false
+	print("[MAIN] _show_selection() instantiate Selection.tscn")
+	_clear_screen()
+
+	if selection_ps == null:
+		push_error("[MAIN] selection_ps is null (missing in export?)")
+		return
+
+	_selection_inst = selection_ps.instantiate()
+	screen_root.add_child(_selection_inst)
+	
+	print("[MAIN][I18N] entering Selection, locale(before)=", TranslationServer.get_locale(), " forced=", _current_lang)
+
+
+
+	if _selection_inst.has_signal("selection_done"):
+		_selection_inst.connect("selection_done", Callable(self, "_show_menu_after_selection"))
+	if _selection_inst.has_signal("back_requested"):
+		_selection_inst.connect("back_requested", Callable(self, "_show_team_name"))
+
+
+func _dbg_dump_visible_canvases(tag: String) -> void:
+	print("=== [DBG][VISIBLE] ", tag, " ===")
+	_dbg_dump_visible_canvases_rec(get_tree().root, 0)
+
+func _dbg_dump_visible_canvases_rec(n: Node, depth: int) -> void:
+	if n is CanvasItem:
+		var ci := n as CanvasItem
+		if ci.visible:
+			var ind := "  ".repeat(depth)
+			print(ind, "- ", n.get_path(), "  class=", n.get_class())
+	for c in n.get_children():
+		_dbg_dump_visible_canvases_rec(c, depth + 1)
+
+
+func _hide_texture_by_name(filename: String) -> void:
+	var root := get_tree().root
+	if root == null:
+		return
+	var stack: Array = [root]
+	while stack.size() > 0:
+		var n: Node = stack.pop_back()
+		if n is TextureRect:
+			var tr_rect: TextureRect = n as TextureRect
+			var tex: Texture2D = tr_rect.texture
+			if tex != null and String(tex.resource_path).ends_with(filename):
+				tr_rect.visible = false
+
+		elif n is Sprite2D:
+			var sp2: Sprite2D = n as Sprite2D
+			var tex2: Texture2D = sp2.texture
+			if tex2 != null and String(tex2.resource_path).ends_with(filename):
+				sp2.visible = false
+
+		for c in n.get_children():
+			stack.append(c)
+			
+func _apply_pending_team_name() -> void:
+	print("[MAIN] _apply_pending_team_name pending=", _pending_team_name)
+	if _pending_team_name == "":
+		return
+
+	ProfileManager.reset_active_profile()
+	SaveSvc.ensure_exists()
+
+	# BM_RESET_NEW_CLUB_V1 -------------------------------------------------
+	# Première création / changement de club => reset des totaux (sinon on récupère une vieille save)
+	var new_name := str(_pending_team_name).strip_edges()
+
+	var save_cur: Dictionary = PlayerLife.load_savegame()
+	if typeof(save_cur) != TYPE_DICTIONARY:
+		save_cur = {}
+
+	# Lire le nom déjà stocké dans la save (plus robuste que SaveSvc.has_method())
+	var prev_name := ""
+	if save_cur.has("club_name"):
+		prev_name = str(save_cur.get("club_name", "")).strip_edges()
+	elif save_cur.has("team_name"):
+		prev_name = str(save_cur.get("team_name", "")).strip_edges()
+	elif save_cur.has("club"):
+		prev_name = str(save_cur.get("club", "")).strip_edges()
+
+	# Si vrai nouveau club => reset complet finance (canon)
+	if new_name != "" and (prev_name == "" or prev_name != new_name):
+		PlayerLife.reset_finance_for_new_club(save_cur)
+		if not save_cur.has("stadium") or typeof(save_cur["stadium"]) != TYPE_DICTIONARY:
+			save_cur["stadium"] = {}
+		var stadium_cur: Dictionary = save_cur["stadium"] as Dictionary
+		stadium_cur["niveau_global_jeu"] = 1
+		stadium_cur["niveau_stade"] = 1
+		stadium_cur["ticketing"] = {}
+		stadium_cur["travaux_baseline_matchs_saison"] = 0
+		stadium_cur["travaux_cible_ng"] = 0
+		stadium_cur["travaux_cible_ns"] = 0
+		stadium_cur["travaux_duree_totale"] = 0
+		stadium_cur["travaux_en_cours"] = false
+		stadium_cur["travaux_matches_restants"] = 0
+		save_cur["season_number"] = 1
+		save_cur["season_id"] = "season_1"
+		save_cur["early_flow_stadium_unlocked"] = false
+		save_cur["early_flow_finances_unlocked"] = false
+		save_cur["popup_bienvenue_club_deja_vu"] = false
+		save_cur["club_name"] = new_name
+		save_cur["team_name"] = new_name
+		PlayerLife.write_savegame(save_cur)
+		print("[MAIN][RESET] new club -> finance reset prev=", prev_name, " new=", new_name)
+# ----------------------------------------------------------------------
+# ----------------------------------------------------------------------
+	SaveSvc.set_club_name(_pending_team_name)
+
+	# Réécriture canonique après SaveSvc pour éviter qu’un ancien legacy save réinjecte des totaux
+	var save_post: Dictionary = PlayerLife.load_savegame()
+	if typeof(save_post) != TYPE_DICTIONARY:
+		save_post = {}
+	PlayerLife.reset_finance_for_new_club(save_post)
+	if not save_post.has("club") or typeof(save_post["club"]) != TYPE_DICTIONARY:
+		save_post["club"] = {}
+	var club_post: Dictionary = save_post["club"] as Dictionary
+	club_post["name"] = new_name
+	club_post["level"] = 1
+	club_post["xp"] = 0
+	if not save_post.has("stadium") or typeof(save_post["stadium"]) != TYPE_DICTIONARY:
+		save_post["stadium"] = {}
+	var stadium_post: Dictionary = save_post["stadium"] as Dictionary
+	stadium_post["niveau_global_jeu"] = 1
+	stadium_post["niveau_stade"] = 1
+	stadium_post["ticketing"] = {}
+	stadium_post["travaux_baseline_matchs_saison"] = 0
+	stadium_post["travaux_cible_ng"] = 0
+	stadium_post["travaux_cible_ns"] = 0
+	stadium_post["travaux_duree_totale"] = 0
+	stadium_post["travaux_en_cours"] = false
+	stadium_post["travaux_matches_restants"] = 0
+	if new_name != "" and (prev_name == "" or prev_name != new_name):
+		save_post["season_number"] = 1
+		save_post["season_id"] = "season_1"
+		save_post["early_flow_stadium_unlocked"] = false
+		save_post["early_flow_finances_unlocked"] = false
+		save_post["popup_bienvenue_club_deja_vu"] = false
+	save_post["tournament_results_by_season"] = {}
+	save_post["total_tournois"] = 0
+
+	# BM_RESET_MISSIONS_NEW_CLUB_V1
+	# Nouvelle équipe = aucune ancienne mission ne doit survivre.
+	if new_name != "" and (prev_name == "" or prev_name != new_name):
+		save_post["missions_progress"] = {"completed": [], "in_progress": [], "selected": [], "rewards_awarded": []}
+		save_post["missions_state"] = {
+			"counters": {
+				"wins_total": 0,
+				"win_streak": 0,
+				"pts_75_plus": 0,
+				"pts_90_plus": 0,
+				"pts_100_plus": 0,
+				"price_adjust_done": 0,
+				"stadium_upgraded": 0,
+				"mercato_achats": 0,
+				"tournois_participations": 0,
+				"coach_signed": 0,
+				"sponsors_signes": 0,
+				"youth_ok_matches": 0
+			},
+			"current": "",
+			"last_screen": "",
+			"last_stadium_level": "",
+			"stadium_upgraded_flag": 0
+		}
+
+	save_post["club_name"] = new_name
+	save_post["team_name"] = new_name
+	print("[WRITE TEAM] ", new_name)
+	PlayerLife.write_savegame(save_post)
+	if SaveSvc != null:
+		SaveSvc.write_dict(save_post.duplicate(true))
+	print("[MAIN][RESET][POST-SAVESVC] total_tournois=", int(save_post.get("total_tournois", -1)), " total_recettes=", int(save_post.get("total_recettes", -1)))
+
+	# NEW CLUB CLOUD GUARD: empêche l’ancien blob cloud du même email d’écraser le nouveau club
+	var _f_new_club_guard := FileAccess.open(FILE_NEW_CLUB_PENDING_CLOUD, FileAccess.WRITE)
+	if _f_new_club_guard != null:
+		_f_new_club_guard.store_string(str(_pending_team_name).strip_edges())
+		_f_new_club_guard.close()
+		print("[MAIN][NEW_CLUB_GUARD] wrote ", FILE_NEW_CLUB_PENDING_CLOUD, " team=", str(_pending_team_name).strip_edges())
+	print("[MAIN] saved club_name=", SaveSvc.get_club_name())
+	_track_team_name_created(new_name)
+
+	# ✅ refresh UI menu si déjà affiché
+	if _menu_inst != null and _menu_inst.has_method("_update_club_name_label_from_save"):
+		_menu_inst.call("_update_club_name_label_from_save")
+
+	_pending_team_name = ""
+
+	# ✅ après création du nom : rester sur Menu, le popup pilotera ensuite l'ouverture de Selection
+	if has_method("_ensure_shop_confirm_button"):
+		call_deferred("_ensure_shop_confirm_button")
+	if has_method("_load_shop_from_save"):
+		call_deferred("_load_shop_from_save")
+
+
+func _on_menu_go_match() -> void:
+	print("[MAIN] go_match -> MatchSim")
+
+	var _save_funnel := PlayerLife.load_savegame()
+	if typeof(_save_funnel) == TYPE_DICTIONARY and not bool(_save_funnel.get("funnel_first_match_started_sent", false)):
+		_save_funnel["funnel_first_match_started_sent"] = true
+		PlayerLife.write_savegame(_save_funnel)
+
+		var _http_funnel := HTTPRequest.new()
+		add_child(_http_funnel)
+
+		print("[FUNNEL START] profile_uuid=", str(Session.profile_uuid))
+
+		var _payload := JSON.stringify({
+			"profile_uuid": str(Session.profile_uuid)
+		})
+
+		_http_funnel.request_completed.connect(func(_result, _code, _h, _b):
+			_http_funnel.queue_free()
+		)
+
+		var _request_error := _http_funnel.request(
+			"https://api.basketmanager-game.com/v1/funnel/first-match-started",
+			["Content-Type: application/json"],
+			HTTPClient.METHOD_POST,
+			_payload
+		)
+		if _request_error != OK:
+			_http_funnel.queue_free()
+
+	get_tree().change_scene_to_file("res://scenes/MatchSim.tscn")
+
+
+func show_stadium() -> void:
+	print("[MAIN] show_stadium")
+	if stadium_ps == null:
+		stadium_ps = load("res://scenes/Stadium.tscn")
+		if stadium_ps == null:
+			push_error("stadium_ps null")
+			return
+	_clear_screen()
+	var inst = stadium_ps.instantiate()
+	screen_root.add_child(inst)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		ProfileManager.flush_active_to_profile_file()
+
+func _finish_web_guest_auth_silent() -> void:
+	_web_guest_auth_pending = false
+	if _web_team_name_requested:
+		_web_team_name_requested = false
+		call_deferred("_show_team_name")
+
+
+func _try_guest_auth_silent() -> void:
+	var http := HTTPRequest.new()
+	add_child(http)
+
+	var url := "https://api.basketmanager-game.com/v1/auth/guest"
+	var headers := PackedStringArray(["Content-Type: application/json"])
+
+	http.request_completed.connect(func(result, code, _h, body):
+		if result == HTTPRequest.RESULT_SUCCESS and code >= 200 and code < 300:
+			var parsed: Variant = JSON.parse_string((body as PackedByteArray).get_string_from_utf8())
+			if typeof(parsed) == TYPE_DICTIONARY:
+				var d := parsed as Dictionary
+				var at := str(d.get("access_token", "")).strip_edges()
+				var rt := str(d.get("refresh_token", "")).strip_edges()
+				var tt := str(d.get("token_type", "Bearer")).strip_edges()
+				if at.length() >= 20:
+					Session.set_tokens(at, rt, tt)
+					Session.profile_uuid = str(d.get("profile_uuid", "")).strip_edges()
+					if Session.profile_uuid != "":
+						ProfileManager.add_profile(Session.profile_uuid, Session.profile_uuid)
+						ProfileManager.activate_profile(Session.profile_uuid)
+						_save_session_local_from_main()
+		_finish_web_guest_auth_silent()
+		http.queue_free()
+	)
+
+	var request_error := http.request(url, headers, HTTPClient.METHOD_POST, "{}")
+	if request_error != OK:
+		_finish_web_guest_auth_silent()
+		http.queue_free()
+
+
+func _track_team_name_created(team_name: String) -> void:
+	if str(Session.profile_uuid).strip_edges() == "":
+		return
+
+	var http := HTTPRequest.new()
+	add_child(http)
+
+	var url := "https://api.basketmanager-game.com/v1/funnel/team-name-created"
+	var headers := PackedStringArray(["Content-Type: application/json"])
+
+	var payload := {
+		"profile_uuid": str(Session.profile_uuid),
+		"team_name": str(team_name)
+	}
+
+	http.request_completed.connect(func(_result, _code, _h, _b):
+		http.queue_free()
+	)
+
+	var request_error := http.request(url, headers, HTTPClient.METHOD_POST, JSON.stringify(payload))
+	if request_error != OK:
+		http.queue_free()
+
+
+
+func _cloud_save(data: Dictionary) -> void:
+	if str(Session.access_token).strip_edges().length() < 20:
+		print("[CLOUD_SAVE] no token → skip")
+		return
+
+	var http := HTTPRequest.new()
+	add_child(http)
+
+	var url := "https://api.basketmanager-game.com/v1/cloud/save"
+
+	var headers := PackedStringArray([
+		"Content-Type: application/json",
+		"Authorization: Bearer " + Session.access_token
+	])
+
+	var payload := {
+		"profile_uuid": Session.profile_uuid,
+		"blob": data
+	}
+
+	var body := JSON.stringify(payload)
+
+	http.request_completed.connect(func(result, code, _h, _b):
+		if result == HTTPRequest.RESULT_SUCCESS and code >= 200 and code < 300:
+			print("[CLOUD_SAVE] success")
+		else:
+			print("[CLOUD_SAVE] failed code=", code)
+	)
+
+	http.request(url, headers, HTTPClient.METHOD_POST, body)

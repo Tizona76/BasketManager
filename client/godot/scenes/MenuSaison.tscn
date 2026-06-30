@@ -1,0 +1,511 @@
+[gd_scene load_steps=3 format=3 uid="uid://bdor56ajyhjct"]
+
+[ext_resource type="Script" uid="uid://df4xqrn02a52t" path="res://scripts/MenuSaison.gd" id="1_nrrof"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_tab_normal.tres" id="ext_menu_tab_normal"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_tab_hover.tres" id="ext_menu_tab_hover"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_tab_pressed.tres" id="ext_menu_tab_pressed"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_match_normal.tres" id="ext_menu_match_normal"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_match_hover.tres" id="ext_menu_match_hover"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_match_pressed.tres" id="ext_menu_match_pressed"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes/btn_back_red.tres" id="ext_btn_back_red"]
+[ext_resource type="Script" path="res://scripts/ClassementGraph.gd" id="2_graph"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/btn_back_pressed.tres" id="ext_btn_back_red_pressed"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_shared/hud_progress_panel.tres" id="ext_hud_progress_style"]
+[ext_resource type="Texture2D" path="res://assets/images/token.png" id="ext_token_icon"]
+[ext_resource type="Texture2D" path="res://assets/images/backgrounds/missions.png" id="90_missions_bg"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_mercato/mercato_tab_normal.tres" id="ext_mercato_tab_normal"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_mercato/mercato_tab_hover.tres" id="ext_mercato_tab_hover"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_mercato/mercato_tab_pressed.tres" id="ext_mercato_tab_pressed"]
+
+[ext_resource type="Script" path="res://scripts/PopularityBadge.gd" id="ext_popularity_badge"]
+[ext_resource type="Texture2D" path="res://assets/images/ballon.png" id="ext_popup_ball_saison"]
+[node name="MenuSaison" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_nrrof")
+
+[node name="BG" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="UI" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+
+[node name="HudProgressPanel" type="Panel" parent="UI"]
+custom_minimum_size = Vector2(220, 128)
+layout_mode = 0
+offset_left = 1110.0
+offset_top = 78.0
+offset_right = 1330.0
+offset_bottom = 206.0
+theme_override_styles/panel = ExtResource("ext_hud_progress_style")
+modulate = Color(1, 1, 1, 1)
+
+[node name="HudVBox" type="VBoxContainer" parent="UI/HudProgressPanel"]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 10.0
+offset_right = 206.0
+offset_bottom = 118.0
+theme_override_constants/separation = 6
+
+[node name="LblHudLevel" type="Label" parent="UI/HudProgressPanel/HudVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1.00, 0.90, 0.28, 1)
+theme_override_font_sizes/font_size = 24
+text = "Lv 1"
+theme_override_colors/font_outline_color = Color(0.34, 0.20, 0.00, 0.98)
+theme_override_constants/outline_size = 7
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.55)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 3
+
+[node name="LblHudXp" type="Label" parent="UI/HudProgressPanel/HudVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.92, 1.00, 1)
+theme_override_font_sizes/font_size = 24
+text = "XP 0"
+theme_override_colors/font_outline_color = Color(0.02, 0.18, 0.28, 0.98)
+theme_override_constants/outline_size = 7
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.55)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 3
+
+[node name="TokensRow" type="HBoxContainer" parent="UI/HudProgressPanel/HudVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ImgToken" type="TextureRect" parent="UI/HudProgressPanel/HudVBox/TokensRow"]
+custom_minimum_size = Vector2(20, 20)
+layout_mode = 2
+texture = ExtResource("ext_token_icon")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LblHudTokens" type="Label" parent="UI/HudProgressPanel/HudVBox/TokensRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1.00, 0.72, 0.20, 1)
+theme_override_font_sizes/font_size = 24
+text = "Tokens 0"theme_override_colors/font_outline_color = Color(0.36, 0.14, 0.00, 0.98)
+theme_override_constants/outline_size = 7
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.55)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 3
+
+[node name="PopularityBadge" type="Label" parent="."]
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -360.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 56.0
+text = "Popularity: 50%"
+horizontal_alignment = 2
+vertical_alignment = 1
+script = ExtResource("ext_popularity_badge")
+
+[node name="PopularityBadge2" type="Label" parent="."]
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -360.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 56.0
+text = "Popularity: 50%"
+horizontal_alignment = 2
+vertical_alignment = 1
+script = ExtResource("ext_popularity_badge")
+[connection signal="pressed" from="Overlays/PopupStadiumIntro/BtnCloseStadiumIntro" to="." method="_on_close_stadium_intro_pressed"]
+[connection signal="gui_input" from="Overlays/PopupStadiumIntro" to="." method="_on_popup_stadium_intro_gui_input"]
+
+[node name="Tabs" type="HBoxContainer" parent="UI"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 260.0
+offset_bottom = 320.0
+theme_override_constants/separation = 28
+custom_minimum_size = Vector2(0, 62)
+size_flags_vertical = 0
+
+[node name="BtnClassement" type="Button" parent="UI/Tabs"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = ExtResource("ext_menu_tab_normal")
+theme_override_styles/hover = ExtResource("ext_menu_tab_hover")
+theme_override_styles/pressed = ExtResource("ext_menu_tab_pressed")
+text = "Classement"
+custom_minimum_size = Vector2(0, 62)
+size_flags_vertical = 0
+
+[node name="BtnStatistiques" type="Button" parent="UI/Tabs"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = ExtResource("ext_menu_tab_normal")
+theme_override_styles/hover = ExtResource("ext_menu_tab_hover")
+theme_override_styles/pressed = ExtResource("ext_menu_tab_pressed")
+text = "Statistiques"
+custom_minimum_size = Vector2(0, 62)
+size_flags_vertical = 0
+
+[node name="BtnCalendrier" type="Button" parent="UI/Tabs"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = ExtResource("ext_menu_tab_normal")
+theme_override_styles/hover = ExtResource("ext_menu_tab_hover")
+theme_override_styles/pressed = ExtResource("ext_menu_tab_pressed")
+text = "Calendrier"
+custom_minimum_size = Vector2(0, 62)
+size_flags_vertical = 0
+
+[node name="BtnMercato" type="Button" parent="UI/Tabs"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = ExtResource("ext_menu_tab_normal")
+theme_override_styles/hover = ExtResource("ext_menu_tab_hover")
+theme_override_styles/pressed = ExtResource("ext_menu_tab_pressed")
+text = "Mercato"
+custom_minimum_size = Vector2(0, 62)
+size_flags_vertical = 0
+[node name="BtnMissions" type="Button" parent="UI/Tabs"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = ExtResource("ext_menu_tab_normal")
+theme_override_styles/hover = ExtResource("ext_menu_tab_hover")
+theme_override_styles/pressed = ExtResource("ext_menu_tab_pressed")
+text = "Missions"
+custom_minimum_size = Vector2(0, 62)
+size_flags_vertical = 0
+
+[node name="BtnTournois" type="Button" parent="UI/Tabs"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = ExtResource("ext_menu_tab_normal")
+theme_override_styles/hover = ExtResource("ext_menu_tab_hover")
+theme_override_styles/pressed = ExtResource("ext_menu_tab_pressed")
+text = "Tournois"
+custom_minimum_size = Vector2(0, 62)
+size_flags_vertical = 0
+
+[node name="BtnMatch" type="Button" parent="UI"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -180.0
+offset_top = -40.0
+offset_right = 180.0
+offset_bottom = 38.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.05, 0.06, 0.08, 1)
+theme_override_font_sizes/font_size = 26
+theme_override_styles/normal = ExtResource("ext_menu_match_normal")
+theme_override_styles/hover = ExtResource("ext_menu_match_hover")
+theme_override_styles/pressed = ExtResource("ext_menu_match_pressed")
+text = "Match"
+
+[node name="BtnRetour" type="Button" parent="UI"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 34.0
+offset_top = -92.0
+offset_right = 240.0
+offset_bottom = -30.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = ExtResource("ext_btn_back_red")
+theme_override_styles/pressed = ExtResource("ext_btn_back_red_pressed")
+text = "Retour"
+
+[node name="BtnCloseClassement" type="Button" parent="UI"]
+z_index = 200
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -116.0
+offset_top = 90.0
+offset_right = -66.0
+offset_bottom = 140.0
+grow_horizontal = 0
+grow_vertical = 0
+focus_mode = 0
+mouse_filter = 1
+mouse_default_cursor_shape = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 34
+text = "×"
+flat = true
+
+[node name="Overlays" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PopupBienvenue" type="Panel" parent="Overlays"]
+visible = false
+layout_mode = 0
+offset_left = 300.0
+offset_top = 150.0
+offset_right = 900.0
+offset_bottom = 450.0
+
+
+[node name="ImgPopupBallBienvenue" type="TextureRect" parent="Overlays/PopupBienvenue"]
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 0
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.0
+anchor_bottom = 0.0
+offset_left = -28.0
+offset_top = 402.0
+offset_right = 28.0
+offset_bottom = 458.0
+texture = ExtResource("ext_popup_ball_saison")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BtnCloseBienvenue" type="Button" parent="Overlays/PopupBienvenue"]
+layout_mode = 0
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.0
+anchor_bottom = 0.0
+offset_left = -80.0
+offset_top = 470.0
+offset_right = 80.0
+offset_bottom = 510.0
+text = "OK"
+
+[node name="LblBienvenue" type="RichTextLabel" parent="Overlays/PopupBienvenue"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 70.0
+offset_right = 570.0
+offset_bottom = 260.0
+theme_override_font_sizes/normal_font_size = 20
+bbcode_enabled = false
+fit_content = false
+scroll_active = true
+autowrap_mode = 3
+text = "popup_intro_title"
+
+
+[node name="StandingsPanel" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchor_left = 0.511
+anchor_right = 0.801
+anchor_bottom = 1.0
+offset_left = -330.0
+offset_top = 80.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="StandingsPanelBG" type="ColorRect" parent="StandingsPanel"]
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0.52)
+
+[node name="LblStandings" type="RichTextLabel" parent="StandingsPanel"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_font_sizes/normal_font_size = 26
+bbcode_enabled = true
+
+[node name="StandingsGraphPanel" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 0
+anchor_left = 0.74
+anchor_top = 0.25
+anchor_right = 0.965
+anchor_bottom = 0.74
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+color = Color(0.08, 0.08, 0.08, 0.72)
+
+[node name="StandingsGraphTitle" type="Label" parent="StandingsGraphPanel"]
+layout_mode = 1
+offset_left = 18.0
+offset_top = 14.0
+offset_right = 240.0
+offset_bottom = 42.0
+theme_override_font_sizes/font_size = 22
+text = "Évolution classement"
+
+[node name="StandingsGraph" type="Control" parent="StandingsGraphPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = 44.0
+offset_right = -12.0
+offset_bottom = -12.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_graph")
+
+
+[node name="MissionsPanel" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+mouse_filter = 2
+color = Color(0.05, 0.06, 0.10, 0.92)
+
+[node name="MissionsCard" type="Panel" parent="MissionsPanel"]
+layout_mode = 0
+offset_left = 70.0
+offset_top = 70.0
+offset_right = 1210.0
+offset_bottom = 670.0
+mouse_filter = 1
+self_modulate = Color(1, 1, 1, 0.84)
+z_index = 5
+
+
+[node name="BgMissions" type="TextureRect" parent="MissionsPanel"]
+layout_mode = 1
+anchors_preset = 15
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+texture = ExtResource("90_missions_bg")
+expand_mode = 1
+stretch_mode = 6
+mouse_filter = 2
+z_index = 0
+
+[node name="MissionsDarken" type="ColorRect" parent="MissionsPanel"]
+layout_mode = 1
+anchors_preset = 15
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+color = Color(0.03, 0.04, 0.07, 0.08)
+mouse_filter = 2
+z_index = 1
+
+[node name="LblMissionsTitle" type="Label" parent="MissionsPanel/MissionsCard"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 22.0
+offset_right = 1140.0
+offset_bottom = 82.0
+text = "MISSIONS"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 40
+theme_override_colors/font_color = Color(0.96, 0.99, 1, 1)
+theme_override_colors/font_outline_color = Color(1.00, 0.82, 0.18, 0.98)
+theme_override_constants/outline_size = 8
+
+[node name="LblMissionsLevel" type="Label" parent="MissionsPanel/MissionsCard"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 78.0
+offset_right = 240.0
+offset_bottom = 118.0
+text = "Lv 1"
+theme_override_font_sizes/font_size = 24
+
+[node name="LblMissionsStatus" type="Label" parent="MissionsPanel/MissionsCard"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 520.0
+offset_right = 820.0
+offset_bottom = 560.0
+text = "Mission en cours"
+theme_override_font_sizes/font_size = 22
+
+[node name="LblMissionsReward" type="Label" parent="MissionsPanel/MissionsCard"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 560.0
+offset_right = 820.0
+offset_bottom = 600.0
+text = "Gain : 0 tokens"
+theme_override_font_sizes/font_size = 22
+
+[node name="MetroCanvas" type="Control" parent="MissionsPanel/MissionsCard"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 130.0
+offset_right = 1080.0
+offset_bottom = 500.0
+mouse_filter = 1
+
+[node name="BtnClaimMission" type="Button" parent="MissionsPanel/MissionsCard"]
+layout_mode = 0
+offset_left = 860.0
+offset_top = 525.0
+offset_right = 1080.0
+offset_bottom = 585.0
+text = "Réclamer"
+mouse_filter = 0
+
+[node name="BtnCloseMissions" type="Button" parent="MissionsPanel/MissionsCard"]
+layout_mode = 0
+offset_left = 860.0
+offset_top = 600.0
+offset_right = 1080.0
+offset_bottom = 660.0
+text = "BTN_BACK"
+mouse_filter = 0

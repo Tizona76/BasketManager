@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://b6ollfk6oy0vt"
+
+[deps]
+
+files=["res://data/avatars_meta.gender.translation", "res://data/avatars_meta.first.translation"]
+
+source_file="res://data/avatars_meta.csv"
+dest_files=["res://data/avatars_meta.gender.translation", "res://data/avatars_meta.first.translation"]
+
+[params]
+
+compress=true
+delimiter=0

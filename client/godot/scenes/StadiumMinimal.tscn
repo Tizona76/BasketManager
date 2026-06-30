@@ -1,0 +1,380 @@
+[gd_scene load_steps=11 format=3 uid="uid://fxam4smafvoe"]
+
+[ext_resource type="Script" uid="uid://cllk74iivum1o" path="res://scripts/PopularityBadge.gd" id="1"]
+[ext_resource type="Script" uid="uid://b2fs0q4irc6mi" path="res://scenes/StadiumMinimal.gd" id="1_stadium_min_gd"]
+[ext_resource type="StyleBox" uid="uid://byvsyt5r525lg" path="res://ui/styleboxes/btn_back_red.tres" id="3_btn_back_red"]
+[ext_resource type="StyleBox" uid="uid://dxmreyym0vpbt" path="res://ui/styleboxes_nba/btn_back_pressed.tres" id="4_btn_back_pressed"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_tab_hover.tres" id="ext_menu_tab_hover"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_tab_normal.tres" id="ext_menu_tab_normal"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_tab_pressed.tres" id="ext_menu_tab_pressed"]
+[ext_resource type="StyleBox" uid="uid://cbacda305utsa" path="res://ui/styleboxes/btn_match.tres" id="ext_btn_match"]
+[ext_resource type="StyleBox" uid="uid://bxdp0y33u4aoy" path="res://ui/styleboxes_nba/btn_match_hover.tres" id="ext_btn_match_hover"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/btn_match_pressed.tres" id="ext_btn_match_pressed"]
+
+[node name="StadiumMinimal" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_stadium_min_gd")
+
+[node name="Bg" type="TextureRect" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+offset_top = 28.0
+offset_bottom = 80.0
+theme_override_font_sizes/font_size = 44
+text = "Stadium"
+horizontal_alignment = 1
+
+
+[node name="Overlays" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="PopupStadiumIntro" type="Panel" parent="Overlays"]
+visible = false
+custom_minimum_size = Vector2(760, 320)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -380.0
+offset_top = -160.0
+offset_right = 380.0
+offset_bottom = 160.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LblStadiumIntro" type="RichTextLabel" parent="Overlays/PopupStadiumIntro"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 20.0
+offset_right = -24.0
+offset_bottom = -84.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/normal_font_size = 22
+scroll_active = false
+
+[node name="BtnCloseStadiumIntro" type="Button" parent="Overlays/PopupStadiumIntro"]
+custom_minimum_size = Vector2(140, 48)
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -70.0
+offset_top = -62.0
+offset_right = 70.0
+offset_bottom = -14.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 0
+text = "OK"
+
+
+[node name="BtnRetour" type="Button" parent="."]
+layout_mode = 0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 34.0
+offset_top = -92.0
+offset_right = 240.0
+offset_bottom = -30.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = ExtResource("3_btn_back_red")
+theme_override_styles/pressed = ExtResource("4_btn_back_pressed")
+text = "Retour"
+
+[node name="Cards" type="VBoxContainer" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+offset_left = 34.0
+offset_top = 120.0
+offset_right = -34.0
+offset_bottom = 420.0
+theme_override_constants/separation = 16
+
+[node name="Tabs" type="HBoxContainer" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+offset_left = 34.0
+offset_top = 96.0
+offset_right = -34.0
+offset_bottom = 146.0
+theme_override_constants/separation = 52
+alignment = 1
+
+[node name="BtnTabShop" type="Button" parent="Tabs"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = ExtResource("ext_btn_match")
+theme_override_styles/pressed = ExtResource("ext_btn_match_pressed")
+theme_override_styles/hover = ExtResource("ext_btn_match_hover")
+theme_override_styles/focus = ExtResource("ext_btn_match")
+text = "stadium.tab.shop"
+
+[node name="BtnTabTicketing" type="Button" parent="Tabs"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = ExtResource("ext_btn_match")
+theme_override_styles/pressed = ExtResource("ext_btn_match_pressed")
+theme_override_styles/hover = ExtResource("ext_btn_match_hover")
+theme_override_styles/focus = ExtResource("ext_btn_match")
+text = "stadium.tab.ticketing"
+
+[node name="BtnTabCafe" type="Button" parent="Tabs"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = ExtResource("ext_menu_tab_normal")
+theme_override_styles/pressed = ExtResource("ext_menu_tab_pressed")
+theme_override_styles/hover = ExtResource("ext_menu_tab_hover")
+text = "stadium.tab.cafe"
+
+[node name="BtnTabUpgrade" type="Button" parent="Tabs"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = ExtResource("ext_btn_match")
+theme_override_styles/pressed = ExtResource("ext_btn_match_pressed")
+theme_override_styles/hover = ExtResource("ext_btn_match_hover")
+theme_override_styles/focus = ExtResource("ext_btn_match")
+text = "stadium.tab.upgrade"
+
+[node name="Content" type="Control" parent="."]
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 140.0
+offset_bottom = -20.0
+
+[node name="CenterTicketing" type="CenterContainer" parent="Content"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="PanelTicketing" type="PanelContainer" parent="Content/CenterTicketing"]
+custom_minimum_size = Vector2(860, 520)
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 0
+
+[node name="VBox" type="VBoxContainer" parent="Content/CenterTicketing/PanelTicketing"]
+layout_mode = 2
+
+[node name="LblTicketingTitle" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox"]
+layout_mode = 2
+text = "stadium.ticketing.title"
+
+[node name="Grid" type="GridContainer" parent="Content/CenterTicketing/PanelTicketing/VBox"]
+layout_mode = 2
+columns = 4
+
+[node name="HdrCat" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "stadium.ticketing.col.category"
+horizontal_alignment = 1
+
+[node name="HdrPrice" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "stadium.ticketing.col.price"
+horizontal_alignment = 1
+
+[node name="HdrSeats" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "stadium.ticketing.col.seats"
+horizontal_alignment = 1
+
+[node name="HdrSpacer" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "stadium.shop.col.estimated_revenue"
+horizontal_alignment = 1
+
+[node name="LblCatA" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+text = "stadium.ticketing.cat.a"
+
+[node name="BoxPriceA" type="HBoxContainer" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+
+[node name="PriceA" type="LineEdit" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceA"]
+custom_minimum_size = Vector2(102, 0)
+layout_mode = 2
+text = "0"
+
+[node name="PriceAUp" type="Button" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceA"]
+layout_mode = 2
+text = "+"
+
+[node name="PriceADown" type="Button" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceA"]
+layout_mode = 2
+text = "-"
+
+[node name="BoxSeatsA" type="HBoxContainer" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+
+[node name="SeatsA" type="LineEdit" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsA"]
+custom_minimum_size = Vector2(102, 0)
+layout_mode = 2
+text = "0"
+
+[node name="SeatsAUp" type="Button" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsA"]
+layout_mode = 2
+text = "+"
+
+[node name="SeatsADown" type="Button" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsA"]
+layout_mode = 2
+text = "-"
+
+[node name="SpacerA" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "0 €"
+horizontal_alignment = 1
+
+[node name="LblCatB" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+text = "stadium.ticketing.cat.b"
+
+[node name="BoxPriceB" type="HBoxContainer" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+
+[node name="PriceB" type="LineEdit" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceB"]
+custom_minimum_size = Vector2(102, 0)
+layout_mode = 2
+text = "0"
+
+[node name="PriceBUp" type="Button" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceB"]
+layout_mode = 2
+text = "+"
+
+[node name="PriceBDown" type="Button" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceB"]
+layout_mode = 2
+text = "-"
+
+[node name="BoxSeatsB" type="HBoxContainer" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+
+[node name="SeatsB" type="LineEdit" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsB"]
+custom_minimum_size = Vector2(102, 0)
+layout_mode = 2
+text = "0"
+
+[node name="SeatsBUp" type="Button" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsB"]
+layout_mode = 2
+text = "+"
+
+[node name="SeatsBDown" type="Button" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsB"]
+layout_mode = 2
+text = "-"
+
+[node name="SpacerB" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "0 €"
+horizontal_alignment = 1
+
+[node name="LblCatC" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+text = "stadium.ticketing.cat.c"
+
+[node name="BoxPriceC" type="HBoxContainer" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+
+[node name="PriceC" type="LineEdit" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceC"]
+custom_minimum_size = Vector2(102, 0)
+layout_mode = 2
+text = "0"
+
+[node name="PriceCUp" type="Button" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceC"]
+layout_mode = 2
+text = "+"
+
+[node name="PriceCDown" type="Button" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceC"]
+layout_mode = 2
+text = "-"
+
+[node name="BoxSeatsC" type="HBoxContainer" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+
+[node name="SeatsC" type="LineEdit" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsC"]
+custom_minimum_size = Vector2(102, 0)
+layout_mode = 2
+text = "0"
+
+[node name="SeatsCUp" type="Button" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsC"]
+layout_mode = 2
+text = "+"
+
+[node name="SeatsCDown" type="Button" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsC"]
+layout_mode = 2
+text = "-"
+
+[node name="SpacerC" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "0 €"
+horizontal_alignment = 1
+
+[node name="LblTicketingTotal" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "stadium.ticketing.total"
+horizontal_alignment = 1
+
+[node name="PopularityBadge" type="Label" parent="."]
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -360.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 56.0
+text = "Popularity: 50%"
+horizontal_alignment = 2
+vertical_alignment = 1
+script = ExtResource("1")
+
+[node name="PopularityBadge2" type="Label" parent="."]
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -360.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 56.0
+text = "Popularity: 50%"
+horizontal_alignment = 2
+vertical_alignment = 1
+script = ExtResource("1")
+[connection signal="pressed" from="Overlays/PopupStadiumIntro/BtnCloseStadiumIntro" to="." method="_on_close_stadium_intro_pressed"]
+[connection signal="gui_input" from="Overlays/PopupStadiumIntro" to="." method="_on_popup_stadium_intro_gui_input"]

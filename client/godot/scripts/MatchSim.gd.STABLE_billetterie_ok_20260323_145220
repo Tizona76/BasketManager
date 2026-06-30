@@ -1,0 +1,1210 @@
+extends Control
+
+@onready var lbl_temps: Label = $LabelTemps
+@onready var lbl_score: Label = $LabelScore
+@onready var lbl_info: Label = $LabelInfo
+@onready var timer: Timer = $Timer
+@onready var btn_retour: Button = $BtnRetour
+
+@onready var btn_skip: Button = get_node_or_null("BtnSkip") as Button
+@onready var lbl_team_dom: Label = get_node_or_null("ScoreBoardPanel/LabelTeamDom") as Label
+@onready var lbl_team_ext: Label = get_node_or_null("ScoreBoardPanel/LabelTeamExt") as Label
+@onready var scoreboard_panel: Control = $ScoreBoardPanel
+@onready var info_panel: Control = $InfoPanel
+
+@onready var stats_end: Control = get_node_or_null("StatsEnd") as Control
+@onready var lbl_dom_2p: Label = get_node_or_null("StatsEnd/Grid/LblDom2P") as Label
+@onready var lbl_ext_2p: Label = get_node_or_null("StatsEnd/Grid/LblExt2P") as Label
+@onready var lbl_dom_3p: Label = get_node_or_null("StatsEnd/Grid/LblDom3P") as Label
+@onready var lbl_ext_3p: Label = get_node_or_null("StatsEnd/Grid/LblExt3P") as Label
+@onready var lbl_dom_mvp: Label = get_node_or_null("StatsEnd/Grid/LblDomMVP") as Label
+@onready var lbl_ext_mvp: Label = get_node_or_null("StatsEnd/Grid/LblExtMVP") as Label
+@onready var lbl_title_2p: Label = get_node_or_null("StatsEnd/Grid/LblTitle2P") as Label
+@onready var lbl_title_3p: Label = get_node_or_null("StatsEnd/Grid/LblTitle3P") as Label
+@onready var lbl_title_mvp: Label = get_node_or_null("StatsEnd/Grid/LblTitleMVP") as Label
+
+@onready var lbl_mvp_match: Label = get_node_or_null("StatsEnd/LblMvpMatch") as Label
+
+
+const MATCH_DUREE_MINUTES: int = 40
+const MAX_ADD_PER_MIN: int = 6        # max points ajoutés par équipe sur 1 minute
+const NO_CATCHUP_LAST_MIN: int = 2    # pas de rattrapage brutal sur les 2 dernières minutes
+
+
+const MATCHSIM_SUMMARY_KEYS := {
+"matchsim.summary_comeback_win": true,
+	"matchsim.summary_comeback_loss": true,
+	"matchsim.summary_win_close": true,
+	"matchsim.summary_win_big": true,
+	"matchsim.summary_win_control": true,
+	"matchsim.summary_loss_close": true,
+	"matchsim.summary_loss_big": true,
+	"matchsim.summary_loss_normal": true,
+	"matchsim.summary_default": true,
+}
+
+const MATCHSIM_SUMMARY_ALIASES := {
+	# Variantes / typos -> clés officielles
+	"matchsim.summary_lose_control": "matchsim.summary_loss_normal",
+	"matchsim.summary_lose_close": "matchsim.summary_loss_close",
+	"matchsim.summary_lose_big": "matchsim.summary_loss_big",
+	"matchsim.summary_win_normal": "matchsim.summary_win_control",
+
+	# Identités (clé officielle -> elle-même)
+	"matchsim.summary_win_control": "matchsim.summary_win_control",
+	"matchsim.summary_win_close": "matchsim.summary_win_close",
+	"matchsim.summary_win_big": "matchsim.summary_win_big",
+
+	"matchsim.summary_loss_normal": "matchsim.summary_loss_normal",
+	"matchsim.summary_loss_close": "matchsim.summary_loss_close",
+	"matchsim.summary_loss_big": "matchsim.summary_loss_big",
+
+	"matchsim.summary_comeback_win": "matchsim.summary_comeback_win",
+	"matchsim.summary_comeback_loss": "matchsim.summary_comeback_loss",
+	"matchsim.summary_draw": "matchsim.summary_draw",
+	"matchsim.summary_default": "matchsim.summary_default",
+}
+
+# BM_SALARY_LEVEL_V1 ---------------------------------------------------------
+# Salaires + niveau club (Web-safe, int-only, match-based), anti-double-compte
+const K_SALARY: float = 0.12
+
+const XP_WIN: int = 3
+const XP_LOSS: int = 1
+const XP_DRAW: int = 2
+
+func _ensure_club_wallet_schema(save: Dictionary) -> void:
+	# club.level / club.xp / club.titles_total
+	if not save.has("club") or typeof(save["club"]) != TYPE_DICTIONARY:
+		save["club"] = {}
+	var club: Dictionary = save["club"]
+
+	# Migration soft si tu avais des clés legacy
+	if not club.has("level"):
+		if save.has("club_level"):
+			club["level"] = int(save.get("club_level", 1))
+		else:
+			club["level"] = 1
+	if not club.has("xp"):
+		if save.has("club_xp"):
+			club["xp"] = int(save.get("club_xp", 0))
+		else:
+			club["xp"] = 0
+	if not club.has("titles_total"):
+		club["titles_total"] = int(club.get("titles_total", 0))
+
+	# wallet.euros (Web schema) + compat finance.euros existant
+	if not save.has("wallet") or typeof(save["wallet"]) != TYPE_DICTIONARY:
+		save["wallet"] = {}
+	var wallet: Dictionary = save["wallet"]
+
+	# finance (compat) : garantit un dict avant toute lecture/écriture
+	if not save.has("finance") or typeof(save["finance"]) != TYPE_DICTIONARY:
+		save["finance"] = {}
+
+	# Source actuelle probable: save["finance"]["euros"]
+	var euros_fin: int = 0
+	if save.has("finance") and typeof(save["finance"]) == TYPE_DICTIONARY:
+		euros_fin = int((save["finance"] as Dictionary).get("euros", 0))
+
+	# wallet.euros devient la clé canonique Web, mais on garde sync
+	if not wallet.has("euros"):
+		wallet["euros"] = euros_fin
+	# et si finance.euros absent, on le remplit depuis wallet
+	if save.has("finance") and typeof(save["finance"]) == TYPE_DICTIONARY:
+		(save["finance"] as Dictionary)["euros"] = int(wallet.get("euros", euros_fin))
+
+func _xp_to_next(level: int) -> int:
+	return 10 + (maxi(1, level) - 1) * 6
+
+func _age_mult(age: int) -> float:
+	if age < 23:
+		return 0.85
+	if age <= 29:
+		return 1.15
+	if age <= 33:
+		return 1.00
+	return 0.80
+
+func _compute_player_salary(overall: int, age: int) -> int:
+	var o: int = maxi(1, overall)
+	var base: float = float(o * o) * K_SALARY * _age_mult(age)
+	var s: int = int(round(base))
+	return maxi(0, s)
+
+func _get_player_overall_from_dict(pl: Dictionary) -> int:
+	# Compat: overall/rating/pondération/ponderation
+	if pl.has("overall"):
+		return int(pl.get("overall", 70))
+	if pl.has("rating"):
+		return int(pl.get("rating", 70))
+	if pl.has("pondération"):
+		return int(round(float(pl.get("pondération", 70))))
+	if pl.has("ponderation"):
+		return int(round(float(pl.get("ponderation", 70))))
+	return 70
+
+func _get_player_age_from_dict(pl: Dictionary) -> int:
+	if pl.has("age"):
+		return int(pl.get("age", 25))
+	return 25
+
+func _ensure_roster_players_minimal(save: Dictionary) -> void:
+	# Objectif: roster.players = Array[Dict{id,name,pos,age,overall,salary}]
+	if not save.has("roster") or typeof(save["roster"]) != TYPE_DICTIONARY:
+		save["roster"] = {}
+	var roster: Dictionary = save["roster"]
+
+	if roster.has("players") and typeof(roster["players"]) == TYPE_ARRAY:
+		return
+
+	var out: Array = []
+	# Source actuelle chez toi: players_by_id
+	if save.has("players_by_id") and typeof(save["players_by_id"]) == TYPE_DICTIONARY:
+		var by_id: Dictionary = save["players_by_id"]
+		for pid in by_id.keys():
+			var pl_raw = by_id[pid]
+			if typeof(pl_raw) != TYPE_DICTIONARY:
+				continue
+			var pl: Dictionary = pl_raw
+			var overall := _get_player_overall_from_dict(pl)
+			var age := _get_player_age_from_dict(pl)
+			var pos := str(pl.get("pos", pl.get("poste", "PG"))).strip_edges()
+			var name := ""
+			for k in ["name","display_name","nom","first_name","prenom"]:
+				if pl.has(k) and str(pl[k]).strip_edges() != "":
+					name = str(pl[k]).strip_edges()
+					break
+			if name == "":
+				name = "Player"
+
+			var row := {
+				"id": str(pid),
+				"name": name,
+				"pos": pos,
+				"age": age,
+				"overall": overall,
+				"salary": _compute_player_salary(overall, age),
+			}
+			out.append(row)
+
+	roster["players"] = out
+
+func _compute_total_salary_per_match(save: Dictionary) -> int:
+	var total: int = 0
+	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
+		var roster: Dictionary = save["roster"]
+		if roster.has("players") and typeof(roster["players"]) == TYPE_ARRAY:
+			for row_raw in roster["players"]:
+				if typeof(row_raw) != TYPE_DICTIONARY:
+					continue
+				var row: Dictionary = row_raw
+				total += int(row.get("salary", 0))
+	return maxi(0, total)
+
+func _apply_salaries_and_level(save: Dictionary, did_win: bool, did_draw: bool) -> void:
+	_ensure_club_wallet_schema(save)
+	_ensure_roster_players_minimal(save)
+
+	var wallet: Dictionary = save["wallet"]
+	var club: Dictionary = save["club"]
+
+	# 1) Paiement salaires (1x / match)
+
+	var total_sal := _compute_total_salary_per_match(save)
+	PlayerLife.ensure_finance_schema(save)
+	# total_depenses est géré une seule fois dans _fin_match() après apply_post_match_to_save()
+	wallet["euros"] = int(wallet.get("euros", 0)) - total_sal
+
+	# Sync compat finance.euros
+	if save.has("finance") and typeof(save["finance"]) == TYPE_DICTIONARY:
+		(save["finance"] as Dictionary)["euros"] = int(wallet["euros"])
+
+	# 2) XP + level up
+	var xp_add := XP_LOSS
+	if did_draw:
+		xp_add = XP_DRAW
+	elif did_win:
+		xp_add = XP_WIN
+
+	club["xp"] = int(club.get("xp", 0)) + xp_add
+
+	var level := int(club.get("level", 1))
+	while true:
+		var need := _xp_to_next(level)
+		if int(club["xp"]) < need:
+			break
+		club["xp"] = int(club["xp"]) - need
+		level += 1
+	club["level"] = level
+# ---------------------------------------------------------------------------
+
+var minute: int = 0
+var score_dom: int = 0
+var score_ext: int = 0
+var match_fini: bool = false
+
+var _score_final_dom: int = 0
+var _score_final_ext: int = 0
+var _timeline_dom: Array[int] = []
+var _timeline_ext: Array[int] = []
+var _team_dom_name: String = ""
+var _team_ext_name: String = ""
+
+var _user_is_home: bool = true
+var _user_team_name: String = ""
+var _opp_team_name: String = ""
+
+
+func _ensure_translations_loaded() -> void:
+	var key_test := "matchsim.summary_loss_close"
+	var paths := [
+		"res://i18n/translations.fr.tres",
+		"res://i18n/translations.en.tres",
+		"res://i18n/translations.es.tres",
+		"res://i18n/translations.it.tres",
+		"res://i18n/translations.pt.tres",
+	]
+	for path in paths:
+		var t: Translation = load(path) as Translation
+		if t == null:
+			print("[MATCHSIM][I18N] load FAIL ", path)
+			continue
+		# Preuve: ce que contient réellement l'objet Translation
+		var msg := t.get_message(key_test)
+		print("[MATCHSIM][I18N] loaded ", path, " locale=", t.locale, " has_key=", (msg != ""), " sample=", msg)
+		TranslationServer.add_translation(t)
+
+
+func _ready() -> void:
+	randomize()
+	_ensure_translations_loaded()
+	print("[MATCHSIM][I18N] test summary_loss_close=", tr("matchsim.summary_loss_close"))
+	print("[MATCHSIM][I18N] locale=", TranslationServer.get_locale())
+	print("[MATCHSIM][I18N] test end_prefix=", tr("matchsim.end_prefix"))
+	print("[MATCHSIM][I18N] test loss_close=", tr("matchsim.summary_loss_close"))
+
+	# UI init
+	lbl_info.text = ""
+	if stats_end != null:
+		stats_end.visible = false
+
+	print("[DBG] before _apply_stats_titles")
+	_apply_stats_titles()
+	print("[DBG] after _apply_stats_titles")
+
+	print("[DBG] before _apply_end_stats_transparency")
+	_apply_end_stats_transparency()
+	print("[DBG] after _apply_end_stats_transparency")
+
+	print("[DBG] before _center_stats_end_horizontally")
+	_center_stats_end_horizontally()
+	print("[DBG] after _center_stats_end_horizontally")
+
+	btn_retour.disabled = true
+	if not btn_retour.pressed.is_connected(_on_btn_retour_pressed):
+		btn_retour.pressed.connect(_on_btn_retour_pressed)
+
+	# BtnSkip (fast-forward fin de match)
+	if btn_skip != null:
+		btn_skip.text = tr("matchsim.btn_skip")
+		if not btn_skip.pressed.is_connected(_on_btn_skip_pressed):
+			btn_skip.pressed.connect(_on_btn_skip_pressed)
+
+
+	# Timer (1 sec = 1 minute)
+	timer.wait_time = 1.0
+	timer.one_shot = false
+	timer.autostart = false
+	if not timer.timeout.is_connected(_on_timer_timeout):
+		timer.timeout.connect(_on_timer_timeout)
+
+		print("[DBG READY] before _prepare_match_like_py")
+	_prepare_match_like_py()
+	print("[DBG READY] after _prepare_match_like_py")
+
+	print("[DBG READY] before _init_team_names")
+	_init_team_names()
+	print("[DBG READY] after _init_team_names")
+
+	print("[DBG READY] before _fade_in_scoreboard")
+	_fade_in_scoreboard()
+	print("[DBG READY] after _fade_in_scoreboard")
+
+	print("[DBG READY] before _update_ui")
+	_update_ui()
+	print("[DBG READY] after _update_ui")
+
+	print("[DBG READY] before timer.start")
+	timer.start()
+	print("[DBG READY] after timer.start")
+
+func _prepare_match_like_py() -> void:
+	# --- DUPLICATION LOGIQUE .py (base_score 70-90 + diff*25 + rand(-5..5), clamp 50..120) ---
+	# Tant qu’on n’a pas encore la pondération côté Godot, on utilise une diff simple.
+	# (Tu pourras remplacer _estimate_strength_* par tes vraies pondérations quand elles seront prêtes.)
+	var base_score: int = randi_range(70, 90)
+
+	var mean_dom: float = _estimate_strength_dom()
+	var mean_ext: float = _estimate_strength_ext()
+	var diff: float = mean_dom - mean_ext
+
+	_score_final_dom = clampi(int(base_score + diff * 25.0 + float(randi_range(-5, 5))), 50, 120)
+	_score_final_ext = clampi(int(base_score - diff * 25.0 + float(randi_range(-5, 5))), 50, 120)
+
+	_generate_timeline_scores(_score_final_dom, _score_final_ext, MATCH_DUREE_MINUTES)
+
+func _estimate_strength_dom() -> float:
+	# TODO: remplacer par ta moyenne de pondération (comme calculer_pondération dans le .py)
+	return 70.0
+
+func _estimate_strength_ext() -> float:
+	# TODO: remplacer par la moyenne de pondération de l’adversaire
+	return 70.0
+
+func _generate_timeline_scores(target_dom: int, target_ext: int, duree: int) -> void:
+	_timeline_dom.clear()
+	_timeline_ext.clear()
+
+	var dom: int = 0
+	var ext: int = 0
+
+	for m in range(1, duree + 1):
+		var mins_left: int = duree - m + 1
+
+		var rem_dom: int = target_dom - dom
+		var rem_ext: int = target_ext - ext
+
+		# Sur la fin, on répartit le reste doucement (PAS de collage brutal)
+		if mins_left <= NO_CATCHUP_LAST_MIN:
+			var add_dom_end: int = clampi(int(round(float(rem_dom) / float(mins_left))), 0, MAX_ADD_PER_MIN)
+			var add_ext_end: int = clampi(int(round(float(rem_ext) / float(mins_left))), 0, MAX_ADD_PER_MIN)
+			dom += add_dom_end
+			ext += add_ext_end
+		else:
+			# "Budget" par minute + petite variance, capé
+			var base_dom: float = float(rem_dom) / float(mins_left)
+			var base_ext: float = float(rem_ext) / float(mins_left)
+
+			var add_dom: int = clampi(int(round(base_dom + randf_range(-0.8, 0.8))), 0, MAX_ADD_PER_MIN)
+			var add_ext: int = clampi(int(round(base_ext + randf_range(-0.8, 0.8))), 0, MAX_ADD_PER_MIN)
+
+			dom += add_dom
+			ext += add_ext
+
+		# Jamais dépasser les targets
+		if dom > target_dom: dom = target_dom
+		if ext > target_ext: ext = target_ext
+
+		_timeline_dom.append(dom)
+		_timeline_ext.append(ext)
+
+	# Sécurité finale : si on est un peu en dessous, on distribue l'écart AVANT la fin (jamais les dernières minutes)
+	var diff_dom: int = target_dom - dom
+	var diff_ext: int = target_ext - ext
+	_distribute_diff_early(_timeline_dom, diff_dom, duree)
+	_distribute_diff_early(_timeline_ext, diff_ext, duree)
+
+
+func _distribute_diff_early(tl: Array[int], diff: int, duree: int) -> void:
+	if diff <= 0:
+		return
+
+	var limit: int = max(1, duree - NO_CATCHUP_LAST_MIN) # exclut les dernières minutes
+	while diff > 0:
+		var idx: int = randi_range(0, limit - 1)
+		var add: int = min(2, diff) # petites touches
+		for j in range(idx, tl.size()):
+			tl[j] += add
+		diff -= add
+
+func _init_team_names() -> void:
+	# Nom équipe depuis savegame (clé réelle = team_name)
+	var user_name := tr("matchsim.team_default")
+	var save := PlayerLife.load_savegame()
+
+	if typeof(save) == TYPE_DICTIONARY:
+		# ✅ priorité : team_name (création équipe)
+		var n := str(save.get("team_name", "")).strip_edges()
+		if n != "":
+			user_name = n
+		else:
+			# fallback : club_name si présent (cas futur)
+			n = str(save.get("club_name", "")).strip_edges()
+			if n != "":
+				user_name = n
+
+	_user_team_name = user_name
+
+	# Adversaire + home/away via SeasonState
+	var opp_name := tr("matchsim.opponent_default")
+	var user_home := true
+
+	var ss := get_node_or_null("/root/SeasonState") as SeasonState
+	if ss != null:
+		var r := int(save.get("season_round", 0))
+
+		# ✅ Calendrier round-robin si dispo
+		if ss.has_method("get_user_fixture_for_round"):
+			var fx: Dictionary = ss.call("get_user_fixture_for_round", user_name, r)
+			if typeof(fx) == TYPE_DICTIONARY and fx.size() > 0:
+				user_home = bool(fx.get("user_is_home", true))
+				opp_name = str(fx.get("opponent", opp_name)).strip_edges()
+			else:
+				# fallback ancien
+				user_home = (r % 2 == 0)
+				if ss.has_method("compute_next_opponent_name"):
+					var v := str(ss.call("compute_next_opponent_name", user_name)).strip_edges()
+					if v != "":
+						opp_name = v
+		else:
+			# fallback ancien si pas de fixture
+			user_home = (r % 2 == 0)
+			if ss.has_method("compute_next_opponent_name"):
+				var v2 := str(ss.call("compute_next_opponent_name", user_name)).strip_edges()
+				if v2 != "":
+					opp_name = v2
+
+	_user_is_home = user_home
+	_opp_team_name = opp_name
+
+	# Mapping visuel : RECEVEUR à gauche (DOM), VISITEUR à droite (EXT)
+	var dom_name := ""
+	var ext_name := ""
+
+	if _user_is_home:
+		dom_name = _user_team_name
+		ext_name = _opp_team_name
+	else:
+		dom_name = _opp_team_name
+		ext_name = _user_team_name
+
+	_team_dom_name = dom_name
+	_team_ext_name = ext_name
+
+	print("[DBG NAMES] dom_name=", dom_name, " ext_name=", ext_name, " lbl_team_dom=", lbl_team_dom, " lbl_team_ext=", lbl_team_ext)
+	if lbl_team_dom != null:
+		lbl_team_dom.text = dom_name
+	if lbl_team_ext != null:
+		lbl_team_ext.text = ext_name
+func _fade_in_scoreboard() -> void:
+	# Fade-in doux (0.35s) du scoreboard + info panel
+	if scoreboard_panel == null or info_panel == null:
+		return
+
+	scoreboard_panel.modulate.a = 0.0
+	info_panel.modulate.a = 0.0
+
+	var tw := create_tween()
+	tw.set_trans(Tween.TRANS_SINE)
+	tw.set_ease(Tween.EASE_OUT)
+	tw.tween_property(scoreboard_panel, "modulate:a", 1.0, 1.30)
+	tw.parallel().tween_property(info_panel, "modulate:a", 1.0, 1.30)
+
+func _on_timer_timeout() -> void:
+	if match_fini:
+		return
+
+	minute += 1
+
+	if minute <= _timeline_dom.size():
+		score_dom = int(_timeline_dom[minute - 1])
+	if minute <= _timeline_ext.size():
+		score_ext = int(_timeline_ext[minute - 1])
+
+	_update_ui()
+
+	if minute >= MATCH_DUREE_MINUTES:
+		_fin_match()
+
+func _update_ui() -> void:
+	print("[DBG UI] lbl_temps=", lbl_temps, " lbl_score=", lbl_score, " minute=", minute, " dom=", score_dom, " ext=", score_ext)
+	if lbl_temps != null:
+		lbl_temps.text = str(minute) + "'"
+	if lbl_score != null:
+		lbl_score.text = str(score_dom) + " - " + str(score_ext)
+
+func _apply_stats_titles() -> void:
+	# Titres au centre (KEYs -> tr via I18n.gd)
+	if lbl_title_2p != null:
+		lbl_title_2p.text = tr("matchsim.stats_2p")
+	if lbl_title_3p != null:
+		lbl_title_3p.text = tr("matchsim.stats_3p")
+	if lbl_title_mvp != null:
+		lbl_title_mvp.text = tr("matchsim.stats_mvp")
+
+func _apply_end_stats_transparency() -> void:
+	var a := 0.85
+
+	if lbl_dom_2p != null: lbl_dom_2p.modulate.a = a
+	if lbl_ext_2p != null: lbl_ext_2p.modulate.a = a
+	if lbl_dom_3p != null: lbl_dom_3p.modulate.a = a
+	if lbl_ext_3p != null: lbl_ext_3p.modulate.a = a
+	if lbl_dom_mvp != null: lbl_dom_mvp.modulate.a = a
+	if lbl_ext_mvp != null: lbl_ext_mvp.modulate.a = a
+
+	if lbl_title_2p != null: lbl_title_2p.modulate.a = 0.95
+	if lbl_title_3p != null: lbl_title_3p.modulate.a = 0.95
+	if lbl_title_mvp != null: lbl_title_mvp.modulate.a = 0.95
+
+func _center_stats_end_horizontally() -> void:
+	if stats_end == null:
+		return
+
+	# Ancrer horizontalement au centre et recalculer les offsets selon la taille réelle
+	stats_end.anchor_left = 0.5
+	stats_end.anchor_right = 0.5
+
+	# Assure que la taille est à jour (utile si layout)
+	stats_end.queue_redraw()
+	await get_tree().process_frame
+
+	stats_end.offset_left = -stats_end.size.x * 0.5
+	stats_end.offset_right = stats_end.size.x * 0.5
+
+
+
+func _persist_ranking_history_to_save() -> void:
+	var ss := get_node_or_null("/root/SeasonState") as SeasonState
+	if ss == null:
+		return
+
+	if ss.has_method("push_current_club_rank"):
+		ss.call("push_current_club_rank", _user_team_name)
+
+	var save: Dictionary = PlayerLife.load_savegame()
+	save["ranking_history"] = ss.ranking_history.duplicate()
+	PlayerLife.write_savegame(save)
+	print("[MATCHSIM][RANK] persisted ranking_history=", save["ranking_history"])
+
+
+
+func _append_finance_history_to_save(save: Dictionary) -> void:
+	if not save.has("finance_history_recettes") or typeof(save["finance_history_recettes"]) != TYPE_ARRAY:
+		save["finance_history_recettes"] = []
+	if not save.has("finance_history_depenses") or typeof(save["finance_history_depenses"]) != TYPE_ARRAY:
+		save["finance_history_depenses"] = []
+	if not save.has("finance_history_solde") or typeof(save["finance_history_solde"]) != TYPE_ARRAY:
+		save["finance_history_solde"] = []
+
+	var recettes_total: int = int(save.get("total_recettes", 0))
+	var depenses_total: int = int(save.get("total_depenses", 0))
+	var solde_total: int = recettes_total - depenses_total
+
+	(save["finance_history_recettes"] as Array).append(recettes_total)
+	(save["finance_history_depenses"] as Array).append(depenses_total)
+	(save["finance_history_solde"] as Array).append(solde_total)
+
+func _pick_home_mvp_name_or_fallback() -> String:
+	var save := PlayerLife.load_savegame()
+	var played_ids: Array = []
+
+	if typeof(save) == TYPE_DICTIONARY and save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
+		var roster: Dictionary = save["roster"]
+		if roster.has("selected_ids") and typeof(roster["selected_ids"]) == TYPE_ARRAY:
+			played_ids = roster["selected_ids"]
+
+	if typeof(save) == TYPE_DICTIONARY and save.has("players_by_id") and typeof(save["players_by_id"]) == TYPE_DICTIONARY and played_ids.size() > 0:
+		var by_id: Dictionary = save["players_by_id"]
+		var any_id = played_ids[randi_range(0, played_ids.size() - 1)]
+		if by_id.has(any_id) and typeof(by_id[any_id]) == TYPE_DICTIONARY:
+			var pl: Dictionary = by_id[any_id]
+			for k in ["first_name", "name", "prenom", "display_name"]:
+				if pl.has(k) and str(pl[k]).strip_edges() != "":
+					return str(pl[k]).strip_edges()
+
+	return "Joueur"
+
+
+func _compute_end_stats_and_show(dom_team: String, ext_team: String) -> void:
+	# Stats cohérentes (simple) : dépend du rythme + diff
+	var total := score_dom + score_ext
+	var diff := score_dom - score_ext
+
+	# Base en fonction du total points (rythme)
+	var base_2p := clampi(46 + int((total - 150) * 0.05), 40, 60)
+	var base_3p := clampi(33 + int((total - 150) * 0.03), 25, 45)
+
+	# Petites variations + léger biais vers le gagnant
+	var bias := clampi(int(diff * 0.15), -6, 6)
+
+	var dom_2p := clampi(base_2p + randi_range(-4, 4) + (1 if diff > 0 else 0), 35, 65)
+	var ext_2p := clampi(base_2p + randi_range(-4, 4) - (1 if diff > 0 else 0), 35, 65)
+
+	var dom_3p := clampi(base_3p + randi_range(-5, 5) + (1 if diff > 0 else 0), 20, 50)
+	var ext_3p := clampi(base_3p + randi_range(-5, 5) - (1 if diff > 0 else 0), 20, 50)
+
+	# MVP : côté gagnant (sinon random)
+	var mvp_side := 0 # 0=dom, 1=ext
+	if diff == 0:
+		mvp_side = randi() % 2
+	elif diff < 0:
+		mvp_side = 1
+
+	var dom_mvp := "—"
+	var ext_mvp := "—"
+
+	if mvp_side == 0:
+		dom_mvp = _pick_home_mvp_name_or_fallback()
+		ext_mvp = ext_team + " #" + str(randi_range(1, 15))
+	else:
+		ext_mvp = ext_team + " #" + str(randi_range(1, 15))
+		dom_mvp = tr("matchsim.mvp_home_short")  # ex: "—" ou "Capitaine"
+
+	# Ecriture UI (grille 3 colonnes)
+	if lbl_dom_2p != null: lbl_dom_2p.text = str(dom_2p) + "%"
+	if lbl_ext_2p != null: lbl_ext_2p.text = str(ext_2p) + "%"
+
+	if lbl_dom_3p != null: lbl_dom_3p.text = str(dom_3p) + "%"
+	if lbl_ext_3p != null: lbl_ext_3p.text = str(ext_3p) + "%"
+
+	if lbl_dom_mvp != null: lbl_dom_mvp.text = dom_mvp
+	if lbl_ext_mvp != null: lbl_ext_mvp.text = ext_mvp
+
+	# ✅ MVP du match (1 ligne sous la grille)
+	if lbl_mvp_match != null:
+		var mvp_name := (dom_mvp if mvp_side == 0 else ext_mvp)
+		lbl_mvp_match.text = tr("matchsim.mvp_match") + " : " + str(mvp_name)
+		lbl_mvp_match.modulate.a = 0.90
+
+	# Centrage + affichage
+	_center_stats_end_horizontally()
+
+	if stats_end != null:
+		stats_end.visible = true
+
+
+
+func _build_match_summary(score_dom: int, score_ext: int) -> String:
+	# Résumé en 10–15 mots (phrases pré-calibrées)
+	var diff := score_dom - score_ext
+
+	# Diff mi-temps (minute 20) si timeline dispo
+	var half_diff := 0
+	if _timeline_dom.size() >= 20 and _timeline_ext.size() >= 20:
+		half_diff = int(_timeline_dom[19]) - int(_timeline_ext[19])
+
+	# Cas match nul (11 mots)
+	if diff == 0:
+		return tr("matchsim.summary_draw")
+
+	# Comeback / renversement (11 mots)
+	if half_diff < 0 and diff > 0:
+		return tr("matchsim.summary_comeback_win")
+	if half_diff > 0 and diff < 0:
+		return tr("matchsim.summary_comeback_loss")
+
+	# Victoire
+	if diff > 0:
+		if diff <= 5:
+			return tr("matchsim.summary_win_close")
+		elif diff >= 16:
+			return tr("matchsim.summary_win_big")
+		else:
+			return tr("matchsim.summary_win_control")
+
+	# Défaite
+	if diff < 0:
+		if diff >= -5:
+			return tr("matchsim.summary_loss_close")
+		elif diff <= -16:
+			return tr("matchsim.summary_loss_big")
+		else:
+			return tr("matchsim.summary_loss_normal")
+	
+	return tr("matchsim.summary_default")
+
+func _tr_summary_key_or_text(s: String) -> String:
+	var k := s.strip_edges()
+	if k.begins_with("matchsim.summary_"):
+		if MATCHSIM_SUMMARY_ALIASES.has(k):
+			k = str(MATCHSIM_SUMMARY_ALIASES[k])
+		return tr(k)
+	# si ce n’est pas une clé, on renvoie tel quel
+	return s
+
+
+func _resolve_and_tr_summary(raw: String) -> String:
+	var k := raw.strip_edges()
+
+	# ✅ Si ce n'est pas une KEY i18n, c'est déjà une phrase -> on la garde
+	if not k.begins_with("matchsim."):
+		return k
+
+	# Alias -> clé officielle (typos / variantes)
+	if MATCHSIM_SUMMARY_ALIASES.has(k):
+		k = str(MATCHSIM_SUMMARY_ALIASES[k])
+
+	# Traduction directe : si la clé existe, tr() renvoie une phrase différente
+	var t := tr(k)
+	if t != k:
+		return t
+
+	# Fallback ultime
+	return tr("matchsim.summary_default")
+
+# BM_POP_FIN_V1 --------------------------------------------------------------
+# Objectif: clone logique .py (popularité -> coef 0.30..1.00 -> recettes domicile cumulées)
+# SÉCURITÉ: anti-double-compte via save["last_pop_fin_round"]
+
+func _get_int_path(d: Dictionary, path: Array, default_val: int = 0) -> int:
+	var cur = d
+	for i in range(path.size()):
+		var k = path[i]
+		if typeof(cur) != TYPE_DICTIONARY:
+			return default_val
+		if not cur.has(k):
+			return default_val
+		cur = cur[k]
+	return int(cur) if cur != null else default_val
+
+func _compute_ticketing_prevision(save: Dictionary) -> int:
+	# Forme attendue: prix A/B/C + places A/B/C
+	var candidates = [
+		[["stadium","ticketing","price_a"], ["stadium","ticketing","seats_a"]],
+		[["stadium","ticketing","price_b"], ["stadium","ticketing","seats_b"]],
+		[["stadium","ticketing","price_c"], ["stadium","ticketing","seats_c"]],
+		[["ticketing","price_a"], ["ticketing","seats_a"]],
+		[["ticketing","price_b"], ["ticketing","seats_b"]],
+		[["ticketing","price_c"], ["ticketing","seats_c"]],
+	]
+	var total := 0
+	for pair in candidates:
+		var price_path = pair[0]
+		var seats_path = pair[1]
+		var price := _get_int_path(save, price_path, 0)
+		var seats := _get_int_path(save, seats_path, 0)
+		if price > 0 and seats > 0:
+			total += price * seats
+	return total
+
+func _compute_shop_prevision(save: Dictionary) -> int:
+	# 1) shop.items = [{price, qty}...] ou shop.items_by_id = {id:{price,qty}}
+	var total := 0
+
+	var items: Array = []
+	if save.has("shop") and typeof(save["shop"]) == TYPE_DICTIONARY:
+		var shop: Dictionary = save["shop"]
+		if shop.has("items") and typeof(shop["items"]) == TYPE_ARRAY:
+			items = shop["items"]
+	if items.size() > 0:
+		for it in items:
+			if typeof(it) != TYPE_DICTIONARY:
+				continue
+			var price := int(it.get("price", 0))
+			var qty := int(it.get("qty", it.get("stock", 0)))
+			if price > 0 and qty > 0:
+				total += price * qty
+		return total
+
+	if save.has("shop") and typeof(save["shop"]) == TYPE_DICTIONARY:
+		var shop2: Dictionary = save["shop"]
+		if shop2.has("items_by_id") and typeof(shop2["items_by_id"]) == TYPE_DICTIONARY:
+			var by: Dictionary = shop2["items_by_id"]
+			for k in by.keys():
+				var it2 = by[k]
+				if typeof(it2) != TYPE_DICTIONARY:
+					continue
+				var price2 := int(it2.get("price", 0))
+				var qty2 := int(it2.get("qty", it2.get("stock", 0)))
+				if price2 > 0 and qty2 > 0:
+					total += price2 * qty2
+			return total
+
+	total = int((save.get("shop", {}) as Dictionary).get("total_forecast", 0))
+	return total
+
+func _apply_popularity_after_match(save: Dictionary, did_win: bool, did_draw: bool) -> void:
+	PlayerLife.ensure_finance_schema(save)
+
+	# --- Resolve a stable round/match id from save (best-effort) ---
+	var round_id: int = -1
+	if save.has("journee"):
+		print("[POP] BEFORE =", save.get("popularite", -1), " win=", did_win, " draw=", did_draw)
+		round_id = int(save.get("journee", -1))
+	elif save.has("round_id"):
+		round_id = int(save.get("round_id", -1))
+	elif save.has("round"):
+		round_id = int(save.get("round", -1))
+	elif save.has("match_index"):
+		round_id = int(save.get("match_index", -1))
+	elif save.has("season") and typeof(save["season"]) == TYPE_DICTIONARY:
+		var s := save["season"] as Dictionary
+		if s.has("journee"):
+			round_id = int(s.get("journee", -1))
+		elif s.has("round"):
+			round_id = int(s.get("round", -1))
+		elif s.has("match_index"):
+			round_id = int(s.get("match_index", -1))
+
+
+	# --- Source of truth: popularite (fallback 50), migrate legacy keys once ---
+	var pop: int = int(save.get("popularite", 50))
+	if not save.has("popularite"):
+		if save.has("popularity"):
+			pop = int(save.get("popularity", 50))
+		elif save.has("notoriety"):
+			pop = int(save.get("notoriety", 50))
+		elif save.has("notoriete"):
+			pop = int(save.get("notoriete", 50))
+		save["popularite"] = pop
+	print("[POP] AFTER =", pop)
+
+	# --- Clamp canonical ---
+	pop = clampi(pop, 30, 100)
+	save["popularite"] = pop
+	var coef: float = float(pop) / 100.0
+
+	# --- Shop income computed from forecast * popularity coef (unchanged structure) ---
+	var shop_forecast: int = 0
+	if save.has("shop") and typeof(save["shop"]) == TYPE_DICTIONARY:
+		shop_forecast = int((save["shop"] as Dictionary).get("total_forecast", 0))
+
+	var shop_income: int = int(round(float(shop_forecast) * coef))
+	if shop_income < 0:
+		shop_income = 0
+	# NOTE: si tu stockes shop_income quelque part, fais-le dans la clé existante attendue (non modifiée ici)
+
+	# --- Update popularity after match result (win +8 / draw +1 / lose -7) ---
+	if did_draw:
+		pop += 1
+	elif did_win:
+		pop += 8
+	else:
+		pop -= 7
+
+	print("[POP][FINAL BEFORE CLAMP] pop=", pop)
+	pop = clampi(pop, 30, 100)
+	save["popularite"] = pop
+	print("[POP] UPDATED =", pop)
+func _fin_match() -> void:
+	match_fini = true
+	timer.stop()
+
+	var resultat := ""
+	var user_score := score_dom if _user_is_home else score_ext
+	var opp_score := score_ext if _user_is_home else score_dom
+
+	if user_score > opp_score:
+		resultat = tr("matchsim.result_win")
+	elif user_score < opp_score:
+		resultat = tr("matchsim.result_loss")
+	else:
+		resultat = tr("matchsim.result_draw")
+
+	var resume_raw := _build_match_summary(user_score, opp_score)
+	var resume := tr(resume_raw) # ✅ si resume_raw est une clé => traduit, sinon inchangé
+	print("[MATCHSIM][DBG] summary_raw_before_resolve=", str(resume))
+	resume = _resolve_and_tr_summary(str(resume))
+	lbl_info.text = tr("matchsim.end_prefix") + " " + resultat + "\n" + resume
+
+	if stats_end != null:
+		_compute_end_stats_and_show(_team_dom_name, _team_ext_name)
+
+	# --- PATCH ULTRA-CIBLÉ: update joueurs "vivants" + rewrite savegame.json ---
+	var save := PlayerLife.load_savegame()
+	# BM_POP_FIN_APPLY_V2 ------------------------------------------------------
+	PlayerLife.ensure_finance_schema(save)
+
+	var _finance_euros_before_match: int = 0
+	if save.has("finance") and typeof(save["finance"]) == TYPE_DICTIONARY:
+		_finance_euros_before_match = int((save["finance"] as Dictionary).get("euros", 0))
+	elif save.has("wallet") and typeof(save["wallet"]) == TYPE_DICTIONARY:
+		_finance_euros_before_match = int((save["wallet"] as Dictionary).get("euros", 0))
+
+	var _total_recettes_before_match: int = int(save.get("total_recettes", 0))
+	var _total_depenses_before_match: int = int(save.get("total_depenses", 0))
+
+	# BM_ROUND_PERSIST_V2: source unique = save[season_round] (ne dépend pas de SeasonState)
+	var round_index_local := int(save.get("season_round", 0))
+	if save.has("progress") and typeof(save["progress"]) == TYPE_DICTIONARY:
+		var progress_local: Dictionary = save["progress"] as Dictionary
+		round_index_local = maxi(0, int(progress_local.get("journee", round_index_local + 1)) - 1)
+	var last_round := int(save.get("last_pop_fin_round", -999))
+	var already_applied := (last_round == round_index_local)
+
+	var did_draw_local := (score_dom == score_ext)
+	var did_win_local := false
+	if _user_is_home:
+		did_win_local = (score_dom > score_ext)
+	else:
+		did_win_local = (score_ext > score_dom)
+
+	# BM_DBG_POP_V1
+	print("[POP][DBG] already_applied=", already_applied, " round=", round_index_local, " last=", int(save.get('last_pop_fin_round', -999)), " season_round=", int(save.get('season_round', -1)), " pop=", int(save.get('popularite', 50)))
+	if not already_applied:
+		print("APPLY POP CALLED")
+		_apply_popularity_after_match(save, did_win_local, did_draw_local)
+		print("[DBG LAST WRITE] season_results=", save.get("season_results", {}))
+		PlayerLife.write_savegame(save)
+
+	if not already_applied and _user_is_home:
+		var coef := PlayerLife.popularity_coef(save)
+		var prev_ticket := _compute_ticketing_prevision(save)
+		var prev_shop := _compute_shop_prevision(save)
+		print("[SEATS DEBUG] A=", save.get("stadium", {}).get("ticketing", {}).get("seats_a", -1))
+		print("[SEATS DEBUG] B=", save.get("stadium", {}).get("ticketing", {}).get("seats_b", -1))
+		print("[SEATS DEBUG] C=", save.get("stadium", {}).get("ticketing", {}).get("seats_c", -1))
+		var rec_ticket := int(round(float(prev_ticket) * coef))
+		print("[TICKET DEBUG] prev_ticket=", prev_ticket, " coef=", coef, " rec_ticket=", rec_ticket)
+		var rec_shop := int(round(float(prev_shop) * coef))
+		save["total_billetterie"] = int(save.get("total_billetterie", 0)) + rec_ticket
+		save["total_boutique"] = int(save.get("total_boutique", 0)) + rec_shop
+		save["total_recettes"] = int(save.get("total_recettes", 0)) + rec_ticket + rec_shop
+
+		# Pas de crédit direct de finance.euros ici :
+		# wallet / finance sont recalculés plus bas à partir des cumuls.
+
+	if not already_applied and round_index_local != -1:
+		save["last_pop_fin_round"] = round_index_local
+	var played_ids: Array = []
+	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
+		var roster: Dictionary = save["roster"]
+		if roster.has("selected_ids") and typeof(roster["selected_ids"]) == TYPE_ARRAY:
+			played_ids = roster["selected_ids"]
+
+	var did_win := false
+	if _user_is_home:
+		did_win = (score_dom > score_ext)
+	else:
+		did_win = (score_ext > score_dom)
+	
+	# --- Shop income (local scope, no name collisions) ---
+	var _shop_pop_raw := 50
+	_shop_pop_raw = int(save.get("popularite", 50))
+	var _shop_pop_val := clampi(_shop_pop_raw, 30, 100)
+	var _shop_coef := float(_shop_pop_val) / 100.0
+
+	var _shop_forecast := 0
+	if save.has("shop") and typeof(save["shop"]) == TYPE_DICTIONARY:
+		_shop_forecast = int((save["shop"] as Dictionary).get("total_forecast", 0))
+	print("[SHOP DBG] pop=", _shop_pop_val, " coef=", _shop_coef, " forecast_from_save=", _shop_forecast)
+	print("[SHOP DBG] pop=", _shop_pop_val, " coef=", _shop_coef, " forecast_from_save=", _shop_forecast)
+
+	var shop_income := int(round(float(_shop_forecast) * _shop_coef))
+	if shop_income < 0:
+		shop_income = 0
+	# -----------------------------------------------
+	print("[POP BEFORE apply_post_match] =", save.get("popularite", -1))
+
+	# --- KEEP STADIUM / FINANCE STADIUM FIELDS ------------------------------
+	var _stadium_keep: Dictionary = {}
+	if save.has("stadium") and typeof(save["stadium"]) == TYPE_DICTIONARY:
+		_stadium_keep = (save["stadium"] as Dictionary).duplicate(true)
+
+	var _finance_stadium_keep: Dictionary = {}
+	if save.has("finance") and typeof(save["finance"]) == TYPE_DICTIONARY:
+		var _fin_keep: Dictionary = save["finance"] as Dictionary
+		_finance_stadium_keep["total_cout_evolution_stade"] = int(_fin_keep.get("total_cout_evolution_stade", 0))
+		_finance_stadium_keep["dernier_achat_stade_cout"] = int(_fin_keep.get("dernier_achat_stade_cout", 0))
+		_finance_stadium_keep["dernier_achat_stade_label"] = str(_fin_keep.get("dernier_achat_stade_label", ""))
+	# -----------------------------------------------------------------------
+
+	# 🔒 Sauvegarde ticketing AVANT overwrite
+	var _ticketing_keep := {}
+	if save.has("stadium") and typeof(save["stadium"]) == TYPE_DICTIONARY:
+		var _st := save["stadium"] as Dictionary
+		if _st.has("ticketing") and typeof(_st["ticketing"]) == TYPE_DICTIONARY:
+			_ticketing_keep = _st["ticketing"].duplicate(true)
+
+	save = PlayerLife.apply_post_match_to_save(save, played_ids, did_win)
+
+	# 🔒 Restauration ticketing APRÈS overwrite
+	if not _ticketing_keep.is_empty():
+		if not save.has("stadium") or typeof(save["stadium"]) != TYPE_DICTIONARY:
+			save["stadium"] = {}
+		(save["stadium"] as Dictionary)["ticketing"] = _ticketing_keep
+
+	if not _stadium_keep.is_empty():
+		var _st_after := _stadium_keep
+
+		if not _ticketing_keep.is_empty():
+			_st_after["ticketing"] = _ticketing_keep
+
+		if not save.has("stadium") or typeof(save["stadium"]) != TYPE_DICTIONARY:
+			save["stadium"] = {}
+
+		var _st_current := save["stadium"] as Dictionary
+
+		for k in _st_after.keys():
+			if k != "ticketing":
+				_st_current[k] = _st_after[k]
+
+		save["stadium"] = _st_current
+
+	if not save.has("finance") or typeof(save["finance"]) != TYPE_DICTIONARY:
+		save["finance"] = {}
+	var _fin_after: Dictionary = save["finance"] as Dictionary
+	for _k in _finance_stadium_keep.keys():
+		_fin_after[_k] = _finance_stadium_keep[_k]
+
+	print("[POP AFTER apply_post_match] =", save.get("popularite", -1))
+
+	# ✅ Salaires + XP/level : 1 seule fois / match (anti double-compte)
+	# On le fait APRÈS apply_post_match_to_save() car il réécrit 'save'.
+	if not already_applied:
+		_apply_salaries_and_level(save, did_win, did_draw_local)
+		PlayerLife.ensure_finance_schema(save)
+		var salary_match := int(save.get("salary_total_per_match", 0))
+		save["total_depenses"] = int(save.get("total_depenses", 0)) + salary_match
+		save["total_salaires"] = int(save.get("total_salaires", 0)) + salary_match
+
+	# Revenus boutique déjà cumulés plus haut dans le bloc domicile.
+
+	# Sync wallet -> finance après la dernière écriture de la frame
+	# Sync wallet <-> finance après la dernière écriture de la frame
+	_ensure_club_wallet_schema(save)
+	if save.has("wallet") and typeof(save["wallet"]) == TYPE_DICTIONARY and save.has("finance") and typeof(save["finance"]) == TYPE_DICTIONARY:
+		var _recettes_cumulees: int = int(save.get("total_recettes", 0))
+		var _depenses_cumulees: int = int(save.get("total_depenses", 0))
+		var _wallet_after_match: int = _recettes_cumulees - _depenses_cumulees
+		if _wallet_after_match < 0:
+			_wallet_after_match = 0
+
+		print("[WALLET DBG] recettes=", _recettes_cumulees, " depenses=", _depenses_cumulees, " wallet_after=", _wallet_after_match)
+		(save["finance"] as Dictionary)["euros"] = _wallet_after_match
+		(save["wallet"] as Dictionary)["euros"] = _wallet_after_match
+		print("[WALLET DBG] saved finance.euros=", (save["finance"] as Dictionary).get("euros", -1), " wallet.euros=", (save["wallet"] as Dictionary).get("euros", -1))
+		_append_finance_history_to_save(save)
+
+	if not save.has("season_results") or typeof(save["season_results"]) != TYPE_DICTIONARY:
+		save["season_results"] = {}
+	var season_results_final: Dictionary = save["season_results"] as Dictionary
+	var round_key_final := str(round_index_local)
+	if not season_results_final.has(round_key_final) or typeof(season_results_final[round_key_final]) != TYPE_DICTIONARY:
+		season_results_final[round_key_final] = {}
+	var result_key_final := str(_team_dom_name) + "||" + str(_team_ext_name)
+	(season_results_final[round_key_final] as Dictionary)[result_key_final] = {
+		"score_dom": int(score_dom),
+		"score_ext": int(score_ext)
+	}
+	save["season_results"] = season_results_final
+
+	PlayerLife.write_savegame(save)
+
+	# Mise à jour saison
+	var ss := get_node_or_null("/root/SeasonState") as SeasonState
+	if ss != null:
+		# ✅ round du match réellement joué = round_index_local
+		var round_index: int = int(round_index_local)
+		ss.matchs_joues = round_index
+		print("[ROUND][SOURCE OF TRUTH] round_index=", round_index, " ss.matchs_joues=", int(ss.matchs_joues), " save.season_round=", int(save.get("season_round", -1)))
+
+		# 1) enregistrer le match user pour la journée round_index
+		if ss.has_method("register_match_result"):
+			ss.call("register_match_result", _team_dom_name, _team_ext_name, score_dom, score_ext, _user_team_name)
+
+			if not save.has("season_results") or typeof(save["season_results"]) != TYPE_DICTIONARY:
+				save["season_results"] = {}
+			var season_results_local: Dictionary = save["season_results"] as Dictionary
+			var round_key_local := str(round_index)
+			if not season_results_local.has(round_key_local) or typeof(season_results_local[round_key_local]) != TYPE_DICTIONARY:
+				season_results_local[round_key_local] = {}
+			var result_key_local := str(_team_dom_name) + "||" + str(_team_ext_name)
+			(season_results_local[round_key_local] as Dictionary)[result_key_local] = {
+				"score_dom": int(score_dom),
+				"score_ext": int(score_ext)
+			}
+			save["season_results"] = season_results_local
+
+		# 2) simuler les autres matchs de la même journée round_index
+		if ss.has_method("simulate_other_games_for_round"):
+			ss.call("simulate_other_games_for_round", _team_dom_name, _team_ext_name, round_index, _user_team_name)
+			_persist_ranking_history_to_save()
+
+			# --- Apply final rank-based popularity modifier AFTER real standings persist ---
+			var save_rank := PlayerLife.load_savegame()
+			if save_rank.has("ranking_history") and typeof(save_rank["ranking_history"]) == TYPE_ARRAY:
+				var hist: Array = save_rank["ranking_history"]
+				if hist.size() > 0:
+					var current_rank := int(hist[hist.size() - 1])
+					print("[POP][RANK FINAL] current_rank=", current_rank)
+
+					var pop_final := int(save_rank.get("popularite", 50))
+					if current_rank <= 3:
+						pop_final += 2
+					elif current_rank <= 6:
+						pop_final += 1
+					elif current_rank >= 10:
+						pop_final -= 1
+
+					pop_final = clampi(pop_final, 30, 100)
+					save_rank["popularite"] = pop_final
+					if save.has("season_results") and typeof(save["season_results"]) == TYPE_DICTIONARY:
+						save_rank["season_results"] = (save["season_results"] as Dictionary).duplicate(true)
+					PlayerLife.write_savegame(save_rank)
+					print("[POP][RANK FINAL APPLIED] pop=", pop_final)
+
+		# 3) incrémenter APRES la journée complète (une seule fois)
+		ss.matchs_joues = mini(round_index_local + 1, int(SeasonState.total_matchs_saison))
+
+		# --- FINAL FRESH SAVE SYNC (source de vérité disque) ---
+		var save_sync := PlayerLife.load_savegame()
+		if typeof(save_sync) != TYPE_DICTIONARY:
+			save_sync = {}
+
+		save_sync["season_round"] = int(ss.matchs_joues)
+
+		if not save_sync.has("progress") or typeof(save_sync["progress"]) != TYPE_DICTIONARY:
+			save_sync["progress"] = {}
+		(save_sync["progress"] as Dictionary)["journee"] = int(ss.matchs_joues) + 1
+
+		if not save_sync.has("season_results") or typeof(save_sync["season_results"]) != TYPE_DICTIONARY:
+			save_sync["season_results"] = {}
+		var season_results_sync: Dictionary = save_sync["season_results"] as Dictionary
+		var round_key_sync := str(round_index)
+		var round_results_sync: Dictionary = {}
+		if season_results_sync.has(round_key_sync) and typeof(season_results_sync[round_key_sync]) == TYPE_DICTIONARY:
+			round_results_sync = season_results_sync[round_key_sync] as Dictionary
+		var result_key_sync := str(_team_dom_name) + "||" + str(_team_ext_name)
+		round_results_sync[result_key_sync] = {
+			"score_dom": int(score_dom),
+			"score_ext": int(score_ext)
+		}
+		season_results_sync[round_key_sync] = round_results_sync
+		save_sync["season_results"] = season_results_sync
+
+		print("[DBG ROUND SYNC FRESH] season_results=", JSON.stringify(save_sync["season_results"]))
+		PlayerLife.write_savegame(save_sync)
+		print("[ROUND][SYNC FULL] season_round=", int(save_sync.get("season_round", -1)), " progress.journee=", int((save_sync["progress"] as Dictionary).get("journee", -1)), " season_results=", JSON.stringify(save_sync.get("season_results", {})))
+
+		# --- STADIUM WORKS SYNC -------------------------------------------------
+		var save_singleton := get_node_or_null("/root/SaveSingleton")
+		if save_singleton != null and save_singleton.has_method("stadium_sync_travaux"):
+			var current_matchs_saison: int = int(save.get("season_round", 0))
+			var sync_any: Variant = save_singleton.call("stadium_sync_travaux", current_matchs_saison)
+			if typeof(sync_any) == TYPE_DICTIONARY:
+				var sync_result: Dictionary = sync_any as Dictionary
+				if bool(sync_result.get("finished", false)):
+					print("[STADIUM] travaux terminés -> niveau ", sync_result.get("new_ng"), ".", sync_result.get("new_ns"))
+		# ----------------------------------------------------------------------
+
+		# 4) préparer l'adversaire suivant (optionnel)
+		if ss.has_method("get_user_fixture_for_round"):
+			var fx: Dictionary = ss.call("get_user_fixture_for_round", _user_team_name, int(ss.matchs_joues))
+			if typeof(fx) == TYPE_DICTIONARY and fx.size() > 0:
+				ss.opponent_name = str(fx.get("opponent", "")).strip_edges()
+
+	if btn_retour != null:
+		btn_retour.disabled = false
+
+func _on_btn_skip_pressed() -> void:
+	# Avance le match jusqu'à la fin sans changer la simulation : on saute l'attente.
+	if match_fini:
+		return
+
+	# Stop timer et bascule l'affichage sur le score final (timeline dernière valeur)
+	timer.stop()
+	minute = MATCH_DUREE_MINUTES
+
+	if _timeline_dom.size() > 0:
+		score_dom = int(_timeline_dom[_timeline_dom.size() - 1])
+	if _timeline_ext.size() > 0:
+		score_ext = int(_timeline_ext[_timeline_ext.size() - 1])
+
+	_update_ui()
+	_fin_match()
+
+
+func _on_btn_retour_pressed() -> void:
+	get_tree().change_scene_to_file("res://scenes/MenuSaison.tscn")

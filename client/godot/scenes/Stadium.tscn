@@ -1,0 +1,279 @@
+[gd_scene load_steps=24 format=3 uid="uid://b75f0rng4hgh6"]
+
+[ext_resource type="Script" uid="uid://cxnfc0do4ntn4" path="res://scripts/PopularityBadge.gd" id="1"]
+[ext_resource type="Script" uid="uid://c3wackmo0me1t" path="res://scenes/Stadium.gd" id="1_mkgw1"]
+[ext_resource type="Texture2D" uid="uid://ben5r7ogbey86" path="res://assets/images/stades/stadium.png" id="1_scrys"]
+[ext_resource type="Theme" uid="uid://xs5xp8el4jec" path="res://ui/theme_main.tres" id="1_ww51b"]
+[ext_resource type="Texture2D" uid="uid://cw4sc1gq4b6rx" path="res://assets/images/flags/fr.png" id="4_5vmom"]
+[ext_resource type="Texture2D" uid="uid://dqvrsv04pg8ko" path="res://assets/images/flags/us.png" id="5_cd1oo"]
+[ext_resource type="Texture2D" uid="uid://cl8dlls1yjafv" path="res://assets/images/flags/es.png" id="6_dnp4i"]
+[ext_resource type="Texture2D" uid="uid://ct8ol7rclxtcg" path="res://assets/images/flags/it.png" id="7_ylfig"]
+[ext_resource type="Texture2D" uid="uid://cnlfevlxi57x" path="res://assets/images/flags/pt.png" id="8_y8vb5"]
+[ext_resource type="StyleBox" uid="uid://byvsyt5r525lg" path="res://ui/styleboxes/btn_back_red.tres" id="ext_btn_back"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/btn_back_hover.tres" id="ext_btn_back_hover"]
+[ext_resource type="StyleBox" uid="uid://dxmreyym0vpbt" path="res://ui/styleboxes_nba/btn_back_pressed.tres" id="ext_btn_back_pressed"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_scrys"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.043137256, 0.23921569, 0.5686275, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ww51b"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.043137256, 0.23921569, 0.5686275, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mkgw1"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.043137256, 0.23921569, 0.5686275, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_f44ee"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.043137256, 0.23921569, 0.5686275, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dfcwh"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.043137256, 0.23921569, 0.5686275, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_afg8l"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.043137256, 0.23921569, 0.5686275, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ki05k"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.043137256, 0.23921569, 0.5686275, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5vmom"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.043137256, 0.23921569, 0.5686275, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cd1oo"]
+bg_color = Color(0.12156863, 0.5411765, 0.23137255, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dnp4i"]
+bg_color = Color(0.08627451, 0.4, 0.16862746, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ylfig"]
+bg_color = Color(0.16078432, 0.7019608, 0.2901961, 1)
+
+[node name="Stadium" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_ww51b")
+script = ExtResource("1_mkgw1")
+
+[node name="BG" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("1_scrys")
+stretch_mode = 4
+
+[node name="Menu" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.574
+anchor_top = 0.57100004
+anchor_right = 0.574
+anchor_bottom = 0.57100004
+offset_left = -303.248
+offset_top = 83.991974
+offset_right = 261.752
+offset_bottom = 205.42398
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 175
+
+[node name="BtnReprendre" type="Button" parent="Menu"]
+custom_minimum_size = Vector2(150, 70)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_scrys")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_ww51b")
+theme_override_styles/hover = SubResource("StyleBoxFlat_mkgw1")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_f44ee")
+text = "Reprendre la partie"
+
+[node name="BtnInscrire" type="Button" parent="Menu"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_dfcwh")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_afg8l")
+theme_override_styles/hover = SubResource("StyleBoxFlat_ki05k")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_5vmom")
+text = "S'inscrire / Créer son équipe"
+
+[node name="BtnPlayInstantly" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_right = 150.0
+offset_bottom = 64.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Play instantly"
+
+[node name="BtnConfirmer" type="Button" parent="."]
+visible = false
+layout_mode = 0
+offset_right = 8.0
+offset_bottom = 8.0
+theme_override_styles/normal = SubResource("StyleBoxFlat_cd1oo")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_dnp4i")
+theme_override_styles/hover = SubResource("StyleBoxFlat_ylfig")
+text = "Confirmer"
+
+[node name="BtnRetour" type="Button" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 34.0
+offset_top = -92.0
+offset_right = 240.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = ExtResource("ext_btn_back")
+theme_override_styles/pressed = ExtResource("ext_btn_back_pressed")
+theme_override_styles/hover = ExtResource("ext_btn_back_hover")
+theme_override_styles/focus = ExtResource("ext_btn_back")
+text = "btn.back"
+
+[node name="LangBar" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.98200005
+anchor_right = 1.0
+offset_left = -240.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 50.0
+grow_horizontal = 0
+
+[node name="BtnLangFR" type="TextureButton" parent="LangBar"]
+custom_minimum_size = Vector2(36, 24)
+layout_mode = 2
+tooltip_text = "Français"
+texture_normal = ExtResource("4_5vmom")
+stretch_mode = 5
+
+[node name="BtnLangEN" type="TextureButton" parent="LangBar"]
+custom_minimum_size = Vector2(48, 32)
+layout_mode = 2
+tooltip_text = "English"
+texture_normal = ExtResource("5_cd1oo")
+stretch_mode = 5
+
+[node name="BtnLangES" type="TextureButton" parent="LangBar"]
+custom_minimum_size = Vector2(48, 32)
+layout_mode = 2
+tooltip_text = "Español"
+texture_normal = ExtResource("6_dnp4i")
+stretch_mode = 5
+
+[node name="BtnLangIT" type="TextureButton" parent="LangBar"]
+custom_minimum_size = Vector2(48, 32)
+layout_mode = 2
+tooltip_text = "Italiano"
+texture_normal = ExtResource("7_ylfig")
+stretch_mode = 5
+
+[node name="BtnLangPT" type="TextureButton" parent="LangBar"]
+custom_minimum_size = Vector2(48, 32)
+layout_mode = 2
+tooltip_text = "Portugês"
+texture_normal = ExtResource("8_y8vb5")
+stretch_mode = 5
+
+[node name="PopularityBadge" type="Label" parent="."]
+visible = false
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -360.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 56.0
+text = "Popularity: 50%"
+horizontal_alignment = 2
+vertical_alignment = 1
+script = ExtResource("1")
+
+[node name="PopularityBadge2" type="Label" parent="."]
+visible = false
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -360.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 56.0
+text = "Popularity: 50%"
+horizontal_alignment = 2
+vertical_alignment = 1
+script = ExtResource("1")

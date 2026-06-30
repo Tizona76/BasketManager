@@ -1,0 +1,108 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ShopTokens.gd" id="1_shop"]
+
+[node name="ShopTokens" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_shop")
+
+[node name="UI" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Title" type="Label" parent="UI"]
+layout_mode = 0
+offset_left = 80.0
+offset_top = 40.0
+offset_right = 500.0
+offset_bottom = 90.0
+theme_override_font_sizes/font_size = 34
+text = "Shop Tokens (Debug)"
+
+[node name="LblStatus" type="Label" parent="UI"]
+layout_mode = 0
+offset_left = 80.0
+offset_top = 95.0
+offset_right = 900.0
+offset_bottom = 130.0
+theme_override_font_sizes/font_size = 20
+text = "No package selected"
+
+[node name="Packages" type="VBoxContainer" parent="UI"]
+layout_mode = 0
+offset_left = 80.0
+offset_top = 170.0
+offset_right = 520.0
+offset_bottom = 500.0
+theme_override_constants/separation = 18
+
+[node name="Pkg100" type="Button" parent="UI/Packages"]
+custom_minimum_size = Vector2(340, 72)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "100 Tokens"
+
+[node name="Pkg300" type="Button" parent="UI/Packages"]
+custom_minimum_size = Vector2(340, 72)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "300 Tokens"
+
+[node name="Pkg800" type="Button" parent="UI/Packages"]
+custom_minimum_size = Vector2(340, 72)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "800 Tokens"
+
+[node name="PopupConfirm" type="Panel" parent="UI"]
+visible = false
+layout_mode = 0
+offset_left = 560.0
+offset_top = 190.0
+offset_right = 980.0
+offset_bottom = 420.0
+
+[node name="LblConfirm" type="Label" parent="UI/PopupConfirm"]
+layout_mode = 0
+offset_left = 28.0
+offset_top = 28.0
+offset_right = 392.0
+offset_bottom = 88.0
+theme_override_font_sizes/font_size = 24
+text = "Confirm 100 Tokens ?"
+
+[node name="BtnConfirm" type="Button" parent="UI/PopupConfirm"]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 140.0
+offset_right = 186.0
+offset_bottom = 196.0
+theme_override_font_sizes/font_size = 22
+text = "Confirmer"
+
+[node name="BtnCancel" type="Button" parent="UI/PopupConfirm"]
+layout_mode = 0
+offset_left = 220.0
+offset_top = 140.0
+offset_right = 370.0
+offset_bottom = 196.0
+theme_override_font_sizes/font_size = 22
+text = "Annuler"
+
+[node name="BtnBack" type="Button" parent="UI"]
+layout_mode = 0
+offset_left = 80.0
+offset_top = 560.0
+offset_right = 280.0
+offset_bottom = 620.0
+theme_override_font_sizes/font_size = 24
+text = "Retour"

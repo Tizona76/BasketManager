@@ -1,0 +1,274 @@
+[gd_scene load_steps=17 format=3 uid="uid://cdvhid1s7kys0"]
+
+[ext_resource type="Theme" uid="uid://xs5xp8el4jec" path="res://ui/theme_main.tres" id="1_vjyvb"]
+[ext_resource type="Script" path="res://scenes/TeamName.gd" id="1_xlg6o"]
+[ext_resource type="Texture2D" path="res://assets/images/backgrounds/fond_match.png" id="2_bgmatch"]
+[ext_resource type="Texture2D" path="res://assets/images/flags/fr.png" id="3_flag_fr"]
+[ext_resource type="Texture2D" path="res://assets/images/flags/us.png" id="4_flag_en"]
+[ext_resource type="Texture2D" path="res://assets/images/flags/es.png" id="5_flag_es"]
+[ext_resource type="Texture2D" path="res://assets/images/flags/it.png" id="6_flag_it"]
+[ext_resource type="Texture2D" path="res://assets/images/flags/pt.png" id="7_flag_pt"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_arsp1"]
+bg_color = Color(1, 1, 1, 1)
+border_width_left = 2
+border_color = Color(0.3571908, 0.35719088, 0.35719055, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_xlg6o"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.043137256, 0.23921569, 0.5686275, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vjyvb"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.043137256, 0.23921569, 0.5686275, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_exlag"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.08282562, 0.338656, 0.77772367, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ebv7s"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.043137256, 0.23921569, 0.5686275, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7u2wx"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.4, 0.09411765, 0.14117648, 1)
+border_color = Color(0.2901961, 0.05882353, 0.09411765, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_m3eu3"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.043137256, 0.23921569, 0.5686275, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_16j5b"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.5411765, 0.14509805, 0.2, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_8lq35"]
+content_margin_left = 20.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.22745098, 0.101960786, 0.12156863, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[node name="TeamName" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_vjyvb")
+script = ExtResource("1_xlg6o")
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_bgmatch")
+expand_mode = 1
+stretch_mode = 6
+mouse_filter = 2
+
+[node name="Menu" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 70.0
+offset_top = -185.0
+offset_right = -70.0
+offset_bottom = -113.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 36
+
+[node name="BtnReprendre" type="Button" parent="Menu"]
+custom_minimum_size = Vector2(150, 70)
+layout_mode = 2
+text = "Resume"
+
+[node name="SpacerEntryButtons" type="Control" parent="Menu"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnInscrire" type="Button" parent="Menu"]
+layout_mode = 2
+text = "Sign up"
+
+[node name="LangBar" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.98200005
+anchor_right = 1.0
+offset_left = -240.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 50.0
+grow_horizontal = 0
+theme_override_constants/separation = 22
+
+[node name="BtnLangFR" type="TextureButton" parent="LangBar"]
+custom_minimum_size = Vector2(34, 23)
+layout_mode = 2
+tooltip_text = "Français"
+texture_normal = ExtResource("3_flag_fr")
+ignore_texture_size = true
+stretch_mode = 5
+
+[node name="BtnLangEN" type="TextureButton" parent="LangBar"]
+custom_minimum_size = Vector2(45, 30)
+layout_mode = 2
+tooltip_text = "English"
+texture_normal = ExtResource("4_flag_en")
+ignore_texture_size = true
+stretch_mode = 5
+
+[node name="BtnLangES" type="TextureButton" parent="LangBar"]
+custom_minimum_size = Vector2(45, 30)
+layout_mode = 2
+tooltip_text = "Español"
+texture_normal = ExtResource("5_flag_es")
+ignore_texture_size = true
+stretch_mode = 5
+
+[node name="BtnLangIT" type="TextureButton" parent="LangBar"]
+custom_minimum_size = Vector2(45, 30)
+layout_mode = 2
+tooltip_text = "Italiano"
+texture_normal = ExtResource("6_flag_it")
+ignore_texture_size = true
+stretch_mode = 5
+
+[node name="BtnLangPT" type="TextureButton" parent="LangBar"]
+custom_minimum_size = Vector2(45, 30)
+layout_mode = 2
+tooltip_text = "Português"
+texture_normal = ExtResource("7_flag_pt")
+ignore_texture_size = true
+stretch_mode = 5
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Box" type="VBoxContainer" parent="Center"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="LblTitle" type="Label" parent="Center/Box"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+theme_override_font_sizes/font_size = 22
+text = "Choisis le nom de ton équipe"
+horizontal_alignment = 1
+
+[node name="LblTeamNameInput" type="Label" parent="Center/Box"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0.86, 0.03, 0.06, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 24
+text = "Your team name:"
+horizontal_alignment = 1
+
+[node name="WrapInput" type="MarginContainer" parent="Center/Box"]
+layout_mode = 2
+theme_override_constants/margin_bottom = 5
+
+[node name="InputTeam" type="LineEdit" parent="Center/Box/WrapInput"]
+placeholder_text = "teamname.placeholder"
+theme_override_colors/font_placeholder_color = Color(0.28, 0.28, 0.28, 1)
+theme_override_font_sizes/font_size = 26
+custom_minimum_size = Vector2(330, 56)
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+theme_override_styles/normal = SubResource("StyleBoxFlat_arsp1")
+max_length = 20
+
+[node name="SpaceAfterInput" type="Control" parent="Center/Box"]
+custom_minimum_size = Vector2(0, 15)
+layout_mode = 2
+
+[node name="BtnConfirmer" type="Button" parent="Center/Box"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_xlg6o")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_vjyvb")
+theme_override_styles/hover = SubResource("StyleBoxFlat_exlag")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_ebv7s")
+theme_override_font_sizes/font_size = 24
+text = "Créer son équipe"
+
+[node name="BtnPlayInstantly" type="Button" parent="Center/Box"]
+visible = false
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_xlg6o")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_vjyvb")
+theme_override_styles/hover = SubResource("StyleBoxFlat_exlag")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_ebv7s")
+theme_override_font_sizes/font_size = 24
+text = "Continue"

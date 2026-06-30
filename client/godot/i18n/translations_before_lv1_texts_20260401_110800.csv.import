@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://cmrmehm3m0yxf"
+
+[deps]
+
+files=["res://i18n/translations_before_lv1_texts_20260401_110800.fr.translation", "res://i18n/translations_before_lv1_texts_20260401_110800.en.translation", "res://i18n/translations_before_lv1_texts_20260401_110800.es.translation", "res://i18n/translations_before_lv1_texts_20260401_110800.it.translation", "res://i18n/translations_before_lv1_texts_20260401_110800.pt.translation"]
+
+source_file="res://i18n/translations_before_lv1_texts_20260401_110800.csv"
+dest_files=["res://i18n/translations_before_lv1_texts_20260401_110800.fr.translation", "res://i18n/translations_before_lv1_texts_20260401_110800.en.translation", "res://i18n/translations_before_lv1_texts_20260401_110800.es.translation", "res://i18n/translations_before_lv1_texts_20260401_110800.it.translation", "res://i18n/translations_before_lv1_texts_20260401_110800.pt.translation"]
+
+[params]
+
+compress=true
+delimiter=0

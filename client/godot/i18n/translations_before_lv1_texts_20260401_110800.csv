@@ -1,0 +1,241 @@
+key,fr,en,es,it,pt
+menu.title,Management du Club,Club Management,Gestión del Club,Gestione del Club,Gestão do Clube
+menu.play,Match,Match,Partido,Partita,Partida
+menu.back,Retour,Back,Atrás,Indietro,Voltar
+menu.mercato,Mercato,Market,Mercado,Mercato,Mercado
+menu.finances,Finances,Finances,Finanzas,Finanze,Finanças
+menu.sponsors,Sponsors,Sponsors,Patrocinadores,Sponsor,Patrocinadores
+STADIUM_RESUME,Reprendre la partie,Resume,Reanudar,Riprendi,Rettomare
+STADIUM_SIGNUP,S'inscrire / Créer son équipe,Sign up / Create team,Registrarse / Crear equipo,Iscriversi / Creare squadra,Inscrever / Criar equipa
+TEAMNAME_TITLE,Choisis le nom de ton équipe,Choose your team name,Elige el nombre de tu equipo,Scegli il nome della tua squadra,Escolhe o nome da tua equipa
+TEAMNAME_CREATE,Créer son équipe,Create team,Crear equipo,Crea squadra,Criar equipa
+BTN_BACK,Retour,Back,Atrás,Indietro,Voltar
+BTN_ADD,Ajouter,Add,Añadir,Aggiungi,Adicionar
+BTN_REMOVE,Retirer,Remove,Quitar,Rimuovi,Remover
+BTN_VALIDATE_SELECTION,Valider sélection,Confirm selection,Validar selección,Conferma selezione,Validar seleção
+LABEL_JOURNEE,Journée,Matchday,Jornada,Giornata,Jornada
+LABEL_MANAGEMENT,Management du Club,Club Management,Gestión del Club,Gestione del Club,Gestão do Clube
+BTN_BACK_LOGIN,Retour Login,Back to Login,Volver a Login,Torna al Login,Voltar ao Login
+teamname.title,Choisis le nom de ton équipe,Choose your team name,Elige el nombre de tu equipo,Scegli il nome della tua squadra,Escolhe o nome da tua equipa
+teamname.create,Créer son équipe,Create team,Crear equipo,Crea squadra,Criar equipa
+teamname.back,Retour,Back,Atrás,Indietro,Voltar
+player.add,Ajouter,Add,Añadir,Aggiungi,Adicionar
+player.remove,Retirer,Remove,Quitar,Rimuovi,Remover
+selection.validate,Valider sélection,Confirm selection,Validar selección,Conferma selezione,Validar seleção
+selection.selected,Sélectionnés:,Selected:,Seleccionados:,Selezionati:,Selecionados:
+,,,,,
+selection.title,Sélectionne 8 joueurs,Select 8 players,Selecciona 8 jugadores,Seleziona 8 giocatori,Seleciona 8 jogadores
+menu.day_progress,Journée {j} | {w}V-{l}D,Day {j} | {w}W-{l}L,Jornada {j} | {w}V-{l}D,Giornata {j} | {w}V-{l}S,Jornada {j} | {w}V-{l}D
+menu.title_with_club,Management du Club : {club},Club Management: {club},Gestión del Club: {club},Gestione del Club: {club},Gestão do Clube: {club}
+menu.back_login,Retour Login,Back to Login,Volver al Login,Torna al Login,Voltar ao Login
+menu.day,Journée,Day,Jornada,Giornata,Jornada
+matchsim.team_default,Mon équipe,My team,Mi equipo,La mia squadra,Minha equipe
+matchsim.opponent_default,Adversaire,Opponent,Rival,Avversario,Adversário
+matchsim.result_win,Victoire !,Win!,¡Victoria!,Vittoria!,Vitória!
+matchsim.result_loss,Défaite,Loss,Derrota,Sconfitta,Derrota
+matchsim.result_draw,Match nul,Draw,Empate,Pareggio,Empate
+matchsim.end_prefix,Fin du match :,End of game:,Fin del partido:,Fine partita:,Fim do jogo:
+matchsim.summary_draw,Match équilibré; échanges de paniers; suspense jusqu’au buzzer final.,Tight game; trading baskets; suspense until the final buzzer.,Partido igualado; intercambio de canastas; suspense hasta el final.,Gara equilibrata; scambi di canestri; suspense fino alla sirena.,Jogo equilibrado; troca de cestas; suspense até ao buzzer final.
+matchsim.summary_comeback_win,Après une première mi-temps difficile; superbe retour et victoire au caractère.,After a tough first half; great comeback and a win with grit.,Tras una mala primera parte; gran reacción y victoria con carácter.,Dopo un primo tempo difficile; rimonta splendida e vittoria di carattere.,Após uma primeira parte difícil; grande reação e vitória com garra.
+matchsim.summary_comeback_loss,Bon départ; puis baisse d’intensité; l’adversaire renverse le match en fin.,Strong start; then intensity drops; opponent turns it late.,Buen inicio; luego baja la intensidad; el rival remonta al final.,Buona partenza; poi calo d’intensità; l’avversario ribalta nel finale.,Bom início; depois queda de intensidade; o rival vira no fim.
+matchsim.summary_win_close,Match serré; victoire au mental; défense solide et paniers décisifs en fin.,Close game; tough win; solid defense and clutch buckets late.,Partido ajustado; victoria mental; defensa firme y canastas decisivas al final.,Match tirato; vittoria di cuore; difesa solida e canestri decisivi nel finale.,Jogo apertado; vitória na raça; defesa firme e cestas decisivas no fim.
+matchsim.summary_win_big,Victoire nette; rythme élevé; domination au rebond et adresse constante.,Big win; high pace; rebounding edge and steady shooting all game.,Victoria clara; ritmo alto; dominio del rebote y acierto constante.,Vittoria netta; ritmo alto; dominio a rimbalzo e buona precisione costante.,Vitória clara; ritmo alto; domínio nos ressaltos e bom aproveitamento constante.
+matchsim.summary_win_control,Victoire maîtrisée; bonne adresse; rotations efficaces et défense solide.,Controlled win; good shooting; effective rotations and steady defense.,Victoria controlada; buen acierto; rotaciones eficaces y defensa sólida.,Vittoria gestita; buona precisione; rotazioni efficaci e difesa solida.,Vitória controlada; bom aproveitamento; rotações eficazes e defesa firme.
+matchsim.summary_loss_close,Défaite frustrante; match accroché; quelques pertes de balle coûtent cher.,Frustrating loss; tight game; a few turnovers prove costly.,Derrota frustrante; partido ajustado; algunas pérdidas cuestan caro.,Sconfitta amara; gara equilibrata; alcune palle perse pesano.,Derrota frustrante; jogo apertado; alguns erros custam caro.
+matchsim.summary_loss_big,Défaite lourde; manque d’adresse; trop d’erreurs et rival plus intense.,Heavy loss; poor shooting; too many mistakes and a more intense opponent.,Derrota dura; poco acierto; demasiados errores y rival más intenso.,Sconfitta pesante; poca precisione; troppi errori e avversario più intenso.,Derrota pesada; baixo aproveitamento; muitos erros e rival mais intenso.
+matchsim.summary_loss_normal,Défaite logique; trop d’irrégularité; rythme subi et difficulté à conclure.,Fair loss; inconsistency; tempo against us and trouble finishing possessions.,Derrota lógica; irregularidad; ritmo en contra y dificultad para cerrar posesiones.,Sconfitta meritata; incostanza; ritmo subito e difficoltà a chiudere i possessi.,Derrota justa; irregularidade; ritmo contra e dificuldade em concluir posses.
+matchsim.summary_default,Match intense; rythme soutenu; quelques tournants clés font la différence aujourd’hui.,Intense game; high pace; key moments made the difference today.,Partido intenso; ritmo alto; momentos clave marcaron la diferencia hoy.,Partita intensa; ritmo alto; episodi chiave hanno fatto la differenza oggi.,Jogo intenso; ritmo alto; momentos-chave fizeram a diferença hoje.
+matchsim.summary_win_normal,Victoire maîtrisée; bonne adresse; rotations efficaces et défense solide.,Controlled win; good shooting; effective rotations and steady defense.,Victoria controlada; buen acierto; rotaciones eficaces y defensa sólida.,Vittoria gestita; buona precisione; rotazioni efficaci e difesa solida.,Vitória controlada; bom aproveitamento; rotações eficazes e defesa firme.
+matchsim.stats_2p,% tirs 2 pts,2PT FG%,% tiros 2 pts,% tiri 2 pt,% lances 2 pts
+matchsim.stats_3p,% tirs 3 pts,3PT FG%,% tiros 3 pts,% tiri 3 pt,% lances 3 pts
+matchsim.stats_mvp,MVP du match,Game MVP,MVP del partido,MVP della partita,MVP do jogo
+matchsim.mvp_home_fallback,Joueur,Player,Jugador,Giocatore,Jogador
+matchsim.mvp_home_short,—,—,—,—,—
+,,,,,
+matchsim.btn_skip,Passer,Skip,Saltar,Salta,Passar
+season.btn_play_match,Jouer le match,Play match,Jugar el partido,Gioca la partita,Jogar a partida
+stadium.title,Stadium,Stadium,,,
+stadium.tab.shop,Boutique,Shop,Tienda,Negozio,Loja
+stadium.tab.ticketing,Billetterie,Ticketing,Entradas,Biglietteria,Bilheteria
+stadium.tab.cafe,Cafétéria,Cafeteria,,,
+stadium.tab.upgrade,Évolution Stade,Stadium Upgrade,Mejora del estadio,Evoluzione stadio,Evolução do estádio
+stadium.ticketing.title,Billetterie,Ticketing,,,
+stadium.ticketing.col.category,Cat.,Cat.,,,
+stadium.ticketing.col.price,Prix,Price,,,
+stadium.ticketing.col.seats,Places,Seats,,,
+stadium.ticketing.cat.a,A,A,,,
+stadium.ticketing.cat.b,B,B,,,
+stadium.ticketing.cat.c,C,C,,,
+stadium.ticketing.total,Total,Total,,,
+menu.tab.club,Club,Club,Club,Club,Club
+menu.tab.ranking,Classement,Ranking,Clasificación,Classifica,Classificação
+ranking.title,Classement mondial — Winrate,World Ranking — Winrate,Ranking mundial — Winrate,Classifica mondiale — Winrate,Ranking mundial — Winrate
+ranking.col.rank,#,#,#,#,#
+ranking.col.club,Nom du Club,Club Name,Nombre del club,Nome del club,Nome do clube
+ranking.col.winrate,Winrate,Winrate,Winrate,Winrate,Winrate
+ranking.col.titles,Titres,Titles,Títulos,Titoli,Títulos
+ranking.col.level,Niveau,Level,Nivel,Livello,Nível
+ranking.loading,Chargement…,Loading…,Cargando…,Caricamento…,Carregando…
+ranking.me_suffix,(Moi),(Me),(Yo),(Io),(Eu)
+ranking.invalid_json,JSON invalide,Invalid JSON,JSON inválido,JSON non valido,JSON inválido
+ranking.http_error_prefix,Erreur: ,Error: ,Error: ,Errore: ,Erro: 
+
+menu.btn_save,Sauvegarder,Save,Guardar,Salva,Guardar
+menu.save_ok,Sauvegarde OK,Save OK,Guardado correcto,Salvataggio OK,Guardado OK
+saison.tab.standings,Classement,Standings,Clasificación,Classifica,Classificação
+saison.tab.stats,Statistiques,Stats,Estadísticas,Statistiche,Estatísticas
+saison.tab.calendar,Calendrier,Calendar,Calendario,Calendario,Calendário
+saisons.tab.standings,Classement,Standings,Clasificación,Classifica,Classificação
+saisons.tab.stats,Statistiques,Stats,Estadísticas,Statistiche,Estatísticas
+saisons.tab.calendar,Calendrier,Calendar,Calendario,Calendario,Calendário
+
+saison.tab.missions,Missions,Missions,Misiones,Missioni,Missões
+saison.tab.tournois,Tournois,Tournaments,Torneos,Tornei,Torneios
+popup_intro_title,>> Bienvenue dans Basket Manager,>> Welcome to Basket Manager,>> Bienvenido a Basket Manager,>> Benvenuto in Basket Manager,>> Bem-vindo ao Basket Manager
+popup_intro_build_title,🏟 Construisez votre club,🏟 Build your club,🏟 Construye tu club,🏟 Costruisci il tuo club,🏟 Construa seu clube
+popup_intro_build_body,Gérez votre effectif, vos finances (budget, solde...) et votre stade (boutique, billetterie...).,Manage your roster, finances (budget, balance...) and stadium (shop, ticketing...).,Gestiona tu plantilla, tus finanzas (presupuesto, saldo...) y tu estadio (tienda, taquilla...).,Gestisci il tuo roster, le finanze (budget, saldo...) e lo stadio (negozio, biglietteria...).,Gerencie seu elenco, suas finanças (orçamento, saldo...) e seu estádio (loja, bilheteria...).
+popup_intro_decisions_title,📊 Prenez les bonnes décisions,📊 Make the right decisions,📊 Toma las decisiones correctas,📊 Prendi le decisioni giuste,📊 Tome as decisões certas
+popup_intro_decisions_body,Recrutez des joueurs, développez votre popularité : plus elle est élevée, plus les spectateurs viendront au stade.,Recruit players, grow your popularity: the higher it is, the more spectators will come to the stadium.,Ficha jugadores y aumenta tu popularidad: cuanto más alta sea, más espectadores vendrán al estadio.,Ingaggia giocatori e aumenta la tua popolarità: più è alta, più spettatori verranno allo stadio.,Contrate jogadores e aumente sua popularidade: quanto mais alta ela for, mais espectadores virão ao estádio.
+popup_intro_sim_title,>> Les matchs sont simulés,>> Matches are simulated,>> Los partidos se simulan,>> Le partite sono simulate,>> As partidas são simuladas
+popup_intro_sim_body,Développez votre équipe : votre stratégie et votre effectif déterminent le résultat.,Develop your team: your strategy and squad determine the result.,Desarrolla tu equipo: tu estrategia y tu plantilla determinan el resultado.,Sviluppa la tua squadra: la tua strategia e la tua rosa determinano il risultato.,Desenvolva sua equipe: sua estratégia e seu elenco determinam o resultado.
+popup_intro_close,Fermer,Close,Cerrar,Chiudi,Fechar
+popup_intro_dont_show,Ne plus afficher,Don't show again,No mostrar de nuevo,Non mostrare più,Não mostrar novamente
+popup_match_title,Journée de match,Welcome to Match Day,Día de partido,Giorno della partita,Dia de jogo
+popup_match_play_title,>> Lancez vos matchs,>> Launch your matches,>> Lanza tus partidos,>> Avvia le partite,>> Lance suas partidas
+popup_match_play_body,Suivez le déroulement du match avec un résultat visuel en temps réel.,Watch the game unfold with live visual results.,Sigue el partido con resultados visuales en tiempo real.,Segui la partita con risultati visivi in tempo reale.,Acompanhe a partida com resultados visuais em tempo real.
+popup_match_season_title,>> Suivez votre saison,>> Follow your season,>> Sigue tu temporada,>> Segui la tua stagione,>> Acompanhe sua temporada
+popup_match_season_body,Consultez le classement et suivez la progression de votre club.,Check the standings and track your club’s progress.,Consulta la clasificación y sigue el progreso de tu club.,Controlla la classifica e segui i progressi del tuo club.,Veja a classificação e acompanhe o progresso do seu clube.
+popup_match_extra_title,>> Relevez des défis supplémentaires,>> Take on extra challenges,>> Acepta nuevos desafíos,>> Affronta nuove sfide,>> Enfrente novos desafios
+popup_match_extra_body,Participez aux tournois et accomplissez des missions pour développer votre club.,Join tournaments and complete missions to grow your club.,Participa en torneos y completa misiones para desarrollar tu club.,Partecipa ai tornei e completa missioni per far crescere il tuo club.,Participe de torneios e complete missões para desenvolver seu clube.
+stadium.level,Niveau,Level,Nivel,Livello,Nível
+stadium.target_level,Niveau cible,Target level,Nivel objetivo,Livello obiettivo,Nível alvo
+stadium.capacity,Capacité,Capacity,Capacidad,Capacità,Capacidade
+stadium.cost,Coût,Cost,Coste,Costo,Custo
+stadium.duration,Durée,Duration,Duración,Durata,Duração
+stadium.confirm_upgrade,Confirmer l'évolution,Confirm upgrade,Confirmar mejora,Conferma miglioramento,Confirmar melhoria
+stadium.upgrade.save_missing,Save introuvable.,Save not found.,Guardado no encontrado.,Salvataggio non trovato.,Save não encontrado.
+stadium.upgrade.next_level_missing,Fonction stadium_next_level introuvable.,stadium_next_level function not found.,Función stadium_next_level no encontrada.,Funzione stadium_next_level non trovata.,Função stadium_next_level não encontrada.
+stadium.upgrade.none_available,Aucune évolution de stade disponible.,No stadium upgrade available.,No hay mejora de estadio disponible.,Nessun miglioramento stadio disponibile.,Nenhuma melhoria de estádio disponível.
+stadium.upgrade.works_in_progress,Travaux en cours vers le niveau {level}\nMatchs restants : {remaining},Upgrade in progress to level {level}\nMatches remaining: {remaining},Mejora en curso hacia el nivel {level}\nPartidos restantes: {remaining},Lavori in corso verso il livello {level}\nPartite rimanenti: {remaining},Obras em curso para o nível {level}\nPartidas restantes: {remaining}
+stadium.upgrade.launch_missing,Fonction stadium_launch_upgrade introuvable.,stadium_launch_upgrade function not found.,Función stadium_launch_upgrade no encontrada.,Funzione stadium_launch_upgrade non trovata.,Função stadium_launch_upgrade não encontrada.
+stadium.upgrade.invalid_response,Réponse invalide.,Invalid response.,Respuesta no válida.,Risposta non valida.,Resposta inválida.
+stadium.upgrade.insufficient_funds,Fonds insuffisants.\nWallet disponible : {wallet} €,Insufficient funds.\nAvailable wallet: {wallet} €,Fondos insuficientes.\nWallet disponible: {wallet} €,Fondi insufficienti.\nWallet disponibile: {wallet} €,Fundos insuficientes.\nWallet disponível: {wallet} €
+stadium.upgrade.invalid_step,Palier invalide.,Invalid tier.,Nivel no válido.,Livello non valido.,Patamar inválido.
+stadium.upgrade.impossible,Évolution impossible.,Upgrade impossible.,Mejora imposible.,Miglioramento impossibile.,Melhoria impossível.
+stadium.upgrade.applied,Évolution du stade appliquée.,Stadium upgrade applied.,Mejora del estadio aplicada.,Miglioramento dello stadio applicato.,Melhoria do estádio aplicada.
+stadium.upgrade.started,Travaux lancés pour {duration} match(s).,Upgrade started for {duration} match(es).,Obras iniciadas por {duration} partido(s).,Lavori avviati per {duration} partita/e.,Obras iniciadas por {duration} partida(s).
+club.popularity,Popularité,Popularity,Popularidad,Popolarità,Popularidade
+
+btn.confirm,Confirmer,Confirm,Confirmar,Conferma,Confirmar
+season.ball.season,Saison,Season,Temporada,Stagione,Temporada
+season.ball.matches,Matchs,Matches,Partidos,Partite,Partidas
+season.label,Season {season} - Day {day},Season {season} - Day {day},Temporada {season} - Día {day},Stagione {season} - Giorno {day},Temporada {season} - Dia {day}
+END_SEASON_TITLE,Fin de saison,End of season,Fin de temporada,Fine stagione,Fim da temporada
+END_SEASON_RANK,Votre équipe termine à la place %d.,Your team finishes in position %d.,Tu equipo termina en la posición %d.,La tua squadra termina in posizione %d.,Sua equipe termina na posição %d.
+END_SEASON_RANK_1,Votre équipe termine à la 1re place.,Your team finishes 1st.,Tu equipo termina en 1ª posición.,La tua squadra termina al 1° posto.,Sua equipe termina em 1º lugar.
+END_SEASON_RANK_2,Votre équipe termine à la 2e place.,Your team finishes 2nd.,Tu equipo termina en 2ª posición.,La tua squadra termina al 2° posto.,Sua equipe termina em 2º lugar.
+END_SEASON_SUMMARY,Bilan,Summary,Resumen,Riepilogo,Resumo
+END_SEASON_WINS,Victoires,Wins,Victorias,Vittorie,Vitórias
+END_SEASON_LOSSES,Défaites,Losses,Derrotas,Sconfitte,Derrotas
+END_SEASON_NEW_SEASON,Commencer la nouvelle saison,Start new season,Comenzar nueva temporada,Inizia nuova stagione,Iniciar nova temporada
+login.step_email,1. Entrez votre email,1. Enter your email,1. Introduce tu email,1. Inserisci la tua email,1. Insira seu e-mail
+login.step_send_code,2. Recevoir le code (ouvrez ensuite votre email pour voir le code),2. Get code (then check your email for the code),2. Recibir el código (luego abre tu correo para ver el código),2. Ricevi il codice (poi apri la tua email per vedere il codice),2. Receber o código (depois abra seu email para ver o código)
+login.step_code,3. Saisissez le code,3. Enter the code,3. Introduce el código,3. Inserisci il codice,3. Digite o código
+login.step_validate,4. Validez,4. Validate,4. Valida,4. Conferma,4. Validar
+login.step.email,1. Entrez votre email,1. Enter your email,1. Introduce tu email,1. Inserisci la tua email,1. Digite seu email
+login.step.send_code_hint,2. Recevoir le code (ouvrez ensuite votre email pour voir le code),2. Get code (then check your email for the code),2. Recibir el código (luego abre tu correo para ver el código),2. Ricevi il codice (poi apri la tua email per vedere il codice),2. Receber o código (depois abra seu email para ver o código)
+login.step.code,3. Saisissez le code,3. Enter the code,3. Introduce el código,3. Inserisci il codice,3. Digite o código
+login.step.validate,4. Validez,4. Validate,4. Valida,4. Convalida,4. Validar
+login.btn.send_code,Recevoir le code,Get code,Recibir el código,Ricevi il codice,Receber o código
+login.btn.validate,Valider,Validate,Validar,Convalida,Validar
+tournois.select_tournament,Sélectionnez un tournoi,Select a tournament,Seleccione un torneo,Seleziona un torneo,Selecione um torneio
+tournois.launch_round,Lancer le tour,Launch round,Lanzar ronda,Lancia turno,Lançar rodada
+tournois.beginner,Débutant,Beginner,Principiante,Principiante,Iniciante
+tournois.current_round,Tour actuel,Current round,Ronda actual,Turno attuale,Rodada atual
+tournois.round,Tour,Round,Ronda,Turno,Rodada
+tournois.tournament_a,Tournoi A,Tournament A,Torneo A,Torneo A,Torneio A
+tournois.intermediate,Intermédiaire,Intermediate,Intermedio,Intermedio,Intermediário
+tournois.elite,Élite,Elite,Élite,Élite,Elite
+
+myteam.poste,Poste,Position,Posición,Posizione,Posição
+myteam.age,Âge,Age,Edad,Età,Idade
+myteam.performance,Performance,Performance,Rendimiento,Prestazione,Desempenho
+myteam.salary,Salaire,Salary,Salario,Salario,Salário
+
+myteam.header.poste,Poste,Position,Posición,Posizione,Posição
+myteam.header.age,Âge,Age,Edad,Età,Idade
+myteam.header.performance,Performance,Performance,Rendimiento,Prestazione,Desempenho
+myteam.header.salary,Salaire,Salary,Salario,Salario,Salário
+
+myteam.motivation,Motivation,Motivation,Motivación,Motivazione,Motivação
+myteam.header.motivation,Motivation,Motivation,Motivación,Motivazione,Motivação
+
+classement.evolution,Évolution classement,Ranking evolution,Evolución clasificación,Evoluzione classifica,Evolução classificação
+
+standings.graph.title,Évolution classement,Ranking evolution,Evolución clasificación,Evoluzione classifica,Evolução classificação
+standings.team_header,Équipe,Team,Equipo,Squadra,Equipe
+
+tournois.intermediate_selected_info,Intermédiaire sélectionné (écran bracket à brancher ensuite).,Intermediate selected (bracket screen to be connected later).,Intermedio seleccionado (pantalla del cuadro por conectar después).,Intermedio selezionato (schermata del tabellone da collegare in seguito).,Intermediário selecionado (tela da chave a conectar depois).
+tournois.elite_selected_info,Élite sélectionné (écran bracket à brancher ensuite).,Elite selected (bracket screen to be connected later).,Élite seleccionado (pantalla del cuadro por conectar después).,Élite selezionato (schermata del tabellone da collegare in seguito).,Elite selecionado (tela da chave a conectar depois).
+tournois.victory_title,Victoire !,Victory!,¡Victoria!,Vittoria!,Vitória!
+tournois.victory_subtitle,Victoire dans le Tournoi A,Victory in Tournament A,Victoria en el Torneo A,Vittoria nel Torneo A,Vitória no Torneio A
+common.close,Fermer,Close,Cerrar,Chiudi,Fechar
+tournois.reward_title,Récompense du tournoi,Tournament reward,Recompensa del torneo,Ricompensa del torneo,Recompensa do torneio
+tournois.reward_subtitle,Gain d'argent,Prize money,Premio en dinero,Premio in denaro,Prémio em dinheiro
+
+selection.avg_age,Âge moyen,Average age,Edad media,Età media,Idade média
+selection.avg_salary,Salaire moyen,Average salary,Salario medio,Salario medio,Salário médio
+finance.income.tournaments,Tournois,Tournaments,Torneos,Tornei,Torneios
+selection.avg_perf,Perf moyenne,Average performance,Rendimiento medio,Prestazione media,Performance média
+tournois.info.teams,Équipes,Teams,Equipos,Squadre,Equipes
+tournois.info.entry_fee,Adhésion,Entry fee,Inscripción,Iscrizione,Adesão
+tournois.info.runner_up,Finaliste,Runner-up,Finalista,Finalista,Finalista
+tournois.info.champion,Champion,Champion,Campeón,Campione,Campeão
+tournois.info.tokens,tokens,tokens,tokens,tokens,tokens
+finance.expenses.tournament_fees,Frais tournois,Tournament fees,Gastos torneos,Spese tornei,Taxas torneios
+tournois.victory_subtitle_intermediate,Victoire dans le tournoi Intermédiaire,Victory in the Intermediate tournament,Victoria en el torneo Intermedio,Vittoria nel torneo Intermedio,Vitória no torneio Intermediário
+tournois.victory_subtitle_elite,Victoire dans le tournoi Élite,Victory in the Elite tournament,Victoria en el torneo Élite,Vittoria nel torneo Élite,Vitória no torneio Elite
+stadium_intro_title,Stadium,Stadium,Stadium,Stadium,Stadium
+stadium_intro_capacity,>> Gérez votre stade et augmentez sa capacité,>> Manage your stadium and increase its capacity,>> Gestiona tu estadio y aumenta su capacidad,>> Gestisci il tuo stadio e aumentane la capienza,>> Gerencie seu estádio e aumente sua capacidade
+stadium_intro_shop,>> Boutique : fixez vos prix pour générer des revenus,>> Shop: set your prices to generate revenue,>> Tienda: fija tus precios para generar ingresos,>> Negozio: imposta i prezzi per generare entrate,>> Loja: defina seus preços para gerar receita
+stadium_intro_ticketing,>> Billetterie : ajustez prix et places pour optimiser vos gains,>> Ticketing: adjust prices and seat numbers to optimize your earnings,>> Taquilla: ajusta precios y plazas para optimizar tus ganancias,>> Biglietteria: regola prezzi e posti per ottimizzare i tuoi guadagni,>> Bilheteria: ajuste preços e quantidade de lugares para otimizar seus ganhos
+stadium_btn_ticketing,Billetterie,Ticketing,Billettería,Biglietteria,Bilheteria
+stadium_btn_shop,Boutique,Shop,Tienda,Negozio,Loja
+stadium_btn_upgrade,Évolution Stade,Stadium Upgrade,Mejora del estadio,Evoluzione stadio,Evolução do estádio
+missions.ui.active,Mission active,Active mission,Misión activa,Missione attiva,Missão ativa
+missions.ui.progress,Progression,Progress,Progreso,Progresso,Progresso
+missions.ui.reward,Gain,Reward,Recompensa,Ricompensa,Recompensa
+missions.ui.claim,Réclamer,Claim,Reclamar,Riscuoti,Resgatar
+missions.ui.in_progress,Mission en cours,Mission in progress,Misión en curso,Missione in corso,Missão em andamento
+missions.ui.done,Terminé,Done,Completado,Completato,Concluído
+missions.ui.all_done,Toutes les missions du niveau sont terminées.,All missions for this level are completed.,Todas las misiones del nivel están completadas.,Tutte le missioni del livello sono completate.,Todas as missões do nível estão concluídas.
+missions.lv1.win_1,Gagner 1 match,Win 1 match,Ganar 1 partido,Vincere 1 partita,Vencer 1 partida
+missions.lv1.pts_75_1,Marquer 75 points,Score 75 points,Anotar 75 puntos,Segnare 75 punti,Marcar 75 pontos
+missions.lv1.price_1,Ajuster un prix (boutique ou billetterie),Adjust a price (shop or ticketing),Ajustar un precio (tienda o taquilla),Regolare un prezzo (shop o biglietteria),Ajustar um preço (loja ou bilheteria)
+missions.lv1.stadium_1,Débloquer un niveau de stade,Unlock a stadium level,Desbloquear un nivel de estadio,Sbloccare un livello stadio,Desbloquear um nível de estádio
+missions.lv2.win_3,Gagner 3 matchs,Win 3 matches,Ganar 3 partidos,Vincere 3 partite,Vencer 3 partidas
+missions.lv2.pts_75_2,Marquer 75 points 2 fois,Score 75 points twice,Anotar 75 puntos 2 veces,Segnare 75 punti 2 volte,Marcar 75 pontos 2 vezes
+missions.lv2.price_2,Ajuster des prix 2 fois (boutique ou billetterie),Adjust prices twice (shop or ticketing),Ajustar precios 2 veces (tienda o taquilla),Regolare i prezzi 2 volte (shop o biglietteria),Ajustar preços 2 vezes (loja ou bilheteria)
+missions.lv2.streak_2,Gagner 2 matchs d'affilée,Win 2 matches in a row,Ganar 2 partidos seguidos,Vincere 2 partite di fila,Vencer 2 partidas seguidas
+mercato.closed.title,Mercato fermé,Transfer market closed,Mercado cerrado,Mercato chiuso,Mercado fechado
+mercato.closed.body,"Mercato fermé.
+Ouverture : avant la saison jusqu'au match 2 inclus, puis pendant les matchs 10, 11 et 12.","Transfer market closed.
+Open before the season up to match 2 inclusive, then during matches 10, 11 and 12.","Mercado cerrado.
+Abierto antes de la temporada hasta el partido 2 inclusive, luego durante los partidos 10, 11 y 12.","Mercato chiuso.
+Aperto prima della stagione fino alla partita 2 inclusa, poi durante le partite 10, 11 e 12.","Mercado fechado.
+Aberto antes da temporada até o jogo 2 inclusive, depois durante os jogos 10, 11 e 12."
+mercato.buy,Acheter,Buy,Comprar,Acquistare,Comprar
+mercato.bought,Acheté,Bought,Comprado,Acquistato,Comprado
+common.back,Retour,Back,Volver,Indietro,Voltar
+mercato.title,Mercato,Transfer Market,Mercado,Mercato,Mercado
+mercato.col.name,Nom,Name,Nombre,Nome,Nome
+mercato.col.position,Poste,Position,Posición,Posizione,Posição
+mercato.col.age,Âge,Age,Edad,Età,Idade
+mercato.col.performance,Performance,Performance,Rendimiento,Prestazione,Desempenho
+mercato.col.salary,Salaire,Salary,Salario,Salario,Salário
+mercato.new_salaries_total,Nouveaux salaires,New salaries,Nuevos salarios,Nuovi salari,Novos salários
+myteam.btn.sell,Vendre,Sell,Vender,Vendi,Vender
+myteam.btn.sold,Vendu,Sold,Vendido,Venduto,Vendido
+myteam.btn.confirm,Confirmer,Confirm,Confirmar,Conferma,Confirmar
+mercato.closed.open_from_season2,Ouvert à partir de la saison 2 !,Open from Season 2!,¡Abierto desde la temporada 2!,Aperto dalla stagione 2!,Aberto a partir da temporada 2!
+club_identity.not_enough_tokens,Pas assez de tokens,Not enough tokens,No tienes suficientes tokens,Token insufficienti,Tokens insuficientes

@@ -1,0 +1,38 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/ShopPanel.gd" id="1_1"]
+
+[node name="ShopPanel" type="Control"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_1")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 40.0
+offset_top = 40.0
+offset_right = -40.0
+offset_bottom = -40.0
+
+[node name="Title" type="Label" parent="VBox"]
+text = "Boutique"
+horizontal_alignment = 1
+
+[node name="Grid" type="GridContainer" parent="VBox"]
+columns = 3
+size_flags_vertical = 3
+
+[node name="Bottom" type="HBoxContainer" parent="VBox"]
+size_flags_horizontal = 3
+
+[node name="LblTotal" type="Label" parent="VBox/Bottom"]
+text = "Total"
+size_flags_horizontal = 3
+
+[node name="LblTotalValue" type="Label" parent="VBox/Bottom"]
+text = "0"
+horizontal_alignment = 2
+size_flags_horizontal = 3

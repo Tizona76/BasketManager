@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://p56bu83evi1q"
+
+[deps]
+
+files=["res://avatar_gender_audit.gender.translation", "res://avatar_gender_audit.first.translation", "res://avatar_gender_audit.image.translation"]
+
+source_file="res://avatar_gender_audit.csv"
+dest_files=["res://avatar_gender_audit.gender.translation", "res://avatar_gender_audit.first.translation", "res://avatar_gender_audit.image.translation"]
+
+[params]
+
+compress=true
+delimiter=0

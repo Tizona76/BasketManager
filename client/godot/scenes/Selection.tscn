@@ -1,0 +1,291 @@
+[gd_scene load_steps=4 format=3 uid="uid://ch5230m1g6pqp"]
+
+[ext_resource type="Theme" uid="uid://xs5xp8el4jec" path="res://ui/theme_main.tres" id="1_4vqxs"]
+[ext_resource type="Script" path="res://scripts/Selection.gd" id="1_oy3em"]
+[ext_resource type="Texture2D" uid="uid://c1p1clrjpd4tp" path="res://assets/images/backgrounds/ballon_terrain.jpeg" id="2_nujcg"]
+
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btnretour_red_normal"]
+bg_color = Color(0.78, 0.10, 0.16, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+content_margin_left = 16.0
+content_margin_top = 10.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btnretour_red_hover"]
+bg_color = Color(0.86, 0.14, 0.20, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+content_margin_left = 16.0
+content_margin_top = 10.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btnretour_red_pressed"]
+bg_color = Color(0.64, 0.08, 0.12, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+content_margin_left = 16.0
+content_margin_top = 10.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+
+[node name="UI" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_4vqxs")
+script = ExtResource("1_oy3em")
+
+[node name="TextureRect" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_nujcg")
+
+[node name="LblDebug" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -74.5
+offset_top = -11.5
+offset_right = 74.5
+offset_bottom = 11.5
+grow_horizontal = 2
+grow_vertical = 2
+visible = false
+text = "SELECTION SCREEN"
+
+[node name="LabelTitle" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 40.0
+offset_bottom = 68.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.05, 0.12, 0.33, 1)
+theme_override_font_sizes/font_size = 48
+text = "Choisis tes joueurs"
+horizontal_alignment = 1
+
+[node name="LabelCount" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 95.0
+offset_bottom = 123.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.05, 0.12, 0.33, 1)
+theme_override_font_sizes/font_size = 42
+text = "Sélectionnés : 0 / 8"
+horizontal_alignment = 1
+
+[node name="LabelProgress" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 185.0
+offset_bottom = 156.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.05, 0.12, 0.33, 1)
+theme_override_font_sizes/font_size = 48
+horizontal_alignment = 1
+
+[node name="BoxButtons" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -82.0
+offset_top = -45.0
+offset_right = 82.0
+offset_bottom = 45.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+
+[node name="BtnRetour" type="Button" parent="BoxButtons"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_styles/normal = SubResource("StyleBoxFlat_btnretour_red_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btnretour_red_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_btnretour_red_pressed")
+text = "Retour"
+
+[node name="BtnValider" type="Button" parent="BoxButtons"]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+text = "Valider sélection"
+
+[node name="HeaderRow" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 24.0
+offset_top = 149.0
+offset_right = -24.0
+offset_bottom = 126.0
+grow_horizontal = 2
+theme_override_constants/separation = 14
+
+[node name="HeaderAvatar" type="Label" parent="HeaderRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(88, 0)
+theme_override_colors/font_color = Color(0.05, 0.12, 0.33, 1)
+theme_override_font_sizes/font_size = 22
+text = "PLAYER"
+
+[node name="HeaderStars" type="Button" parent="HeaderRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(72, 0)
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "⭐"
+
+[node name="HeaderPos" type="Button" parent="HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "POS."
+
+[node name="HeaderAge" type="Button" parent="HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "AGE"
+
+[node name="HeaderGender" type="Button" parent="HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "player.attr.tir"
+
+[node name="HeaderSpeed" type="Button" parent="HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "SPEED"
+
+[node name="HeaderDefense" type="Button" parent="HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "DEFENSE"
+
+[node name="HeaderPrecision" type="Button" parent="HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "ACCURACY"
+
+[node name="HeaderMotivation" type="Button" parent="HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "MOT."
+
+[node name="HeaderSalary" type="Button" parent="HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "SALARY"
+
+[node name="HeaderBtn" type="Label" parent="HeaderRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+text = ""
+
+[node name="ScrollContainer" type="ScrollContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 199.0
+offset_right = -24.0
+offset_bottom = -90.0
+grow_horizontal = 2
+grow_vertical = 2
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 1
+
+[node name="CardsRow" type="VBoxContainer" parent="ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 0

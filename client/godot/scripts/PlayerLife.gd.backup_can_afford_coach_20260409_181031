@@ -1,0 +1,1001 @@
+# res://scripts/PlayerLife.gd
+extends RefCounted
+
+const FATIGUE_MIN := 0
+const FATIGUE_MAX := 100
+const MOTIV_MIN := 0
+const MOTIV_MAX := 100
+
+# ---- Réglages “type .py” (à affiner ensuite) ----
+const FATIGUE_GAIN_PLAY := 12        # +fatigue si joueur a joué
+const FATIGUE_RECOVER_REST := 10     # -fatigue si joueur n'a pas joué
+const MOTIV_WIN_GAIN := 4
+const MOTIV_LOSS_DROP := 4
+const MOTIV_REST_GAIN := 1
+
+# Blessure: probabilité augmente avec fatigue haute + endurance basse
+const INJURY_BASE_PCT := 1.0         # % mini
+const INJURY_FATIGUE_FACTOR := 0.10  # +0.10% par point de fatigue
+const INJURY_ENDURANCE_FACTOR := 0.35 # -0.35% par point d'endurance (si endurance élevée)
+const CONVAL_MIN := 1
+const CONVAL_MAX := 4
+
+static func _resolve_save_path(path: String = "user://savegame.json") -> String:
+	if path != "user://savegame.json":
+		return path
+
+	var tree := Engine.get_main_loop()
+	if tree != null and tree is SceneTree:
+		var root := (tree as SceneTree).root
+		if root != null:
+			var pm_node := root.get_node_or_null("/root/ProfileManager")
+			if pm_node != null:
+				if pm_node.has_method("get_active_profile_id"):
+					var pid := str(pm_node.call("get_active_profile_id")).strip_edges()
+					if pid != "":
+						return "user://save_%s.json" % pid
+				if pm_node.has_method("get_current_profile_id"):
+					var pid2 := str(pm_node.call("get_current_profile_id")).strip_edges()
+					if pid2 != "":
+						return "user://save_%s.json" % pid2
+
+	var profiles_path := "user://profiles.json"
+	if FileAccess.file_exists(profiles_path):
+		var f := FileAccess.open(profiles_path, FileAccess.READ)
+		if f != null:
+			var parsed = JSON.parse_string(f.get_as_text())
+			if typeof(parsed) == TYPE_DICTIONARY:
+				var d: Dictionary = parsed as Dictionary
+				var pid_file := str(d.get("active_profile_id", "")).strip_edges()
+				if pid_file != "":
+					return "user://save_%s.json" % pid_file
+
+	return path
+
+static func load_savegame(path: String = "user://savegame.json") -> Dictionary:
+	path = _resolve_save_path(path)
+	if not FileAccess.file_exists(path):
+		return {}
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return {}
+	var txt := f.get_as_text()
+	var parsed = JSON.parse_string(txt)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {}
+	var save: Dictionary = parsed as Dictionary
+	var had_legacy_wallet: bool = save.has("wallet") and typeof(save["wallet"]) != TYPE_DICTIONARY
+	ensure_progression_wallet_schema(save)
+	if had_legacy_wallet:
+		write_savegame(save, path)
+	return save
+
+static func write_savegame(data: Dictionary, path: String = "user://savegame.json") -> void:
+	path = _resolve_save_path(path)
+	ensure_progression_wallet_schema(data)
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_string(JSON.stringify(data, "\t"))
+
+static func clampi(v: int, a: int, b: int) -> int:
+	return int(clamp(v, a, b))
+
+
+static func _ensure_club_schema(save: Dictionary) -> void:
+	if save == null:
+		return
+	if not save.has("club") or typeof(save["club"]) != TYPE_DICTIONARY:
+		save["club"] = {}
+	var club: Dictionary = save["club"] as Dictionary
+	club["name"] = str(club.get("name", save.get("team_name", "BM Club"))).strip_edges()
+	if club["name"] == "":
+		club["name"] = "BM Club"
+	club["level"] = maxi(1, int(club.get("level", save.get("club_level", 1))))
+	club["xp"] = maxi(0, int(club.get("xp", save.get("club_xp", 0))))
+
+
+static func _ensure_wallet_schema(save: Dictionary) -> void:
+	if save == null:
+		return
+	if not save.has("wallet"):
+		save["wallet"] = {}
+	elif typeof(save["wallet"]) != TYPE_DICTIONARY:
+		var legacy_wallet := int(save["wallet"])
+		save["wallet"] = {
+			"euros": legacy_wallet,
+			"tokens": 0
+		}
+		print("[FIX WALLET] converted legacy wallet=", legacy_wallet)
+	var wallet: Dictionary = save["wallet"] as Dictionary
+	wallet["euros"] = int(wallet.get("euros", 0))
+	wallet["tokens"] = maxi(0, int(wallet.get("tokens", 0)))
+
+
+static func ensure_progression_wallet_schema(save: Dictionary) -> void:
+	_ensure_club_schema(save)
+	_ensure_wallet_schema(save)
+
+	# --- COACHS SCHEMA ---
+	if not save.has("coachs") or typeof(save["coachs"]) != TYPE_DICTIONARY:
+		save["coachs"] = {
+			"owned": [],
+			"active": "",
+			"last_hired_season": 0
+		}
+
+
+const CLUB_LEVEL_XP_FLOORS: Dictionary = {
+	1: 0,
+	2: 350,
+	3: 800,
+	4: 1350,
+	5: 2000,
+	6: 2750,
+}
+
+
+static func _get_level_floor_xp(level: int) -> int:
+	var lv := maxi(1, int(level))
+	if CLUB_LEVEL_XP_FLOORS.has(lv):
+		return int(CLUB_LEVEL_XP_FLOORS[lv])
+	return int(CLUB_LEVEL_XP_FLOORS[6])
+
+
+static func _get_next_level_floor_xp(level: int) -> int:
+	var lv := maxi(1, int(level))
+	if CLUB_LEVEL_XP_FLOORS.has(lv + 1):
+		return int(CLUB_LEVEL_XP_FLOORS[lv + 1])
+	return int(CLUB_LEVEL_XP_FLOORS[6])
+
+
+static func get_club_level_from_total_xp(total_xp: int) -> int:
+	var xp := maxi(0, int(total_xp))
+	if xp >= int(CLUB_LEVEL_XP_FLOORS[6]):
+		return 6
+	if xp >= int(CLUB_LEVEL_XP_FLOORS[5]):
+		return 5
+	if xp >= int(CLUB_LEVEL_XP_FLOORS[4]):
+		return 4
+	if xp >= int(CLUB_LEVEL_XP_FLOORS[3]):
+		return 3
+	if xp >= int(CLUB_LEVEL_XP_FLOORS[2]):
+		return 2
+	return 1
+
+
+static func _migrate_club_xp_to_total_if_needed(save: Dictionary) -> void:
+	ensure_progression_wallet_schema(save)
+	if bool(save.get("club_xp_total_migrated", false)):
+		return
+
+	var club: Dictionary = save["club"] as Dictionary
+	var current_level := maxi(1, int(club.get("level", 1)))
+	var current_xp := maxi(0, int(club.get("xp", 0)))
+
+	club["xp"] = _get_level_floor_xp(current_level) + current_xp
+	club["level"] = get_club_level_from_total_xp(int(club["xp"]))
+	save["club_xp_total_migrated"] = true
+
+
+static func sync_club_level_from_xp(save: Dictionary) -> void:
+	ensure_progression_wallet_schema(save)
+	_migrate_club_xp_to_total_if_needed(save)
+	var club: Dictionary = save["club"] as Dictionary
+	club["xp"] = maxi(0, int(club.get("xp", 0)))
+	club["level"] = get_club_level_from_total_xp(int(club["xp"]))
+
+
+static func get_club_level(save: Dictionary) -> int:
+	ensure_progression_wallet_schema(save)
+	sync_club_level_from_xp(save)
+	return maxi(1, int((save["club"] as Dictionary).get("level", 1)))
+
+
+static func get_club_xp(save: Dictionary) -> int:
+	ensure_progression_wallet_schema(save)
+	_migrate_club_xp_to_total_if_needed(save)
+	return maxi(0, int((save["club"] as Dictionary).get("xp", 0)))
+
+
+static func is_coachs_unlocked(save: Dictionary) -> bool:
+	ensure_progression_wallet_schema(save)
+	var club_level: int = get_club_level(save)
+	var season_number: int = maxi(1, int(save.get("season_number", 1)))
+	return club_level >= 2 or season_number >= 3
+
+
+static func get_tokens(save: Dictionary) -> int:
+	ensure_progression_wallet_schema(save)
+	return maxi(0, int((save["wallet"] as Dictionary).get("tokens", 0)))
+
+
+static func get_xp_to_next_level(level: int) -> int:
+	var lv := maxi(1, int(level))
+	var cur_floor := _get_level_floor_xp(lv)
+	var next_floor := _get_next_level_floor_xp(lv)
+	return maxi(0, next_floor - cur_floor)
+
+
+static func add_club_xp(save: Dictionary, amount: int, reason: String = "") -> Dictionary:
+	ensure_progression_wallet_schema(save)
+	_migrate_club_xp_to_total_if_needed(save)
+
+	var club: Dictionary = save["club"] as Dictionary
+	var xp_add := maxi(0, int(amount))
+	club["xp"] = maxi(0, int(club.get("xp", 0))) + xp_add
+	club["level"] = get_club_level_from_total_xp(int(club["xp"]))
+
+	if reason != "":
+		print("[ECON][XP] +", xp_add, " reason=", reason, " => level=", int(club["level"]), " xp_total=", int(club["xp"]))
+	return save
+
+
+static func can_spend_tokens(save: Dictionary, amount: int) -> bool:
+	return get_tokens(save) >= maxi(0, int(amount))
+
+
+static func spend_tokens(save: Dictionary, amount: int, reason: String = "") -> bool:
+	ensure_progression_wallet_schema(save)
+	var spend := maxi(0, int(amount))
+	if spend <= 0:
+		return true
+	var wallet: Dictionary = save["wallet"] as Dictionary
+	var cur := maxi(0, int(wallet.get("tokens", 0)))
+	if cur < spend:
+		return false
+	wallet["tokens"] = cur - spend
+	if reason != "":
+		print("[ECON][TOKENS] -", spend, " reason=", reason, " => tokens=", int(wallet["tokens"]))
+	return true
+
+
+static func add_tokens(save: Dictionary, amount: int, reason: String = "") -> Dictionary:
+	ensure_progression_wallet_schema(save)
+	var gain := maxi(0, int(amount))
+	var wallet: Dictionary = save["wallet"] as Dictionary
+	wallet["tokens"] = maxi(0, int(wallet.get("tokens", 0))) + gain
+	if reason != "":
+		print("[ECON][TOKENS] +", gain, " reason=", reason, " => tokens=", int(wallet["tokens"]))
+	return save
+
+
+static func spend_euros_or_tokens(save: Dictionary, euros_cost: int, tokens_cost: int, reason: String = "") -> bool:
+	ensure_progression_wallet_schema(save)
+
+	var euros_needed: int = maxi(0, int(euros_cost))
+	var tokens_needed: int = maxi(0, int(tokens_cost))
+
+	var wallet: Dictionary = save["wallet"] as Dictionary
+	var euros_have: int = maxi(0, int(wallet.get("euros", 0)))
+	var tokens_have: int = maxi(0, int(wallet.get("tokens", 0)))
+
+	if euros_have >= euros_needed:
+		wallet["euros"] = euros_have - euros_needed
+		if reason != "":
+			print("[ECON][EUROS] -", euros_needed, " reason=", reason, " => euros=", int(wallet["euros"]))
+		return true
+
+	if euros_needed <= 0:
+		if tokens_have < tokens_needed:
+			return false
+		wallet["tokens"] = tokens_have - tokens_needed
+		if reason != "":
+			print("[ECON][TOKENS] -", tokens_needed, " reason=", reason, " => tokens=", int(wallet["tokens"]))
+		return true
+
+	var euros_missing: int = euros_needed - euros_have
+	var tokens_extra_for_missing: int = 0
+	if euros_cost > 0 and tokens_cost > 0:
+		tokens_extra_for_missing = int(ceil(float(euros_missing) * float(tokens_cost) / float(euros_cost)))
+	else:
+		return false
+
+	var tokens_total_needed: int = tokens_needed + tokens_extra_for_missing
+	if tokens_have < tokens_total_needed:
+		return false
+
+	wallet["euros"] = 0
+	wallet["tokens"] = tokens_have - tokens_total_needed
+	if reason != "":
+		print("[ECON][MIX] euros=-", euros_have, " tokens=-", tokens_total_needed, " reason=", reason, " => tokens=", int(wallet["tokens"]))
+	return true
+
+
+
+# --- Finance/Popularité schema (clone logique .py) ---
+# popularite: 0..100 (init 50)
+# totaux cumulés: int (init 0)
+static func ensure_finance_schema(save: Dictionary) -> void:
+	if save == null:
+		return
+	ensure_progression_wallet_schema(save)
+
+	if not save.has("popularite"):
+		save["popularite"] = 50
+	elif int(save.get("season_round", 0)) == 0:
+		save["popularite"] = 50
+	save["popularite"] = clampi(int(save["popularite"]), 30, 100)
+
+	if not save.has("total_billetterie"):
+		save["total_billetterie"] = 0
+	if not save.has("total_boutique"):
+		save["total_boutique"] = 0
+	if not save.has("total_sponsors"):
+		save["total_sponsors"] = 0
+	if not save.has("total_tournois"):
+		save["total_tournois"] = 0
+	if not save.has("total_depenses"):
+		save["total_depenses"] = 0
+	if not save.has("total_recettes"):
+		save["total_recettes"] = 0
+	
+	save["total_billetterie"] = int(save["total_billetterie"])
+	save["total_boutique"] = int(save["total_boutique"])
+	save["total_sponsors"] = int(save["total_sponsors"])
+	save["total_tournois"] = int(save["total_tournois"])
+	save["total_depenses"] = int(save["total_depenses"])
+	save["total_recettes"] = int(save["total_recettes"])
+
+	# ---- Salaires (par match) : stocké pour affichage Finance dès le boot ----
+
+
+	if not save.has("salary_total_per_match"):
+		save["salary_total_per_match"] = 0
+
+	var sal_total := 0
+	# 1) Priorité: roster.players
+	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
+		var r := save["roster"] as Dictionary
+		if r.has("players") and typeof(r["players"]) == TYPE_ARRAY and not (r["players"] as Array).is_empty():
+			for row_raw in (r["players"] as Array):
+				if typeof(row_raw) != TYPE_DICTIONARY:
+					continue
+				var row := row_raw as Dictionary
+				sal_total += int(row.get("salary", 0))
+
+	# Fallback désactivé : on ne doit JAMAIS utiliser tout players_by_id
+
+
+	save["salary_total_per_match"] = int(round(float(sal_total) / 22.0))
+
+static func popularity_coef(save: Dictionary) -> float:
+	# clone .py: coef = clamp(pop/100, 0.30..1.00)
+	var pop := 50
+	if save != null and save.has("popularite"):
+		pop = int(save["popularite"])
+	pop = clampi(pop, 30, 100)
+	var coef := float(pop) / 100.0
+	coef = clamp(coef, 0.30, 1.00)
+	return coef
+
+static func _ensure_player_schema(p: Dictionary) -> void:
+	# attributs
+	if not p.has("precision"): p["precision"] = 50
+	if not p.has("vitesse"): p["vitesse"] = 50
+	if not p.has("force"): p["force"] = 50
+	if not p.has("defense"): p["defense"] = 50
+	if not p.has("endurance"): p["endurance"] = 50
+
+	# état
+	if not p.has("fatigue"): p["fatigue"] = 0
+	if not p.has("motivation"): p["motivation"] = 50
+	if not p.has("blessure"): p["blessure"] = false
+	if not p.has("matches_conval"): p["matches_conval"] = 0
+
+	# progression
+	if not p.has("matchs_consecutifs"): p["matchs_consecutifs"] = 0
+	if not p.has("repos_consecutifs"): p["repos_consecutifs"] = 0
+
+	# calculés
+	if not p.has("ponderation"): p["ponderation"] = 0
+	if not p.has("pct_2pts"): p["pct_2pts"] = 0
+	if not p.has("pct_3pts"): p["pct_3pts"] = 0
+	if not p.has("salaire"): p["salaire"] = 0
+
+static func _recalc_derived(p: Dictionary) -> void:
+	# Base pondération: moyenne pondérée simple des attributs
+	var base := (
+		int(p["precision"]) * 0.30 +
+		int(p["vitesse"])   * 0.20 +
+		int(p["force"])     * 0.15 +
+		int(p["defense"])   * 0.20 +
+		int(p["endurance"]) * 0.15
+	)
+
+	# Modifiers “vivants”
+	var fatigue := int(p["fatigue"])
+	var motiv := int(p["motivation"])
+	var injured := bool(p["blessure"])
+
+	var fatigue_penalty := (float(fatigue) / 100.0) * 0.30   # jusqu’à -30%
+	var motiv_bonus := ((float(motiv) - 50.0) / 50.0) * 0.10 # +/-10% autour de 50
+	var injury_penalty := 0.35 if injured else 0.0           # -35% si blessé
+
+	var mult := 1.0 - fatigue_penalty - injury_penalty + motiv_bonus
+	mult = clamp(mult, 0.25, 1.25)
+
+	var pond := int(round(float(base) * mult))
+	p["ponderation"] = pond
+	p["pondération"] = pond
+
+	# %2pts / %3pts: “type .py” simplifié basé sur precision + fatigue
+	# (valeurs en %)
+	var prec := int(p["precision"])
+	var pct2 := prec * 0.9 + 10 - float(fatigue) * 0.15
+	var pct3 := prec * 0.6 + float(p["vitesse"]) * 0.1 - float(fatigue) * 0.12
+
+	p["pct_2pts"] = clampi(int(round(pct2)), 25, 85)
+	p["pct_3pts"] = clampi(int(round(pct3)), 15, 65)
+
+	# Salaire: index simple basé sur pondération (à aligner plus tard sur ton .py)
+	# salaire annuel conservé : ne pas écraser ici
+
+static func _injury_roll(p: Dictionary, rng: RandomNumberGenerator) -> bool:
+	# Pas de nouvelle blessure si déjà blessé
+	if bool(p["blessure"]):
+		return false
+
+	var fatigue := float(p["fatigue"])
+	var endu := float(p["endurance"])
+
+	var pct := INJURY_BASE_PCT
+	pct += fatigue * INJURY_FATIGUE_FACTOR
+	pct -= endu * INJURY_ENDURANCE_FACTOR
+	pct = clamp(pct, 0.2, 25.0) # plafond sécurité
+
+	return rng.randf() < (pct / 100.0)
+
+static func _normalize_player_id(v) -> String:
+	var s := str(v).strip_edges()
+	if s == "":
+		return ""
+	if s.is_valid_int():
+		return str(int(s))
+	return str(int(float(s)))
+
+static func apply_post_match_to_save(save: Dictionary, played_ids: Array, did_win: bool) -> Dictionary:
+	if save.is_empty():
+		return save
+	if not save.has("players_by_id"):
+		return save
+	if typeof(save["players_by_id"]) != TYPE_DICTIONARY:
+		return save
+
+	var players_by_id: Dictionary = save["players_by_id"]
+
+	# IDs réellement joués -> clés de players_by_id
+	var played_keys: Array[String] = []
+	for id in played_ids:
+		var sid := str(id).strip_edges()
+		if sid == "":
+			continue
+		var key := str(int(round(float(sid))))
+		if not played_keys.has(key):
+			played_keys.append(key)
+	print("[POST_MATCH][PLAYED_IDS_RAW] ", played_ids)
+	print("[POST_MATCH][PLAYED_KEYS] ", played_keys)
+
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+
+	var touched := {}
+
+
+
+	# 1) Joueurs ayant joué
+	for key in played_keys:
+		if not players_by_id.has(key):
+			continue
+		var p = players_by_id[key]
+		if typeof(p) != TYPE_DICTIONARY:
+			continue
+
+		_ensure_player_schema(p)
+
+		# Blessure / convalescence
+		if bool(p["blessure"]):
+			p["matches_conval"] = maxi(0, int(p["matches_conval"]) - 1)
+			if int(p["matches_conval"]) <= 0:
+				p["blessure"] = false
+				p["matches_conval"] = 0
+
+		# Joué => fatigue +
+		p["fatigue"] = clampi(int(p["fatigue"]) + FATIGUE_GAIN_PLAY, FATIGUE_MIN, FATIGUE_MAX)
+		p["matchs_consecutifs"] = int(p["matchs_consecutifs"]) + 1
+		p["repos_consecutifs"] = 0
+
+		if _injury_roll(p, rng):
+			p["blessure"] = true
+			p["matches_conval"] = rng.randi_range(CONVAL_MIN, CONVAL_MAX)
+
+		p["motivation"] = clampi(
+			int(p["motivation"]) + (MOTIV_WIN_GAIN if did_win else -MOTIV_LOSS_DROP),
+			MOTIV_MIN, MOTIV_MAX
+		)
+
+		_recalc_derived(p)
+		players_by_id[key] = p
+		touched[key] = true
+
+	# 2) Joueurs au repos
+	for pid in players_by_id.keys():
+		var key := str(pid).strip_edges()
+		if touched.has(key):
+			continue
+		var p = players_by_id[pid]
+		if typeof(p) != TYPE_DICTIONARY:
+			continue
+
+		_ensure_player_schema(p)
+
+		# Blessure / convalescence
+		if bool(p["blessure"]):
+			p["matches_conval"] = maxi(0, int(p["matches_conval"]) - 1)
+			if int(p["matches_conval"]) <= 0:
+				p["blessure"] = false
+				p["matches_conval"] = 0
+
+		# Repos => fatigue -
+		p["fatigue"] = clampi(int(p["fatigue"]) - FATIGUE_RECOVER_REST, FATIGUE_MIN, FATIGUE_MAX)
+		p["repos_consecutifs"] = int(p["repos_consecutifs"]) + 1
+		p["matchs_consecutifs"] = 0
+		p["motivation"] = clampi(int(p["motivation"]) + MOTIV_REST_GAIN, MOTIV_MIN, MOTIV_MAX)
+
+		_recalc_derived(p)
+		players_by_id[pid] = p
+
+	save["players_by_id"] = players_by_id
+
+	# Sync players array utilisé par certaines vues/UI (ex: MyTeam)
+	if save.has("players") and typeof(save["players"]) == TYPE_ARRAY:
+		var arr: Array = save["players"] as Array
+		for i in range(arr.size()):
+			var row_raw = arr[i]
+			if typeof(row_raw) != TYPE_DICTIONARY:
+				continue
+			var row: Dictionary = row_raw as Dictionary
+			var row_id := str(int(round(float(str(row.get("id", -1)).strip_edges()))))
+			if players_by_id.has(row_id) and typeof(players_by_id[row_id]) == TYPE_DICTIONARY:
+				arr[i] = (players_by_id[row_id] as Dictionary).duplicate(true)
+		save["players"] = arr
+
+	return save
+
+
+
+static func _mercato_scan_avatar_portraits(path: String) -> Array[String]:
+	var out: Array[String] = []
+	var dir := DirAccess.open(path)
+	if dir == null:
+		return out
+	dir.list_dir_begin()
+	while true:
+		var fn := dir.get_next()
+		if fn == "":
+			break
+		if dir.current_is_dir():
+			continue
+		var lf := fn.to_lower()
+		if not lf.begins_with("avatar_"):
+			continue
+		if lf.ends_with(".png") or lf.ends_with(".webp") or lf.ends_with(".jpg") or lf.ends_with(".jpeg"):
+			out.append(fn)
+	dir.list_dir_end()
+	out.sort()
+	return out
+
+
+static func _mercato_meta_key_candidates(avatar_key: String) -> Array[String]:
+	var keys: Array[String] = []
+	keys.append(avatar_key)
+	if not avatar_key.begins_with("avatar_"):
+		return keys
+	var rest: String = avatar_key.substr(7)
+	var suffix := ""
+	var digits := rest
+	while digits.length() > 0 and not digits[digits.length() - 1].is_valid_int():
+		suffix = digits[digits.length() - 1] + suffix
+		digits = digits.substr(0, digits.length() - 1)
+	if digits.is_valid_int():
+		var num := int(digits)
+		keys.append("avatar_%d%s" % [num, suffix])
+		keys.append("avatar_%02d%s" % [num, suffix])
+		keys.append("avatar_%03d%s" % [num, suffix])
+	return keys
+
+
+static func _mercato_load_avatar_meta() -> Dictionary:
+	var out: Dictionary = {}
+	var path := "res://data/avatars_meta_raw.txt"
+	if not FileAccess.file_exists(path):
+		return out
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return out
+	var lines := f.get_as_text().split("\n", false)
+	for i in range(1, lines.size()):
+		var line := String(lines[i]).strip_edges()
+		if line == "":
+			continue
+		var parts := line.split(",", false)
+		if parts.size() < 3:
+			continue
+		var key := String(parts[0]).strip_edges()
+		var gender := String(parts[1]).strip_edges()
+		var first_name := String(parts[2]).strip_edges()
+		if key != "":
+			out[key] = {"gender": gender, "first_name": first_name}
+	return out
+
+
+static func _mercato_avatar_candidates() -> Array:
+	var base_root := "res://assets/images/avatars"
+	var base_used := base_root
+	var files: Array[String] = _mercato_scan_avatar_portraits(base_root)
+	if files.size() == 0:
+		base_used = base_root + "/avatars_dessin"
+		files = _mercato_scan_avatar_portraits(base_used)
+	var meta: Dictionary = _mercato_load_avatar_meta()
+	var out: Array = []
+	for i in range(files.size()):
+		var fname := files[i]
+		var avatar_key := fname.get_basename()
+		var first_name := avatar_key.replace("_", " ")
+		var gender := "U"
+		for k in _mercato_meta_key_candidates(avatar_key):
+			if meta.has(k):
+				var m: Dictionary = meta[k] as Dictionary
+				gender = str(m.get("gender", "U"))
+				first_name = str(m.get("first_name", first_name))
+				break
+		out.append({
+			"id": i,
+			"avatar_key": avatar_key,
+			"avatar_path": base_used + "/" + fname,
+			"name": first_name,
+			"gender": gender
+		})
+	return out
+
+
+static func _mercato_pick_unused_avatar(save: Dictionary) -> Dictionary:
+	var candidates: Array = _mercato_avatar_candidates()
+	if candidates.is_empty():
+		return {}
+	var used := {}
+	if save.has("players_by_id") and typeof(save["players_by_id"]) == TYPE_DICTIONARY:
+		var by_id: Dictionary = save["players_by_id"] as Dictionary
+		for k in by_id.keys():
+			var p_raw = by_id[k]
+			if typeof(p_raw) != TYPE_DICTIONARY:
+				continue
+			var p: Dictionary = p_raw as Dictionary
+			var ak := str(p.get("avatar_key", "")).strip_edges()
+			if ak != "":
+				used[ak] = true
+	for c_raw in candidates:
+		if typeof(c_raw) != TYPE_DICTIONARY:
+			continue
+		var c: Dictionary = c_raw as Dictionary
+		var ak2 := str(c.get("avatar_key", "")).strip_edges()
+		if ak2 == "":
+			continue
+		if not used.has(ak2):
+			return c
+	return candidates[0] as Dictionary
+
+
+static func _mercato_rng() -> RandomNumberGenerator:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	return rng
+
+static func _mercato_random_poste(rng: RandomNumberGenerator) -> String:
+	var postes: Array[String] = ["Meneur", "Ailier", "Pivot", "Arrière"]
+	return postes[rng.randi_range(0, postes.size() - 1)]
+
+static func _mercato_calc_ponderation(j: Dictionary) -> float:
+	var poste: String = str(j.get("poste", ""))
+	var precision: float = float(j.get("precision", 0.75)) * 100.0
+	var vitesse: float = float(j.get("vitesse", 70))
+	var force: float = float(j.get("force", 70))
+	var defense: float = float(j.get("defense", 70))
+	var endurance: float = float(j.get("endurance", 70))
+
+	var ponderation: float = 0.0
+	if poste == "Meneur":
+		ponderation = precision * 0.30 + vitesse * 0.30 + endurance * 0.20 + defense * 0.10 + force * 0.10
+	elif poste == "Ailier":
+		ponderation = precision * 0.25 + vitesse * 0.25 + force * 0.20 + defense * 0.15 + endurance * 0.15
+	elif poste == "Pivot":
+		ponderation = force * 0.30 + defense * 0.25 + precision * 0.15 + endurance * 0.15 + vitesse * 0.15
+	elif poste == "Arrière":
+		ponderation = precision * 0.28 + vitesse * 0.28 + endurance * 0.20 + defense * 0.14 + force * 0.10
+	else:
+		ponderation = precision * 0.25 + vitesse * 0.25 + force * 0.20 + defense * 0.15 + endurance * 0.15
+
+	var age: int = int(j.get("age", 25))
+	var coef_age: float = 1.0
+	if age <= 22:
+		coef_age = 0.9
+	elif age <= 26:
+		coef_age = 1.0
+	elif age <= 30:
+		coef_age = 1.05
+	elif age <= 34:
+		coef_age = 0.95
+	else:
+		coef_age = 0.85
+	ponderation *= coef_age
+
+	var matchs_consecutifs: int = int(j.get("matchs_consecutifs", 0))
+	var coef_matchs_consecutifs: float = 1.0
+	if matchs_consecutifs >= 8:
+		coef_matchs_consecutifs = 0.92
+	elif matchs_consecutifs >= 6:
+		coef_matchs_consecutifs = 0.95
+	elif matchs_consecutifs >= 6:
+		coef_matchs_consecutifs = 0.98
+	ponderation *= coef_matchs_consecutifs
+
+	var repos: int = int(j.get("repos_consecutifs", 0))
+	if repos > 0:
+		var coef_repos := 1.0
+		if repos == 1:
+			coef_repos = 1.02
+		elif repos == 2:
+			coef_repos = 1.04
+		elif repos == 3:
+			coef_repos = 1.00
+		elif repos == 4:
+			coef_repos = 0.96
+		else:
+			coef_repos = 0.92
+		ponderation *= coef_repos
+
+	var est_blesse := bool(j.get("blessure", false)) or int(j.get("matches_conval", 0)) > 0
+	if est_blesse:
+		ponderation *= 0.70
+
+	var motivation: float = float(j.get("motivation", 80))
+	ponderation *= 1.0 + (motivation - 80.0) / 200.0
+
+	return snapped(ponderation, 0.01)
+
+static func _mercato_next_generated_id(save: Dictionary) -> int:
+	var max_id: int = 999
+
+	if save.has("players_by_id") and typeof(save["players_by_id"]) == TYPE_DICTIONARY:
+		var by_id: Dictionary = save["players_by_id"] as Dictionary
+		for k in by_id.keys():
+			var sid := str(k).strip_edges()
+			if sid.is_valid_int():
+				max_id = maxi(max_id, int(sid))
+
+	if save.has("mercato") and typeof(save["mercato"]) == TYPE_DICTIONARY:
+		var md: Dictionary = save["mercato"] as Dictionary
+		max_id = maxi(max_id, int(md.get("last_generated_id", max_id)))
+
+	return max_id + 1
+
+static func _mercato_make_new_player(save: Dictionary) -> Dictionary:
+	var rng := _mercato_rng()
+	var pid: int = _mercato_next_generated_id(save)
+	var poste: String = _mercato_random_poste(rng)
+	var age: int = rng.randi_range(18, 35)
+	var avatar_pick: Dictionary = _mercato_pick_unused_avatar(save)
+
+	var nom_affiche := "Prospect " + str(pid)
+	var avatar_key := ""
+	var avatar_path := ""
+	if not avatar_pick.is_empty():
+		nom_affiche = str(avatar_pick.get("name", nom_affiche))
+		avatar_key = str(avatar_pick.get("avatar_key", ""))
+		avatar_path = str(avatar_pick.get("avatar_path", ""))
+
+	var j: Dictionary = {
+		"id": pid,
+		"nom": nom_affiche,
+		"name": nom_affiche,
+		"avatar_key": avatar_key,
+		"avatar_path": avatar_path,
+		"poste": poste,
+		"pos": poste,
+		"age": age,
+		"precision": rng.randf_range(0.60, 0.95),
+		"vitesse": rng.randi_range(55, 95),
+		"force": rng.randi_range(55, 95),
+		"defense": rng.randi_range(55, 95),
+		"endurance": rng.randi_range(55, 95),
+		"matchs_consecutifs": 0,
+		"repos_consecutifs": 0,
+		"fatigue": 0,
+		"blessure": false,
+		"matches_conval": 0,
+		"mercato_generated": true
+	}
+
+	j["pondération"] = _mercato_calc_ponderation(j)
+	j["ponderation"] = j["pondération"]
+
+	var base_motivation: int = 80
+	if age < 23:
+		base_motivation = rng.randi_range(75, 95)
+	elif age > 30:
+		base_motivation = rng.randi_range(60, 80)
+	else:
+		base_motivation = rng.randi_range(65, 90)
+
+	if float(j["pondération"]) > 80.0:
+		base_motivation += 5
+	elif float(j["pondération"]) < 65.0:
+		base_motivation -= 5
+
+	j["motivation"] = clamp(base_motivation, 50, 100)
+
+	var salaire_int: int = int(70000 + float(j["pondération"]) * 500.0)
+	salaire_int = clamp(salaire_int, 70000, 130000)
+	j["salaire"] = salaire_int
+
+	return j
+
+static func ensure_mercato_schema(save: Dictionary) -> void:
+	if not save.has("mercato") or typeof(save["mercato"]) != TYPE_DICTIONARY:
+		save["mercato"] = {}
+
+	var md: Dictionary = save["mercato"] as Dictionary
+
+	if not md.has("current_ids") or typeof(md["current_ids"]) != TYPE_ARRAY:
+		md["current_ids"] = []
+	if not md.has("seen_ids") or typeof(md["seen_ids"]) != TYPE_ARRAY:
+		md["seen_ids"] = []
+	if not md.has("pool_size"):
+		md["pool_size"] = 8
+	if not md.has("keep_ratio"):
+		md["keep_ratio"] = 0.0
+	if not md.has("cycle"):
+		md["cycle"] = 0
+	if not md.has("last_generated_id"):
+		md["last_generated_id"] = 999
+	if not md.has("last_refresh_season"):
+		md["last_refresh_season"] = 0
+	if not md.has("last_refresh_phase"):
+		md["last_refresh_phase"] = ""
+
+	save["mercato"] = md
+
+static func refresh_mercato_pool(save: Dictionary, phase: String = "manual") -> void:
+	ensure_mercato_schema(save)
+
+	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
+		save["players_by_id"] = {}
+	var by_id: Dictionary = save["players_by_id"] as Dictionary
+
+	var md: Dictionary = save["mercato"] as Dictionary
+	var current_ids: Array = (md.get("current_ids", []) as Array).duplicate()
+	var seen_ids: Array = (md.get("seen_ids", []) as Array).duplicate()
+
+	var season_now: int = int(save.get("season_number", 1))
+	var pool_size: int = 8
+	var next_ids: Array = []
+
+	# Même saison + pool déjà complet => on garde exactement les mêmes 8
+	if int(md.get("last_refresh_season", 0)) == season_now and current_ids.size() == pool_size:
+		next_ids = current_ids.duplicate()
+	else:
+		while next_ids.size() < pool_size:
+			var player: Dictionary = _mercato_make_new_player(save)
+			var pid: int = int(player.get("id", -1))
+			if pid < 0:
+				continue
+
+			var key := str(pid)
+			by_id[key] = player
+			next_ids.append(pid)
+
+			if not seen_ids.has(pid):
+				seen_ids.append(pid)
+
+			md["last_generated_id"] = maxi(int(md.get("last_generated_id", 999)), pid)
+
+	md["current_ids"] = next_ids
+	md["seen_ids"] = seen_ids
+	md["cycle"] = int(md.get("cycle", 0)) + 1
+	md["last_refresh_phase"] = phase
+	md["last_refresh_season"] = season_now
+
+	save["players_by_id"] = by_id
+	save["mercato"] = md
+
+# --- Reset Finance pour nouveau club (appelé depuis Main.gd) ---
+static func reset_finance_for_new_club(save: Dictionary) -> void:
+	if save == null:
+		return
+
+	ensure_progression_wallet_schema(save)
+	ensure_finance_schema(save)
+
+	# Totaux
+	save["total_billetterie"] = 0
+	save["total_boutique"] = 0
+	save["total_sponsors"] = 0
+	save["total_tournois"] = 0
+
+	# Salaires (cumul + par match)
+	if not save.has("total_salaires"):
+		save["total_salaires"] = 0
+	save["total_salaires"] = 0
+	save["salary_total_per_match"] = 0
+
+	# Round/persistance anti double-compte
+	save["season_round"] = 0
+	save["last_pop_fin_round"] = -1
+
+	# Progression saison remise à zéro pour une nouvelle équipe
+	if not save.has("progress") or typeof(save["progress"]) != TYPE_DICTIONARY:
+		save["progress"] = {}
+	(save["progress"] as Dictionary)["journee"] = 1
+	(save["progress"] as Dictionary)["wins"] = 0
+	(save["progress"] as Dictionary)["losses"] = 0
+
+	# Résultats / historique saison
+	save["season_results"] = {}
+	save["ranking_history"] = []
+
+	# Cumuls finances / solde
+	save["total_recettes"] = 0
+	save["total_depenses"] = 0
+
+	# Historiques finances
+	save["finance_history_recettes"] = []
+	save["finance_history_depenses"] = []
+	save["finance_history_solde"] = []
+
+	# Wallet / finance réalignés à zéro pour un nouveau club
+	if not save.has("wallet") or typeof(save["wallet"]) != TYPE_DICTIONARY:
+		save["wallet"] = {}
+	(save["wallet"] as Dictionary)["euros"] = 0
+	(save["wallet"] as Dictionary)["tokens"] = 0
+
+	# --- RESET COACHS ---
+	save["coachs"] = {
+		"owned": [],
+		"active": "",
+		"last_hired_season": 0
+	}
+
+	if not save.has("finance") or typeof(save["finance"]) != TYPE_DICTIONARY:
+		save["finance"] = {}
+	(save["finance"] as Dictionary)["euros"] = 0
+
+	# Travaux stade / coûts reportés
+	save["travaux_stade"] = 0
+	if not save.has("finance") or typeof(save["finance"]) != TYPE_DICTIONARY:
+		save["finance"] = {}
+	(save["finance"] as Dictionary)["total_cout_evolution_stade"] = 0
+	(save["finance"] as Dictionary)["dernier_achat_stade_cout"] = 0
+	(save["finance"] as Dictionary)["dernier_achat_stade_label"] = ""
+
+	if not save.has("stadium") or typeof(save["stadium"]) != TYPE_DICTIONARY:
+		save["stadium"] = {}
+	var stadium: Dictionary = save["stadium"] as Dictionary
+	stadium["travaux_en_cours"] = false
+	stadium["travaux_cible_ng"] = 0
+	stadium["travaux_cible_ns"] = 0
+	stadium["travaux_matches_restants"] = 0
+	stadium["travaux_duree_totale"] = 0
+	stadium["travaux_baseline_matchs_saison"] = 0
+
+	# Ticketing
+	if not save.has("ticketing") or typeof(save["ticketing"]) != TYPE_DICTIONARY:
+		save["ticketing"] = {}
+	if not save.has("stadium") or typeof(save["stadium"]) != TYPE_DICTIONARY:
+		save["stadium"] = {}
+	var stadium_ticketing_holder: Dictionary = save["stadium"] as Dictionary
+	if not stadium_ticketing_holder.has("ticketing") or typeof(stadium_ticketing_holder["ticketing"]) != TYPE_DICTIONARY:
+		stadium_ticketing_holder["ticketing"] = {}
+
+	# Shop
+	save["shop"] = {}
+	save["shop_total_forecast"] = 0

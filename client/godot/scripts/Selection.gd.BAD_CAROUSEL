@@ -1,0 +1,337 @@
+extends Control
+
+signal selection_done()
+signal back_requested()
+
+const MAX_SEL := 8
+
+var selected_ids: Array[int] = []
+
+var PlayerRowPS: PackedScene = preload("res://scenes/PlayerRow.tscn")
+const Save := preload("res://scripts/Save.gd") # ✅ required: Save is not a global class_name
+
+# Nodes (résolus dynamiquement, robustes)
+var box: VBoxContainer
+var lbl_count: Label
+var btn_val: BaseButton
+var btn_back: BaseButton
+var box_buttons: Control
+var scroll: Control
+var BG_TEST: Control
+var Title: Control
+
+var lbl_title: Label
+var lbl_progress: Label
+
+
+func _ready() -> void:
+	print("[SELECTION] ready path=", get_path())
+
+	# --- resolve nodes safely (paths + fallback by name)
+	box = _get_node_typed("ScrollContainer/VBoxPlayers", VBoxContainer) as VBoxContainer
+	if box == null:
+		box = find_child("VBoxPlayers", true, false) as VBoxContainer
+
+	lbl_count = _get_node_typed("LabelCount", Label) as Label
+	if lbl_count == null:
+		lbl_count = find_child("LabelCount", true, false) as Label
+
+	lbl_title = _get_node_typed("LabelTitle", Label) as Label
+	if lbl_title == null:
+		lbl_title = find_child("LabelTitle", true, false) as Label
+
+	lbl_progress = _get_node_typed("LabelProgress", Label) as Label
+	if lbl_progress == null:
+		lbl_progress = find_child("LabelProgress", true, false) as Label
+
+	box_buttons = _get_node_typed("BoxButtons", Control) as Control
+	if box_buttons == null:
+		box_buttons = find_child("BoxButtons", true, false) as Control
+
+	scroll = _get_node_typed("ScrollContainer", Control) as Control
+	if scroll == null:
+		scroll = find_child("ScrollContainer", true, false) as Control
+
+	BG_TEST = get_node_or_null("BG_TEST") as Control
+	if BG_TEST == null:
+		BG_TEST = find_child("BG_TEST", true, false) as Control
+
+	Title = get_node_or_null("Title") as Control
+	if Title == null:
+		Title = find_child("Title", true, false) as Control
+
+	# Boutons: on accepte Button OU TextureButton (BaseButton)
+	btn_val = _get_node_typed("BoxButtons/BtnValider", BaseButton) as BaseButton
+	if btn_val == null:
+		btn_val = find_child("BtnValider", true, false) as BaseButton
+
+	btn_back = _get_node_typed("BoxButtons/BtnRetour", BaseButton) as BaseButton
+	if btn_back == null:
+		btn_back = find_child("BtnRetour", true, false) as BaseButton
+
+	# ✅ i18n: mettre la CLÉ (pas tr()) et la mémoriser
+	if btn_val != null:
+		btn_val.set_meta("i18n_key", "BTN_VALIDATE_SELECTION")
+		btn_val.text = "BTN_VALIDATE_SELECTION"
+		I18nSvc.apply_node(btn_val)
+
+	if btn_back != null:
+		btn_back.set_meta("i18n_key", "BTN_BACK")
+		btn_back.text = "BTN_BACK"
+		I18nSvc.apply_node(btn_back)
+
+
+	_print_node_map()
+
+	# --- anti-block: décor ignore souris
+	if BG_TEST != null:
+		BG_TEST.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if Title != null:
+		Title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# root laisse passer aux enfants
+	mouse_filter = Control.MOUSE_FILTER_PASS
+
+	# --- ensure list/buttons don't block each other
+	if scroll != null:
+		scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+		scroll.z_index = 0
+
+	if box_buttons != null:
+		box_buttons.mouse_filter = Control.MOUSE_FILTER_PASS
+		box_buttons.z_index = 200
+
+	if btn_val != null:
+		btn_val.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn_val.z_index = 210
+		btn_val.disabled = true
+		if btn_val.pressed.is_connected(_on_validate):
+			btn_val.pressed.disconnect(_on_validate)
+		btn_val.pressed.connect(_on_validate)
+
+	if btn_back != null:
+		btn_back.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn_back.z_index = 210
+		if btn_back.pressed.is_connected(_on_back):
+			btn_back.pressed.disconnect(_on_back)
+		btn_back.pressed.connect(_on_back)
+
+	# Build list
+	if box == null:
+		push_error("[SELECTION] VBoxPlayers not found -> cannot build list")
+		return
+
+	# --- CRITICAL: ensure BoxButtons is ABOVE ScrollContainer in draw & hit order
+	if scroll != null:
+		scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+		scroll.z_index = 0
+
+	if box_buttons != null:
+		box_buttons.mouse_filter = Control.MOUSE_FILTER_PASS
+		box_buttons.z_index = 10
+		box_buttons.move_to_front() # ✅ indispensable
+
+	if btn_val != null:
+		btn_val.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn_val.z_index = 11
+		btn_val.move_to_front()     # ✅
+
+	if btn_back != null:
+		btn_back.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn_back.z_index = 11
+		btn_back.move_to_front()    # ✅
+
+	# Optionnel: fixe la zone boutons en bas (évite overlap visuel)
+	if box_buttons != null:
+		box_buttons.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		box_buttons.offset_left = 0
+		box_buttons.offset_right = 0
+		box_buttons.offset_bottom = 0
+		box_buttons.offset_top = -90  # hauteur approx de la zone boutons
+
+	_build_list(_dummy_players())
+
+	# ✅ i18n global sur cet écran (inclut boutons + rows déjà instanciées)
+	I18nSvc.apply_node(self)
+
+	# ton state UI
+	_update_ui()
+
+	# ✅ i18n + UI state
+	_apply_i18n()
+
+
+func _print_node_map() -> void:
+	print("[SELECTION][NODES] box=", _p(box),
+		" lbl_count=", _p(lbl_count),
+		" box_buttons=", _p(box_buttons),
+		" scroll=", _p(scroll))
+	print("[SELECTION][NODES] btn_val=", _p(btn_val), " btn_back=", _p(btn_back))
+	if btn_val == null or btn_back == null:
+		print("[SELECTION][WARN] Missing buttons => check your scene names: BtnValider / BtnRetour")
+
+
+func _p(n: Node) -> String:
+	if n == null:
+		return "NULL"
+	return "%s (%s)" % [str(n.get_path()), n.get_class()]
+
+
+func _get_node_typed(path: String, t: Variant) -> Node:
+	var n := get_node_or_null(path)
+	if n == null:
+		return null
+	# Godot: `is` fonctionne avec classes natives
+	if t == BaseButton and (n is BaseButton):
+		return n
+	if t == Control and (n is Control):
+		return n
+	if t == VBoxContainer and (n is VBoxContainer):
+		return n
+	if t == Label and (n is Label):
+		return n
+	return null
+
+
+func _on_back() -> void:
+	print("[SELECTION] BACK pressed")
+	emit_signal("back_requested")
+
+
+func _build_list(players: Array) -> void:
+	for c in box.get_children():
+		c.queue_free()
+
+	for p in players:
+		var row = PlayerRowPS.instantiate()
+
+		if not row.has_method("setup"):
+			push_error("[SELECTION] PlayerRow has no setup() -> check PlayerRow.tscn script attachment")
+			print("[SELECTION] row class=", row.get_class(), " script=", row.get_script())
+			return
+
+		row.setup(p)
+
+		if row.toggled.is_connected(_on_row_toggled):
+			row.toggled.disconnect(_on_row_toggled)
+		row.toggled.connect(_on_row_toggled)
+
+		box.add_child(row)
+
+
+func _on_row_toggled(pid: int) -> void:
+	if pid in selected_ids:
+		selected_ids.erase(pid)
+	else:
+		if selected_ids.size() >= MAX_SEL:
+			print("[SELECTION] max reached")
+			return
+		selected_ids.append(pid)
+
+	_update_ui()
+
+
+func _update_ui() -> void:
+	# ---- Title + Subtitle + Visual counter (centered) ----
+	if lbl_title != null:
+		lbl_title.text = tr("selection.title")
+		lbl_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	if lbl_count != null:
+		lbl_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	if lbl_progress != null:
+		lbl_progress.text = "%d/%d" % [selected_ids.size(), MAX_SEL]
+		lbl_progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+		I18nSvc.apply_node(lbl_count)
+
+		var s := lbl_count.text
+		s = s.replace("{n}", str(selected_ids.size())).replace("{max}", str(MAX_SEL))
+		lbl_count.text = s
+
+	if btn_val != null:
+		btn_val.set_meta("i18n_key", "BTN_VALIDATE_SELECTION")
+		btn_val.text = "BTN_VALIDATE_SELECTION"
+		I18nSvc.apply_node(btn_val)
+		btn_val.disabled = (selected_ids.size() != MAX_SEL)
+
+	if btn_back != null:
+		btn_back.set_meta("i18n_key", "BTN_BACK")
+		btn_back.text = "BTN_BACK"
+		I18nSvc.apply_node(btn_back)
+
+
+func _on_validate() -> void:
+	print("[SELECTION] VALIDATE pressed, selected_ids=", selected_ids)
+
+	if selected_ids.size() != MAX_SEL:
+		print("[SELECTION] blocked: need exactly ", MAX_SEL)
+		return
+
+	Save.ensure_exists(str(Session.profile_uuid))
+	var d: Dictionary = Save.read_dict()
+	if not d.has("roster") or typeof(d["roster"]) != TYPE_DICTIONARY:
+		d["roster"] = {}
+
+	(d["roster"] as Dictionary)["selected_ids"] = selected_ids.duplicate()
+	Save.write_dict(d)
+
+	print("[SELECTION] saved roster.selected_ids=", (d["roster"] as Dictionary).get("selected_ids", []))
+	emit_signal("selection_done")
+
+
+func _dummy_players() -> Array:
+	var arr: Array = []
+	var pos := ["PG","SG","SF","PF","C"]
+	for i in range(12):
+		arr.append({
+			"id": i,
+			"name": "Joueur %d" % (i + 1),
+			"pos": pos[i % pos.size()],
+			"rating": 60 + i
+		})
+	return arr
+
+
+# DEBUG (tu pourras supprimer après)
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed:
+		print("[SELECTION][_input] click at ", event.position, " button=", event.button_index)
+		var under := get_viewport().gui_get_hovered_control()
+		if under != null:
+			print("[SELECTION] hovered=", under.name, " path=", under.get_path(), " class=", under.get_class(),
+				" mf=", under.mouse_filter, " gp=", under.global_position, " size=", under.size)
+		else:
+			print("[SELECTION] hovered=NONE")
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed:
+		print("[SELECTION][_unhandled_input] click at ", event.position, " button=", event.button_index)
+
+
+# ------------------------------------------------------------
+# I18N (appelé auto quand la langue change)
+# ------------------------------------------------------------
+func _apply_i18n() -> void:
+	I18nSvc.apply_node(self)
+
+	if lbl_title != null:
+		lbl_title.text = tr("selection.title")
+
+	if box != null:
+		for r in box.get_children():
+			if r != null:
+				if r.has_method("_update_text"):
+					r.call("_update_text")
+				if r.has_method("_update_style"):
+					r.call("_update_style")
+
+	_update_ui()
+
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED:
+		_apply_i18n()

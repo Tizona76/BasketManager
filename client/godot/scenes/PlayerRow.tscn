@@ -1,0 +1,72 @@
+[gd_scene load_steps=2 format=3 uid="uid://ddqign8bttqes"]
+
+[ext_resource type="Script" uid="uid://dyu8yvc8qq681" path="res://scripts/PlayerRow.gd" id="1_4nygd"]
+
+[node name="PlayerRow" type="HBoxContainer"]
+script = ExtResource("1_4nygd")
+theme_override_constants/separation = 14
+
+[node name="AvatarBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+custom_minimum_size = Vector2(88, 84)
+
+[node name="Avatar" type="TextureRect" parent="AvatarBox"]
+custom_minimum_size = Vector2(60, 60)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LabelName" type="Label" parent="AvatarBox"]
+layout_mode = 2
+horizontal_alignment = 1
+
+[node name="LabelStars" type="Label" parent="."]
+layout_mode = 2
+custom_minimum_size = Vector2(72, 0)
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="LabelPos" type="Label" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+
+[node name="LabelAge" type="Label" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+
+[node name="LabelGender" type="Label" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+
+[node name="LabelSpeed" type="Label" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+
+[node name="LabelDefense" type="Label" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+
+[node name="LabelPrecision" type="Label" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+
+[node name="LabelMotivation" type="Label" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+
+[node name="LabelSalary" type="Label" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+
+[node name="BtnSelect" type="Button" parent="."]
+layout_mode = 2
+custom_minimum_size = Vector2(90, 0)
+text = "Ajouter"

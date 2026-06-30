@@ -1,0 +1,159 @@
+extends Control
+
+const PlayerLife = preload("res://scripts/PlayerLife.gd")
+
+@onready var lbl_title: Label = get_node("UI/Panel/LblTitle") as Label
+@onready var lbl_step: Label = get_node("UI/Panel/LblStep") as Label
+@onready var lbl_mission: Label = get_node("UI/Panel/LblMission") as Label
+@onready var lbl_reward: Label = get_node("UI/Panel/LblReward") as Label
+@onready var lbl_status: Label = get_node("UI/Panel/LblStatus") as Label
+@onready var btn_claim: Button = get_node("UI/Panel/BtnClaim") as Button
+@onready var btn_back: Button = get_node("UI/Panel/BtnBack") as Button
+
+const MISSIONS_V1: Array[Dictionary] = [
+	{
+		"id": "M1",
+		"label": "Gagner 1 match",
+		"reward_tokens": 2,
+		"counter": "wins_total",
+		"target": 1
+	},
+	{
+		"id": "M2",
+		"label": "Marquer 75 points",
+		"reward_tokens": 3,
+		"counter": "pts_75_plus",
+		"target": 1
+	},
+	{
+		"id": "M3",
+		"label": "Ajuster un prix",
+		"reward_tokens": 4,
+		"counter": "price_adjust_done",
+		"target": 1
+	},
+	{
+		"id": "M4",
+		"label": "Débloquer un niveau de stade",
+		"reward_tokens": 5,
+		"counter": "stadium_upgraded",
+		"target": 1
+	}
+]
+
+func _ready() -> void:
+	mouse_filter = Control.MOUSE_FILTER_PASS
+	if has_node("UI"):
+		get_node("UI").mouse_filter = Control.MOUSE_FILTER_PASS
+	if lbl_title != null:
+		lbl_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if lbl_step != null:
+		lbl_step.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if lbl_mission != null:
+		lbl_mission.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if lbl_reward != null:
+		lbl_reward.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if lbl_status != null:
+		lbl_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if btn_claim != null:
+		btn_claim.mouse_filter = Control.MOUSE_FILTER_STOP
+	if btn_back != null:
+		btn_back.disabled = false
+		btn_back.mouse_filter = Control.MOUSE_FILTER_STOP
+	if not btn_claim.pressed.is_connected(_on_claim_pressed):
+		btn_claim.pressed.connect(_on_claim_pressed)
+	if not btn_back.pressed.is_connected(_on_back_pressed):
+		btn_back.pressed.connect(_on_back_pressed)
+	_refresh_ui()
+
+func _get_save() -> Dictionary:
+	return PlayerLife.load_savegame()
+
+func _get_completed(save: Dictionary) -> Array:
+	if not save.has("missions_progress") or typeof(save["missions_progress"]) != TYPE_DICTIONARY:
+		return []
+	var mp: Dictionary = save["missions_progress"] as Dictionary
+	if not mp.has("completed") or typeof(mp["completed"]) != TYPE_ARRAY:
+		return []
+	return mp["completed"] as Array
+
+func _get_counters(save: Dictionary) -> Dictionary:
+	if not save.has("missions_state") or typeof(save["missions_state"]) != TYPE_DICTIONARY:
+		return {}
+	var ms: Dictionary = save["missions_state"] as Dictionary
+	if not ms.has("counters") or typeof(ms["counters"]) != TYPE_DICTIONARY:
+		return {}
+	return ms["counters"] as Dictionary
+
+func _current_index(save: Dictionary) -> int:
+	return _get_completed(save).size()
+
+func _mission_done(mission: Dictionary, counters: Dictionary) -> bool:
+	var key: String = str(mission.get("counter", ""))
+	var target: int = int(mission.get("target", 0))
+	return int(counters.get(key, 0)) >= target
+
+func _refresh_ui() -> void:
+	var save: Dictionary = _get_save()
+	var completed: Array = _get_completed(save)
+	var counters: Dictionary = _get_counters(save)
+	var idx: int = _current_index(save)
+
+	lbl_title.text = "Missions"
+
+	if idx >= MISSIONS_V1.size():
+		lbl_step.text = "Parcours terminé"
+		lbl_mission.text = "Toutes les missions sont terminées."
+		lbl_reward.text = ""
+		lbl_status.text = ""
+		btn_claim.disabled = true
+		return
+
+	var mission: Dictionary = MISSIONS_V1[idx]
+	var cur_val: int = int(counters.get(str(mission.get("counter", "")), 0))
+	var target: int = int(mission.get("target", 0))
+	var done: bool = _mission_done(mission, counters)
+
+	lbl_step.text = "Étape " + str(idx + 1) + " / " + str(MISSIONS_V1.size())
+	lbl_mission.text = str(mission.get("label", ""))
+	lbl_reward.text = "Gain : " + str(int(mission.get("reward_tokens", 0))) + " tokens"
+	lbl_status.text = "Progression : " + str(cur_val) + " / " + str(target)
+
+	if done:
+		btn_claim.disabled = false
+		btn_claim.text = "Réclamer"
+	else:
+		btn_claim.disabled = true
+		btn_claim.text = "Mission en cours"
+
+func _on_claim_pressed() -> void:
+	var save: Dictionary = _get_save()
+	var idx: int = _current_index(save)
+	if idx >= MISSIONS_V1.size():
+		return
+
+	var mission: Dictionary = MISSIONS_V1[idx]
+	var counters: Dictionary = _get_counters(save)
+	if not _mission_done(mission, counters):
+		return
+
+	if not save.has("missions_progress") or typeof(save["missions_progress"]) != TYPE_DICTIONARY:
+		save["missions_progress"] = {"completed": [], "in_progress": [], "selected": []}
+	var mp: Dictionary = save["missions_progress"] as Dictionary
+	if not mp.has("completed") or typeof(mp["completed"]) != TYPE_ARRAY:
+		mp["completed"] = []
+
+	var completed: Array = mp["completed"] as Array
+	var mission_id: String = str(mission.get("id", ""))
+	if not completed.has(mission_id):
+		completed.append(mission_id)
+	mp["completed"] = completed
+	save["missions_progress"] = mp
+
+	PlayerLife.add_tokens(save, int(mission.get("reward_tokens", 0)), "mission_" + mission_id)
+	PlayerLife.write_savegame(save)
+	_refresh_ui()
+
+func _on_back_pressed() -> void:
+	print("[MISSIONS] BtnBack pressed")
+	get_tree().change_scene_to_file("res://scenes/MenuSaison.tscn")

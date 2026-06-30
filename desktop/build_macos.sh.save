@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -e
+
+# 1) Activer le venv (si tu as un .venv, sinon ce bloc est ignoré)
+if [ -d ".venv" ]; then
+  source .venv/bin/activate
+fi
+
+# 2) Nettoyage optionnel de l'ancien build
+rm -rf build_nuitka
+
+# 3) Build Nuitka en app macOS
+python3 -m nuitka \
+  --standalone \
+  --macos-create-app-bundle \
+  --macos-app-name="Basket Manager" \
+  --include-data-dir=images=images \
+  --include-data-dir=fonts=fonts \
+  --include-data-dir=sfx=sfx \
+  --output-dir=build_nuitka \
+  basket_team_selector.py
+

@@ -1,0 +1,64 @@
+[gd_scene load_steps=2 format=3 uid="uid://bop6wdfldik4j"]
+
+[ext_resource type="Script" uid="uid://cviqagmsejf7o" path="res://scripts/CalendrierModal.gd" id="1_1x41v"]
+
+[node name="CalendrierModal" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_1x41v")
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.45)
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 100.0
+offset_top = 90.0
+offset_right = 1100.0
+offset_bottom = 610.0
+
+[node name="Title" type="Label" parent="Panel"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 16.0
+offset_right = 840.0
+offset_bottom = 44.0
+text = "Calendrier"
+
+[node name="BtnClose" type="Button" parent="Panel"]
+layout_mode = 0
+offset_left = 940.0
+offset_top = 12.0
+offset_right = 980.0
+offset_bottom = 48.0
+text = "X"
+
+[node name="Scroll" type="ScrollContainer" parent="Panel"]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 60.0
+offset_right = 984.0
+offset_bottom = 504.0
+mouse_filter = 0
+follow_focus = true
+
+[node name="Content" type="VBoxContainer" parent="Panel/Scroll"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Footer" type="Label" parent="Panel"]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 520.0
+offset_right = 984.0
+offset_bottom = 544.0

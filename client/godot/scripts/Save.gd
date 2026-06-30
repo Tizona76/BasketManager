@@ -1,0 +1,317 @@
+extends Node
+
+const PlayerLife := preload("res://scripts/PlayerLife.gd")
+
+const FILE_SAVEGAME: String = "user://savegame.json"
+const StadiumDataRef = preload("res://scripts/StadiumData.gd")
+
+static func ensure_exists(profile_uuid: String = "") -> void:
+	if FileAccess.file_exists(FILE_SAVEGAME):
+		return
+
+	var d: Dictionary = {
+		"version": 1,
+		"profile_uuid": profile_uuid,
+		"season_id": "2026-01",
+		"club": {"name": "BM Club", "level": 1, "xp": 0},
+		"wallet": {"euros": 0, "tokens": 0},
+		"missions_progress": {
+			"completed": [],
+			"in_progress": [],
+			"selected": []
+		},
+		"missions_state": {
+			"current": "",
+			"counters": {
+				"wins_total": 0,
+				"pts_75_plus": 0,
+				"pts_90_plus": 0,
+				"pts_100_plus": 0,
+				"price_adjust_done": 0,
+				"stadium_upgraded": 0,
+				"win_streak": 0,
+				"youth_ok_matches": 0,
+				"sponsors_signes": 0,
+				"coach_signed": 0,
+				"tournois_participations": 0,
+				"mercato_achats": 0
+			},
+			"last_screen": "",
+			"last_stadium_level": "",
+			"stadium_upgraded_flag": 0
+		},
+		"total_tournois": 0,
+		"progress": {"journee": 1, "wins": 0, "losses": 0},
+		"roster": {"players": [], "selected_ids": [], "match_selected_ids": [], "auto_save_match_selection_paid": false},
+		"players_by_id": {},
+			"stadium": {
+				"niveau_global_jeu": 1,
+				"niveau_stade": 0,
+				"travaux_en_cours": false,
+			"travaux_cible_ng": 0,
+			"travaux_cible_ns": 0,
+			"travaux_matches_restants": 0,
+			"travaux_duree_totale": 0,
+			"travaux_baseline_matchs_saison": 0
+		},
+		"finance": {
+			"euros": 0,
+			"total_cout_evolution_stade": 0,
+			"dernier_achat_stade_cout": 0,
+			"dernier_achat_stade_label": ""
+		},
+		"meta": {"created_at_unix": Time.get_unix_time_from_system()}
+	}
+	write_dict(d)
+
+
+static func _ensure_missions_block(d: Dictionary) -> void:
+	if not d.has("missions_progress"):
+		d["missions_progress"] = {
+			"completed": [],
+			"in_progress": [],
+			"selected": []
+		}
+
+	if not d.has("missions_state"):
+		d["missions_state"] = {
+			"current": "",
+			"counters": {
+				"wins_total": 0,
+				"pts_75_plus": 0,
+				"price_adjust_done": 0,
+				"stadium_upgraded": 0,
+				"win_streak": 0,
+				"youth_ok_matches": 0,
+				"sponsors_signes": 0,
+				"coach_signed": 0,
+				"tournois_participations": 0,
+				"mercato_achats": 0
+			},
+			"last_screen": "",
+			"last_stadium_level": "",
+			"stadium_upgraded_flag": 0
+		}
+
+static func read_dict() -> Dictionary:
+	return PlayerLife.load_savegame()
+
+
+static func write_dict(d: Dictionary) -> void:
+	PlayerLife.write_savegame(d)
+
+
+static func set_club_name(club_name: String) -> void:
+	var name2: String = club_name.strip_edges()
+	if name2 == "":
+		return
+
+	var d: Dictionary = PlayerLife.load_savegame()
+	if not d.has("club") or typeof(d["club"]) != TYPE_DICTIONARY:
+		d["club"] = {}
+	(d["club"] as Dictionary)["name"] = name2
+
+	d["team_name"] = name2
+	write_dict(d)
+
+static func get_club_name() -> String:
+	var d: Dictionary = read_dict()
+	if d.has("club") and typeof(d["club"]) == TYPE_DICTIONARY:
+		return str((d["club"] as Dictionary).get("name", "")).strip_edges()
+	return str(d.get("team_name", "")).strip_edges()
+
+static func _ensure_stadium_block(d: Dictionary) -> void:
+	if not d.has("stadium") or typeof(d["stadium"]) != TYPE_DICTIONARY:
+		d["stadium"] = {
+			"niveau_global_jeu": 1,
+			"niveau_stade": 0,
+			"travaux_en_cours": false,
+			"travaux_cible_ng": 0,
+			"travaux_cible_ns": 0,
+			"travaux_matches_restants": 0,
+			"travaux_duree_totale": 0,
+			"travaux_baseline_matchs_saison": 0
+		}
+
+static func _ensure_finance_block(d: Dictionary) -> void:
+	if not d.has("finance") or typeof(d["finance"]) != TYPE_DICTIONARY:
+		d["finance"] = {
+			"euros": 0,
+			"total_cout_evolution_stade": 0,
+			"dernier_achat_stade_cout": 0,
+			"dernier_achat_stade_label": ""
+		}
+
+static func get_stadium_data() -> Dictionary:
+	var d: Dictionary = read_dict()
+	_ensure_stadium_block(d)
+	return (d["stadium"] as Dictionary).duplicate(true)
+
+static func set_stadium_data(stadium_data: Dictionary) -> void:
+	var d: Dictionary = read_dict()
+	_ensure_stadium_block(d)
+	d["stadium"] = stadium_data.duplicate(true)
+	write_dict(d)
+
+static func get_finance_data() -> Dictionary:
+	var d: Dictionary = read_dict()
+	_ensure_finance_block(d)
+	return (d["finance"] as Dictionary).duplicate(true)
+
+static func set_finance_data(finance_data: Dictionary) -> void:
+	var d: Dictionary = read_dict()
+	_ensure_finance_block(d)
+	d["finance"] = finance_data.duplicate(true)
+	write_dict(d)
+
+static func stadium_level_str() -> String:
+	var s: Dictionary = get_stadium_data()
+	var ng: int = int(s.get("niveau_global_jeu", 1))
+	var ns: int = int(s.get("niveau_stade", 1))
+	return str(ng) + "." + str(ns)
+
+static func stadium_current_capacity() -> int:
+	var s: Dictionary = get_stadium_data()
+	return int(StadiumDataRef.get_capacity(
+		int(s.get("niveau_global_jeu", 1)),
+		int(s.get("niveau_stade", 1))
+	))
+
+static func stadium_next_level() -> Variant:
+	var s: Dictionary = get_stadium_data()
+	return StadiumDataRef.get_next_level(
+		int(s.get("niveau_global_jeu", 1)),
+		int(s.get("niveau_stade", 1))
+	)
+
+static func stadium_cost_for(ng: int, ns: int) -> int:
+	return int(StadiumDataRef.get_cost(ng, ns))
+
+static func stadium_duration_for(ng: int, ns: int) -> int:
+	return int(StadiumDataRef.get_duration(ng, ns))
+
+static func stadium_tabs_unlocked() -> Array:
+	var s: Dictionary = get_stadium_data()
+	return StadiumDataRef.get_tabs_for_level(
+		int(s.get("niveau_global_jeu", 1)),
+		int(s.get("niveau_stade", 1))
+	)
+
+static func stadium_launch_upgrade(target_ng: int, target_ns: int, current_matchs_saison: int, ignore_budget := false) -> Dictionary:
+	var d: Dictionary = read_dict()
+	_ensure_stadium_block(d)
+	_ensure_finance_block(d)
+
+	var stadium: Dictionary = d["stadium"] as Dictionary
+	var finance: Dictionary = d["finance"] as Dictionary
+
+	var wallet_disponible: int = maxi(0, int(d.get("total_recettes", 0)) - int(d.get("total_depenses", 0)))
+	var cost: int = int(StadiumDataRef.get_cost(target_ng, target_ns))
+	var duration: int = int(StadiumDataRef.get_duration(target_ng, target_ns))
+	var capacity: int = int(StadiumDataRef.get_capacity(target_ng, target_ns))
+	var is_basic_improvements := int(stadium.get("niveau_global_jeu", 1)) == 1 and int(stadium.get("niveau_stade", 1)) == 0 and target_ng == 1 and target_ns == 1
+
+	if cost <= 0:
+		return {"ok": false, "reason": "invalid_target"}
+
+	if not ignore_budget and not is_basic_improvements and wallet_disponible < cost:
+		return {"ok": false, "reason": "insufficient_funds", "cost": cost}
+
+	if not ignore_budget:
+		d["total_depenses"] = int(d.get("total_depenses", 0)) + cost
+
+	finance["euros"] = int(d.get("total_recettes", 0)) - int(d.get("total_depenses", 0))
+	finance["total_cout_evolution_stade"] = int(finance.get("total_cout_evolution_stade", 0)) + cost
+	finance["dernier_achat_stade_cout"] = cost
+	finance["dernier_achat_stade_label"] = "Achat évol. stade %d.%d" % [target_ng, target_ns]
+
+	if duration <= 0:
+		stadium["niveau_global_jeu"] = target_ng
+		stadium["niveau_stade"] = target_ns
+		write_dict(d)
+		return {
+			"ok": true,
+			"applied_now": true,
+			"target_ng": target_ng,
+			"target_ns": target_ns,
+			"capacity": capacity,
+			"duration": duration
+		}
+
+	stadium["travaux_en_cours"] = true
+	stadium["travaux_cible_ng"] = target_ng
+	stadium["travaux_cible_ns"] = target_ns
+	stadium["travaux_matches_restants"] = duration
+	stadium["travaux_duree_totale"] = duration
+	stadium["travaux_baseline_matchs_saison"] = current_matchs_saison
+
+	write_dict(d)
+
+	return {
+		"ok": true,
+		"applied_now": false,
+		"target_ng": target_ng,
+		"target_ns": target_ns,
+		"capacity": capacity,
+		"duration": duration
+	}
+
+static func stadium_sync_travaux(current_matchs_saison: int) -> Dictionary:
+	var d: Dictionary = read_dict()
+	_ensure_stadium_block(d)
+
+	var stadium: Dictionary = d["stadium"] as Dictionary
+
+	if not bool(stadium.get("travaux_en_cours", false)):
+		return {"changed": false, "finished": false}
+
+	var duree_totale: int = int(stadium.get("travaux_duree_totale", 0))
+	var baseline: int = int(stadium.get("travaux_baseline_matchs_saison", 0))
+	var deja: int = max(0, current_matchs_saison - baseline)
+	var rem: int = max(0, duree_totale - deja)
+
+	if rem == int(stadium.get("travaux_matches_restants", 0)):
+		return {"changed": false, "finished": false}
+
+	stadium["travaux_matches_restants"] = rem
+
+	if rem <= 0:
+		stadium["niveau_global_jeu"] = int(stadium.get("travaux_cible_ng", 1))
+		stadium["niveau_stade"] = int(stadium.get("travaux_cible_ns", 1))
+		stadium["travaux_en_cours"] = false
+		stadium["travaux_cible_ng"] = 0
+		stadium["travaux_cible_ns"] = 0
+		stadium["travaux_matches_restants"] = 0
+		stadium["travaux_duree_totale"] = 0
+		stadium["travaux_baseline_matchs_saison"] = 0
+
+		write_dict(d)
+
+		return {
+			"changed": true,
+			"finished": true,
+			"new_ng": int(stadium.get("niveau_global_jeu", 1)),
+			"new_ns": int(stadium.get("niveau_stade", 1)),
+			"capacity": int(StadiumDataRef.get_capacity(
+				int(stadium.get("niveau_global_jeu", 1)),
+				int(stadium.get("niveau_stade", 1))
+			))
+		}
+
+	write_dict(d)
+
+	return {
+		"changed": true,
+		"finished": false,
+		"remaining": rem
+	}
+
+static func get_total_cout_evolution_stade() -> int:
+	var f: Dictionary = get_finance_data()
+	return int(f.get("total_cout_evolution_stade", 0))
+
+static func stadium_apply_travaux_revenue_penalty(amount: int, factor: float) -> int:
+	var s: Dictionary = get_stadium_data()
+	if bool(s.get("travaux_en_cours", false)):
+		return int(round(float(amount) * factor))
+	return amount

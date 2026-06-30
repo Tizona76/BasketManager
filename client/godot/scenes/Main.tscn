@@ -1,0 +1,52 @@
+[gd_scene load_steps=4 format=3 uid="uid://crlican6akxk0"]
+
+[ext_resource type="Theme" uid="uid://xs5xp8el4jec" path="res://ui/theme_main.tres" id="1_0bbpv"]
+[ext_resource type="Script" uid="uid://dskpetkjj0nag" path="res://scripts/Main.gd" id="1_elqb8"]
+[ext_resource type="AudioStream" uid="uid://cqaeboi7j6ltk" path="res://scenes/click_stream.tres" id="2_rvslj"]
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+theme = ExtResource("1_0bbpv")
+script = ExtResource("1_elqb8")
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("2_rvslj")
+
+[node name="UI" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Status" type="Label" parent="UI"]
+layout_mode = 2
+text = "Status: idle"
+
+[node name="BtnClick" type="Button" parent="UI"]
+layout_mode = 2
+text = "Click"
+
+[node name="BG_LAYER" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ScreenRoot" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2

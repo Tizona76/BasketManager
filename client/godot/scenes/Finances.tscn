@@ -1,0 +1,478 @@
+[gd_scene load_steps=5 format=3 uid="uid://cnwk65pv2sa21"]
+
+
+[ext_resource type="Script" path="res://scripts/PopularityBadge.gd" id="1"]
+
+[ext_resource type="Script" uid="uid://b2cl0pa88r8jo" path="res://scripts/Finances.gd" id="1_fin"]
+[ext_resource type="StyleBox" uid="uid://byvsyt5r525lg" path="res://ui/styleboxes/btn_back_red.tres" id="ext_btn_back"]
+[ext_resource type="StyleBox" uid="uid://dxmreyym0vpbt" path="res://ui/styleboxes_nba/btn_back_pressed.tres" id="ext_btn_back_pressed"]
+
+[ext_resource type="Texture2D" path="res://assets/images/backgrounds/finance_fond.png" id="99_fin_bg"]
+[ext_resource type="Script" path="res://scripts/FinanceGraph.gd" id="2_graph"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_shared/hud_progress_panel.tres" id="ext_hud_progress_style"]
+[ext_resource type="Texture2D" path="res://assets/images/token.png" id="ext_token_icon"]
+[node name="Finances" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_fin")
+
+
+[node name="Bg" type="TextureRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource("99_fin_bg")
+expand_mode = 1
+stretch_mode = 6
+
+
+[node name="HudProgressPanel" type="Panel" parent="."]
+custom_minimum_size = Vector2(220, 136.0)
+layout_mode = 0
+offset_left = 1110.0
+offset_top = 78.0
+offset_right = 1330.0
+offset_bottom = 214.0
+theme_override_styles/panel = ExtResource("ext_hud_progress_style")
+modulate = Color(1, 1, 1, 1)
+
+[node name="HudVBox" type="VBoxContainer" parent="HudProgressPanel"]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 10.0
+offset_right = 206.0
+offset_bottom = 98.0
+theme_override_constants/separation = 6
+
+[node name="LblHudLevel" type="Label" parent="HudProgressPanel/HudVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1.00, 0.90, 0.28, 1)
+theme_override_font_sizes/font_size = 24
+text = "Lv 1"
+theme_override_colors/font_outline_color = Color(0.34, 0.20, 0.00, 0.98)
+theme_override_constants/outline_size = 7
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.55)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 3
+
+[node name="LblHudXp" type="Label" parent="HudProgressPanel/HudVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.92, 1.00, 1)
+theme_override_font_sizes/font_size = 24
+text = "XP 0"
+theme_override_colors/font_outline_color = Color(0.02, 0.18, 0.28, 0.98)
+theme_override_constants/outline_size = 7
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.55)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 3
+
+[node name="TokensRow" type="HBoxContainer" parent="HudProgressPanel/HudVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ImgToken" type="TextureRect" parent="HudProgressPanel/HudVBox/TokensRow"]
+custom_minimum_size = Vector2(20, 20)
+layout_mode = 2
+texture = ExtResource("ext_token_icon")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LblHudTokens" type="Label" parent="HudProgressPanel/HudVBox/TokensRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1.00, 0.72, 0.20, 1)
+theme_override_font_sizes/font_size = 24
+text = "Tokens 0"theme_override_colors/font_outline_color = Color(0.36, 0.14, 0.00, 0.98)
+theme_override_constants/outline_size = 7
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.55)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 3
+
+[node name="LblTitle" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -240.0
+offset_top = 22.0
+offset_right = 240.0
+offset_bottom = 78.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 40
+text = "finance.title"
+horizontal_alignment = 1
+
+[node name="IncomePanel" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -520.0
+offset_top = 110.0
+offset_right = 200.0
+offset_bottom = 325.0
+grow_horizontal = 2
+color = Color(0.12, 0.12, 0.12, 0.85)
+
+[node name="IncomeTitle" type="Label" parent="IncomePanel"]
+theme_override_colors/font_color = Color(0.20, 0.85, 0.35, 1)
+layout_mode = 1
+offset_left = 18.0
+offset_top = 12.0
+offset_right = 320.0
+offset_bottom = 56.0
+theme_override_font_sizes/font_size = 26
+text = "finance.income.title"
+[node name="IncomeTotal" type="Label" parent="IncomePanel"]
+theme_override_colors/font_color = Color(0.20, 0.85, 0.35, 1)
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -240.0
+offset_top = 12.0
+offset_right = -18.0
+offset_bottom = 56.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 32
+text = "0 €"
+horizontal_alignment = 2
+[node name="IncomeTicketsLabel" type="Label" parent="IncomePanel"]
+layout_mode = 1
+offset_left = 22.0
+offset_top = 72.0
+offset_right = 320.0
+offset_bottom = 100.0
+theme_override_font_sizes/font_size = 22
+text = "finance.income.tickets"
+
+[node name="IncomeTicketsValue" type="Label" parent="IncomePanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -240.0
+offset_top = 72.0
+offset_right = -22.0
+offset_bottom = 100.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 22
+text = "0 €"
+horizontal_alignment = 2
+
+[node name="IncomeShopLabel" type="Label" parent="IncomePanel"]
+layout_mode = 1
+offset_left = 22.0
+offset_top = 110.0
+offset_right = 320.0
+offset_bottom = 138.0
+theme_override_font_sizes/font_size = 22
+text = "finance.income.shop"
+
+[node name="IncomeShopValue" type="Label" parent="IncomePanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -240.0
+offset_top = 110.0
+offset_right = -22.0
+offset_bottom = 138.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 22
+text = "0 €"
+horizontal_alignment = 2
+
+[node name="IncomeSponsorsLabel" type="Label" parent="IncomePanel"]
+layout_mode = 1
+offset_left = 22.0
+offset_top = 148.0
+offset_right = 320.0
+offset_bottom = 176.0
+theme_override_font_sizes/font_size = 22
+text = "finance.income.tournaments"
+
+[node name="IncomeSponsorsValue" type="Label" parent="IncomePanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -240.0
+offset_top = 148.0
+offset_right = -22.0
+offset_bottom = 176.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 22
+text = "0 €"
+horizontal_alignment = 2
+
+
+[node name="IncomeTournamentsLabel" type="Label" parent="IncomePanel"]
+layout_mode = 1
+offset_left = 22.0
+offset_top = 186.0
+offset_right = 320.0
+offset_bottom = 214.0
+theme_override_font_sizes/font_size = 22
+text = "finance.income.tournaments"
+
+[node name="IncomeTournamentsValue" type="Label" parent="IncomePanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -240.0
+offset_top = 186.0
+offset_right = -22.0
+offset_bottom = 214.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 22
+text = "0 €"
+horizontal_alignment = 2
+
+[node name="ExpensesPanel" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -520.0
+offset_top = 370.0
+offset_right = 200.0
+offset_bottom = 590.0
+grow_horizontal = 2
+color = Color(0.12, 0.12, 0.12, 0.85)
+
+[node name="ExpensesTitle" type="Label" parent="ExpensesPanel"]
+theme_override_colors/font_color = Color(0.92, 0.28, 0.28, 1)
+layout_mode = 1
+offset_left = 18.0
+offset_top = 12.0
+offset_right = 320.0
+offset_bottom = 56.0
+theme_override_font_sizes/font_size = 32
+text = "finance.expenses.title"
+[node name="ExpensesTotal" type="Label" parent="ExpensesPanel"]
+theme_override_colors/font_color = Color(0.92, 0.28, 0.28, 1)
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -240.0
+offset_top = 12.0
+offset_right = -18.0
+offset_bottom = 56.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 32
+text = "0 €"
+horizontal_alignment = 2
+[node name="ExpensesSalariesLabel" type="Label" parent="ExpensesPanel"]
+layout_mode = 1
+offset_left = 22.0
+offset_top = 72.0
+offset_right = 320.0
+offset_bottom = 100.0
+theme_override_font_sizes/font_size = 22
+text = "finance.expenses.salaries"
+
+[node name="ExpensesSalariesValue" type="Label" parent="ExpensesPanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -240.0
+offset_top = 72.0
+offset_right = -22.0
+offset_bottom = 100.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 22
+text = "0 €"
+horizontal_alignment = 2
+
+[node name="ExpensesStaffLabel" type="Label" parent="ExpensesPanel"]
+layout_mode = 1
+offset_left = 22.0
+offset_top = 110.0
+offset_right = 320.0
+offset_bottom = 138.0
+theme_override_font_sizes/font_size = 22
+text = "finance.expenses.staff"
+
+[node name="ExpensesStaffValue" type="Label" parent="ExpensesPanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -240.0
+offset_top = 110.0
+offset_right = -22.0
+offset_bottom = 138.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 22
+text = "0 €"
+horizontal_alignment = 2
+
+[node name="ExpensesMaintenanceLabel" type="Label" parent="ExpensesPanel"]
+layout_mode = 1
+offset_left = 22.0
+offset_top = 148.0
+offset_right = 320.0
+offset_bottom = 176.0
+theme_override_font_sizes/font_size = 22
+text = "finance.expenses.maintenance"
+
+[node name="ExpensesMaintenanceValue" type="Label" parent="ExpensesPanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -240.0
+offset_top = 148.0
+offset_right = -22.0
+offset_bottom = 176.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 22
+text = "0 €"
+horizontal_alignment = 2
+
+[node name="ExpensesStadiumWorksLabel" type="Label" parent="ExpensesPanel"]
+layout_mode = 1
+offset_left = 22.0
+offset_top = 186.0
+offset_right = 320.0
+offset_bottom = 214.0
+theme_override_font_sizes/font_size = 22
+text = "finance.expenses.stadium_works"
+
+[node name="ExpensesStadiumWorksValue" type="Label" parent="ExpensesPanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -240.0
+offset_top = 186.0
+offset_right = -22.0
+offset_bottom = 214.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 22
+text = "0 €"
+horizontal_alignment = 2
+
+[node name="BalancePanel" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -394.0
+offset_top = 610.0
+offset_right = 95.0
+offset_bottom = 685.6
+grow_horizontal = 2
+color = Color(0.12, 0.12, 0.12, 0.85)
+
+[node name="BalanceTitle" type="Label" parent="BalancePanel"]
+layout_mode = 1
+offset_left = 18.0
+offset_top = 18.0
+offset_right = 320.0
+offset_bottom = 110.0
+theme_override_font_sizes/font_size = 32
+text = "finance.balance.title"
+
+[node name="BalanceValue" type="Label" parent="BalancePanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -240.0
+offset_top = 18.0
+offset_right = -18.0
+offset_bottom = 70.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 32
+text = "0 €"
+horizontal_alignment = 2
+
+
+[node name="FinanceGraphPanel" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 0
+anchor_left = 0.70
+anchor_top = 0.335
+anchor_right = 0.97
+anchor_bottom = 0.665
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+color = Color(0.08, 0.08, 0.08, 0.72)
+
+[node name="FinanceGraphTitle" type="Label" parent="FinanceGraphPanel"]
+layout_mode = 1
+offset_left = 18.0
+offset_top = 14.0
+offset_right = 220.0
+offset_bottom = 42.0
+theme_override_font_sizes/font_size = 22
+text = "finance.graph.title"
+
+[node name="FinanceGraph" type="Control" parent="FinanceGraphPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = 44.0
+offset_right = -12.0
+offset_bottom = -12.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_graph")
+
+[node name="BtnRetour" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 34.0
+offset_top = -92.0
+offset_right = 240.0
+offset_bottom = -30.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = ExtResource("ext_btn_back")
+theme_override_styles/pressed = ExtResource("ext_btn_back_pressed")
+text = "btn.back"
+
+[node name="PopularityBadge" type="Label" parent="."]
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -360.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "Popularité : 50%"
+horizontal_alignment = 2
+vertical_alignment = 1
+script = ExtResource("1")
+
+[node name="PopularityBadge" type="Label" parent="."]
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -360.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "Popularité : 50%"
+horizontal_alignment = 2
+vertical_alignment = 1
+script = ExtResource("1")

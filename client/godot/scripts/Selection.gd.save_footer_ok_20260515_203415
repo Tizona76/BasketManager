@@ -1,0 +1,1554 @@
+extends Control
+const PL = preload("res://scripts/PlayerLife.gd")
+
+signal selection_done()
+signal back_requested()
+
+const MAX_SEL := 12
+
+var selected_ids: Array[int] = []
+
+var PlayerRowPS: PackedScene = preload("res://scenes/PlayerRow.tscn")
+const Save := preload("res://scripts/Save.gd") # required: Save is not a global class_name
+
+# Map pid -> row node (pour mettre à jour les boutons)
+var row_by_id: Dictionary = {}  # int -> Node
+
+# Nodes (résolus dynamiquement, robustes)
+var box: BoxContainer
+var lbl_count: Label
+var btn_val: BaseButton
+var btn_back: BaseButton
+var box_buttons: Control
+var scroll: Control
+var BG_TEST: Control
+var Title: Control
+
+var lbl_title: Label
+var lbl_progress: Label
+var lbl_avg_age: Label
+var lbl_avg_perf: Label
+var lbl_avg_salary: Label
+var player_data_by_id: Dictionary = {}
+
+# avatar_key -> {gender:String, first_name:String}
+var avatar_meta: Dictionary = {}
+
+# tri headers seulement
+var current_players_source: Array = []
+var current_sort_key: String = ""
+var current_sort_ascending: bool = true
+
+
+func _selection_is_mobile_layout() -> bool:
+	var vp: Vector2 = get_viewport_rect().size
+	var win: Vector2i = DisplayServer.window_get_size()
+	if OS.has_feature("android") or OS.has_feature("ios") or minf(vp.x, float(win.x)) < 900.0:
+		return true
+	if OS.has_feature("web"):
+		var js_mobile: Variant = JavaScriptBridge.eval("(window.innerWidth < 900) || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)", true)
+		return bool(js_mobile)
+	return false
+
+# Coverflow visuel SAFE (sans casser la logique existante)
+var carousel_active_index: int = 0
+const CAROUSEL_NEG_SEPARATION := -36
+const CAROUSEL_SCALE_CENTER := 1.08
+const CAROUSEL_SCALE_NEAR := 0.96
+const CAROUSEL_SCALE_FAR := 0.88
+const CAROUSEL_ALPHA_CENTER := 1.00
+const CAROUSEL_ALPHA_NEAR := 1.00
+const CAROUSEL_ALPHA_FAR := 1.00
+const CAROUSEL_ROT_DEG_NEAR := 2.5
+const CAROUSEL_ROT_DEG_FAR := 4.0
+
+
+func _ready() -> void:
+	# VISUAL ONLY: force selection background at runtime
+	var bg_tex_rect := get_node_or_null("TextureRect") as TextureRect
+	if bg_tex_rect != null:
+		var bg_tex := load("res://assets/images/backgrounds/ballon_terrain.jpeg")
+		if bg_tex != null:
+			bg_tex_rect.texture = bg_tex
+			bg_tex_rect.modulate = Color(1, 1, 1, 0.72)
+			bg_tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			bg_tex_rect.z_index = -100
+			bg_tex_rect.show_behind_parent = true
+	print("[SELECTION] ready path=", get_path())
+
+	# --- resolve nodes safely
+	box = _get_node_typed("ScrollContainer/CardsWrap/CardsRow", BoxContainer) as BoxContainer
+	if box == null:
+		box = find_child("CardsRow", true, false) as BoxContainer
+
+	lbl_count = _get_node_typed("LabelCount", Label) as Label
+	if lbl_count == null:
+		lbl_count = find_child("LabelCount", true, false) as Label
+
+	lbl_title = _get_node_typed("LabelTitle", Label) as Label
+	if lbl_title == null:
+		lbl_title = find_child("LabelTitle", true, false) as Label
+
+	lbl_progress = _get_node_typed("LabelProgress", Label) as Label
+	if lbl_progress == null:
+		lbl_progress = find_child("LabelProgress", true, false) as Label
+	if lbl_progress != null:
+		lbl_progress.visible = false
+
+	box_buttons = _get_node_typed("BoxButtons", Control) as Control
+	if box_buttons == null:
+		box_buttons = find_child("BoxButtons", true, false) as Control
+
+	scroll = _get_node_typed("ScrollContainer", Control) as Control
+	if scroll == null:
+		scroll = find_child("ScrollContainer", true, false) as Control
+
+	BG_TEST = get_node_or_null("BG_TEST") as Control
+	if BG_TEST == null:
+		BG_TEST = find_child("BG_TEST", true, false) as Control
+
+	Title = get_node_or_null("Title") as Control
+	if Title == null:
+		Title = find_child("Title", true, false) as Control
+
+	# Boutons bas
+	btn_val = _get_node_typed("BoxButtons/BtnValider", BaseButton) as BaseButton
+	if btn_val == null:
+		btn_val = find_child("BtnValider", true, false) as BaseButton
+
+	_connect_sort_header("HeaderStars", "stars")
+	_connect_sort_header("HeaderPos", "poste")
+	_connect_sort_header("HeaderAge", "age")
+	_connect_sort_header("HeaderGender", "tir")
+	_connect_sort_header("HeaderSpeed", "vitesse")
+	_connect_sort_header("HeaderDefense", "defense")
+	_connect_sort_header("HeaderPrecision", "precision")
+	_connect_sort_header("HeaderMotivation", "motivation")
+	_connect_sort_header("HeaderSalary", "salaire")
+
+	btn_back = _get_node_typed("BoxButtons/BtnRetour", BaseButton) as BaseButton
+	if btn_back == null:
+		btn_back = find_child("BtnRetour", true, false) as BaseButton
+
+	# i18n boutons
+	if btn_val != null:
+		btn_val.set_meta("i18n_key", "BTN_VALIDATE_SELECTION")
+		btn_val.text = "BTN_VALIDATE_SELECTION"
+		I18nSvc.apply_node(btn_val)
+
+	if btn_back != null:
+		btn_back.set_meta("i18n_key", "BTN_BACK")
+		btn_back.text = "BTN_BACK"
+		I18nSvc.apply_node(btn_back)
+
+	for pid in row_by_id.keys():
+		var row: Node = row_by_id[pid]
+		if row == null:
+			continue
+		if row.has_method("set_selected_visual"):
+			row.call("set_selected_visual", int(pid) in selected_ids)
+
+	_ensure_selection_top_stats()
+	_ensure_bottom_actions_bar()
+	_update_selection_top_stats()
+
+	_print_node_map()
+
+	# --- anti-block: décor ignore souris
+	if BG_TEST != null:
+		BG_TEST.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if Title != null:
+		Title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	mouse_filter = Control.MOUSE_FILTER_PASS
+
+	# --- layers
+	if scroll != null:
+		scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+		scroll.z_index = 0
+		if scroll is ScrollContainer:
+			var sc := scroll as ScrollContainer
+			if not sc.gui_input.is_connected(_on_scroll_gui_input):
+				sc.gui_input.connect(_on_scroll_gui_input)
+			var hbar: HScrollBar = sc.get_h_scroll_bar()
+			if hbar != null and not hbar.value_changed.is_connected(_on_cards_scroll_changed):
+				hbar.value_changed.connect(_on_cards_scroll_changed)
+
+	if box_buttons != null:
+		box_buttons.mouse_filter = Control.MOUSE_FILTER_PASS
+		box_buttons.z_index = 10
+		box_buttons.move_to_front()
+		box_buttons.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		box_buttons.offset_left = 0
+		box_buttons.offset_right = 0
+		box_buttons.offset_bottom = 0
+		box_buttons.offset_top = -120
+		if box_buttons is VBoxContainer:
+			(box_buttons as VBoxContainer).alignment = BoxContainer.ALIGNMENT_CENTER
+		if box_buttons is VBoxContainer:
+			(box_buttons as VBoxContainer).alignment = BoxContainer.ALIGNMENT_CENTER
+
+	if btn_val != null:
+		btn_val.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn_val.z_index = 11
+		if btn_val.get_parent() == null or btn_val.get_parent().name != "BottomActionsBar":
+			btn_val.move_to_front()
+		btn_val.disabled = true
+		if btn_val is Control:
+			var btn_val_ctrl := btn_val as Control
+			btn_val_ctrl.custom_minimum_size = Vector2(234, 62)
+			btn_val_ctrl.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			btn_val_ctrl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+			var sb_val_n := StyleBoxFlat.new()
+			sb_val_n.bg_color = Color(0.12, 0.72, 0.28, 1.0)
+			sb_val_n.corner_radius_top_left = 14
+			sb_val_n.corner_radius_top_right = 14
+			sb_val_n.corner_radius_bottom_left = 14
+			sb_val_n.corner_radius_bottom_right = 14
+			sb_val_n.border_width_left = 2
+			sb_val_n.border_width_top = 2
+			sb_val_n.border_width_right = 2
+			sb_val_n.border_width_bottom = 5
+			sb_val_n.border_color = Color(0.04, 0.36, 0.12, 1.0)
+			sb_val_n.shadow_color = Color(0.04, 0.28, 0.08, 0.46)
+			sb_val_n.shadow_size = 10
+			sb_val_n.shadow_offset = Vector2(0, 5)
+			sb_val_n.content_margin_left = 22
+			sb_val_n.content_margin_right = 22
+			sb_val_n.content_margin_top = 12
+			sb_val_n.content_margin_bottom = 12
+
+			var sb_val_d := sb_val_n.duplicate() as StyleBoxFlat
+			sb_val_d.bg_color = Color(0.95, 0.48, 0.12, 0.34)
+			sb_val_d.border_width_bottom = 0
+			sb_val_d.shadow_size = 0
+
+			var sb_val_h := sb_val_n.duplicate() as StyleBoxFlat
+			sb_val_h.bg_color = Color(0.18, 0.86, 0.36, 1.0)
+			sb_val_h.shadow_size = 14
+
+			btn_val.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+			btn_val.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.56))
+			btn_val.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
+			btn_val.add_theme_stylebox_override("normal", sb_val_n)
+			btn_val.add_theme_stylebox_override("disabled", sb_val_d)
+			btn_val.add_theme_stylebox_override("hover", sb_val_h)
+			btn_val.add_theme_font_size_override("font_size", 20)
+
+	if btn_back != null:
+		btn_back.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn_back.z_index = 11
+		if btn_back.get_parent() == null or btn_back.get_parent().name != "BottomActionsBar":
+			btn_back.move_to_front()
+		if btn_back is Control:
+			var btn_back_ctrl := btn_back as Control
+			btn_back_ctrl.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			btn_back_ctrl.custom_minimum_size = Vector2(132, 52)
+
+		var sb_back_n := StyleBoxFlat.new()
+		sb_back_n.bg_color = Color(0.90, 0.05, 0.05, 1.0)
+		sb_back_n.corner_radius_top_left = 10
+		sb_back_n.corner_radius_top_right = 10
+		sb_back_n.corner_radius_bottom_left = 10
+		sb_back_n.corner_radius_bottom_right = 10
+		sb_back_n.border_width_bottom = 3
+		sb_back_n.border_color = Color(0.60, 0.0, 0.0, 1.0)
+		sb_back_n.shadow_color = Color(0, 0, 0, 0.35)
+		sb_back_n.shadow_size = 6
+		sb_back_n.shadow_offset = Vector2(0, 4)
+		sb_back_n.content_margin_left = 20
+		sb_back_n.content_margin_right = 20
+		sb_back_n.content_margin_top = 10
+		sb_back_n.content_margin_bottom = 10
+
+		var sb_back_h := sb_back_n.duplicate() as StyleBoxFlat
+		sb_back_h.bg_color = Color(1.0, 0.10, 0.10, 1.0)
+		sb_back_h.border_width_bottom = 4
+		sb_back_h.shadow_color = Color(0, 0, 0, 0.45)
+		sb_back_h.shadow_size = 8
+
+		var sb_back_p := sb_back_n.duplicate() as StyleBoxFlat
+		sb_back_p.bg_color = Color(0.70, 0.02, 0.02, 1.0)
+		sb_back_p.border_width_bottom = 2
+		sb_back_p.shadow_color = Color(0, 0, 0, 0.25)
+		sb_back_p.shadow_size = 4
+
+		btn_back.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+		btn_back.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
+		btn_back.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
+		btn_back.add_theme_stylebox_override("normal", sb_back_n)
+		btn_back.add_theme_stylebox_override("hover", sb_back_h)
+		btn_back.add_theme_stylebox_override("pressed", sb_back_p)
+
+	# ✅ CONNECT Godot 4 (robuste)
+	if btn_val != null:
+		var cbv := Callable(self, "_on_validate")
+		if btn_val.pressed.is_connected(cbv):
+			btn_val.pressed.disconnect(cbv)
+		btn_val.pressed.connect(cbv)
+
+	if btn_back != null:
+		var cbb := Callable(self, "_on_back")
+		if btn_back.pressed.is_connected(cbb):
+			btn_back.pressed.disconnect(cbb)
+		btn_back.pressed.connect(cbb)
+
+	# ✅ charge le CSV des prénoms/genres
+	await _load_avatar_meta()
+
+	# ✅ Build list depuis avatars
+	if box == null:
+		push_error("[SELECTION] CardsRow not found -> cannot build carousel")
+		return
+
+	current_players_source = _avatar_players()
+	_refresh_players_view()
+
+	# ✅ i18n global + UI
+	I18nSvc.apply_node(self)
+	_update_ui()
+	_apply_i18n()
+
+func _on_cards_scroll_changed(_value: float) -> void:
+	call_deferred("_refresh_coverflow_deferred")
+
+func _refresh_coverflow_deferred() -> void:
+	_refresh_coverflow()
+
+func _center_card_deferred() -> void:
+	if box == null:
+		return
+	if box.get_child_count() <= 0:
+		return
+	carousel_active_index = clamp(carousel_active_index, 0, box.get_child_count() - 1)
+	_center_card(carousel_active_index)
+	_refresh_coverflow()
+
+func _center_card(idx: int) -> void:
+	if box == null or scroll == null:
+		return
+	if not (scroll is ScrollContainer):
+		return
+	if idx < 0 or idx >= box.get_child_count():
+		return
+
+	var sc := scroll as ScrollContainer
+	var child: Control = box.get_child(idx) as Control
+	if child == null:
+		return
+
+	await get_tree().process_frame
+
+	var target: int = int((child.position.x + child.size.x * 0.5) - sc.size.x * 0.5)
+	var max_scroll: int = max(0, int(box.size.x - sc.size.x))
+	sc.scroll_horizontal = clamp(target, 0, max_scroll)
+
+func _refresh_coverflow() -> void:
+	if box == null:
+		return
+	if not (box is HBoxContainer):
+		return
+	if scroll == null or not (scroll is ScrollContainer):
+		return
+	if box.get_child_count() <= 0:
+		return
+
+	var hbox: HBoxContainer = box as HBoxContainer
+	hbox.add_theme_constant_override("separation", CAROUSEL_NEG_SEPARATION)
+
+	var sc := scroll as ScrollContainer
+	var viewport_center_x: float = float(sc.scroll_horizontal) + sc.size.x * 0.5
+
+	var cards: Array[Control] = []
+	var best_idx: int = 0
+	var best_dist: float = 1e18
+
+	for i in range(box.get_child_count()):
+		var card: Control = box.get_child(i) as Control
+		if card == null:
+			continue
+		cards.append(card)
+		card.pivot_offset = card.size * 0.5
+		var cx: float = card.position.x + card.size.x * 0.5
+		var dist: float = abs(cx - viewport_center_x)
+		if dist < best_dist:
+			best_dist = dist
+			best_idx = i
+
+	carousel_active_index = best_idx
+
+	var active_card: Control = null
+
+	for i in range(box.get_child_count()):
+		var card: Control = box.get_child(i) as Control
+		if card == null:
+			continue
+
+		var delta: int = abs(i - best_idx)
+		var sxy: float = CAROUSEL_SCALE_FAR
+		var alpha: float = CAROUSEL_ALPHA_FAR
+		var rot: float = 0.0
+
+		if delta == 0:
+			sxy = CAROUSEL_SCALE_CENTER
+			alpha = CAROUSEL_ALPHA_CENTER
+			rot = 0.0
+			active_card = card
+		elif delta == 1:
+			sxy = CAROUSEL_SCALE_NEAR
+			alpha = CAROUSEL_ALPHA_NEAR
+			rot = -CAROUSEL_ROT_DEG_NEAR if i < best_idx else CAROUSEL_ROT_DEG_NEAR
+		else:
+			sxy = CAROUSEL_SCALE_FAR
+			alpha = CAROUSEL_ALPHA_FAR
+			rot = -CAROUSEL_ROT_DEG_FAR if i < best_idx else CAROUSEL_ROT_DEG_FAR
+
+		card.scale = Vector2(sxy, sxy)
+		card.rotation_degrees = rot
+		card.modulate.a = alpha
+
+	# Ne pas déplacer active_card : sinon l'ordre visuel du tri est cassé.
+	# Le coverflow garde le zoom/alpha, mais respecte l'ordre des joueurs.
+	#if active_card != null:
+	#	box.move_child(active_card, box.get_child_count() - 1)
+
+func _scan_avatar_portraits(path: String) -> Array[String]:
+	var res: Array[String] = []
+
+	# 1) Desktop/Editor: listing réel du dossier (rapide)
+	var d: DirAccess = DirAccess.open(path)
+	if d != null:
+		d.list_dir_begin()
+		while true:
+			var f: String = d.get_next()
+			if f == "":
+				break
+			if d.current_is_dir():
+				continue
+
+			var lf: String = f.to_lower()
+			# ✅ ne garder que les portraits, pas les layers/masks
+			if not lf.begins_with("avatar_"):
+				continue
+			if lf.ends_with(".png") or lf.ends_with(".webp") or lf.ends_with(".jpg") or lf.ends_with(".jpeg"):
+				res.append(f)
+		d.list_dir_end()
+
+	res.sort()
+
+	# 2) HTML5 fallback: DirAccess peut renvoyer vide même si c'est dans le .pck
+	if res.size() == 0:
+		# On "probe" des fichiers connus : avatar_01..avatar_60 (+ variantes)
+		var exts: Array[String] = [".png", ".webp", ".jpg", ".jpeg"]
+		for i in range(1, 61):
+			var a2 := "avatar_%02d" % i
+			var a1 := "avatar_%d" % i
+			for base in [a2, a1]:
+				for ext in exts:
+					var p: String = path + "/" + base + ext
+					if ResourceLoader.exists(p):
+						res.append(base + ext)
+						break
+
+		# variantes spécifiques (si tu en as)
+		for ext in exts:
+			var p2: String = path + "/avatar_10B" + ext
+			if ResourceLoader.exists(p2):
+				res.append("avatar_10B" + ext)
+				break
+
+		res.sort()
+
+	return res
+
+
+
+func _avatar_players() -> Array:
+	var base_root: String = "res://assets/images/avatars"
+	var base_used: String = base_root
+	var files: Array[String] = []
+
+	# 1) Essai: racine (compat si tu y mets des avatar_01.png un jour)
+	files = _scan_avatar_portraits(base_root)
+
+	# 2) Fallback: avatars_dessin (TON cas actuel)
+	if files.size() == 0:
+		base_used = base_root + "/avatars_dessin"
+		files = _scan_avatar_portraits(base_used)
+
+	# 3) Si toujours rien -> dummy (évite liste vide)
+	if files.size() == 0:
+		push_error("[SELECTION] no avatar portraits found in " + base_root + " or avatars_dessin -> fallback dummy")
+		return _dummy_players()
+
+	var out: Array = []
+	var n: int = mini(16, files.size())
+
+	# 1) hommes d'abord
+	var males: Array = []
+	var females: Array = []
+
+	for fname in files:
+		var avatar_key: String = fname.get_basename()
+		var gender: String = "U"
+
+		for k in _meta_key_candidates(avatar_key):
+			if avatar_meta.has(k):
+				gender = str(avatar_meta[k].get("gender", "U"))
+				break
+
+		if gender == "M":
+			males.append(fname)
+		else:
+			females.append(fname)
+
+	var ordered := males + females
+
+	for i: int in range(mini(n, ordered.size())):
+		var fname: String = ordered[i]
+		var avatar_key: String = fname.get_basename()
+
+		# Par défaut : nom lisible depuis filename
+		var gender: String = "U"
+		var first_name: String = avatar_key.replace("_", " ")
+
+		# CSV override (robuste: avatar_10 / avatar_010 / avatar_10B / avatar_010B / etc.)
+		var cands: Array[String] = _meta_key_candidates(avatar_key)
+		for k: String in cands:
+			if avatar_meta.has(k):
+				var m: Dictionary = avatar_meta[k] as Dictionary
+				gender = str(m.get("gender", "U"))
+				first_name = str(m.get("first_name", first_name))
+				break
+
+		out.append({
+			"id": i,
+			"avatar_key": avatar_key,
+			"gender": gender,
+			"name": first_name,
+			"avatar_path": base_used + "/" + fname,
+			"pos": "",
+			"rating": ""
+		})
+
+	print("[SELECTION] avatar_players=", n, " from ", base_used)
+	return out
+
+
+func _print_node_map() -> void:
+	print("[SELECTION][NODES] box=", _p(box),
+		" lbl_count=", _p(lbl_count),
+		" box_buttons=", _p(box_buttons),
+		" scroll=", _p(scroll))
+	print("[SELECTION][NODES] btn_val=", _p(btn_val), " btn_back=", _p(btn_back))
+	if btn_val == null or btn_back == null:
+		print("[SELECTION][WARN] Missing buttons => check your scene names: BtnValider / BtnRetour")
+
+
+func _p(n: Node) -> String:
+	if n == null:
+		return "NULL"
+	return "%s (%s)" % [str(n.get_path()), n.get_class()]
+
+
+func _selection_team_name_text() -> String:
+	var save: Dictionary = PL.load_savegame()
+	if typeof(save) == TYPE_DICTIONARY:
+		var name := ""
+		name = str(save.get("team_name", "")).strip_edges()
+		if name == "":
+			name = str(save.get("teamName", "")).strip_edges()
+		if name == "":
+			name = str(save.get("club_name", "")).strip_edges()
+		if name == "":
+			name = str(save.get("clubName", "")).strip_edges()
+		if name == "" and save.has("team") and typeof(save["team"]) == TYPE_DICTIONARY:
+			name = str((save["team"] as Dictionary).get("name", "")).strip_edges()
+		if name != "":
+			return name.to_upper()
+	return ""
+
+func _ensure_center_team_label() -> void:
+	if not (btn_val is Control):
+		return
+
+	var btn_val_ctrl := btn_val as Control
+	var lbl := get_node_or_null("LblTeamCenter") as Label
+	if lbl == null:
+		lbl = Label.new()
+		lbl.name = "LblTeamCenter"
+		add_child(lbl)
+
+	var team_name := _selection_team_name_text()
+	if team_name == "":
+		lbl.visible = false
+		return
+
+	lbl.visible = true
+	lbl.text = team_name
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lbl.z_index = 12
+	lbl.set_as_top_level(true)
+	lbl.add_theme_color_override("font_color", Color(0.10, 0.42, 0.95, 1.0))
+	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.10, 0.28, 0.95))
+	lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.28))
+	lbl.add_theme_constant_override("outline_size", 3)
+	lbl.add_theme_font_size_override("font_size", 36)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	var vp := get_viewport_rect().size
+	var btn_sz := btn_val_ctrl.size
+	if btn_sz.x <= 1.0 or btn_sz.y <= 1.0:
+		btn_sz = btn_val_ctrl.get_combined_minimum_size()
+
+	var lbl_sz := lbl.get_combined_minimum_size()
+	lbl.position = Vector2(
+		(vp.x - lbl_sz.x) / 2.0,
+		btn_val_ctrl.global_position.y - lbl_sz.y - 14.0
+	)
+
+
+func _get_node_typed(path: String, t: Variant) -> Node:
+	var n := get_node_or_null(path)
+	if n == null:
+		return null
+	if t == BaseButton and (n is BaseButton):
+		return n
+	if t == Control and (n is Control):
+		return n
+	if t == VBoxContainer and (n is VBoxContainer):
+		return n
+	if t == Label and (n is Label):
+		return n
+	return null
+
+
+func _on_back() -> void:
+	print("[SELECTION] BACK pressed")
+	emit_signal("back_requested")
+
+
+func _connect_sort_header(node_name: String, sort_key: String) -> void:
+	var b := get_node_or_null(node_name) as BaseButton
+	if b == null:
+		b = find_child(node_name, true, false) as BaseButton
+	if b == null:
+		return
+	b.mouse_filter = Control.MOUSE_FILTER_STOP
+	var cb := Callable(self, "_on_sort_header_pressed").bind(sort_key)
+	if not b.pressed.is_connected(cb):
+		b.pressed.connect(cb)
+
+func _on_sort_header_pressed(sort_key: String) -> void:
+	if current_sort_key == sort_key:
+		current_sort_ascending = not current_sort_ascending
+	else:
+		current_sort_key = sort_key
+		current_sort_ascending = true
+	_refresh_players_view()
+
+func _refresh_players_view() -> void:
+	if current_players_source.is_empty():
+		_build_list([])
+		return
+
+	var players: Array = []
+	for p_raw in current_players_source:
+		var p: Dictionary = (p_raw as Dictionary).duplicate(true)
+		var j_ui: Dictionary = _bm_init_player_from_avatar(p)
+		for k in j_ui.keys():
+			p[k] = j_ui[k]
+		p["stars"] = _selection_star_count(p)
+		p["bm_selection_mobile_rating_ratio"] = _selection_is_mobile_layout()
+		players.append(p)
+
+	if current_sort_key != "":
+		_sort_players_in_place(players, current_sort_key, current_sort_ascending)
+
+	_update_sort_header_titles()
+	_build_list(players)
+
+
+func _selection_star_count(d: Dictionary) -> int:
+	var tir := int(d.get("tir", 0))
+	var vitesse := int(d.get("vitesse", 0))
+	var defense := int(d.get("defense", 0))
+	var motivation := int(d.get("motivation", 0))
+	var avg := int(round(float(tir + vitesse + defense + motivation) / 4.0))
+	return clampi(int(round(float(avg) / 20.0)), 1, 5)
+
+func _sort_players_in_place(players: Array, sort_key: String, ascending: bool) -> void:
+	players.sort_custom(func(a, b):
+		var da: Dictionary = a as Dictionary
+		var db: Dictionary = b as Dictionary
+		var av = da.get(sort_key, 0)
+		var bv = db.get(sort_key, 0)
+
+		if sort_key == "stars":
+			var asv_star := _selection_star_count(da)
+			var bsv_star := _selection_star_count(db)
+			if asv_star == bsv_star:
+				return int(da.get("id", 0)) < int(db.get("id", 0)) if ascending else int(da.get("id", 0)) > int(db.get("id", 0))
+			return asv_star < bsv_star if ascending else asv_star > bsv_star
+
+		if sort_key == "tir":
+			var asv := int(av)
+			var bsv := int(bv)
+			return asv < bsv if ascending else asv > bsv
+
+		if sort_key == "poste":
+			var asv2 := str(av)
+			var bsv2 := str(bv)
+			return asv2 < bsv2 if ascending else asv2 > bsv2
+
+		if sort_key == "precision":
+			var af := str(av).to_float()
+			var bf := str(bv).to_float()
+			return af < bf if ascending else af > bf
+
+		var ai := str(av).to_int()
+		var bi := str(bv).to_int()
+		return ai < bi if ascending else ai > bi
+	)
+
+func _update_sort_header_titles() -> void:
+	var labels := {
+		"HeaderStars": "⭐",
+		"HeaderPos": "POS.",
+		"HeaderAge": "AGE",
+		"HeaderGender": tr("player.attr.tir"),
+		"HeaderSpeed": "SPEED",
+		"HeaderDefense": "DEFENSE",
+		"HeaderPrecision": "ACCURACY",
+		"HeaderMotivation": tr("selection.header.motivation"),
+		"HeaderSalary": "SALARY",
+	}
+	for node_name in labels.keys():
+		var b := get_node_or_null(node_name) as BaseButton
+		if b == null:
+			b = find_child(node_name, true, false) as BaseButton
+		if b == null:
+			continue
+		var txt := str(labels[node_name])
+		if node_name == "HeaderStars" and _selection_is_mobile_layout():
+			txt = "RAT."
+		var key := ""
+		match node_name:
+			"HeaderStars":
+				key = "stars"
+			"HeaderPos":
+				key = "poste"
+			"HeaderAge":
+				key = "age"
+			"HeaderGender":
+				key = "tir"
+			"HeaderSpeed":
+				key = "vitesse"
+			"HeaderDefense":
+				key = "defense"
+			"HeaderPrecision":
+				key = "precision"
+			"HeaderMotivation":
+				key = "motivation"
+			"HeaderSalary":
+				key = "salaire"
+		if current_sort_key == key:
+			txt += " ↑" if current_sort_ascending else " ↓"
+		b.text = txt
+		if _selection_is_mobile_layout() and not b.has_meta("bm_selection_mobile_header_plus1_done"):
+			b.set_meta("bm_selection_mobile_header_plus1_done", true)
+			var fs: int = int(b.get_theme_font_size("font_size"))
+			if fs > 0:
+				b.add_theme_font_size_override("font_size", fs + 1)
+
+func _build_list(players: Array) -> void:
+	row_by_id.clear()
+	player_data_by_id.clear()
+	selected_ids.clear()
+
+	for c in box.get_children():
+		c.queue_free()
+
+	var cb_row := Callable(self, "_on_row_toggled")
+
+	for p in players:
+		var row: Node = PlayerRowPS.instantiate()
+
+		if not row.has_method("setup"):
+			push_error("[SELECTION] PlayerRow has no setup() -> check PlayerRow.tscn script attachment")
+			print("[SELECTION] row class=", row.get_class(), " script=", row.get_script())
+			return
+
+		var p_ui: Dictionary = p.duplicate(true)
+		var j_ui: Dictionary = _bm_init_player_from_avatar(p)
+		for k in j_ui.keys():
+			p_ui[k] = j_ui[k]
+		row.call("setup", p_ui)
+
+		var pid: int = int(p.get("id", -1))
+		player_data_by_id[pid] = p_ui.duplicate(true)
+		if pid >= 0:
+			row_by_id[pid] = row
+
+		# ✅ CONNECT toggled (robuste)
+		if row.has_signal("toggled"):
+			if row.is_connected("toggled", cb_row):
+				row.disconnect("toggled", cb_row)
+			row.connect("toggled", cb_row)
+		else:
+			push_warning("[SELECTION] PlayerRow has no signal 'toggled'")
+
+		box.add_child(row)
+
+
+	_refresh_quota_ui()
+	_update_selection_top_stats()
+
+
+func _on_row_toggled(pid: int) -> void:
+	if pid in selected_ids:
+		selected_ids.erase(pid)
+		_update_ui()
+		_refresh_quota_ui()
+		_update_selection_top_stats()
+		call_deferred("_center_card_deferred")
+		return
+
+	if selected_ids.size() >= MAX_SEL:
+		print("[SELECTION] max reached")
+		_refresh_quota_ui()
+		_update_selection_top_stats()
+		return
+
+	selected_ids.append(pid)
+	_update_ui()
+	_refresh_quota_ui()
+	_update_selection_top_stats()
+
+
+func _update_ui() -> void:
+	if lbl_title != null:
+		var team_name := _selection_team_name_text().strip_edges()
+		if team_name == "":
+			lbl_title.text = tr("selection.title")
+		else:
+			lbl_title.text = team_name
+		lbl_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl_title.add_theme_font_size_override("font_size", 52)
+		lbl_title.add_theme_color_override("font_color", Color(0.10, 0.42, 0.95, 1.0))
+		lbl_title.add_theme_color_override("font_outline_color", Color(0.02, 0.10, 0.28, 0.95))
+		lbl_title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.28))
+		lbl_title.add_theme_constant_override("outline_size", 3)
+
+	if lbl_count != null:
+		lbl_count.text = "Select 12 players: %d/%d" % [selected_ids.size(), MAX_SEL]
+		lbl_count.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+		lbl_count.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+		lbl_count.add_theme_constant_override("outline_size", 2)
+		lbl_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	if btn_val != null:
+		btn_val.set_meta("i18n_key", "BTN_VALIDATE_SELECTION")
+		btn_val.text = "BTN_VALIDATE_SELECTION"
+		I18nSvc.apply_node(btn_val)
+		btn_val.disabled = (selected_ids.size() != MAX_SEL)
+
+	if btn_back != null:
+		btn_back.set_meta("i18n_key", "BTN_BACK")
+		btn_back.text = "BTN_BACK"
+		I18nSvc.apply_node(btn_back)
+
+# =========================
+# BM PYPORT HELPERS (init + pondération)
+# =========================
+
+func _bm_rng_for_pid(pid: int) -> RandomNumberGenerator:
+	var rng := RandomNumberGenerator.new()
+	# seed stable -> mêmes joueurs à chaque run
+	rng.seed = int(pid) * 1103515245 + 12345
+	return rng
+
+func _bm_calc_ponderation(j: Dictionary) -> float:
+	var poste: String = str(j.get("poste", ""))
+	var precision: float = float(j.get("precision", 0.75)) * 100.0
+	var tir: float = float(j.get("tir", precision))
+	var vitesse: float = float(j.get("vitesse", 70))
+	var force: float = float(j.get("force", 70))
+	var defense: float = float(j.get("defense", 70))
+	var endurance: float = float(j.get("endurance", 70))
+
+	var ponderation: float = 0.0
+	if poste == "Meneur":
+		ponderation = precision * 0.20 + tir * 0.10 + vitesse * 0.30 + endurance * 0.20 + defense * 0.10 + force * 0.10
+	elif poste == "Ailier":
+		ponderation = precision * 0.18 + tir * 0.12 + vitesse * 0.22 + force * 0.20 + defense * 0.13 + endurance * 0.15
+	elif poste == "Pivot":
+		ponderation = force * 0.30 + defense * 0.25 + precision * 0.10 + tir * 0.05 + endurance * 0.15 + vitesse * 0.15
+	elif poste == "Arrière":
+		# (reprend l'esprit du .py : précision + vitesse prioritaires)
+		ponderation = precision * 0.18 + tir * 0.10 + vitesse * 0.28 + endurance * 0.20 + defense * 0.14 + force * 0.10
+	else:
+		ponderation = precision * 0.18 + tir * 0.10 + vitesse * 0.22 + force * 0.20 + defense * 0.15 + endurance * 0.15
+
+	# coef âge (comme .py)
+	var age: int = int(j.get("age", 25))
+	var coef_age: float = 1.0
+	if age <= 22:
+		coef_age = 0.9
+	elif age <= 26:
+		coef_age = 1.0
+	elif age <= 30:
+		coef_age = 1.05
+	elif age <= 34:
+		coef_age = 0.95
+	else:
+		coef_age = 0.85
+	ponderation *= coef_age
+
+	# matchs_consecutifs = léger malus complémentaire à la fatigue réelle
+	var matchs_consecutifs: int = int(j.get("matchs_consecutifs", 0))
+	var coef_matchs_consecutifs: float = 1.0
+	if matchs_consecutifs >= 8:
+		coef_matchs_consecutifs = 0.92
+	elif matchs_consecutifs >= 6:
+		coef_matchs_consecutifs = 0.95
+	elif matchs_consecutifs >= 6:
+		coef_matchs_consecutifs = 0.98
+	ponderation *= coef_matchs_consecutifs
+
+
+	# repos_consecutifs (comme .py)
+	var repos: int = int(j.get("repos_consecutifs", 0))
+	if repos > 0:
+		var coef_repos := 1.0
+		if repos == 1:
+			coef_repos = 1.02
+		elif repos == 2:
+			coef_repos = 1.04
+		elif repos == 3:
+			coef_repos = 1.00
+		elif repos == 4:
+			coef_repos = 0.96
+		else:
+			coef_repos = 0.92
+		ponderation *= coef_repos
+
+	# blessure/conval (pénalité simple, comme .py défaut ~0.30)
+	var est_blesse := bool(j.get("blessure", false)) or int(j.get("matches_conval", 0)) > 0
+	if est_blesse:
+		ponderation *= (1.0 - 0.30)
+
+	# motivation (pivot 80, comme .py)
+	var motivation: float = float(j.get("motivation", 80))
+	ponderation *= 1.0 + (motivation - 80.0) / 200.0
+
+	return snapped(ponderation, 0.01)
+
+func _bm_init_player_from_avatar(p: Dictionary) -> Dictionary:
+	# p vient de _avatar_players(): id, name, gender, avatar_key, avatar_path
+	var pid: int = int(p.get("id", -1))
+	var rng := _bm_rng_for_pid(pid)
+
+	var postes: Array[String] = ["Meneur", "Ailier", "Pivot", "Arrière"]
+
+	var poste: String = postes[rng.randi_range(0, postes.size() - 1)]
+	var age: int = rng.randi_range(18, 35)
+
+	# attributs de base (échelle comparable au .py)
+	var precision: float = rng.randf_range(0.60, 0.95) # 0.60..0.95
+	var tir: int = rng.randi_range(55, 95)
+	var vitesse: int = rng.randi_range(55, 95)
+	var force: int = rng.randi_range(55, 95)
+	var defense: int = rng.randi_range(55, 95)
+	var endurance: int = rng.randi_range(55, 95)
+
+	var j: Dictionary = {
+		"id": pid,
+		"avatar_key": str(p.get("avatar_key", "")),
+		"avatar_path": str(p.get("avatar_path", "")),
+		"nom": str(p.get("name", "")),
+		"poste": poste,
+		"age": age,
+		"precision": precision,
+		"tir": tir,
+		"vitesse": vitesse,
+		"force": force,
+		"defense": defense,
+		"endurance": endurance,
+
+		# état match
+		"matchs_consecutifs": 0,
+		"repos_consecutifs": 0,
+		"fatigue": 0,
+		"blessure": false,
+		"matches_conval": 0
+	}
+
+	# pondération initiale
+	j["pondération"] = _bm_calc_ponderation(j)
+	j["base_ponderation"] = j["pondération"]
+
+	# motivation initiale (comme .py)
+	var base_motivation: int = 80
+	if age < 23:
+		base_motivation = rng.randi_range(75, 95)
+	elif age > 30:
+		base_motivation = rng.randi_range(60, 80)
+	else:
+		base_motivation = rng.randi_range(65, 90)
+
+	if float(j["pondération"]) > 80.0:
+		base_motivation += 5
+	elif float(j["pondération"]) < 65.0:
+		base_motivation -= 5
+
+	j["motivation"] = clamp(base_motivation, 50, 100)
+
+	# salaire (comme .py)
+	var salaire_int: int = int(70000 + float(j["pondération"]) * 500.0)
+	salaire_int = clamp(salaire_int, 70000, 130000)
+	j["salaire"] = salaire_int
+
+	# % tirs init (comme .py)
+	var perf0: float = float(j["pondération"])
+	var base2: float = 0.48 + (perf0 - 75.0) / 400.0
+	var base3: float = 0.33 + (perf0 - 75.0) / 600.0
+	base2 += rng.randf_range(-0.02, 0.02)
+	base3 += rng.randf_range(-0.02, 0.02)
+	j["reussite_2pts"] = clamp(base2, 0.30, 0.65)
+	j["reussite_3pts"] = clamp(base3, 0.20, 0.45)
+
+	return j
+
+
+func _on_validate() -> void:
+	print("[SELECTION] VALIDATE pressed, selected_ids=", selected_ids)
+
+	if selected_ids.size() != MAX_SEL:
+		print("[SELECTION] blocked: need exactly ", MAX_SEL)
+		return
+
+	Save.ensure_exists(str(Session.profile_uuid))
+	var d: Dictionary = Save.read_dict()
+	if not d.has("roster") or typeof(d["roster"]) != TYPE_DICTIONARY:
+		d["roster"] = {}
+
+	# ✅ Ensure persistent players stats (like basket_team_selector.py)
+	if not d.has("players_by_id") or typeof(d["players_by_id"]) != TYPE_DICTIONARY:
+		d["players_by_id"] = {}
+
+	var pmap: Dictionary = d["players_by_id"] as Dictionary
+
+	# Build/merge the full catalog from avatars (16 by default)
+	var all_players: Array = _avatar_players()
+	for p in all_players:
+		var pid: int = int(p.get("id", -1))
+		if pid < 0:
+			continue
+
+		var key := str(pid)
+		if not pmap.has(key) or typeof(pmap[key]) != TYPE_DICTIONARY:
+			# Create true persistent player entry (same logic as Selection/MyTeam)
+			var new_j: Dictionary = _bm_init_player_from_avatar(p)
+			new_j["gender"] = str(p.get("gender", "U"))
+			new_j["form"] = 0
+			new_j["injury"] = 0
+			new_j["xp"] = 0
+			pmap[key] = new_j
+		else:
+			# Merge statique : réaligner identité visuelle + nom, garder les stats évolutives
+			var cur: Dictionary = pmap[key] as Dictionary
+			cur["avatar_key"] = str(p.get("avatar_key", cur.get("avatar_key", "")))
+			cur["avatar_path"] = str(p.get("avatar_path", cur.get("avatar_path", "")))
+			cur["gender"] = str(p.get("gender", cur.get("gender", "U")))
+			cur["name"] = str(p.get("name", cur.get("name", "")))
+			cur["nom"] = str(p.get("name", cur.get("nom", "")))
+			if not cur.has("pos"):
+				cur["pos"] = str(p.get("pos", ""))
+			if not cur.has("rating"):
+				cur["rating"] = int(p.get("rating", 50))
+			pmap[key] = cur
+
+	# write back (explicit)
+	d["players_by_id"] = pmap
+	
+	# ✅ players_by_id: init/merge persistent stats (py-like)
+	if not d.has("players_by_id") or typeof(d["players_by_id"]) != TYPE_DICTIONARY:
+		d["players_by_id"] = {}
+
+	var pmap_py: Dictionary = d["players_by_id"] as Dictionary
+
+	for p in all_players:
+		var pid2: int = int(p.get("id", -1))
+		if pid2 < 0:
+			continue
+
+		var key2 := str(pid2)
+		if not pmap_py.has(key2) or typeof(pmap_py[key2]) != TYPE_DICTIONARY:
+			pmap_py[key2] = _bm_init_player_from_avatar(p)
+		else:
+			var cur2: Dictionary = pmap_py[key2] as Dictionary
+			if not cur2.has("id"):
+				cur2["id"] = pid2
+			cur2["avatar_key"] = str(p.get("avatar_key", cur2.get("avatar_key", "")))
+			cur2["avatar_path"] = str(p.get("avatar_path", cur2.get("avatar_path", "")))
+			cur2["gender"] = str(p.get("gender", cur2.get("gender", "U")))
+			cur2["name"] = str(p.get("name", cur2.get("name", "")))
+			cur2["nom"] = str(p.get("name", cur2.get("nom", "")))
+			var base_j: Dictionary = _bm_init_player_from_avatar(p)
+
+			# Réparation ciblée: corriger uniquement les salaires aberrants
+			if (not cur2.has("salaire")) or int(cur2.get("salaire", 0)) < 10000:
+				cur2["salaire"] = int(base_j.get("salaire", 0))
+
+
+			if not cur2.has("poste") or not cur2.has("age") or not cur2.has("pondération") or not cur2.has("salaire") or not cur2.has("tir"):
+				for kk in base_j.keys():
+					if not cur2.has(kk):
+						cur2[kk] = base_j[kk]
+
+			# migration: anciens joueurs créés avec motivation=100
+			if (not cur2.has("motivation")) or int(cur2.get("motivation", 100)) == 100:
+				cur2["motivation"] = int(base_j.get("motivation", 80))
+
+			pmap_py[key2] = cur2
+
+	d["players_by_id"] = pmap_py
+
+	var selected_players: Array = []
+	for pid_v in selected_ids:
+		var spid: int = int(pid_v)
+		var skey := str(spid)
+		if pmap_py.has(skey) and typeof(pmap_py[skey]) == TYPE_DICTIONARY:
+			selected_players.append((pmap_py[skey] as Dictionary).duplicate(true))
+	d["players"] = selected_players
+
+	# === BM FIX: construire roster.players + salary_total_per_match dès la sélection initiale ===
+	var roster_players: Array = []
+	var sal_total: int = 0
+	for p_raw in selected_players:
+		if typeof(p_raw) != TYPE_DICTIONARY:
+			continue
+		var p: Dictionary = p_raw as Dictionary
+		var overall_val: int = int(round(float(p.get("pondération", p.get("ponderation", p.get("overall", 0))))))
+		var salary_val: int = int(p.get("salaire", p.get("salary", 0)))
+		roster_players.append({
+			"id": str(p.get("id", "")),
+			"name": str(p.get("nom", p.get("name", ""))),
+			"pos": str(p.get("poste", p.get("pos", ""))),
+			"age": int(p.get("age", 25)),
+			"overall": overall_val,
+			"salary": salary_val
+		})
+		sal_total += salary_val
+
+	(d["roster"] as Dictionary)["players"] = roster_players
+	(d["roster"] as Dictionary)["selected_ids"] = selected_ids.duplicate()
+	(d["roster"] as Dictionary)["match_selected_ids"] = []
+	d["salary_total_per_match"] = int(round(float(sal_total) / 22.0))
+	# === END FIX ===
+
+	Save.write_dict(d)
+
+	print("[SELECTION] saved roster.selected_ids=", (d["roster"] as Dictionary).get("selected_ids", []))
+	emit_signal("selection_done")
+
+
+
+
+func _ensure_bottom_actions_bar() -> void:
+	if btn_back == null or btn_val == null:
+		return
+ 
+
+	var bar := get_node_or_null("BottomActionsBar") as HBoxContainer
+	if bar == null:
+		bar = HBoxContainer.new()
+		bar.name = "BottomActionsBar"
+		bar.alignment = BoxContainer.ALIGNMENT_BEGIN
+		bar.add_theme_constant_override("separation", 14)
+		add_child(bar)
+		bar.anchor_left = 0.0
+		bar.anchor_top = 1.0
+		bar.anchor_right = 1.0
+		bar.anchor_bottom = 1.0
+		bar.offset_left = 24.0
+		bar.offset_top = -92.0
+		bar.offset_right = -24.0
+		bar.offset_bottom = -24.0
+
+	if box_buttons != null:
+		box_buttons.visible = false
+
+	if btn_back.get_parent() != bar:
+		btn_back.reparent(bar)
+
+	var spacer := bar.get_node_or_null("ConfirmSpacer") as Control
+	if spacer == null:
+		spacer = Control.new()
+		spacer.name = "ConfirmSpacer"
+		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		spacer.custom_minimum_size = Vector2(1, 1)
+		bar.add_child(spacer)
+
+	if btn_val.get_parent() != bar:
+		btn_val.reparent(bar)
+
+	# ordre visuel forcé
+	bar.move_child(btn_back, 0)
+	bar.move_child(spacer, 1)
+	bar.move_child(btn_val, 2)
+
+	# reset layout résiduel après reparent
+	if btn_back is Control:
+		var bb := btn_back as Control
+		bb.layout_mode = 2
+		bb.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		bb.offset_left = 0
+		bb.offset_top = 0
+		bb.offset_right = 0
+		bb.offset_bottom = 0
+
+	if btn_val is Control:
+		var bv := btn_val as Control
+		bv.layout_mode = 2
+		bv.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		bv.offset_left = 0
+		bv.offset_top = 0
+		bv.offset_right = 0
+		bv.offset_bottom = 0
+
+	btn_back.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	btn_val.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	btn_back.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	btn_val.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+	btn_back.custom_minimum_size = Vector2(170, 56)
+	btn_val.custom_minimum_size = Vector2(220, 56)
+	call_deferred("_bm_mobile_confirm_selection_plus15_textplus4")
+
+func _ensure_selection_top_stats() -> void:
+	if lbl_avg_age == null:
+		lbl_avg_age = get_node_or_null("LblAvgAge") as Label
+	if lbl_avg_age == null:
+		lbl_avg_age = Label.new()
+		lbl_avg_age.name = "LblAvgAge"
+		add_child(lbl_avg_age)
+
+	if lbl_avg_perf == null:
+		lbl_avg_perf = get_node_or_null("LblAvgPerf") as Label
+	if lbl_avg_perf == null:
+		lbl_avg_perf = Label.new()
+		lbl_avg_perf.name = "LblAvgPerf"
+		add_child(lbl_avg_perf)
+
+	if lbl_avg_salary == null:
+		lbl_avg_salary = get_node_or_null("LblAvgSalary") as Label
+	if lbl_avg_salary == null:
+		lbl_avg_salary = Label.new()
+		lbl_avg_salary.name = "LblAvgSalary"
+		add_child(lbl_avg_salary)
+
+	for lbl in [lbl_avg_age, lbl_avg_perf, lbl_avg_salary]:
+		if lbl == null:
+			continue
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		lbl.add_theme_font_size_override("font_size", 22)
+		lbl.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+		lbl.size = Vector2(380, 28)
+		lbl.anchor_left = 1.0
+		lbl.anchor_right = 1.0
+		lbl.anchor_top = 0.0
+		lbl.anchor_bottom = 0.0
+
+	lbl_avg_age.position = Vector2(size.x - 500.0, 20.0)
+	lbl_avg_perf.position = Vector2(size.x - 500.0, 48.0)
+	lbl_avg_salary.position = Vector2(size.x - 500.0, 76.0)
+
+func _update_selection_top_stats() -> void:
+	if lbl_avg_age == null or lbl_avg_perf == null or lbl_avg_salary == null:
+		return
+
+	var count: int = 0
+	var sum_age: float = 0.0
+	var sum_perf: float = 0.0
+	var sum_salary: int = 0
+
+	for pid in selected_ids:
+		if not player_data_by_id.has(pid):
+			continue
+		var d := player_data_by_id[pid] as Dictionary
+		count += 1
+		sum_age += float(d.get("age", 0))
+		sum_perf += float(d.get("pondération", d.get("ponderation", 0.0)))
+		sum_salary += int(d.get("salaire", 0))
+
+	var age_txt := "-"
+	var perf_txt := "-"
+	var salary_txt := "-"
+	if count > 0:
+		age_txt = str(snapped(sum_age / float(count), 0.1))
+		perf_txt = str(snapped(sum_perf / float(count), 0.1))
+		salary_txt = _fmt_salary_selection(int(round(float(sum_salary) / float(count))))
+
+	lbl_avg_age.text = tr("selection.avg_age") + " = " + age_txt
+	lbl_avg_perf.text = tr("selection.avg_perf") + " = " + perf_txt
+	lbl_avg_salary.text = tr("selection.avg_salary") + " = " + salary_txt
+	_selection_apply_mobile_averages_plus1()
+
+func _fmt_salary_selection(n: int) -> String:
+	var s := str(n)
+	var out := ""
+	var count := 0
+	for i in range(s.length() - 1, -1, -1):
+		out = s.substr(i, 1) + out
+		count += 1
+		if count % 3 == 0 and i > 0:
+			out = " " + out
+	return out + " €"
+
+func _bm_force_team_name_top_left() -> void:
+	var wanted := _selection_team_name_text().strip_edges()
+	if wanted == "":
+		return
+
+	for n in find_children("*", "Label", true, false):
+		var l := n as Label
+		if l == null:
+			continue
+		if str(l.text).strip_edges() == wanted:
+			l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			l.add_theme_color_override("font_color", Color(0, 0, 0, 1))
+			l.position = Vector2(24, 24)
+			l.size = Vector2(320, 32)
+			return
+
+func _dummy_players() -> Array:
+	var arr: Array = []
+	var pos: Array = ["PG","SG","SF","PF","C"]
+	for i in range(12):
+		arr.append({
+			"id": i,
+			"name": "Joueur %d" % (i + 1),
+			"pos": pos[i % pos.size()],
+			"rating": 60 + i
+		})
+	return arr
+
+
+# ------------------------------------------------------------
+# I18N
+# ------------------------------------------------------------
+func _apply_i18n() -> void:
+	I18nSvc.apply_node(self)
+
+	if lbl_title != null:
+		lbl_title.text = tr("selection.title")
+
+	if box != null:
+		for r in box.get_children():
+			if r != null:
+				if r.has_method("_update_text"):
+					r.call("_update_text")
+				if r.has_method("_update_style"):
+					r.call("_update_style")
+
+	_update_ui()
+	_refresh_quota_ui()
+
+
+
+
+
+func _on_scroll_gui_input(event: InputEvent) -> void:
+	if scroll == null or not (scroll is ScrollContainer):
+		return
+	var sc := scroll as ScrollContainer
+
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if not mb.pressed:
+			return
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+			sc.scroll_horizontal = max(0, sc.scroll_horizontal - 180)
+			accept_event()
+		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			sc.scroll_horizontal = min(sc.get_h_scroll_bar().max_value, sc.scroll_horizontal + 180)
+			accept_event()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED:
+		_apply_i18n()
+
+
+# ------------------------------------------------------------
+# QUOTA UI: bleu/vert/rouge + disabled (BtnSelect)
+# ------------------------------------------------------------
+func _set_btn_blue(btn: BaseButton) -> void:
+	btn.disabled = false
+	btn.self_modulate = Color(1, 1, 1, 1)
+
+func _set_btn_green(btn: BaseButton) -> void:
+	btn.disabled = false
+	btn.self_modulate = Color(0.70, 1.00, 0.70, 1)
+
+func _set_btn_red_disabled(btn: BaseButton) -> void:
+	btn.self_modulate = Color(1.00, 0.20, 0.20, 0.85)
+	btn.disabled = true
+
+func _get_row_button(row: Node) -> BaseButton:
+	var b: BaseButton = row.get_node_or_null("BtnSelect") as BaseButton
+	if b != null:
+		return b
+	b = row.find_child("BtnSelect", true, false) as BaseButton
+	return b
+
+func _refresh_quota_ui() -> void:
+	var count: int = selected_ids.size()
+	var quota_full: bool = (count >= MAX_SEL)
+
+	for pid in row_by_id.keys():
+		var row: Node = row_by_id[pid]
+		if row == null:
+			continue
+
+		var btn: BaseButton = _get_row_button(row)
+		if btn == null:
+			continue
+
+		var is_selected: bool = (int(pid) in selected_ids)
+
+		if is_selected:
+			_set_btn_green(btn)
+		else:
+			if quota_full:
+				_set_btn_red_disabled(btn)
+			else:
+				_set_btn_blue(btn)
+
+
+func _load_avatar_meta() -> void:
+	avatar_meta.clear()
+
+	var first_tr := ResourceLoader.load("res://data/avatars_meta.first.translation") as Translation
+	var gender_tr := ResourceLoader.load("res://data/avatars_meta.gender.translation") as Translation
+	print("[SELECTION][METADBG] first_tr null? ", first_tr == null)
+	print("[SELECTION][METADBG] gender_tr null? ", gender_tr == null)
+	if first_tr != null:
+		print("[SELECTION][METADBG] first avatar_001 = ", str(first_tr.get_message("avatar_001")))
+	if gender_tr != null:
+		print("[SELECTION][METADBG] gender avatar_001 = ", str(gender_tr.get_message("avatar_001")))
+	if first_tr != null and gender_tr != null:
+		var base_root := "res://assets/images/avatars"
+		var files: Array[String] = _scan_avatar_portraits(base_root)
+		for fn in files:
+			var avatar_key := String(fn).get_basename()
+			for k in _meta_key_candidates(avatar_key):
+				var key := str(k).strip_edges()
+				if key == "":
+					continue
+				var n := str(first_tr.get_message(key)).strip_edges()
+				if n != "":
+					var g := str(gender_tr.get_message(key)).strip_edges()
+					avatar_meta[key] = {"gender": g, "first_name": n}
+					break
+		if avatar_meta.size() > 0:
+			print("[AVATAR_META] loaded from Translation lookup=", avatar_meta.size())
+			return
+
+
+	var path := "res://data/avatars_meta_raw.txt"
+	var exists := FileAccess.file_exists(path)
+	print("[SELECTION] meta exists? ", exists, " path=", path)
+
+	if not exists:
+		push_error("[SELECTION] missing " + path)
+		return
+
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		print("[SELECTION][DEBUG] CSV open failed, retrying in 0.2s: ", path)
+		await get_tree().create_timer(0.2).timeout
+		f = FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		print("[SELECTION][ERROR] CSV still missing after retry: ", path)
+		return
+	var text := f.get_as_text().replace("\r", "")
+	var lines := text.split("\n", false)
+
+	for i in range(lines.size()):
+		var line := lines[i].strip_edges()
+		if line == "":
+			continue
+		if i == 0:
+			continue # header
+
+		var parts := line.split(",", false)
+		if parts.size() < 3:
+			continue
+
+		var k := parts[0].strip_edges()
+		var g := parts[1].strip_edges()
+		var n := parts[2].strip_edges()
+
+		if k == "" or n == "":
+			continue
+
+		avatar_meta[k] = {"gender": g, "first_name": n}
+
+	print("[SELECTION] avatar_meta loaded=", avatar_meta.size())
+
+func _meta_key_candidates(avatar_key: String) -> Array[String]:
+	var keys: Array[String] = []
+	keys.append(avatar_key)
+
+	if not avatar_key.begins_with("avatar_"):
+		return keys
+
+	var rest: String = avatar_key.substr(7) # après "avatar_"
+	if rest.length() == 0:
+		return keys
+
+	var digits: String = ""
+	var suffix: String = ""
+
+	for i: int in range(rest.length()):
+		var ch: String = rest.substr(i, 1)
+		if ch >= "0" and ch <= "9":
+			digits += ch
+		else:
+			suffix = rest.substr(i)
+			break
+
+	if digits == "":
+		return keys
+
+	var num: int = int(digits)
+	keys.append("avatar_%02d%s" % [num, suffix])
+	keys.append("avatar_%03d%s" % [num, suffix])
+	return keys
+
+
+func _selection_apply_mobile_averages_plus1() -> void:
+	if not _selection_is_mobile_layout():
+		return
+
+	for lbl in [lbl_avg_age, lbl_avg_perf, lbl_avg_salary]:
+		if lbl == null:
+			continue
+		if lbl.has_meta("bm_selection_mobile_average_plus1_done"):
+			continue
+		lbl.set_meta("bm_selection_mobile_average_plus1_done", true)
+		var fs: int = int(lbl.get_theme_font_size("font_size"))
+		if fs > 0:
+			lbl.add_theme_font_size_override("font_size", fs + 1)
+
+
+func _bm_mobile_confirm_selection_plus15_textplus4() -> void:
+	if not _selection_is_mobile_layout():
+		return
+	if btn_val == null:
+		return
+	btn_val.custom_minimum_size = Vector2(299, 71)
+	btn_val.add_theme_font_size_override("font_size", 28)

@@ -1,0 +1,153 @@
+extends Control
+
+const PL = preload("res://scripts/PlayerLife.gd")
+
+const COACH_UI_CONFIG := {
+	"coach_junior": {
+		"contract_text": "Contract: 2 seasons",
+		"payment_text": "Payment: euros / tokens / mix"
+	},
+	"coach_confirme": {
+		"contract_text": "Contract: 3 seasons",
+		"payment_text": "Payment: euros / tokens / mix"
+	},
+	"coach_elite": {
+		"contract_text": "Contract: 2 seasons",
+		"payment_text": "Payment: euros / tokens / mix"
+	}
+}
+
+@onready var BtnBack: Button = get_node_or_null("BtnBack") as Button
+@onready var BtnCoachJunior: Button = get_node_or_null("ScrollCoachs/Content/BtnCoachJunior") as Button
+@onready var BtnCoachConfirme: Button = get_node_or_null("ScrollCoachs/Content/BtnCoachConfirme") as Button
+@onready var BtnCoachElite: Button = get_node_or_null("ScrollCoachs/Content/BtnCoachElite") as Button
+
+@onready var LblCoachJunior: Label = get_node_or_null("ScrollCoachs/Content/LblCoachJunior") as Label
+@onready var LblCoachConfirme: Label = get_node_or_null("ScrollCoachs/Content/LblCoachConfirme") as Label
+@onready var LblCoachElite: Label = get_node_or_null("ScrollCoachs/Content/LblCoachElite") as Label
+
+@onready var LblIntro: Label = get_node_or_null("LblIntro") as Label
+@onready var ImgCoachJunior: TextureRect = get_node_or_null("ImgCoachJunior") as TextureRect
+@onready var ImgCoachConfirme: TextureRect = get_node_or_null("ImgCoachConfirme") as TextureRect
+@onready var ImgCoachElite: TextureRect = get_node_or_null("ImgCoachElite") as TextureRect
+
+@onready var InfoPanel: Panel = get_node_or_null("InfoPanel") as Panel
+@onready var LblInfo: Label = get_node_or_null("InfoPanel/LblInfo") as Label
+@onready var BtnBuyCoach: Button = get_node_or_null("InfoPanel/BtnBuyCoach") as Button
+
+var selected_coach_id: String = ""
+
+func _ready() -> void:
+	if BtnBack != null:
+		BtnBack.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+		BtnBack.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
+		BtnBack.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
+		BtnBack.add_theme_color_override("font_focus_color", Color(1, 1, 1, 1))
+		var sb_normal := StyleBoxFlat.new()
+		sb_normal.bg_color = Color(0.82, 0.16, 0.16, 1)
+		sb_normal.corner_radius_top_left = 8
+		sb_normal.corner_radius_top_right = 8
+		sb_normal.corner_radius_bottom_right = 8
+		sb_normal.corner_radius_bottom_left = 8
+		var sb_hover := StyleBoxFlat.new()
+		sb_hover.bg_color = Color(0.90, 0.20, 0.20, 1)
+		sb_hover.corner_radius_top_left = 8
+		sb_hover.corner_radius_top_right = 8
+		sb_hover.corner_radius_bottom_right = 8
+		sb_hover.corner_radius_bottom_left = 8
+		var sb_pressed := StyleBoxFlat.new()
+		sb_pressed.bg_color = Color(0.70, 0.12, 0.12, 1)
+		sb_pressed.corner_radius_top_left = 8
+		sb_pressed.corner_radius_top_right = 8
+		sb_pressed.corner_radius_bottom_right = 8
+		sb_pressed.corner_radius_bottom_left = 8
+		BtnBack.add_theme_stylebox_override("normal", sb_normal)
+		BtnBack.add_theme_stylebox_override("hover", sb_hover)
+		BtnBack.add_theme_stylebox_override("pressed", sb_pressed)
+	if BtnBack != null and not BtnBack.pressed.is_connected(_on_btn_back):
+		BtnBack.pressed.connect(_on_btn_back)
+
+	if BtnCoachJunior != null and not BtnCoachJunior.pressed.is_connected(_on_btn_coach_junior):
+		BtnCoachJunior.pressed.connect(_on_btn_coach_junior)
+
+	if BtnCoachConfirme != null and not BtnCoachConfirme.pressed.is_connected(_on_btn_coach_confirme):
+		BtnCoachConfirme.pressed.connect(_on_btn_coach_confirme)
+
+	if BtnCoachElite != null and not BtnCoachElite.pressed.is_connected(_on_btn_coach_elite):
+		BtnCoachElite.pressed.connect(_on_btn_coach_elite)
+
+	if InfoPanel != null:
+		InfoPanel.visible = false
+
+	_fill_inline_label("coach_junior", LblCoachJunior)
+	_fill_inline_label("coach_confirme", LblCoachConfirme)
+	_fill_inline_label("coach_elite", LblCoachElite)
+
+
+func _on_btn_back() -> void:
+	var tree := get_tree()
+	if tree == null:
+		print("[COACHS][ERR] get_tree() is null")
+		return
+	var path := "res://scenes/Menu.tscn"
+	print("[COACHS] change_scene_to_file path=", path, " exists=", ResourceLoader.exists(path))
+	var err := tree.change_scene_to_file(path)
+	print("[COACHS] change_scene_to_file err=", err)
+
+func _coach_status_text(coach_id: String) -> String:
+	var save: Dictionary = PL.load_savegame()
+	PL.ensure_progression_wallet_schema(save)
+
+	var unlocked: bool = PL.is_coachs_unlocked(save)
+	var coachs: Dictionary = save.get("coachs", {}) as Dictionary
+	var owned: Array = (coachs.get("owned", []) as Array)
+
+	if owned.has(coach_id):
+		return "Owned"
+	if unlocked:
+		return "Available"
+	return "Locked"
+
+
+func _fmt_int_spaces(v: int) -> String:
+	var s: String = str(maxi(0, int(v)))
+	var out: String = ""
+	while s.length() > 3:
+		out = " " + s.substr(s.length() - 3, 3) + out
+		s = s.substr(0, s.length() - 3)
+	return s + out
+
+func _fill_inline_label(coach_id: String, lbl: Label) -> void:
+	if lbl == null:
+		return
+
+	var data: Dictionary = PL.get_coach_price_data(coach_id)
+	if data.is_empty():
+		lbl.text = "Coach data unavailable"
+		return
+
+	var coach_cfg: Dictionary = COACH_UI_CONFIG.get(coach_id, {
+		"contract_text": "Contract: -",
+		"payment_text": "Payment: -"
+	}) as Dictionary
+	var contract_txt: String = str(coach_cfg.get("contract_text", "Contract: -"))
+	var payment_txt: String = str(coach_cfg.get("payment_text", "Payment: -"))
+
+	var euros_cost: int = int(data.get("euros_cost", 0))
+	var tokens_cost: int = int(data.get("tokens_cost", 0))
+	var status_txt: String = _coach_status_text(coach_id)
+
+	lbl.text = contract_txt \
+		+ "\nStatus: " + status_txt \
+		+ "\nEuros: " + _fmt_int_spaces(euros_cost) + " / season" \
+		+ "\nTokens unlock: " + str(tokens_cost) \
+		+ "\n" + payment_txt
+
+func _on_btn_coach_junior() -> void:
+	selected_coach_id = "coach_junior"
+
+func _on_btn_coach_confirme() -> void:
+	selected_coach_id = "coach_confirme"
+
+func _on_btn_coach_elite() -> void:
+	selected_coach_id = "coach_elite"
