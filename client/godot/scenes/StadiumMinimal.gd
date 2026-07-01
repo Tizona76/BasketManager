@@ -761,6 +761,134 @@ var _upgrade_info_dialog: AcceptDialog = null
 var _upgrade_target_ng: int = 0
 var _upgrade_target_ns: int = 0
 var _upgrade_accel_mode: bool = false
+const UPGRADE_PANEL_ALPHA: float = 0.42
+const UPGRADE_PANEL_RADIUS: int = 18
+const UPGRADE_NEXT_IMAGE_SIZE: Vector2 = Vector2(640, 300)
+
+func _apply_upgrade_readability_panel_style(frame: PanelContainer) -> void:
+	if frame == null:
+		return
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(1, 1, 1, UPGRADE_PANEL_ALPHA)
+	sb.border_width_left = 0
+	sb.border_width_right = 0
+	sb.border_width_top = 0
+	sb.border_width_bottom = 0
+	sb.corner_radius_top_left = UPGRADE_PANEL_RADIUS
+	sb.corner_radius_top_right = UPGRADE_PANEL_RADIUS
+	sb.corner_radius_bottom_left = UPGRADE_PANEL_RADIUS
+	sb.corner_radius_bottom_right = UPGRADE_PANEL_RADIUS
+	sb.content_margin_left = 44
+	sb.content_margin_right = 44
+	sb.content_margin_top = 34
+	sb.content_margin_bottom = 34
+	frame.add_theme_stylebox_override("panel", sb)
+
+func _stadium_image_path_for_level(ng: int, ns: int) -> String:
+	if ng == 1 and ns == 0:
+		return "res://assets/images/stades/stade_11.png"
+	if ng == 1 and ns == 1:
+		return "res://assets/images/stades/stade_115.png"
+	return "res://assets/images/stades/stade_" + str(ng) + str(ns) + ".png"
+
+func _stadium_current_image_path() -> String:
+	if save_node != null and save_node.has_method("stadium_level_str"):
+		var parts := str(save_node.call("stadium_level_str")).split(".")
+		if parts.size() >= 2:
+			return _stadium_image_path_for_level(int(parts[0]), int(parts[1]))
+	return UPGRADE_BG_PATH
+
+func _apply_upgrade_confirm_button_style(btn: Button) -> void:
+	if btn == null:
+		return
+	btn.custom_minimum_size = Vector2(0, 54)
+	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	btn.add_theme_font_size_override("font_size", 26)
+	var sb_n := StyleBoxFlat.new()
+	sb_n.bg_color = Color(0.12, 0.70, 0.25, 1.0)
+	sb_n.corner_radius_top_left = 10
+	sb_n.corner_radius_top_right = 10
+	sb_n.corner_radius_bottom_left = 10
+	sb_n.corner_radius_bottom_right = 10
+	sb_n.content_margin_left = 18
+	sb_n.content_margin_right = 18
+	sb_n.content_margin_top = 10
+	sb_n.content_margin_bottom = 10
+	sb_n.border_width_left = 2
+	sb_n.border_width_right = 2
+	sb_n.border_width_top = 2
+	sb_n.border_width_bottom = 2
+	sb_n.border_color = Color(0.08, 0.55, 0.18, 1.0)
+	sb_n.shadow_size = 6
+	sb_n.shadow_offset = Vector2(0, 4)
+	sb_n.shadow_color = Color(0, 0, 0, 0.35)
+	var sb_h := sb_n.duplicate() as StyleBoxFlat
+	sb_h.bg_color = Color(0.16, 0.80, 0.30, 1.0)
+	var sb_p := sb_n.duplicate() as StyleBoxFlat
+	sb_p.bg_color = Color(0.10, 0.60, 0.20, 1.0)
+	sb_p.shadow_size = 2
+	sb_p.shadow_offset = Vector2(0, 1)
+	btn.add_theme_stylebox_override("normal", sb_n)
+	btn.add_theme_stylebox_override("hover", sb_h)
+	btn.add_theme_stylebox_override("pressed", sb_p)
+	btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
+	btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
+	btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	btn.add_theme_color_override("font_hover_outline_color", Color(0, 0, 0, 0.85))
+	btn.add_theme_color_override("font_pressed_outline_color", Color(0, 0, 0, 0.85))
+	btn.add_theme_constant_override("outline_size", 2)
+
+func _apply_upgrade_cancel_button_style(btn: Button) -> void:
+	if btn == null:
+		return
+	btn.custom_minimum_size = Vector2(0, 54)
+	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	btn.add_theme_font_size_override("font_size", 26)
+	var sb_n := StyleBoxFlat.new()
+	sb_n.bg_color = Color(0.82, 0.18, 0.18, 0.96)
+	sb_n.corner_radius_top_left = 10
+	sb_n.corner_radius_top_right = 10
+	sb_n.corner_radius_bottom_left = 10
+	sb_n.corner_radius_bottom_right = 10
+	sb_n.content_margin_left = 18
+	sb_n.content_margin_right = 18
+	sb_n.content_margin_top = 10
+	sb_n.content_margin_bottom = 10
+	sb_n.border_width_left = 2
+	sb_n.border_width_right = 2
+	sb_n.border_width_top = 2
+	sb_n.border_width_bottom = 2
+	sb_n.border_color = Color(0.55, 0.08, 0.08, 1.0)
+	sb_n.shadow_size = 6
+	sb_n.shadow_offset = Vector2(0, 4)
+	sb_n.shadow_color = Color(0, 0, 0, 0.35)
+	var sb_h := sb_n.duplicate() as StyleBoxFlat
+	sb_h.bg_color = Color(0.90, 0.24, 0.24, 1.0)
+	var sb_p := sb_n.duplicate() as StyleBoxFlat
+	sb_p.bg_color = Color(0.68, 0.12, 0.12, 1.0)
+	sb_p.shadow_size = 2
+	sb_p.shadow_offset = Vector2(0, 1)
+	btn.add_theme_stylebox_override("normal", sb_n)
+	btn.add_theme_stylebox_override("hover", sb_h)
+	btn.add_theme_stylebox_override("pressed", sb_p)
+	btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
+	btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
+	btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	btn.add_theme_color_override("font_hover_outline_color", Color(0, 0, 0, 0.85))
+	btn.add_theme_color_override("font_pressed_outline_color", Color(0, 0, 0, 0.85))
+	btn.add_theme_constant_override("outline_size", 2)
+
+func _get_upgrade_confirm_button(panel: Node) -> Button:
+	if panel == null:
+		return null
+	return panel.find_child("BtnConfirmUpgradePanel", true, false) as Button
+
+func _get_upgrade_cancel_button(panel: Node) -> Button:
+	if panel == null:
+		return null
+	return panel.find_child("BtnCancelUpgradePanel", true, false) as Button
 
 func _format_int(n: int) -> String:
 	# 1250000 -> "1 250 000"
@@ -1175,16 +1303,7 @@ func _stadium_bind_tabs() -> void:
 	var pshop := get_node_or_null("Content/CenterShop/PanelShop")
 	var bg_root := get_node_or_null("Bg") as TextureRect
 	if bg_root != null:
-		var stadium_bg_path := UPGRADE_BG_PATH
-		if save_node != null and save_node.has_method("stadium_level_str"):
-			var level_str := str(save_node.call("stadium_level_str"))
-			var lvl := level_str.replace(".", "")
-			if level_str == "1.1":
-				lvl = "115"
-			elif lvl == "10":
-				lvl = "11"
-			stadium_bg_path = "res://assets/images/stades/stade_" + lvl + ".png"
-		bg_root.texture = load(stadium_bg_path)
+		bg_root.texture = load(_stadium_current_image_path())
 	var shop_screen_bg := get_node_or_null("ShopScreenBG") as TextureRect
 	if shop_screen_bg != null:
 		shop_screen_bg.visible = false
@@ -1432,7 +1551,7 @@ func _refresh_upgrade_works_ui(ng_cur: int, ns_cur: int, rem: int, total: int) -
 	if LblStadiumLevel != null:
 		LblStadiumLevel.visible = false
 
-	var btn_confirm := panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox/BtnConfirmUpgradePanel") as Button
+	var btn_confirm := _get_upgrade_confirm_button(panel)
 	var target_title := panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox/LblUpgradeTargetTitle") as Label
 	var lbl_title := panel.get_node_or_null("VBoxUpgrade/LblUpgradeInProgressTitle") as Label
 	var pb := panel.get_node_or_null("VBoxUpgrade/ProgressBarUpgradeWorks") as ProgressBar
@@ -1462,6 +1581,8 @@ func _refresh_upgrade_works_ui(ng_cur: int, ns_cur: int, rem: int, total: int) -
 		if old_outer_frame != null:
 			old_outer_frame.visible = false
 	if frame != null:
+		if frame is PanelContainer:
+			_apply_upgrade_readability_panel_style(frame as PanelContainer)
 		frame.custom_minimum_size = Vector2(0, 0)
 		frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1491,7 +1612,9 @@ func _refresh_upgrade_works_ui(ng_cur: int, ns_cur: int, rem: int, total: int) -
 		target_title.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 		target_title.visible = false
 	if info != null:
-		info.add_theme_color_override("default_color", Color(1, 1, 1, 1))
+		info.add_theme_color_override("default_color", Color(0, 0, 0, 1))
+		info.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0))
+		info.add_theme_constant_override("outline_size", 0)
 
 	if pb != null:
 		pb.visible = false
@@ -1743,13 +1866,12 @@ func _on_tab_upgrade() -> void:
 		panel.mouse_filter = Control.MOUSE_FILTER_PASS
 		_stadium_make_panel_full_screen(panel)
 		var upgrade_vp_size_open := get_viewport_rect().size
-		var upgrade_panel_size_open := upgrade_vp_size_open * 0.8
 		panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-		panel.offset_left = upgrade_vp_size_open.x * 0.1
-		panel.offset_top = upgrade_vp_size_open.y * 0.1
-		panel.offset_right = -upgrade_vp_size_open.x * 0.1
-		panel.offset_bottom = -upgrade_vp_size_open.y * 0.1
-		panel.custom_minimum_size = upgrade_panel_size_open
+		panel.offset_left = 0
+		panel.offset_top = 0
+		panel.offset_right = 0
+		panel.offset_bottom = 0
+		panel.custom_minimum_size = upgrade_vp_size_open
 		panel.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
 		panel.visible = true
 		if LblCapacity != null:
@@ -1778,9 +1900,9 @@ func _on_tab_upgrade() -> void:
 			bg_up.offset_bottom = 0
 			bg_up.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			bg_up.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-			var next_bg_path_direct := "res://assets/images/stades/stade_115.png" if is_basic_improvements else "res://assets/images/stades/stade_" + str(ng) + str(ns) + ".png"
-			if ResourceLoader.exists(next_bg_path_direct):
-				bg_up.texture = load(next_bg_path_direct) as Texture2D
+			var current_bg_path_direct := _stadium_current_image_path()
+			if ResourceLoader.exists(current_bg_path_direct):
+				bg_up.texture = load(current_bg_path_direct) as Texture2D
 			panel.move_child(bg_up, 0)
 			bg_up.offset_bottom = 0
 			bg_up.size = get_viewport_rect().size
@@ -1801,6 +1923,8 @@ func _on_tab_upgrade() -> void:
 
 		var vbox_up := panel.get_node_or_null("VBoxUpgrade") as Control
 		if vbox_up != null:
+			if vbox_up is BoxContainer:
+				(vbox_up as BoxContainer).alignment = BoxContainer.ALIGNMENT_CENTER
 			vbox_up.mouse_filter = Control.MOUSE_FILTER_PASS
 			vbox_up.scale = Vector2(1, 1)
 			vbox_up.offset_left = 80
@@ -1818,16 +1942,17 @@ func _on_tab_upgrade() -> void:
 				spacer.custom_minimum_size = Vector2(0, 10)
 			var upgrade_frame := vbox_up.get_node_or_null("UpgradeInfoFrame") as PanelContainer
 			if upgrade_frame != null:
-				upgrade_frame.custom_minimum_size = Vector2(0, 0)
-				upgrade_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-				upgrade_frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+				_apply_upgrade_readability_panel_style(upgrade_frame)
+				upgrade_frame.custom_minimum_size = Vector2(960, 680)
+				upgrade_frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+				upgrade_frame.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 				var upgrade_box := upgrade_frame.get_node_or_null("UpgradeInfoBox") as VBoxContainer
 				if upgrade_box == null:
 					upgrade_box = VBoxContainer.new()
 					upgrade_box.name = "UpgradeInfoBox"
 					upgrade_frame.add_child(upgrade_box)
 				upgrade_box.alignment = BoxContainer.ALIGNMENT_CENTER
-				upgrade_box.add_theme_constant_override("separation", 44)
+				upgrade_box.add_theme_constant_override("separation", 18)
 				var old_info := upgrade_frame.get_node_or_null("LblUpgradeInfo") as RichTextLabel
 				if old_info != null:
 					upgrade_frame.remove_child(old_info)
@@ -1852,19 +1977,38 @@ func _on_tab_upgrade() -> void:
 		if LblStadiumLevel != null:
 			LblStadiumLevel.visible = false
 
-		# BM_EVOL_STADE_NEXT_BG_V1: image du prochain stade en fond du popup Evol Stade
+		# BM_EVOL_STADE_CURRENT_BG_V1: image du stade actuel en fond de l'écran Evol Stade
 		var upgrade_bg := panel.get_node_or_null("UpgradeBG") as TextureRect
 		if upgrade_bg != null:
-			var next_bg_path := "res://assets/images/stades/stade_115.png" if is_basic_improvements else "res://assets/images/stades/stade_" + str(ng) + str(ns) + ".png"
-			if ResourceLoader.exists(next_bg_path):
-				upgrade_bg.texture = load(next_bg_path) as Texture2D
+			var current_bg_path := _stadium_current_image_path()
+			if ResourceLoader.exists(current_bg_path):
+				upgrade_bg.texture = load(current_bg_path) as Texture2D
 
 		var info := panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox/LblUpgradeInfo") as RichTextLabel
 		var upgrade_target_title := panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox/LblUpgradeTargetTitle") as Label
+		var upgrade_info_box := panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox") as VBoxContainer
+		var next_image := panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox/UpgradeNextImage") as TextureRect
+		if next_image == null and upgrade_info_box != null:
+			next_image = TextureRect.new()
+			next_image.name = "UpgradeNextImage"
+			upgrade_info_box.add_child(next_image)
+		if next_image != null and upgrade_info_box != null:
+			upgrade_info_box.move_child(next_image, mini(1, upgrade_info_box.get_child_count() - 1))
+		if next_image != null:
+			var next_image_path := _stadium_image_path_for_level(ng, ns)
+			if ResourceLoader.exists(next_image_path):
+				next_image.texture = load(next_image_path) as Texture2D
+			next_image.custom_minimum_size = UPGRADE_NEXT_IMAGE_SIZE
+			next_image.size = UPGRADE_NEXT_IMAGE_SIZE
+			next_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			next_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+			next_image.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			next_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			next_image.visible = true
 		if upgrade_target_title != null:
 			var target_label := _stadium_tr("stadium.basic_improvements") if is_basic_improvements else str(ng) + "." + str(ns)
 			upgrade_target_title.text = _stadium_tr("stadium.target_level") + " : " + target_label
-			upgrade_target_title.add_theme_font_size_override("font_size", 48)
+			upgrade_target_title.add_theme_font_size_override("font_size", 36)
 			upgrade_target_title.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 			upgrade_target_title.add_theme_color_override("font_outline_color", Color(0.0, 0.04, 0.18, 0.85))
 			upgrade_target_title.add_theme_constant_override("outline_size", 2)
@@ -1886,38 +2030,30 @@ func _on_tab_upgrade() -> void:
 			upgrade_target_title.add_theme_stylebox_override("normal", upgrade_title_sb)
 			upgrade_target_title.set_as_top_level(true)
 			var upgrade_title_rect := panel.get_global_rect()
-			upgrade_target_title.global_position = upgrade_title_rect.position + Vector2(upgrade_title_rect.size.x * 0.29, 12)
-			upgrade_target_title.size = Vector2(upgrade_title_rect.size.x * 0.42, 62)
+			upgrade_target_title.global_position = upgrade_title_rect.position + Vector2(upgrade_title_rect.size.x * 0.29, 76)
+			upgrade_target_title.size = Vector2(upgrade_title_rect.size.x * 0.42, 52)
 			upgrade_target_title.z_as_relative = false
 			upgrade_target_title.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
 			upgrade_target_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			upgrade_target_title.visible = true
 
 		if info != null:
-			info.add_theme_font_size_override("normal_font_size", 33)
-			info.add_theme_color_override("default_color", Color(0, 0, 0, 1) if is_basic_improvements else Color(1, 1, 1, 1))
-			info.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0) if is_basic_improvements else Color(0, 0, 0, 0.85))
-			info.add_theme_constant_override("outline_size", 0 if is_basic_improvements else 2)
+			info.add_theme_font_size_override("normal_font_size", 31)
+			info.add_theme_color_override("default_color", Color(0, 0, 0, 1))
+			info.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0))
+			info.add_theme_constant_override("outline_size", 0)
 			info.bbcode_enabled = false
 			info.clear()
 			info.push_paragraph(HORIZONTAL_ALIGNMENT_LEFT)
-			var upgrade_info_indent := "    "
-			if is_basic_improvements:
-				info.add_text(upgrade_info_indent + _stadium_tr("stadium.basic_improvements_desc"))
-				info.newline()
-				info.newline()
-				info.add_text(upgrade_info_indent + _stadium_tr("stadium.cost") + " : " + _format_int(cost) + " €")
-				info.newline()
-				info.add_text(upgrade_info_indent + _stadium_tr("stadium.work_duration") + " : " + _stadium_tr("stadium.duration_one_game"))
-			else:
-				info.add_text(upgrade_info_indent + _stadium_tr("stadium.new_capacity") + " : " + _format_int(target_capacity) + " (+" + str(capacity_gain_percent) + "%)")
-				info.newline()
-				info.add_text(upgrade_info_indent + _stadium_tr("stadium.cost") + " : " + _format_int(cost) + " €")
-				info.newline()
-				info.add_text(upgrade_info_indent + _stadium_tr("stadium.duration") + " : " + str(duration) + " " + _stadium_tr("stadium.duration_unit"))
-			info.pop()
+			info.add_text(_stadium_tr("stadium.capacity") + " : " + _format_int(target_capacity))
 			info.newline()
-			info.push_paragraph(HORIZONTAL_ALIGNMENT_CENTER)
+			info.add_text(_stadium_tr("stadium.cost") + " : " + _format_int(cost) + " €")
+			info.newline()
+			if is_basic_improvements:
+				info.add_text(_stadium_tr("stadium.work_duration") + " : " + _stadium_tr("stadium.duration_one_game"))
+			else:
+				info.add_text(_stadium_tr("stadium.duration") + " : " + str(duration) + " " + _stadium_tr("stadium.duration_unit"))
+			info.pop()
 			var accel_cost_text := str(accel_tokens) + " tokens"
 			# BM_HIDE_ACCELERATION_AVAILABLE_TEXT_V1
 			# info.add_text(_stadium_fmt("stadium.upgrade.acceleration_available", {"tokens": accel_tokens}).replace(accel_cost_text, "").strip_edges() + " ")
@@ -1959,18 +2095,15 @@ func _on_tab_upgrade() -> void:
 					token_pill_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 					token_pill_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 					token_pill_label.add_theme_constant_override("outline_size", 2)
-			info.newline()
-			info.newline()
-			info.add_text(_stadium_tr("stadium.confirm_upgrade") + " ?")
-			info.pop()
 
-		var btn_confirm := panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox/BtnConfirmUpgradePanel") as Button
+		var btn_confirm := _get_upgrade_confirm_button(panel)
 
 		var lbl_title := panel.get_node_or_null("VBoxUpgrade/LblUpgradeInProgressTitle") as Label
 		var pb := panel.get_node_or_null("VBoxUpgrade/ProgressBarUpgradeWorks") as ProgressBar
 		var lbl_remaining := panel.get_node_or_null("VBoxUpgrade/LblUpgradeRemaining") as Label
 		var btn_accel := panel.get_node_or_null("VBoxUpgrade/BtnUpgradeAccelerate") as Button
 		if btn_confirm != null:
+			btn_confirm.text = "Confirm Upgrade"
 			btn_confirm.visible = true
 			btn_confirm.disabled = false
 			btn_confirm.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -2359,6 +2492,7 @@ func _ensure_upgrade_panel() -> void:
 		var root := VBoxContainer.new()
 		root.name = "VBoxUpgrade"
 		root.scale = Vector2(1, 1)
+		root.alignment = BoxContainer.ALIGNMENT_CENTER
 		panel.add_child(root)
 		root.set_anchors_preset(Control.PRESET_FULL_RECT)
 
@@ -2372,9 +2506,9 @@ func _ensure_upgrade_panel() -> void:
 
 		var frame := PanelContainer.new()
 		frame.name = "UpgradeInfoFrame"
-		frame.custom_minimum_size = Vector2(0, 0)
-		frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		frame.custom_minimum_size = Vector2(960, 680)
+		frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		frame.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 		var target_title_label := Label.new()
 		target_title_label.name = "LblUpgradeTargetTitle"
@@ -2389,38 +2523,33 @@ func _ensure_upgrade_panel() -> void:
 		var frame_box := VBoxContainer.new()
 		frame_box.name = "UpgradeInfoBox"
 		frame_box.alignment = BoxContainer.ALIGNMENT_CENTER
-		frame_box.add_theme_constant_override("separation", 44)
+		frame_box.add_theme_constant_override("separation", 18)
 
 		root.add_child(frame)
 		frame.add_child(frame_box)
 		frame_box.add_child(target_title_label)
+		_apply_upgrade_readability_panel_style(frame)
 
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(1,1,1,0.10)
-		sb.border_width_left = 2
-		sb.border_width_right = 2
-		sb.border_width_top = 2
-		sb.border_width_bottom = 2
-		sb.border_color = Color(0.1,0.1,0.1,0.35)
-		sb.corner_radius_top_left = 10
-		sb.corner_radius_top_right = 10
-		sb.corner_radius_bottom_left = 10
-		sb.corner_radius_bottom_right = 10
-		sb.content_margin_left = 16
-		sb.content_margin_right = 16
-		sb.content_margin_top = 14
-		sb.content_margin_bottom = 14
-		frame.add_theme_stylebox_override("panel", sb)
+		var next_image := TextureRect.new()
+		next_image.name = "UpgradeNextImage"
+		next_image.custom_minimum_size = UPGRADE_NEXT_IMAGE_SIZE
+		next_image.size = UPGRADE_NEXT_IMAGE_SIZE
+		next_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		next_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		next_image.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		next_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		next_image.visible = false
+		frame_box.add_child(next_image)
 
 		var info := RichTextLabel.new()
 		info.name = "LblUpgradeInfo"
 		info.fit_content = true
 		info.scroll_active = false
 		info.bbcode_enabled = false
-		info.add_theme_font_size_override("normal_font_size", 33)
-		info.add_theme_color_override("default_color", Color(1,1,1,1))
-		info.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-		info.add_theme_constant_override("outline_size", 2)
+		info.add_theme_font_size_override("normal_font_size", 31)
+		info.add_theme_color_override("default_color", Color(0, 0, 0, 1))
+		info.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0))
+		info.add_theme_constant_override("outline_size", 0)
 		info.modulate = Color(1,1,1,1)
 		frame_box.add_child(info)
 
@@ -2472,6 +2601,24 @@ func _ensure_upgrade_panel() -> void:
 
 		if not btn.pressed.is_connected(_on_upgrade_confirmed):
 			btn.pressed.connect(_on_upgrade_confirmed)
+
+	var btn_confirm_scene := _get_upgrade_confirm_button(panel)
+	if btn_confirm_scene != null:
+		_apply_upgrade_confirm_button_style(btn_confirm_scene)
+		if not btn_confirm_scene.pressed.is_connected(_on_upgrade_confirmed):
+			btn_confirm_scene.pressed.connect(_on_upgrade_confirmed)
+
+	var btn_cancel_scene := _get_upgrade_cancel_button(panel)
+	if btn_cancel_scene != null:
+		btn_cancel_scene.text = "Cancel"
+		_apply_upgrade_cancel_button_style(btn_cancel_scene)
+		if not btn_cancel_scene.pressed.is_connected(_on_close_upgrade_pressed):
+			btn_cancel_scene.pressed.connect(_on_close_upgrade_pressed)
+
+	var btn_close_scene := panel.get_node_or_null("UpgradeOverlay/BtnCloseUpgrade") as Button
+	if btn_close_scene != null:
+		if not btn_close_scene.pressed.is_connected(_on_close_upgrade_pressed):
+			btn_close_scene.pressed.connect(_on_close_upgrade_pressed)
 
 	if panel is CanvasItem:
 		(panel as CanvasItem).visible = false
