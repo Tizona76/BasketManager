@@ -1424,7 +1424,7 @@ func _ensure_table_header() -> void:
 
 	if _is_match_selection_unlocked():
 		myteam_table_header.add_child(_make_header_column(_make_header_visual_button(tr("myteam.btn.select_to_play"), 112.0), 120.0))
-	var sell_header := _make_header_visual_button(tr("myteam.btn.sell"), 90.0)
+	var sell_header := _make_header_visual_button(tr("myteam.header.sell_player"), 90.0)
 	sell_header.mouse_filter = Control.MOUSE_FILTER_PASS
 	_bm_bind_sell_tooltip(sell_header)
 	myteam_table_header.add_child(_make_header_column(sell_header, 110.0))

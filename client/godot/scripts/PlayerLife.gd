@@ -19,6 +19,31 @@ const INJURY_FATIGUE_FACTOR := 0.10  # +0.10% par point de fatigue
 const INJURY_ENDURANCE_FACTOR := 0.35 # -0.35% par point d'endurance (si endurance élevée)
 const CONVAL_MIN := 1
 const CONVAL_MAX := 4
+const CLUB_IDENTITY_MAX_BADGE_LEVEL := 3
+const CLUB_IDENTITY_BASE_BADGE_IDS := [
+	"starter_crest_01",
+	"starter_crest_02",
+	"starter_crest_03",
+	"starter_crest_04",
+	"starter_crest_05",
+	"starter_crest_06"
+]
+const CLUB_IDENTITY_SWITCH_COST := {
+	1: 6,
+	2: 18,
+	3: 33
+}
+const CLUB_IDENTITY_UPGRADE_COST := {
+	1: 8,
+	2: 32
+}
+const CLUB_IDENTITY_SWITCH_UPGRADE_ADJUSTMENT := {
+	1: 14,
+	2: 15
+}
+const CLUB_BADGE_ACTION_SWITCH := "switch"
+const CLUB_BADGE_ACTION_UPGRADE := "upgrade"
+const CLUB_BADGE_ACTION_SWITCH_UPGRADE := "switch_upgrade"
 
 static func _resolve_save_path(path: String = "user://savegame.json") -> String:
 	if path != "user://savegame.json":
@@ -179,9 +204,124 @@ static func _ensure_wallet_schema(save: Dictionary) -> void:
 	wallet["tokens"] = maxi(0, int(wallet.get("tokens", 0)))
 
 
+static func _append_token_history(save: Dictionary, amount: int, reason: String) -> void:
+	var delta := int(amount)
+	if delta == 0:
+		return
+	if not save.has("token_history") or typeof(save["token_history"]) != TYPE_ARRAY:
+		save["token_history"] = []
+	var history: Array = save["token_history"] as Array
+	var clean_reason := str(reason).strip_edges()
+	history.append({
+		"amount": delta,
+		"reason": clean_reason,
+		"reason_key": clean_reason,
+		"created_at_unix": Time.get_unix_time_from_system()
+	})
+	if history.size() > 40:
+		history = history.slice(history.size() - 40, history.size())
+	save["token_history"] = history
+
+
+static func _normalize_club_badge_id(badge_id: Variant) -> String:
+	var raw := str(badge_id).strip_edges()
+	if raw == "":
+		return ""
+	var idx_txt := raw.replace("starter_crest_", "")
+	if not idx_txt.is_valid_int():
+		return ""
+	var idx := int(idx_txt)
+	if idx <= 0:
+		return ""
+	return "starter_crest_%02d" % idx
+
+
+static func _legacy_club_badge_id(save: Dictionary) -> String:
+	var cid := _normalize_club_badge_id(save.get("club_crest_id", save.get("selected_crest_id", "")))
+	if cid == "" and save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
+		cid = _normalize_club_badge_id((save["roster"] as Dictionary).get("selected_crest_id", ""))
+	return cid
+
+
+static func _sync_legacy_club_crest_fields(save: Dictionary) -> void:
+	if not save.has("club_identity") or typeof(save["club_identity"]) != TYPE_DICTIONARY:
+		return
+	var identity: Dictionary = save["club_identity"] as Dictionary
+	var equipped := _normalize_club_badge_id(identity.get("equipped_badge_id", ""))
+	if equipped == "":
+		return
+	var levels: Dictionary = {}
+	if identity.has("badge_levels") and typeof(identity["badge_levels"]) == TYPE_DICTIONARY:
+		levels = identity["badge_levels"] as Dictionary
+	var level := clampi(int(levels.get(equipped, save.get("club_crest_level", 1))), 1, CLUB_IDENTITY_MAX_BADGE_LEVEL)
+	save["club_crest_id"] = equipped
+	save["selected_crest_id"] = equipped
+	save["club_crest_level"] = level
+	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
+		(save["roster"] as Dictionary)["selected_crest_id"] = equipped
+	if save.has("team_crest_map") and typeof(save["team_crest_map"]) == TYPE_DICTIONARY:
+		var team_crest_map := save["team_crest_map"] as Dictionary
+		var team_name := str(save.get("team_name", "")).strip_edges()
+		var club_name := str(save.get("club_name", "")).strip_edges()
+		if team_name != "":
+			team_crest_map[team_name] = equipped
+		if club_name != "":
+			team_crest_map[club_name] = equipped
+
+
+static func _ensure_club_identity_schema(save: Dictionary) -> void:
+	if save == null:
+		return
+	var equipped := _legacy_club_badge_id(save)
+
+	var legacy_level := clampi(int(save.get("club_crest_level", 1)), 1, CLUB_IDENTITY_MAX_BADGE_LEVEL)
+	var identity: Dictionary = {}
+	if save.has("club_identity") and typeof(save["club_identity"]) == TYPE_DICTIONARY:
+		identity = save["club_identity"] as Dictionary
+
+	var current_equipped := _normalize_club_badge_id(identity.get("equipped_badge_id", ""))
+	if current_equipped != "":
+		equipped = current_equipped
+
+	var owned: Array = []
+	if identity.has("owned_badges") and typeof(identity["owned_badges"]) == TYPE_ARRAY:
+		for raw_badge in identity["owned_badges"] as Array:
+			var bid := _normalize_club_badge_id(raw_badge)
+			if bid != "" and not owned.has(bid):
+				owned.append(bid)
+	if equipped == "" and owned.is_empty():
+		identity["equipped_badge_id"] = ""
+		identity["owned_badges"] = []
+		identity["badge_levels"] = {}
+		save["club_identity"] = identity
+		return
+	if equipped == "" and not owned.is_empty():
+		equipped = str(owned[0])
+	if not owned.has(equipped):
+		owned.append(equipped)
+
+	var levels: Dictionary = {}
+	if identity.has("badge_levels") and typeof(identity["badge_levels"]) == TYPE_DICTIONARY:
+		for key in (identity["badge_levels"] as Dictionary).keys():
+			var bid2 := _normalize_club_badge_id(key)
+			if bid2 == "":
+				continue
+			levels[bid2] = clampi(int((identity["badge_levels"] as Dictionary).get(key, 1)), 1, CLUB_IDENTITY_MAX_BADGE_LEVEL)
+	for bid3 in owned:
+		if not levels.has(bid3):
+			levels[bid3] = legacy_level if bid3 == equipped else 1
+
+	identity["equipped_badge_id"] = equipped
+	identity["owned_badges"] = owned
+	identity["badge_levels"] = levels
+	save["club_identity"] = identity
+	_sync_legacy_club_crest_fields(save)
+
+
 static func ensure_progression_wallet_schema(save: Dictionary) -> void:
 	_ensure_club_schema(save)
 	_ensure_wallet_schema(save)
+	_ensure_club_identity_schema(save)
 
 	# --- COACHS SCHEMA ---
 	if not save.has("coachs") or typeof(save["coachs"]) != TYPE_DICTIONARY:
@@ -265,8 +405,163 @@ static func get_club_xp(save: Dictionary) -> int:
 	return maxi(0, int((save["club"] as Dictionary).get("xp", 0)))
 
 
+static func get_club_identity_badge_ids() -> Array[String]:
+	var out: Array[String] = []
+	for bid in CLUB_IDENTITY_BASE_BADGE_IDS:
+		out.append(str(bid))
+	return out
+
+
+static func get_club_identity(save: Dictionary) -> Dictionary:
+	ensure_progression_wallet_schema(save)
+	return (save["club_identity"] as Dictionary).duplicate(true)
+
+
+static func get_equipped_club_badge_id(save: Dictionary) -> String:
+	ensure_progression_wallet_schema(save)
+	return _normalize_club_badge_id((save["club_identity"] as Dictionary).get("equipped_badge_id", ""))
+
+
+static func is_club_badge_owned(save: Dictionary, badge_id: String) -> bool:
+	ensure_progression_wallet_schema(save)
+	var bid := _normalize_club_badge_id(badge_id)
+	if bid == "":
+		return false
+	var owned: Array = (save["club_identity"] as Dictionary).get("owned_badges", []) as Array
+	return owned.has(bid)
+
+
+static func get_club_badge_level(save: Dictionary, badge_id: String) -> int:
+	ensure_progression_wallet_schema(save)
+	var bid := _normalize_club_badge_id(badge_id)
+	if bid == "":
+		return 1
+	var levels: Dictionary = (save["club_identity"] as Dictionary).get("badge_levels", {}) as Dictionary
+	return clampi(int(levels.get(bid, 1)), 1, CLUB_IDENTITY_MAX_BADGE_LEVEL)
+
+
+static func get_base_badge_unlock_cost(_badge_id: String = "") -> int:
+	return get_badge_action_cost({}, _badge_id, CLUB_BADGE_ACTION_SWITCH)
+
+
+static func get_club_badge_upgrade_cost(save: Dictionary, badge_id: String) -> int:
+	return get_badge_action_cost(save, badge_id, CLUB_BADGE_ACTION_UPGRADE)
+
+
+static func get_badge_action_cost(save: Dictionary, badge_id: String, action: String) -> int:
+	if not save.is_empty():
+		ensure_progression_wallet_schema(save)
+	var bid := _normalize_club_badge_id(badge_id)
+	if bid == "":
+		return 0
+	var equipped := ""
+	var current_level := 1
+	if not save.is_empty():
+		equipped = get_equipped_club_badge_id(save)
+		current_level = get_club_badge_level(save, equipped if equipped != "" else bid)
+	current_level = clampi(current_level, 1, CLUB_IDENTITY_MAX_BADGE_LEVEL)
+	match action:
+		CLUB_BADGE_ACTION_SWITCH:
+			if equipped != "" and bid == equipped:
+				return 0
+			return maxi(0, int(CLUB_IDENTITY_SWITCH_COST.get(current_level, 0)))
+		CLUB_BADGE_ACTION_UPGRADE:
+			if current_level >= CLUB_IDENTITY_MAX_BADGE_LEVEL:
+				return 0
+			return maxi(0, int(CLUB_IDENTITY_UPGRADE_COST.get(current_level, 0)))
+		CLUB_BADGE_ACTION_SWITCH_UPGRADE:
+			if current_level >= CLUB_IDENTITY_MAX_BADGE_LEVEL:
+				return 0
+			var switch_cost := 0 if (equipped != "" and bid == equipped) else maxi(0, int(CLUB_IDENTITY_SWITCH_COST.get(current_level, 0)))
+			var upgrade_cost := maxi(0, int(CLUB_IDENTITY_UPGRADE_COST.get(current_level, 0)))
+			var adjustment := 0 if switch_cost <= 0 else maxi(0, int(CLUB_IDENTITY_SWITCH_UPGRADE_ADJUSTMENT.get(current_level, 0)))
+			return switch_cost + upgrade_cost + adjustment
+	return 0
+
+
+static func apply_club_badge_action(save: Dictionary, badge_id: String, action: String) -> bool:
+	ensure_progression_wallet_schema(save)
+	var bid := _normalize_club_badge_id(badge_id)
+	if bid == "":
+		return false
+	var equipped := get_equipped_club_badge_id(save)
+	if equipped == "":
+		equipped = bid
+	var current_level := clampi(get_club_badge_level(save, equipped), 1, CLUB_IDENTITY_MAX_BADGE_LEVEL)
+	var target_level := current_level
+	if action == CLUB_BADGE_ACTION_UPGRADE or action == CLUB_BADGE_ACTION_SWITCH_UPGRADE:
+		if current_level >= CLUB_IDENTITY_MAX_BADGE_LEVEL:
+			return false
+		target_level = current_level + 1
+	var cost := get_badge_action_cost(save, bid, action)
+	if cost > 0 and not spend_tokens(save, cost, "club_badge_" + action):
+		return false
+	var identity: Dictionary = save["club_identity"] as Dictionary
+	var owned: Array = identity.get("owned_badges", []) as Array
+	if not owned.has(bid):
+		owned.append(bid)
+	identity["owned_badges"] = owned
+	var levels: Dictionary = identity.get("badge_levels", {}) as Dictionary
+	levels[bid] = clampi(target_level, 1, CLUB_IDENTITY_MAX_BADGE_LEVEL)
+	identity["badge_levels"] = levels
+	identity["equipped_badge_id"] = bid
+	save["club_identity"] = identity
+	_sync_legacy_club_crest_fields(save)
+	return true
+
+
+static func get_club_badge_texture_path(save: Dictionary, badge_id: String) -> String:
+	ensure_progression_wallet_schema(save)
+	var bid := _normalize_club_badge_id(badge_id)
+	if bid == "":
+		return ""
+	return get_club_badge_texture_path_for_level(bid, get_club_badge_level(save, bid))
+
+
+static func get_club_badge_texture_path_for_level(badge_id: String, level: int) -> String:
+	var bid := _normalize_club_badge_id(badge_id)
+	if bid == "":
+		return ""
+	var idx := int(bid.replace("starter_crest_", ""))
+	if idx <= 0:
+		return ""
+	if level >= 3:
+		var lv3_path := "res://assets/images/blasons/blason_%d_lv3.png" % idx
+		if ResourceLoader.exists(lv3_path):
+			return lv3_path
+	if level >= 2:
+		var lv2_path := "res://assets/images/blasons/blason_%d_lv2.png" % idx
+		if ResourceLoader.exists(lv2_path):
+			return lv2_path
+	var base_path := "res://assets/images/blasons/blason_%d.png" % idx
+	if ResourceLoader.exists(base_path):
+		return base_path
+	return ""
+
+
+static func equip_club_badge(save: Dictionary, badge_id: String) -> bool:
+	ensure_progression_wallet_schema(save)
+	var bid := _normalize_club_badge_id(badge_id)
+	if bid == "":
+		return false
+	if not is_club_badge_owned(save, bid):
+		return false
+	(save["club_identity"] as Dictionary)["equipped_badge_id"] = bid
+	_sync_legacy_club_crest_fields(save)
+	return true
+
+
+static func unlock_club_badge(save: Dictionary, badge_id: String) -> bool:
+	return apply_club_badge_action(save, badge_id, CLUB_BADGE_ACTION_SWITCH)
+
+
+static func upgrade_club_badge(save: Dictionary, badge_id: String) -> bool:
+	return apply_club_badge_action(save, badge_id, CLUB_BADGE_ACTION_UPGRADE)
+
+
 
 static func get_display_crest_path(save: Dictionary, team_name: String) -> String:
+	ensure_progression_wallet_schema(save)
 	var tn: String = team_name.strip_edges()
 	var my_team: String = str(save.get("team_name", save.get("club_name", ""))).strip_edges()
 	var cid: String = ""
@@ -298,7 +593,7 @@ static func get_display_crest_path(save: Dictionary, team_name: String) -> Strin
 		if ResourceLoader.exists(cup_path):
 			return cup_path
 
-	var crest_level: int = int(save.get("club_crest_level", 1))
+	var crest_level: int = get_club_badge_level(save, cid) if is_my_team else int(save.get("club_crest_level", 1))
 
 	if is_my_team and crest_level >= 3:
 		var lv3_path: String = "res://assets/images/blasons/blason_%d_lv3.png" % idx
@@ -367,6 +662,7 @@ static func spend_tokens(save: Dictionary, amount: int, reason: String = "") -> 
 		return false
 	wallet["tokens"] = cur - spend
 	save["wallet"] = wallet
+	_append_token_history(save, -spend, reason)
 	if reason != "":
 		print("[ECON][TOKENS] -", spend, " reason=", reason, " => tokens=", int(wallet["tokens"]))
 	return true
@@ -375,9 +671,12 @@ static func spend_tokens(save: Dictionary, amount: int, reason: String = "") -> 
 static func add_tokens(save: Dictionary, amount: int, reason: String = "") -> Dictionary:
 	ensure_progression_wallet_schema(save)
 	var gain := maxi(0, int(amount))
+	if gain <= 0:
+		return save
 	var wallet: Dictionary = save["wallet"] as Dictionary
 	wallet["tokens"] = maxi(0, int(wallet.get("tokens", 0))) + gain
 	save["season_tokens_earned"] = maxi(0, int(save.get("season_tokens_earned", 0))) + gain
+	_append_token_history(save, gain, reason)
 	if reason != "":
 		print("[ECON][TOKENS] +", gain, " reason=", reason, " => tokens=", int(wallet["tokens"]), " season_tokens_earned=", int(save["season_tokens_earned"]))
 	return save
@@ -403,6 +702,7 @@ static func spend_euros_or_tokens(save: Dictionary, euros_cost: int, tokens_cost
 		if tokens_have < tokens_needed:
 			return false
 		wallet["tokens"] = tokens_have - tokens_needed
+		_append_token_history(save, -tokens_needed, reason)
 		if reason != "":
 			print("[ECON][TOKENS] -", tokens_needed, " reason=", reason, " => tokens=", int(wallet["tokens"]))
 		return true
@@ -420,6 +720,7 @@ static func spend_euros_or_tokens(save: Dictionary, euros_cost: int, tokens_cost
 
 	wallet["euros"] = 0
 	wallet["tokens"] = tokens_have - tokens_total_needed
+	_append_token_history(save, -tokens_total_needed, reason)
 	if reason != "":
 		print("[ECON][MIX] euros=-", euros_have, " tokens=-", tokens_total_needed, " reason=", reason, " => tokens=", int(wallet["tokens"]))
 	return true
@@ -1192,6 +1493,7 @@ static func reset_finance_for_new_club(save: Dictionary) -> void:
 	save["total_sponsors"] = 0
 	save["total_tournois"] = 0
 	save["tournois_fees_total"] = 0
+	save.erase("active_sponsor_contract")
 
 	# Salaires (cumul + par match)
 	if not save.has("total_salaires"):

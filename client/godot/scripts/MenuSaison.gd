@@ -4,6 +4,7 @@ const BM_TEST_FORCE_MERCATO_OPEN := false # TEST TEMPORAIRE: remettre à false a
 const PL = preload("res://scripts/PlayerLife.gd")
 const Selection := preload("res://scripts/Selection.gd")
 const TuningData := preload("res://scripts/TuningData.gd")
+const SponsorDataRef := preload("res://scripts/SponsorData.gd")
 const TOKEN_ICON := preload("res://assets/images/token.png")
 
 
@@ -794,6 +795,162 @@ func _bm_maybe_show_climb_standings_goal_match17() -> void:
 	tw.tween_callback(overlay.queue_free)
 
 
+func _bm_show_auto_info_popup(title_key: String, body_key: String, overlay_name: String, on_closed: Callable = Callable()) -> void:
+	var vp: Vector2 = get_viewport_rect().size
+	var mobile := _bm_saison_is_mobile_layout()
+
+	var overlay := Control.new()
+	overlay.name = overlay_name
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.z_index = 30000
+	overlay.set_as_top_level(true)
+	overlay.z_as_relative = false
+	overlay.global_position = Vector2.ZERO
+	overlay.size = vp
+	var overlays := get_node_or_null("Overlays") as Control
+	if overlays != null:
+		overlays.add_child(overlay)
+		overlay.move_to_front()
+	else:
+		add_child(overlay)
+		overlay.move_to_front()
+
+	var dark := ColorRect.new()
+	dark.name = overlay_name + "Backdrop"
+	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dark.color = Color(0, 0, 0, 0.38)
+	dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(dark)
+
+	var card := Panel.new()
+	card.name = overlay_name + "Card"
+	var card_size := Vector2(780, 220)
+	if mobile:
+		card_size = Vector2(minf(vp.x * 0.88, 720.0), 210.0)
+	card.size = card_size
+	card.position = (vp - card_size) * 0.5
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.025, 0.03, 0.055, 0.94)
+	sb.border_width_left = 3
+	sb.border_width_top = 3
+	sb.border_width_right = 3
+	sb.border_width_bottom = 3
+	sb.border_color = Color(1.0, 0.78, 0.22, 0.88)
+	sb.corner_radius_top_left = 22
+	sb.corner_radius_top_right = 22
+	sb.corner_radius_bottom_left = 22
+	sb.corner_radius_bottom_right = 22
+	sb.shadow_color = Color(0, 0, 0, 0.45)
+	sb.shadow_size = 22
+	sb.shadow_offset = Vector2(0, 8)
+	card.add_theme_stylebox_override("panel", sb)
+	card.z_index = 1
+	overlay.add_child(card)
+
+	var lbl := Label.new()
+	lbl.text = tr(title_key).replace("\\n", "\n") + "\n" + tr(body_key).replace("\\n", "\n")
+	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lbl.add_theme_font_size_override("font_size", 38 if not mobile else 32)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.86, 0.28, 1.0))
+	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 1.0))
+	lbl.add_theme_constant_override("outline_size", 8)
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(lbl)
+
+	card.scale = Vector2(0.92, 0.92)
+	card.pivot_offset = card.size * 0.5
+
+	var tw := create_tween()
+	tw.tween_property(card, "scale", Vector2.ONE, 0.22)
+	tw.tween_interval(4.0)
+	tw.tween_property(overlay, "modulate:a", 0.0, 0.45)
+	tw.tween_callback(func():
+		if on_closed.is_valid():
+			on_closed.call()
+		if is_instance_valid(overlay):
+			overlay.queue_free()
+	)
+
+
+func _bm_maybe_show_sponsors_intro_popup() -> bool:
+	var save: Dictionary = PL.load_savegame()
+	if typeof(save) != TYPE_DICTIONARY:
+		return false
+	if bool(save.get("intro_popup_sponsors_seen", false)):
+		return false
+	if int(save.get("season_round", 0)) < 7:
+		return false
+	_bm_show_auto_info_popup("popup.sponsors.title", "popup.sponsors.body", "SponsorsIntroOverlay", func():
+		var save_close: Dictionary = PL.load_savegame()
+		if typeof(save_close) != TYPE_DICTIONARY:
+			return
+		save_close["intro_popup_sponsors_seen"] = true
+		save_close["sponsors_unlocked"] = true
+		PL.write_savegame(save_close)
+	)
+	return true
+
+
+func _bm_maybe_show_club_tokens_intro_popup() -> bool:
+	# Club Tokens intro is now shown on Management, after returning from Season.
+	return false
+
+
+func _bm_maybe_show_sponsors_expired_popup() -> bool:
+	var save: Dictionary = PL.load_savegame()
+	if typeof(save) != TYPE_DICTIONARY:
+		return false
+	if not bool(save.get("pending_sponsors_expired_popup", false)):
+		return false
+	save["pending_sponsors_expired_popup"] = false
+	save["sponsors_unlocked"] = true
+	save["intro_popup_sponsors_seen"] = true
+	PL.write_savegame(save)
+	_bm_show_auto_info_popup("popup.sponsors_expired.title", "popup.sponsors_expired.body", "SponsorsExpiredOverlay")
+	return true
+
+
+func _bm_maybe_show_pending_sponsors_popup() -> void:
+	if _bm_maybe_show_sponsors_expired_popup():
+		return
+	if _bm_maybe_show_club_tokens_intro_popup():
+		return
+	_bm_maybe_show_sponsors_intro_popup()
+
+
+func _bm_show_pending_tokens_or_intro_popups() -> void:
+	if get_node_or_null("MissionTokensRewardPopup") != null:
+		return
+	if _mission_tokens_popup_pending > 0 or not _mission_tokens_popup_pending_labels.is_empty():
+		call_deferred("_bm_flush_pending_mission_tokens_popup_after_frame")
+		return
+	_bm_maybe_show_pending_sponsors_popup()
+
+
+func _bm_show_pending_intro_after_token_reward_popup_close() -> void:
+	await get_tree().process_frame
+	var guard := 0
+	while get_node_or_null("MissionTokensRewardPopup") != null and guard < 8:
+		guard += 1
+		await get_tree().process_frame
+	_bm_maybe_show_pending_sponsors_popup()
+
+
+func _bm_maybe_show_pending_intro_after_new_season() -> void:
+	await get_tree().process_frame
+	var guard := 0
+	while get_node_or_null("SeasonRewardPopup") != null and guard < 12:
+		guard += 1
+		await get_tree().create_timer(0.5).timeout
+	_bm_maybe_show_pending_sponsors_popup()
+
+
 func _refresh_standings_graph() -> void:
 	if standings_graph_panel == null:
 		return
@@ -1068,6 +1225,7 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 	btn.position = Vector2(120, 235)
 	btn.pressed.connect(func():
 		popup.queue_free()
+		call_deferred("_bm_show_pending_intro_after_token_reward_popup_close")
 	)
 	card.add_child(btn)
 
@@ -1075,6 +1233,12 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 
 
 func _bm_flush_pending_mission_tokens_popup() -> void:
+	if _mission_tokens_popup_pending <= 0 and _mission_tokens_popup_pending_labels.is_empty():
+		var save_pending_tokens: Dictionary = PL.load_savegame()
+		if typeof(save_pending_tokens) == TYPE_DICTIONARY:
+			_mission_tokens_popup_pending = maxi(0, int(save_pending_tokens.get("pending_mission_tokens_reward_popup", 0)))
+			if save_pending_tokens.has("pending_mission_tokens_reward_labels") and typeof(save_pending_tokens["pending_mission_tokens_reward_labels"]) == TYPE_ARRAY:
+				_mission_tokens_popup_pending_labels = (save_pending_tokens["pending_mission_tokens_reward_labels"] as Array).duplicate()
 	if _mission_tokens_popup_pending <= 0 and _mission_tokens_popup_pending_labels.is_empty():
 		return
 	if get_node_or_null("LastMatchFinancePopup") != null:
@@ -1084,6 +1248,11 @@ func _bm_flush_pending_mission_tokens_popup() -> void:
 		return
 	var tokens_gain := maxi(1, _mission_tokens_popup_pending)
 	_mission_tokens_popup_pending = 0
+	var save_clear_pending_tokens: Dictionary = PL.load_savegame()
+	if typeof(save_clear_pending_tokens) == TYPE_DICTIONARY:
+		save_clear_pending_tokens.erase("pending_mission_tokens_reward_popup")
+		save_clear_pending_tokens.erase("pending_mission_tokens_reward_labels")
+		PL.write_savegame(save_clear_pending_tokens)
 	call_deferred("_show_mission_tokens_reward_popup", tokens_gain)
 
 
@@ -1412,7 +1581,6 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	btn.pressed.connect(func():
 		var tree := get_tree()
 		popup.queue_free()
-		call_deferred("_bm_flush_pending_mission_tokens_popup_after_frame")
 		var round_cta_now: int = _round_cta
 		var save_cta_now: Dictionary = PL.load_savegame()
 		if typeof(save_cta_now) == TYPE_DICTIONARY:
@@ -1428,6 +1596,8 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 		if round_cta_now >= int(SeasonState.total_matchs_saison):
 			call_deferred("_open_end_season_popup")
 			return
+
+		call_deferred("_bm_show_pending_tokens_or_intro_popups")
 
 		if _open_finances_cta and tree != null and ResourceLoader.exists("res://scenes/Finances.tscn"):
 			tree.call_deferred("change_scene_to_file", "res://scenes/Finances.tscn")
@@ -1614,6 +1784,8 @@ func _ready() -> void:
 				call_deferred("_open_end_season_popup")
 			elif round_popup_gate == 18:
 				call_deferred("_bm_maybe_show_climb_standings_goal_match17")
+			else:
+				call_deferred("_bm_show_pending_tokens_or_intro_popups")
 	# BM_SHOP_RESTOCK_NOTICE_AFTER_FINANCE_POPUP_V1: déclenché après fermeture du popup de fin de match
 	for _nm in ["PopularityBadge", "PopularityBadge2"]:
 		var _pop_lbl := get_node_or_null("UI/%s" % _nm) as Label
@@ -1907,6 +2079,7 @@ func _prepare_new_season() -> void:
 	var end_summary_for_crest: Dictionary = _get_end_season_summary()
 	if int(end_summary_for_crest.get("rank", 12)) == 1:
 		save["club_season_winner_badge_until_season"] = current_season_number + 1
+	SponsorDataRef.advance_season_contract(save)
 	save["season_number"] = current_season_number + 1
 	save["season_id"] = "season_" + str(int(save["season_number"]))
 
@@ -2140,6 +2313,7 @@ func _on_confirm_new_season_pressed() -> void:
 	_close_end_season_popup()
 	_show_pending_season_reward_popup_after_end_season()
 	_prepare_new_season()
+	call_deferred("_bm_maybe_show_pending_intro_after_new_season")
 
 
 func _open_end_season_popup() -> void:
@@ -3250,8 +3424,14 @@ func _missions_auto_claim_reached(save: Dictionary, level_missions: Array, count
 		if tokens_gain > 0:
 			save = PL.add_tokens(save, tokens_gain, "missions_auto_claim")
 			_mission_tokens_popup_pending += tokens_gain
+			var pending_reward_labels: Array = []
+			if save.has("pending_mission_tokens_reward_labels") and typeof(save["pending_mission_tokens_reward_labels"]) == TYPE_ARRAY:
+				pending_reward_labels = (save["pending_mission_tokens_reward_labels"] as Array).duplicate()
 			for label_pending in pending_labels:
 				_mission_tokens_popup_pending_labels.append(label_pending)
+				pending_reward_labels.append(label_pending)
+			save["pending_mission_tokens_reward_popup"] = maxi(0, int(save.get("pending_mission_tokens_reward_popup", 0))) + tokens_gain
+			save["pending_mission_tokens_reward_labels"] = pending_reward_labels
 		PL.write_savegame(save)
 
 	return tokens_gain
@@ -3406,6 +3586,13 @@ func _on_claim_mission_pressed() -> void:
 	save["missions_progress"] = mp
 	if reward_tokens > 0:
 		save = PL.add_tokens(save, reward_tokens, "mission_" + mid)
+		var claim_label := _missions_label_text(cur)
+		var pending_claim_labels: Array = []
+		if save.has("pending_mission_tokens_reward_labels") and typeof(save["pending_mission_tokens_reward_labels"]) == TYPE_ARRAY:
+			pending_claim_labels = (save["pending_mission_tokens_reward_labels"] as Array).duplicate()
+		pending_claim_labels.append(claim_label)
+		save["pending_mission_tokens_reward_popup"] = maxi(0, int(save.get("pending_mission_tokens_reward_popup", 0))) + reward_tokens
+		save["pending_mission_tokens_reward_labels"] = pending_claim_labels
 	PL.write_savegame(save)
 	if reward_tokens > 0:
 		_mission_tokens_popup_pending += reward_tokens

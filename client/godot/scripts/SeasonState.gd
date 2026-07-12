@@ -89,6 +89,74 @@ func _ensure_standings_initialized(user_team_name: String) -> void:
 			"DIFF": 0
 		}
 
+func rebuild_standings_from_season_results(save: Dictionary, user_team_name: String = "") -> void:
+	var season_results: Dictionary = {}
+	if save.has("season_results") and typeof(save["season_results"]) == TYPE_DICTIONARY:
+		season_results = save["season_results"] as Dictionary
+	if season_results.is_empty():
+		return
+
+	var previous_matchs_joues: int = int(matchs_joues)
+	standings = {}
+	season_results_by_round.clear()
+	_ensure_standings_initialized(user_team_name)
+
+	var round_keys: Array = season_results.keys()
+	round_keys.sort_custom(func(a, b):
+		return int(str(a)) < int(str(b))
+	)
+
+	for round_key in round_keys:
+		var round_results_any: Variant = season_results[round_key]
+		if typeof(round_results_any) != TYPE_DICTIONARY:
+			continue
+		var round_results: Dictionary = round_results_any as Dictionary
+		matchs_joues = int(str(round_key))
+		for result_key in round_results.keys():
+			var result_any: Variant = round_results[result_key]
+			if typeof(result_any) != TYPE_DICTIONARY:
+				continue
+			var result: Dictionary = result_any as Dictionary
+			var parts: PackedStringArray = str(result_key).split("||")
+			if parts.size() != 2:
+				continue
+			register_match_result(
+				str(parts[0]),
+				str(parts[1]),
+				int(result.get("score_dom", 0)),
+				int(result.get("score_ext", 0)),
+				user_team_name
+			)
+
+	matchs_joues = previous_matchs_joues
+
+func rebuild_standings_from_season_results_if_needed(save: Dictionary, user_team_name: String = "") -> void:
+	if standings.size() > 0:
+		return
+	if not save.has("season_results") or typeof(save["season_results"]) != TYPE_DICTIONARY:
+		return
+	if (save["season_results"] as Dictionary).is_empty():
+		return
+	rebuild_standings_from_season_results(save, user_team_name)
+
+func hydrate_from_save(save: Dictionary, user_team_name: String = "") -> void:
+	matchs_joues = int(save.get("season_round", matchs_joues))
+	if save.has("ranking_history") and typeof(save["ranking_history"]) == TYPE_ARRAY:
+		ranking_history.clear()
+		for value in save["ranking_history"]:
+			ranking_history.append(int(value))
+
+	if user_team_name.strip_edges() == "":
+		user_team_name = str(save.get("team_name", "")).strip_edges()
+		if user_team_name == "" and save.has("club") and typeof(save["club"]) == TYPE_DICTIONARY:
+			user_team_name = str((save["club"] as Dictionary).get("name", "")).strip_edges()
+
+	if save.has("season_results") and typeof(save["season_results"]) == TYPE_DICTIONARY and not (save["season_results"] as Dictionary).is_empty():
+		rebuild_standings_from_season_results(save, user_team_name)
+	else:
+		standings = {}
+		season_results_by_round.clear()
+
 func register_match_result(dom_team: String, ext_team: String, score_dom: int, score_ext: int, user_team_name: String) -> void:
 	var round_index: int = int(matchs_joues)
 	var result_key := str(dom_team) + "||" + str(ext_team)

@@ -2,6 +2,7 @@ extends Control
 
 const BM_TEST_FORCE_MERCATO_OPEN := false # TEST TEMPORAIRE: remettre à false après tests
 const SHOP_DEBUG_VISIBLE := false
+const BM_DEBUG_FORCE_CLUB_TOKENS_VISIBLE := false # DEBUG TEMPORAIRE: true uniquement pour tester Club Tokens dès le début
 const PL = preload("res://scripts/PlayerLife.gd")
 
 
@@ -67,6 +68,7 @@ const DEBUG_ROUNDTRIP_KEY := KEY_F9
 @onready var BtnMercato: Button = get_node_or_null("UI/BtnMercato") as Button
 @onready var BtnStadium: Button = get_node_or_null("UI/BtnStadium") as Button
 @onready var BtnFinances: Button = get_node_or_null("UI/BtnFinances") as Button
+@onready var BtnSponsors: Button = get_node_or_null("UI/BtnSponsors") as Button
 @onready var BtnMyTeam: Button = get_node_or_null("UI/BtnMyTeam") as Button
 @onready var BtnCoachs: Button = get_node_or_null("UI/BtnCoachs") as Button
 @onready var BtnShopTokensDebug: Button = get_node_or_null("UI/BtnShopTokensDebug") as Button
@@ -148,7 +150,7 @@ func _bm_scale_mobile_button(btn: Button) -> void:
 
 
 func _bm_apply_mobile_management_buttons_plus10() -> void:
-	for btn in [BtnSave, BtnMatch, BtnMercato, BtnStadium, BtnFinances, BtnMyTeam, BtnCoachs, btn_close_bienvenue_club]:
+	for btn in [BtnSave, BtnMatch, BtnMercato, BtnStadium, BtnFinances, BtnSponsors, BtnMyTeam, BtnCoachs, btn_close_bienvenue_club]:
 		_bm_scale_mobile_button(btn)
 
 
@@ -321,7 +323,7 @@ func _bm_club_tr_or_fallback(key: String, fallback: String = "") -> String:
 func _bm_club_popup_intro_text() -> String:
 	var title := _bm_club_tr_or_fallback("popup_intro_title", "Build Your Roster")
 	var body := _bm_club_tr_or_fallback("popup_intro_build_body", "Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.").replace("\\n", "\n")
-	return "[center][font_size=34][b]" + title + "[/b][/font_size][/center]\n\n" + body
+	return "[center][font_size=34][b]" + title + "[/b][/font_size][/center]\n\n[font_size=27][color=#EAF2FF]" + body + "[/color][/font_size]"
 
 
 func _bm_popup_cta_text() -> String:
@@ -421,10 +423,14 @@ func _bm_apply_post_selection_hidden_buttons() -> void:
 	var d_any: Variant = PL.load_savegame()
 	var mercato_unlocked: bool = false
 	var finances_unlocked: bool = false
+	var stadium_unlocked: bool = false
+	var sponsors_unlocked: bool = false
 	if typeof(d_any) == TYPE_DICTIONARY:
 		var d: Dictionary = d_any as Dictionary
 		mercato_unlocked = (int(d.get("season_number", 1)) >= 2)
 		finances_unlocked = bool(d.get("early_flow_finances_unlocked", false))
+		stadium_unlocked = bool(d.get("early_flow_stadium_unlocked", false))
+		sponsors_unlocked = bool(d.get("sponsors_unlocked", false))
 
 	if BtnMercato != null:
 		BtnMercato.visible = mercato_unlocked
@@ -434,8 +440,14 @@ func _bm_apply_post_selection_hidden_buttons() -> void:
 		BtnFinances.visible = (not hide_now) and finances_unlocked
 		BtnFinances.disabled = not finances_unlocked
 		BtnFinances.mouse_filter = Control.MOUSE_FILTER_STOP if finances_unlocked else Control.MOUSE_FILTER_IGNORE
+	if BtnSponsors != null:
+		BtnSponsors.visible = sponsors_unlocked
+		BtnSponsors.disabled = not sponsors_unlocked
+		BtnSponsors.mouse_filter = Control.MOUSE_FILTER_STOP if sponsors_unlocked else Control.MOUSE_FILTER_IGNORE
 	if BtnStadium != null:
-		BtnStadium.visible = !hide_now
+		BtnStadium.visible = (not hide_now) and stadium_unlocked
+		BtnStadium.disabled = not stadium_unlocked
+		BtnStadium.mouse_filter = Control.MOUSE_FILTER_STOP if stadium_unlocked else Control.MOUSE_FILTER_IGNORE
 
 
 func _bm_apply_mercato_visibility_management(show_club: bool = true) -> void:
@@ -460,6 +472,9 @@ func _bm_apply_stadium_unlock_from_save() -> void:
 		BtnStadium.mouse_filter = Control.MOUSE_FILTER_STOP
 		print("[MENU][EARLY_FLOW] BtnStadium visible=true (unlocked)")
 	elif BtnStadium != null:
+		BtnStadium.visible = false
+		BtnStadium.disabled = true
+		BtnStadium.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		print("[MENU][EARLY_FLOW] BtnStadium unchanged (locked)")
 
 func _bm_apply_finances_unlock_from_save() -> void:
@@ -560,6 +575,8 @@ func _bm_management_ensure_menu_music() -> void:
 		am.call("play_music", "res://audio/music/menu.mp3", true, false)
 
 func _ready() -> void:
+	_bm_reconcile_club_tokens_unlock_on_menu_load()
+	call_deferred("_bm_maybe_show_club_tokens_intro_popup_on_management")
 	call_deferred("_bm_management_ensure_menu_music")
 
 	call_deferred("_bm_maybe_show_climb_standings_goal_once")
@@ -746,10 +763,15 @@ func _ready() -> void:
 		lbl_bienvenue_club.bbcode_enabled = true
 		lbl_bienvenue_club.fit_content = false
 		lbl_bienvenue_club.text = _bm_club_popup_intro_text()
-		lbl_bienvenue_club.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl_bienvenue_club.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		lbl_bienvenue_club.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		lbl_bienvenue_club.position.y -= 8
 	if popup_bienvenue_club != null:
+		var bienvenue_sb := popup_bienvenue_club.get_theme_stylebox("panel")
+		if bienvenue_sb != null and bienvenue_sb is StyleBoxFlat:
+			var bienvenue_flat := (bienvenue_sb as StyleBoxFlat).duplicate() as StyleBoxFlat
+			bienvenue_flat.bg_color = Color(0, 0, 0, 0.94)
+			popup_bienvenue_club.add_theme_stylebox_override("panel", bienvenue_flat)
 		popup_bienvenue_club.size = Vector2(popup_bienvenue_club.size.x + 90.0, popup_bienvenue_club.size.y * 0.85)
 		var save := PL.load_savegame()
 		var popup_seen := bool(save.get("popup_bienvenue_club_deja_vu", false))
@@ -776,6 +798,8 @@ func _ready() -> void:
 			BtnStadium.text = "Stadium"
 	if BtnFinances != null:
 		BtnFinances.text = tr("menu.finances")
+	if BtnSponsors != null:
+		BtnSponsors.text = tr("menu.sponsors")
 	if BtnMyTeam != null:
 		BtnMyTeam.text = "My team"
 	if BtnCoachs != null:
@@ -830,6 +854,8 @@ func _ready() -> void:
 		BtnStadium.pressed.connect(_on_btn_stadium)
 	if BtnFinances != null and not BtnFinances.pressed.is_connected(_on_btn_finances):
 		BtnFinances.pressed.connect(_on_btn_finances)
+	if BtnSponsors != null and not BtnSponsors.pressed.is_connected(_on_btn_sponsors):
+		BtnSponsors.pressed.connect(_on_btn_sponsors)
 	if BtnMyTeam != null and not BtnMyTeam.pressed.is_connected(_on_btn_my_team):
 		BtnMyTeam.pressed.connect(_on_btn_my_team)
 	if BtnCoachs != null and not BtnCoachs.pressed.is_connected(_on_btn_coachs):
@@ -894,6 +920,17 @@ func _set_network_state(s: String) -> void:
 		_start_offline_poll()
 	elif _network_state == "ONLINE":
 		_offline_poll_running = false
+
+
+func _is_web_guest_auth_pending() -> bool:
+	if not OS.has_feature("web"):
+		return false
+	var n: Node = self
+	while n != null:
+		if bool(n.get("_web_guest_auth_pending")):
+			return true
+		n = n.get_parent()
+	return false
 
 
 func _start_offline_poll() -> void:
@@ -1174,6 +1211,10 @@ func _on_auth_completed(result: int, response_code: int, _headers: PackedStringA
 func _try_cloud_load() -> void:
 	var access: String = str(Session.access_token).strip_edges()
 	if access == "":
+		if _is_web_guest_auth_pending():
+			_set_status("Status: Starting online session...")
+			_start_offline_poll()
+			return
 		_set_status("Status: Pas connecté")
 		_set_network_state("OFFLINE")
 		_start_offline_poll()
@@ -1363,6 +1404,68 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		if typeof(parsed) == TYPE_DICTIONARY:
 			var dload: Dictionary = parsed as Dictionary
 			is_empty_load = (bool(dload.get("found", true)) == false)
+			if FileAccess.file_exists(FILE_NEW_CLUB_PENDING_CLOUD):
+				print("[CLOUD_GUARD][HARD] skip cloud load apply because new club is pending")
+			else:
+				Session.set_cloud_meta(dload.get("rev", 0), dload.get("checksum", ""))
+				var cloud_ck_load: String = str(dload.get("checksum", ""))
+				var local_ck_before_load: String = _sha256_canonical_from_file(FILE_SAVEGAME)
+				var should_apply_load: bool = true
+				var local_exists_load: bool = FileAccess.file_exists(FILE_SAVEGAME)
+				if local_exists_load:
+					print("[APPLY_SKIP][LOCAL_PRIORITY] local save exists -> skip cloud overwrite")
+					should_apply_load = false
+				if cloud_ck_load != "" and local_ck_before_load != "":
+					should_apply_load = (cloud_ck_load != local_ck_before_load)
+				if dload.has("blob"):
+					var blobv_load: Variant = dload.get("blob")
+					if bool(dload.get("found", true)) == false:
+						print("[APPLY_SKIP] cloud found=false ignored")
+						should_apply_load = false
+					if typeof(blobv_load) == TYPE_NIL:
+						print("[APPLY_SKIP] cloud blob=null ignored")
+						should_apply_load = false
+					if typeof(blobv_load) == TYPE_DICTIONARY and (blobv_load as Dictionary).is_empty():
+						print("[APPLY_SKIP] empty cloud blob ignored")
+						should_apply_load = false
+					if typeof(blobv_load) == TYPE_DICTIONARY:
+						var blobd_load: Dictionary = blobv_load as Dictionary
+						var cloud_tn_load: String = str(blobd_load.get("team_name", "")).strip_edges()
+						var local_now_load: Variant = _read_json_file(FILE_SAVEGAME)
+						var local_tn_load: String = ""
+						if typeof(local_now_load) == TYPE_DICTIONARY:
+							local_tn_load = str((local_now_load as Dictionary).get("team_name", "")).strip_edges()
+						if local_tn_load != "" and cloud_tn_load == "":
+							print("[APPLY_SKIP] cloud empty team_name ignored (local team_name kept)")
+							should_apply_load = false
+						_save_text_file(FILE_CLOUD_BLOB_JSON, JSON.stringify(blobv_load, "\t"))
+						if should_apply_load:
+							_save_text_file(FILE_SAVEGAME, JSON.stringify(blobv_load, "\t"))
+							print("[CLOUD][LOAD] blob applied")
+							var ss_load := get_node_or_null("/root/SeasonState")
+							if ss_load != null and ss_load.has_method("hydrate_from_save"):
+								ss_load.call("hydrate_from_save", blobd_load)
+							_just_loaded_from_cloud = true
+							_update_club_name_label_from_save()
+						else:
+							print("[APPLY] skipped (same checksum)")
+					else:
+						_save_text_file(FILE_CLOUD_BLOB_TXT, str(blobv_load))
+						if should_apply_load:
+							_save_text_file(FILE_SAVEGAME, str(blobv_load))
+							print("[CLOUD][LOAD] blob applied")
+							_update_club_name_label_from_save()
+						else:
+							print("[APPLY] skipped (same checksum)")
+				var local_ck_after_load: String = _sha256_canonical_from_file(FILE_SAVEGAME)
+				_save_text_file(FILE_CLOUD_LAST_APPLY_JSON, JSON.stringify({
+					"applied_at_unix": Time.get_unix_time_from_system(),
+					"cloud_rev": int(Session.cloud_rev),
+					"cloud_checksum": str(Session.get("cloud_checksum")),
+					"local_checksum_before": local_ck_before_load,
+					"local_checksum_after": local_ck_after_load,
+					"should_apply": should_apply_load
+				}, "\t"))
 
 		if is_empty_load and (not _did_auto_save):
 			var local_ck_load: String = _sha256_canonical_from_file(FILE_SAVEGAME)
@@ -1371,6 +1474,8 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 			else:
 				_did_auto_save = true
 				call_deferred("_try_cloud_save_from_local")
+		else:
+			call_deferred("_try_cloud_save_from_local")
 
 		return
 
@@ -1384,8 +1489,8 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 			var d: Dictionary = parsed as Dictionary
 
 			if FileAccess.file_exists(FILE_NEW_CLUB_PENDING_CLOUD):
-				print("[CLOUD_GUARD][HARD] skip entire cloud load because new club is pending")
-				return
+				DirAccess.remove_absolute(ProjectSettings.globalize_path(FILE_NEW_CLUB_PENDING_CLOUD))
+				print("[CLOUD_GUARD][HARD] cleared after cloud save")
 
 			Session.set_cloud_meta(d.get("rev", 0), d.get("checksum", ""))
 
@@ -1456,14 +1561,17 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 						print("[APPLY_SKIP] cloud empty team_name ignored (local team_name kept)")
 						should_apply = false
 
-				if typeof(blobv) == TYPE_DICTIONARY or typeof(blobv) == TYPE_ARRAY:
-					_save_text_file(FILE_CLOUD_BLOB_JSON, JSON.stringify(blobv, "\t"))
-					if should_apply:
-						_save_text_file(FILE_SAVEGAME, JSON.stringify(blobv, "\t"))
-						print("[APPLY] wrote local savegame.json from cloud blob")
-						_just_loaded_from_cloud = true
-					else:
-						print("[APPLY] skipped (same checksum)")
+					if typeof(blobv) == TYPE_DICTIONARY or typeof(blobv) == TYPE_ARRAY:
+						_save_text_file(FILE_CLOUD_BLOB_JSON, JSON.stringify(blobv, "\t"))
+						if should_apply:
+							_save_text_file(FILE_SAVEGAME, JSON.stringify(blobv, "\t"))
+							print("[APPLY] wrote local savegame.json from cloud blob")
+							var ss := get_node_or_null("/root/SeasonState")
+							if ss != null and ss.has_method("hydrate_from_save") and typeof(blobv) == TYPE_DICTIONARY:
+								ss.call("hydrate_from_save", blobv as Dictionary)
+							_just_loaded_from_cloud = true
+						else:
+							print("[APPLY] skipped (same checksum)")
 				else:
 					_save_text_file(FILE_CLOUD_BLOB_TXT, str(blobv))
 					if should_apply:
@@ -1975,6 +2083,21 @@ func _go_finances() -> void:
 	print("[MENU] change_scene_to_file err=", err)
 
 
+func _on_btn_sponsors() -> void:
+	print("[MENU] click Sponsors -> go Sponsors")
+	call_deferred("_go_sponsors")
+
+func _go_sponsors() -> void:
+	var tree := get_tree()
+	if tree == null:
+		print("[MENU][ERR] get_tree() is null")
+		return
+	var path := "res://scenes/Sponsors.tscn"
+	print("[MENU] change_scene_to_file path=", path, " exists=", ResourceLoader.exists(path))
+	var err := tree.change_scene_to_file(path)
+	print("[MENU] change_scene_to_file err=", err)
+
+
 func _on_btn_my_team() -> void:
 	print("[MENU] My Team clicked")
 	var tree := get_tree()
@@ -2116,6 +2239,8 @@ func _apply_i18n() -> void:
 		BtnMercato.text = tr("menu.mercato")
 	if BtnFinances != null:
 		BtnFinances.text = tr("menu.finances")
+	if BtnSponsors != null:
+		BtnSponsors.text = tr("menu.sponsors")
 	if BtnMyTeam != null:
 		BtnMyTeam.text = "My team"
 	if BtnCoachs != null:
@@ -2129,6 +2254,8 @@ func _apply_i18n() -> void:
 		BtnSave.text = "Save"
 	if BtnLanguage != null:
 		BtnLanguage.text = tr("menu.languages")
+	if BtnClubTokens != null:
+		BtnClubTokens.text = tr("menu.club_tokens")
 	if LblSaveToast != null:
 		LblSaveToast.text = "Save OK"
 
@@ -2370,14 +2497,20 @@ func _bm_set_tab(mode: String) -> void:
 	var menu_save_any: Variant = PL.load_savegame()
 	var stadium_unlocked := false
 	var finances_unlocked := false
+	var sponsors_unlocked := false
 	if typeof(menu_save_any) == TYPE_DICTIONARY:
 		var menu_save: Dictionary = menu_save_any as Dictionary
 		stadium_unlocked = bool(menu_save.get("early_flow_stadium_unlocked", false))
 		finances_unlocked = bool(menu_save.get("early_flow_finances_unlocked", false))
+		sponsors_unlocked = bool(menu_save.get("sponsors_unlocked", false))
 	if BtnStadium != null:
 		BtnStadium.visible = show_club and stadium_unlocked
 	if BtnFinances != null:
 		BtnFinances.visible = show_club and finances_unlocked
+	if BtnSponsors != null:
+		BtnSponsors.visible = show_club and sponsors_unlocked
+		BtnSponsors.disabled = not sponsors_unlocked
+		BtnSponsors.mouse_filter = Control.MOUSE_FILTER_STOP if sponsors_unlocked else Control.MOUSE_FILTER_IGNORE
 	if BtnMyTeam != null:
 		BtnMyTeam.visible = show_club
 	if BtnCoachs != null:
@@ -2454,17 +2587,29 @@ func _bm_place_management_top_left_buttons_stack() -> void:
 	if base_pos.x <= 1.0:
 		base_pos.x = 24.0
 	base_pos.y = 84.0
+	var stack_index := -1
 	if BtnSave != null:
 		BtnSave.set_as_top_level(true)
-		BtnSave.global_position = base_pos + Vector2(0, -80)
+		BtnSave.global_position = base_pos + Vector2(0, 80 * stack_index)
+		stack_index += 1
 	BtnTabWinrates.set_as_top_level(true)
-	BtnTabWinrates.global_position = base_pos
+	BtnTabWinrates.global_position = base_pos + Vector2(0, 80 * stack_index)
+	stack_index += 1
 	if BtnMusicToggle != null:
 		BtnMusicToggle.set_as_top_level(true)
-		BtnMusicToggle.global_position = base_pos + Vector2(0, 80)
+		BtnMusicToggle.global_position = base_pos + Vector2(0, 80 * stack_index)
+		stack_index += 1
 	if BtnLanguage != null:
 		BtnLanguage.set_as_top_level(true)
-		BtnLanguage.global_position = base_pos + Vector2(0, 160)
+		BtnLanguage.global_position = base_pos + Vector2(0, 80 * stack_index)
+		stack_index += 1
+	if BtnClubTokens != null:
+		BtnClubTokens.set_as_top_level(true)
+		BtnClubTokens.visible = _bm_are_club_tokens_unlocked()
+		BtnClubTokens.disabled = not BtnClubTokens.visible
+		BtnClubTokens.mouse_filter = Control.MOUSE_FILTER_STOP if BtnClubTokens.visible else Control.MOUSE_FILTER_IGNORE
+		if BtnClubTokens.visible:
+			BtnClubTokens.global_position = base_pos + Vector2(0, 80 * stack_index)
 
 func _ensure_music_toggle_button() -> void:
 	if BtnMusicToggle != null and is_instance_valid(BtnMusicToggle):
@@ -2501,6 +2646,7 @@ func _ensure_music_toggle_button() -> void:
 
 func _ensure_language_button() -> void:
 	if BtnLanguage != null and is_instance_valid(BtnLanguage):
+		_ensure_club_tokens_button()
 		return
 	if BtnMusicToggle == null or BtnTabWinrates == null:
 		return
@@ -2520,6 +2666,171 @@ func _ensure_language_button() -> void:
 	_bm_place_management_top_left_buttons_stack()
 	if not BtnLanguage.pressed.is_connected(_on_btn_language_pressed):
 		BtnLanguage.pressed.connect(_on_btn_language_pressed)
+	_ensure_club_tokens_button()
+
+
+func _bm_are_club_tokens_unlocked() -> bool:
+	if BM_DEBUG_FORCE_CLUB_TOKENS_VISIBLE:
+		return true
+	var save_any: Variant = PL.load_savegame()
+	if typeof(save_any) != TYPE_DICTIONARY:
+		return false
+	var save: Dictionary = save_any as Dictionary
+	return bool(save.get("club_tokens_unlocked", false))
+
+
+func _bm_reconcile_club_tokens_unlock_on_menu_load() -> void:
+	var save_any: Variant = PL.load_savegame()
+	if typeof(save_any) != TYPE_DICTIONARY:
+		return
+	var save: Dictionary = save_any as Dictionary
+	if bool(save.get("club_tokens_unlocked", false)):
+		return
+	if PL.get_tokens(save) <= 0:
+		return
+	save["club_tokens_unlocked"] = true
+	PL.write_savegame(save)
+	print("[MENU][CLUB_TOKENS] unlocked reconciled from existing wallet.tokens")
+
+
+func _bm_show_management_auto_info_popup(title_key: String, body_key: String, overlay_name: String, on_closed: Callable = Callable(), font_delta: int = 0) -> void:
+	if get_node_or_null(overlay_name) != null:
+		return
+	var vp: Vector2 = get_viewport_rect().size
+	var mobile := _bm_is_mobile_layout()
+
+	var overlay := Control.new()
+	overlay.name = overlay_name
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.z_index = 30000
+	overlay.set_as_top_level(true)
+	overlay.z_as_relative = false
+	overlay.global_position = Vector2.ZERO
+	overlay.size = vp
+	var overlays_node := get_node_or_null("Overlays") as Control
+	if overlays_node != null:
+		overlays_node.add_child(overlay)
+		overlay.move_to_front()
+	else:
+		add_child(overlay)
+		overlay.move_to_front()
+
+	var dark := ColorRect.new()
+	dark.name = overlay_name + "Backdrop"
+	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dark.color = Color(0, 0, 0, 0.38)
+	dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(dark)
+
+	var card := Panel.new()
+	card.name = overlay_name + "Card"
+	var card_size := Vector2(780, 220)
+	if mobile:
+		card_size = Vector2(minf(vp.x * 0.88, 720.0), 210.0)
+	card.size = card_size
+	card.position = (vp - card_size) * 0.5
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.025, 0.03, 0.055, 0.94)
+	sb.border_width_left = 3
+	sb.border_width_top = 3
+	sb.border_width_right = 3
+	sb.border_width_bottom = 3
+	sb.border_color = Color(1.0, 0.78, 0.22, 0.88)
+	sb.corner_radius_top_left = 22
+	sb.corner_radius_top_right = 22
+	sb.corner_radius_bottom_left = 22
+	sb.corner_radius_bottom_right = 22
+	sb.shadow_color = Color(0, 0, 0, 0.45)
+	sb.shadow_size = 22
+	sb.shadow_offset = Vector2(0, 8)
+	card.add_theme_stylebox_override("panel", sb)
+	card.z_index = 1
+	overlay.add_child(card)
+
+	var lbl := Label.new()
+	lbl.text = tr(title_key).replace("\\n", "\n") + "\n" + tr(body_key).replace("\\n", "\n")
+	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lbl.add_theme_font_size_override("font_size", (38 if not mobile else 32) + font_delta)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.86, 0.28, 1.0))
+	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 1.0))
+	lbl.add_theme_constant_override("outline_size", 8)
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(lbl)
+
+	card.scale = Vector2(0.92, 0.92)
+	card.pivot_offset = card.size * 0.5
+
+	var tw := create_tween()
+	tw.tween_property(card, "scale", Vector2.ONE, 0.22)
+	tw.tween_interval(4.0)
+	tw.tween_property(overlay, "modulate:a", 0.0, 0.45)
+	tw.tween_callback(func():
+		if on_closed.is_valid():
+			on_closed.call()
+		if is_instance_valid(overlay):
+			overlay.queue_free()
+	)
+
+
+func _bm_maybe_show_club_tokens_intro_popup_on_management() -> void:
+	var save_any: Variant = PL.load_savegame()
+	if typeof(save_any) != TYPE_DICTIONARY:
+		return
+	var save: Dictionary = save_any as Dictionary
+	if bool(save.get("intro_popup_club_tokens_seen", false)):
+		return
+	if PL.get_tokens(save) <= 0:
+		return
+	_bm_show_management_auto_info_popup("popup.club_tokens.title", "popup.club_tokens.body", "ClubTokensIntroOverlay", func():
+		var save_close_any: Variant = PL.load_savegame()
+		if typeof(save_close_any) != TYPE_DICTIONARY:
+			return
+		var save_close: Dictionary = save_close_any as Dictionary
+		save_close["intro_popup_club_tokens_seen"] = true
+		save_close["club_tokens_unlocked"] = true
+		PL.write_savegame(save_close)
+	, -2)
+
+
+func _ensure_club_tokens_button() -> void:
+	if BtnClubTokens != null and is_instance_valid(BtnClubTokens):
+		BtnClubTokens.text = tr("menu.club_tokens")
+		_bm_place_management_top_left_buttons_stack()
+		return
+	if BtnTabWinrates == null:
+		return
+
+	BtnClubTokens = Button.new()
+	BtnClubTokens.name = "BtnClubTokens"
+	BtnClubTokens.text = tr("menu.club_tokens")
+	BtnClubTokens.focus_mode = Control.FOCUS_NONE
+	BtnClubTokens.mouse_filter = Control.MOUSE_FILTER_STOP
+	_bm_apply_play_game_button_style(BtnClubTokens, Vector2(180, 48))
+
+	var parent_ctrl := BtnTabWinrates.get_parent()
+	if parent_ctrl == null:
+		return
+	parent_ctrl.add_child(BtnClubTokens)
+	BtnClubTokens.set_as_top_level(true)
+	_bm_place_management_top_left_buttons_stack()
+	if not BtnClubTokens.pressed.is_connected(_on_btn_club_tokens_pressed):
+		BtnClubTokens.pressed.connect(_on_btn_club_tokens_pressed)
+
+
+func _on_btn_club_tokens_pressed() -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	var path := "res://scenes/ShopTokens.tscn"
+	print("[MENU] click Club Tokens -> ", path, " exists=", ResourceLoader.exists(path))
+	if ResourceLoader.exists(path):
+		tree.change_scene_to_file(path)
 
 
 func _on_btn_language_pressed() -> void:
@@ -2854,6 +3165,7 @@ var _bm_wr_last_rows: Array = []
 var _bm_wr_last_error: String = ""
 var BtnMusicToggle: Button = null
 var BtnLanguage: Button = null
+var BtnClubTokens: Button = null
 var _bm_lb_inflight: String = ""   # "", "top", "submit"
 
 func _bm_wr_fmt_pct(x: float) -> String:
@@ -3447,7 +3759,7 @@ func _bm_menu_apply_mobile_top_left_buttons_plus15_text_plus2() -> void:
 	if not _bm_menu_is_mobile_layout():
 		return
 
-	for b in [BtnTabWinrates, BtnMusicToggle, BtnLanguage]:
+	for b in [BtnTabWinrates, BtnMusicToggle, BtnLanguage, BtnClubTokens]:
 		if b == null:
 			continue
 		if b.has_meta("bm_mobile_top_left_plus15_text_plus2_done"):
@@ -3488,7 +3800,7 @@ func _bm_menu_apply_mobile_top_left_buttons_extra_plus10_text_plus2() -> void:
 	if not _bm_menu_is_mobile_layout():
 		return
 
-	for b in [BtnTabWinrates, BtnMusicToggle, BtnLanguage]:
+	for b in [BtnTabWinrates, BtnMusicToggle, BtnLanguage, BtnClubTokens]:
 		if b == null:
 			continue
 		if b.has_meta("bm_mobile_top_left_extra_plus10_text_plus2_done"):
@@ -3506,7 +3818,7 @@ func _bm_menu_apply_mobile_management_buttons_text_plus2() -> void:
 	if not _bm_menu_is_mobile_layout():
 		return
 
-	for btn in [BtnMatch, BtnMyTeam, BtnFinances, BtnStadium, BtnMercato, BtnCoachs]:
+	for btn in [BtnMatch, BtnMyTeam, BtnFinances, BtnSponsors, BtnStadium, BtnMercato, BtnCoachs]:
 		if btn == null:
 			continue
 
@@ -3849,16 +4161,10 @@ func _upgrade_club_crest_lv2() -> void:
 	if typeof(save) != TYPE_DICTIONARY:
 		return
 
-	var current_level: int = int(save.get("club_crest_level", 1))
-	var target_level: int = current_level + 1
-	var upgrade_cost: int = 190
-	if target_level >= 3:
-		upgrade_cost = 390
-
-	if not PL.can_spend_tokens(save, upgrade_cost):
+	var current_badge_id: String = str(save.get("club_crest_id", save.get("selected_crest_id", ""))).strip_edges()
+	if current_badge_id == "" and save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
+		current_badge_id = str((save["roster"] as Dictionary).get("selected_crest_id", "")).strip_edges()
+	if not PL.upgrade_club_badge(save, current_badge_id):
 		return
-
-	PL.spend_tokens(save, upgrade_cost, "club_crest_lv%d_upgrade" % target_level)
-	save["club_crest_level"] = target_level
 	PL.write_savegame(save)
 	_update_club_name_label_from_save()

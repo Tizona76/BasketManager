@@ -49,6 +49,20 @@ static func _copy_file(src: String, dst: String) -> bool:
 	fw.close()
 	return true
 
+static func _hydrate_season_state_from_active_save() -> void:
+	var tree := Engine.get_main_loop()
+	if tree == null or not (tree is SceneTree):
+		return
+	var root := (tree as SceneTree).root
+	if root == null:
+		return
+	var ss := root.get_node_or_null("/root/SeasonState")
+	if ss == null or not ss.has_method("hydrate_from_save"):
+		return
+	var active_save: Variant = _read_json(LEGACY_SAVE)
+	if typeof(active_save) == TYPE_DICTIONARY:
+		ss.call("hydrate_from_save", active_save as Dictionary)
+
 static func ensure_exists() -> void:
 	# profiles.json déjà là
 	if FileAccess.file_exists(PROFILES_FILE):
@@ -109,6 +123,7 @@ static func activate_profile(profile_id: String) -> void:
 			_write_json(same_src, _default_save_dict(new_id))
 			_copy_file(same_src, LEGACY_SAVE)
 		_set_active_profile_id(new_id)
+		_hydrate_season_state_from_active_save()
 		return
 
 	# 1) flush actuel
@@ -125,6 +140,7 @@ static func activate_profile(profile_id: String) -> void:
 
 	# 3) active
 	_set_active_profile_id(new_id)
+	_hydrate_season_state_from_active_save()
 
 static func reset_active_profile() -> void:
 	ensure_exists()
@@ -132,6 +148,7 @@ static func reset_active_profile() -> void:
 	var fresh: Dictionary = _default_save_dict(pid)
 	_write_json(_profile_path(pid), fresh)
 	_write_json(LEGACY_SAVE, fresh)
+	_hydrate_season_state_from_active_save()
 
 
 static func add_profile(profile_id: String, label: String = "") -> void:

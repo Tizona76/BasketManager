@@ -140,15 +140,9 @@ func _ready() -> void:
 			print("[PROFILE RESTORE] active=", ProfileManager.get_active_profile_id())
 		else:
 			ProfileManager.activate_profile(ProfileManager.get_active_profile_id())
-			if str(Session.refresh_token).strip_edges() == "" and str(Session.access_token).strip_edges().length() < 20:
-				_web_guest_auth_pending = true
-				_try_guest_auth_silent()
-				var guest_timeout := get_tree().create_timer(5.0)
-				guest_timeout.timeout.connect(func():
-					if _web_guest_auth_pending:
-						print("[GUEST AUTH][TIMEOUT] fallback -> finish pending auth")
-						_finish_web_guest_auth_silent()
-				)
+		if str(Session.access_token).strip_edges().length() < 20:
+			_web_guest_auth_pending = true
+			_try_guest_auth_silent()
 	else:
 		ProfileManager.ensure_exists()
 		ProfileManager.activate_profile(ProfileManager.get_active_profile_id())
@@ -361,6 +355,8 @@ func _on_click() -> void:
 		_intro_transition_started = true
 		print("[MAIN] intro transition started")
 
+	_show_preparing_club_label()
+
 	if _accueil_inst != null and _accueil_inst.has_method("start_intro"):
 		if _accueil_inst.has_signal("intro_zoom_finished"):
 			var zoom_done := Callable(self, "_on_intro_zoom_finished")
@@ -373,21 +369,60 @@ func _on_click() -> void:
 
 # BM_SINGLE_PLAY_INSTANTLY_GATE_V1
 func _show_preparing_club_label() -> void:
-	if get_node_or_null("PreparingClubLabel") != null:
+	if get_node_or_null("PreparingClubLayer") != null:
 		return
+	var preparing_layer := CanvasLayer.new()
+	preparing_layer.name = "PreparingClubLayer"
+	preparing_layer.layer = 100
+	add_child(preparing_layer)
+
 	var preparing_label := Label.new()
 	preparing_label.name = "PreparingClubLabel"
-	preparing_label.text = "Preparing your club..."
+	preparing_label.text = tr("startup.preparing_club")
+	preparing_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	preparing_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	preparing_label.anchor_left = 0.0
-	preparing_label.anchor_top = 0.85
-	preparing_label.anchor_right = 1.0
-	preparing_label.anchor_bottom = 0.85
-	preparing_label.add_theme_font_size_override("font_size", 24)
-	add_child(preparing_label)
+	preparing_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	preparing_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	preparing_label.offset_left = 0
+	preparing_label.offset_top = 0
+	preparing_label.offset_right = 0
+	preparing_label.offset_bottom = 0
+	preparing_label.add_theme_font_size_override("font_size", 34)
+	preparing_label.add_theme_color_override("font_color", Color(0.10, 0.36, 0.92, 1.0))
+	preparing_label.add_theme_color_override("font_outline_color", Color(0.90, 0.04, 0.10, 1.0))
+	preparing_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.88))
+	preparing_label.add_theme_constant_override("outline_size", 5)
+	preparing_label.add_theme_constant_override("shadow_offset_x", 3)
+	preparing_label.add_theme_constant_override("shadow_offset_y", 3)
+	preparing_label.add_theme_constant_override("shadow_outline_size", 10)
+	preparing_layer.add_child(preparing_label)
+	call_deferred("_bm_update_preparing_club_label_after_delay")
+
+
+func _bm_update_preparing_club_label_after_delay() -> void:
+	await get_tree().create_timer(8.0).timeout
+	var preparing_layer := get_node_or_null("PreparingClubLayer")
+	if preparing_layer == null:
+		return
+	var preparing_label := preparing_layer.get_node_or_null("PreparingClubLabel") as Label
+	if preparing_label == null:
+		return
+	preparing_label.text = tr("startup.just_seconds_more")
+	await get_tree().create_timer(12.0).timeout
+	preparing_layer = get_node_or_null("PreparingClubLayer")
+	if preparing_layer == null:
+		return
+	preparing_label = preparing_layer.get_node_or_null("PreparingClubLabel") as Label
+	if preparing_label == null:
+		return
+	preparing_label.text = tr("startup.ready_to_manage_full_team")
 
 
 func _hide_preparing_club_label() -> void:
+	var preparing_layer := get_node_or_null("PreparingClubLayer")
+	if preparing_layer != null:
+		preparing_layer.queue_free()
+		return
 	var preparing_lbl := get_node_or_null("PreparingClubLabel")
 	if preparing_lbl != null:
 		preparing_lbl.queue_free()
@@ -696,8 +731,8 @@ func _on_submit_team_name(team_name: String) -> void:
 	_pending_team_name = team_name
 
 	SeasonState.early_flow_post_selection_hide_menu_buttons = true
+	_apply_pending_team_name()
 	_show_menu()
-	call_deferred("_apply_pending_team_name")
 
 
 func _pick_audio_path(kind: String, id: String) -> String:
@@ -897,6 +932,27 @@ func _apply_pending_team_name() -> void:
 	PlayerLife.write_savegame(save_post)
 	if SaveSvc != null:
 		SaveSvc.write_dict(save_post.duplicate(true))
+
+
+	var bm_debug_active_save: Dictionary = PlayerLife.load_savegame()
+	if typeof(bm_debug_active_save) == TYPE_DICTIONARY and not bm_debug_active_save.is_empty():
+		var bm_debug_club_name := ""
+		if bm_debug_active_save.has("club") and typeof(bm_debug_active_save["club"]) == TYPE_DICTIONARY:
+			bm_debug_club_name = str((bm_debug_active_save["club"] as Dictionary).get("name", "")).strip_edges()
+		var bm_debug_roster_selected_size := -1
+		if bm_debug_active_save.has("roster") and typeof(bm_debug_active_save["roster"]) == TYPE_DICTIONARY:
+			var bm_debug_roster: Dictionary = bm_debug_active_save["roster"] as Dictionary
+			if bm_debug_roster.has("selected_ids") and typeof(bm_debug_roster["selected_ids"]) == TYPE_ARRAY:
+				bm_debug_roster_selected_size = (bm_debug_roster["selected_ids"] as Array).size()
+		var bm_debug_players_size := -1
+		if bm_debug_active_save.has("players") and typeof(bm_debug_active_save["players"]) == TYPE_ARRAY:
+			bm_debug_players_size = (bm_debug_active_save["players"] as Array).size()
+		print("[BM_DEBUG][TEAM_NAME_SAVE] active_profile_id=", ProfileManager.get_active_profile_id(), " team_name=", str(bm_debug_active_save.get("team_name", "")), " club_name=", str(bm_debug_active_save.get("club_name", "")), " club.name=", bm_debug_club_name, " popup_bienvenue_club_deja_vu=", bool(bm_debug_active_save.get("popup_bienvenue_club_deja_vu", false)), " roster.selected_ids.size=", bm_debug_roster_selected_size, " players.size=", bm_debug_players_size)
+		var bm_debug_legacy_file := FileAccess.open("user://savegame.json", FileAccess.WRITE)
+		if bm_debug_legacy_file != null:
+			bm_debug_legacy_file.store_string(JSON.stringify(bm_debug_active_save, "	"))
+			bm_debug_legacy_file.close()
+			print("BM_DEBUG legacy savegame synced after team name")
 	print("[MAIN][RESET][POST-SAVESVC] total_tournois=", int(save_post.get("total_tournois", -1)), " total_recettes=", int(save_post.get("total_recettes", -1)))
 
 	# NEW CLUB CLOUD GUARD: empêche l’ancien blob cloud du même email d’écraser le nouveau club
@@ -1100,6 +1156,66 @@ func _schedule_team_name_created_retry() -> void:
 	)
 
 
+func _bm_collect_team_name_browser_meta() -> Dictionary:
+	var meta: Dictionary = {}
+	if not OS.has_feature("web"):
+		return meta
+
+	var js := """
+(function() {
+	try {
+		var nav = window.navigator || {};
+		var ua = String(nav.userAgent || "");
+		var navLanguage = String(nav.language || "");
+		var timezone = "";
+		try {
+			timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+		} catch (e) {}
+
+		var isMobile = ((nav.maxTouchPoints || 0) > 0) || /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+		var browser = "unknown";
+		if (/Edg\\//.test(ua)) {
+			browser = "edge";
+		} else if (/OPR\\//.test(ua) || /Opera/.test(ua)) {
+			browser = "opera";
+		} else if (/Firefox\\//.test(ua)) {
+			browser = "firefox";
+		} else if (/Chrome\\//.test(ua) || /CriOS\\//.test(ua)) {
+			browser = "chrome";
+		} else if (/Safari\\//.test(ua)) {
+			browser = "safari";
+		}
+
+		var payload = {};
+		if (navLanguage) {
+			payload.language = navLanguage.split(/[-_]/)[0];
+			payload.locale = navLanguage;
+		}
+		if (timezone) {
+			payload.timezone = timezone;
+		}
+		if (nav.platform) {
+			payload.platform = String(nav.platform);
+		}
+		payload.device_type = isMobile ? "mobile" : "desktop";
+		payload.browser = browser;
+		if (window.screen) {
+			payload.screen_width = Number(window.screen.width || 0);
+			payload.screen_height = Number(window.screen.height || 0);
+		}
+		return JSON.stringify(payload);
+	} catch (e) {
+		return "{}";
+	}
+})()
+"""
+	var raw_meta: Variant = JavaScriptBridge.eval(js, true)
+	var parsed_meta: Variant = JSON.parse_string(str(raw_meta))
+	if typeof(parsed_meta) == TYPE_DICTIONARY:
+		meta = parsed_meta as Dictionary
+	return meta
+
+
 func _track_team_name_created(team_name: String) -> void:
 	var clean_team_name := team_name.strip_edges()
 	if clean_team_name == "":
@@ -1135,10 +1251,14 @@ func _track_team_name_created(team_name: String) -> void:
 			_schedule_team_name_created_retry()
 	)
 
-	var payload := JSON.stringify({
+	var payload_data := {
 		"profile_uuid": profile_uuid,
 		"team_name": clean_team_name
-	})
+	}
+	var browser_meta := _bm_collect_team_name_browser_meta()
+	if not browser_meta.is_empty():
+		payload_data["meta"] = browser_meta
+	var payload := JSON.stringify(payload_data)
 
 	var request_error := http.request(
 		"https://api.basketmanager-game.com/v1/funnel/team-name-created",

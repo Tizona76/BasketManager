@@ -7,6 +7,135 @@ login.btn.cancel,Annuler,Cancel,Cancelar,Annulla,Cancelar
 menu.mercato,Mercato,Transfers,Mercado,Mercato,Mercado
 menu.finances,Finances,Finance,Finanzas,Finanze,Finanças
 menu.sponsors,Sponsors,Sponsors,Patrocinadores,Sponsor,Patrocinadores
+menu.club_tokens,Club Tokens,Club Tokens,Club Tokens,Club Tokens,Club Tokens
+club_tokens.title,CLUB TOKENS,CLUB TOKENS,CLUB TOKENS,CLUB TOKENS,CLUB TOKENS
+club_tokens.balance,Balance,Balance,Saldo,Saldo,Saldo
+club_tokens.used_for,Utilisation,Used for,Usado para,Usati per,Usado para
+club_tokens.used.coaches,Coachs,Coaches,Entrenadores,Allenatori,Treinadores
+club_tokens.used.premium_upgrades,Améliorations premium,Premium upgrades,Mejoras premium,Miglioramenti premium,Melhorias premium
+club_tokens.used.special_opportunities,Opportunités spéciales,Special opportunities,Oportunidades especiales,Opportunità speciali,Oportunidades especiais
+club_tokens.used.time_savers,Gains de temps,Time savers,Ahorros de tiempo,Risparmi di tempo,Economia de tempo
+club_tokens.how_to_earn,Comment en gagner,How to earn,Cómo ganarlos,Come ottenerli,Como ganhar
+club_tokens.earn.missions,Missions,Missions,Misiones,Missioni,Missões
+club_tokens.earn.tournaments,Tournois,Tournaments,Torneos,Tornei,Torneios
+club_tokens.earn.season_rewards,Récompenses de saison,Season rewards,Recompensas de temporada,Ricompense stagionali,Recompensas da temporada
+club_tokens.buy,ACHETER DES CLUB TOKENS,BUY CLUB TOKENS,COMPRAR CLUB TOKENS,ACQUISTA CLUB TOKENS,COMPRAR CLUB TOKENS
+club_tokens.available_now,NOUVELLES OPPORTUNITÉS POUR FAIRE PROGRESSER TON CLUB,NEW OPPORTUNITIES TO TAKE YOUR CLUB FURTHER,NUEVAS OPORTUNIDADES PARA LLEVAR TU CLUB MÁS LEJOS,NUOVE OPPORTUNITÀ PER PORTARE IL CLUB PIÙ LONTANO,NOVAS OPORTUNIDADES PARA LEVAR O TEU CLUBE MAIS LONGE
+club_tokens.coming_soon,PROCHAINES OPPORTUNITÉS,NEXT OPPORTUNITIES,PRÓXIMAS OPORTUNIDADES,PROSSIME OPPORTUNITÀ,PRÓXIMAS OPORTUNIDADES
+club_tokens.cost.token,{amount} Token,{amount} Token,{amount} Token,{amount} Token,{amount} Token
+club_tokens.cost.tokens,{amount} Tokens,{amount} Tokens,{amount} Tokens,{amount} Token,{amount} Tokens
+club_tokens.action.unlock_now,Débloquer,Unlock now,Desbloquear ahora,Sblocca ora,Desbloquear agora
+club_tokens.action.available,Disponible,Available,Disponible,Disponibile,Disponível
+club_tokens.action.soon,Bientôt,Soon,Pronto,Presto,Em breve
+club_tokens.opportunity.coach_junior,Recruter Coach Teddy,Hire Coach Teddy,Fichar entrenador Teddy,Ingaggia Coach Teddy,Contratar Treinador Teddy
+club_tokens.opportunity.coach_confirme,Recruter Coach James,Hire Coach James,Fichar entrenador James,Ingaggia Coach James,Contratar Treinador James
+club_tokens.opportunity.coach_elite,Recruter Coach Alan,Hire Coach Alan,Fichar entrenador Alan,Ingaggia Coach Alan,Contratar Treinador Alan
+club_tokens.opportunity.skip_final_result,Passer le résumé du match,Skip Match Summary,Saltar resumen del partido,Salta riepilogo partita,Saltar resumo do jogo
+club_tokens.opportunity.auto_save_lineup,Auto Save Lineup,Auto Save Lineup,Auto Save Lineup,Auto Save Lineup,Auto Save Lineup
+club_tokens.opportunity.speed_up_stadium,Accélérer les travaux du stade,Speed Up Stadium Upgrade,Acelerar mejora del estadio,Accelera lavori stadio,Acelerar melhoria do estádio
+club_tokens.opportunity.premium_sponsors,Sponsors Premium,Premium Sponsors,Patrocinadores premium,Sponsor premium,Patrocinadores premium
+club_tokens.benefit.coach_junior,Développe tes jeunes joueurs plus vite après chaque match avec ton premier coach professionnel.,Develop your young players faster after every game with your first professional coach.,Desarrolla a tus jóvenes jugadores más rápido después de cada partido con tu primer entrenador profesional.,Fai crescere più velocemente i giovani giocatori dopo ogni partita con il tuo primo coach professionista.,Desenvolve os teus jovens jogadores mais depressa depois de cada jogo com o teu primeiro treinador profissional.
+club_tokens.benefit.coach_confirme,Améliore la progression de ton effectif avec un staff plus expérimenté.,Improve your squad's progression with a more experienced coaching staff.,Mejora la progresión de tu plantilla con un cuerpo técnico más experimentado.,Migliora la progressione della rosa con uno staff tecnico più esperto.,Melhora a progressão do teu plantel com uma equipa técnica mais experiente.
+club_tokens.benefit.coach_elite,Construis le staff le plus fort pour maximiser le développement à long terme de chaque joueur.,Build the strongest coaching staff to maximize every player's long-term development.,Construye el cuerpo técnico más fuerte para maximizar el desarrollo a largo plazo de cada jugador.,Costruisci lo staff più forte per massimizzare lo sviluppo a lungo termine di ogni giocatore.,Constrói a equipa técnica mais forte para maximizar o desenvolvimento a longo prazo de cada jogador.
+club_tokens.benefit.skip_final_result,Gagne du temps après chaque match en passant la séquence d’après-match pour aller directement à ta prochaine décision.,Save time after every game by skipping the post-match sequence and jump directly to your next decision.,Ahorra tiempo después de cada partido saltando la secuencia postpartido y ve directo a tu próxima decisión.,Risparmia tempo dopo ogni partita saltando la sequenza post-partita e vai subito alla prossima decisione.,Poupa tempo depois de cada jogo ao saltar a sequência pós-jogo e avança diretamente para a próxima decisão.
+club_tokens.benefit.auto_save_lineup,Ne reconstruis jamais deux fois la même composition. Ta composition précédente est automatiquement réutilisée avant chaque match.,Never build the same lineup twice. Your previous lineup is automatically reused before every game.,No vuelvas a montar dos veces la misma alineación. Tu alineación anterior se reutiliza automáticamente antes de cada partido.,Non ricostruire mai due volte la stessa formazione. La formazione precedente viene riutilizzata automaticamente prima di ogni partita.,Nunca montes a mesma equipa duas vezes. O alinhamento anterior é reutilizado automaticamente antes de cada jogo.
+club_tokens.benefit.speed_up_stadium,Termine les travaux du stade plus tôt et profite de tes nouvelles installations avant tes plus grands matchs.,Finish stadium construction earlier and enjoy your new facilities before your biggest matches.,Termina las obras del estadio antes y disfruta tus nuevas instalaciones antes de tus partidos más importantes.,Termina prima i lavori dello stadio e sfrutta le nuove strutture prima delle partite più importanti.,Termina a construção do estádio mais cedo e aproveita as novas instalações antes dos jogos maiores.
+club_tokens.benefit.premium_sponsors,Reçois des offres de sponsoring plus élevées et augmente les revenus de ton club pendant la saison.,Receive higher-value sponsorship offers and increase your club's income throughout the season.,Recibe ofertas de patrocinio de mayor valor y aumenta los ingresos de tu club durante la temporada.,Ricevi offerte sponsor di valore più alto e aumenta le entrate del club durante la stagione.,Recebe ofertas de patrocínio de maior valor e aumenta as receitas do clube ao longo da época.
+club_tokens.progress.0,Gagne tes premiers Club Tokens pour débloquer de nouvelles opportunités !,Earn your first Club Tokens to unlock new opportunities!,Gana tus primeros Club Tokens para desbloquear nuevas oportunidades!,Guadagna i tuoi primi Club Token per sbloccare nuove opportunità!,Ganha os teus primeiros Club Tokens para desbloquear novas oportunidades!
+club_tokens.progress.1,Félicitations ! Ton premier Club Token est prêt à être utilisé !,Congratulations! Your first Club Token is waiting to be spent!,¡Felicidades! Tu primer Club Token está listo para usarse!,Congratulazioni! Il tuo primo Club Token è pronto per essere usato!,Parabéns! O teu primeiro Club Token está pronto para ser usado!
+club_tokens.progress.8,Tu te rapproches de ta première amélioration Club !,You're getting closer to your first Club upgrade!,¡Te acercas a tu primera mejora del club!,Ti stai avvicinando al primo miglioramento del club!,Estás perto da tua primeira melhoria do clube!
+club_tokens.progress.10,Bravo ! Tu peux maintenant débloquer ta première fonctionnalité premium de management !,Great! You can now unlock your first premium management feature!,¡Genial! Ya puedes desbloquear tu primera función premium de gestión!,Ottimo! Ora puoi sbloccare la tua prima funzione premium di gestione!,Boa! Já podes desbloquear a tua primeira funcionalidade premium de gestão!
+club_tokens.progress.25,Ton club est prêt pour des opportunités encore plus importantes !,Your club is ready for even bigger opportunities!,¡Tu club está listo para oportunidades aún mayores!,Il tuo club è pronto per opportunità ancora più grandi!,O teu clube está pronto para oportunidades ainda maiores!
+club_tokens.progress.50,Fantastique ! Les grandes améliorations sont maintenant à portée !,Fantastic! Major upgrades are now within reach!,¡Fantástico! Las grandes mejoras ya están a tu alcance!,Fantastico! I grandi miglioramenti sono ora a portata!,Fantástico! As grandes melhorias estão agora ao teu alcance!
+club_tokens.progress.100,Excellent ! Tu peux choisir parmi plusieurs grandes opportunités !,Excellent! You can now choose between several major opportunities!,¡Excelente! Ahora puedes elegir entre varias grandes oportunidades!,Eccellente! Ora puoi scegliere tra diverse grandi opportunità!,Excelente! Agora podes escolher entre várias grandes oportunidades!
+club_tokens.progress.250,Exceptionnel ! Ton stock de Tokens ouvre des investissements majeurs !,Outstanding! Your Token balance opens up major investments!,¡Extraordinario! Tu saldo de Tokens abre grandes inversiones!,Straordinario! Il tuo saldo Token apre investimenti importanti!,Excelente! O teu saldo de Tokens abre grandes investimentos!
+club_tokens.store.starter_pack,STARTER PACK,STARTER PACK,STARTER PACK,STARTER PACK,STARTER PACK
+club_tokens.store.club_pack,CLUB PACK,CLUB PACK,CLUB PACK,CLUB PACK,CLUB PACK
+club_tokens.store.manager_pack,MANAGER PACK,MANAGER PACK,MANAGER PACK,MANAGER PACK,MANAGER PACK
+club_tokens.store.purchase_title,Achat de Club Tokens,Purchase Club Tokens,Comprar Club Tokens,Acquista Club Token,Comprar Club Tokens
+club_tokens.store.secure_payment,Continuer vers le paiement sécurisé,Continue to secure payment,Continuar al pago seguro,Continua al pagamento sicuro,Continuar para pagamento seguro
+club_tokens.store.continue,Continuer,Continue,Continuar,Continua,Continuar
+club_tokens.no_available,Aucune opportunité disponible pour le moment.,No opportunity available right now.,No hay oportunidades disponibles ahora mismo.,Nessuna opportunità disponibile al momento.,Nenhuma oportunidade disponível agora.
+club_tokens.no_available.subtitle,Continuez à progresser pour débloquer plus d’options.,Keep progressing to unlock more options.,Sigue progresando para desbloquear más opciones.,Continua a progredire per sbloccare più opzioni.,Continua a progredir para desbloquear mais opções.
+club_tokens.coming.training_center,Construire un centre d’entraînement,Build a Training Center,Construir un centro de entrenamiento,Costruisci un centro di allenamento,Construir um centro de treino
+club_tokens.coming.premium_sponsors,Débloquer des sponsors premium,Unlock Premium Sponsors,Desbloquear patrocinadores premium,Sblocca sponsor premium,Desbloquear patrocinadores premium
+club_tokens.coming.special_events,Participer à des événements spéciaux,Join Special Events,Participar en eventos especiales,Partecipa a eventi speciali,Participar em eventos especiais
+club_tokens.coming.subtitle,Bientôt disponible,Coming soon,Próximamente,In arrivo,Em breve
+club_tokens.coming.benefit.training_center,Débloque de nouvelles options d’entraînement pour ton club.,Unlock advanced training options for your club.,Desbloquea opciones avanzadas de entrenamiento para tu club.,Sblocca opzioni di allenamento avanzate per il tuo club.,Desbloqueia opções avançadas de treino para o teu clube.
+club_tokens.coming.benefit.premium_sponsors,Accède à des contrats de sponsoring plus précieux.,Access more valuable sponsorship contracts.,Accede a contratos de patrocinio más valiosos.,Accedi a contratti di sponsorizzazione più preziosi.,Acede a contratos de patrocínio mais valiosos.
+club_tokens.coming.benefit.special_events,Participe à des défis de club limités dans le temps.,Enter limited-time club challenges.,Participa en desafíos de club por tiempo limitado.,Partecipa a sfide club a tempo limitato.,Participa em desafios de clube por tempo limitado.
+club_tokens.status.coming_soon,Bientôt disponible,Coming soon,Próximamente,In arrivo,Em breve
+club_tokens.history,Historique,History,Historial,Cronologia,Histórico
+club_tokens.history.close,Fermer,Close,Cerrar,Chiudi,Fechar
+club_tokens.history.empty,Aucun historique de Tokens pour le moment.,No token history yet.,Aún no hay historial de Tokens.,Nessuna cronologia Token per ora.,Ainda não há histórico de Tokens.
+club_tokens.history.tokens,Tokens,Tokens,Tokens,Token,Tokens
+club_tokens.history.season_reward,Récompense de saison,Season reward,Recompensa de temporada,Ricompensa stagionale,Recompensa da temporada
+club_tokens.history.current_balance,Solde actuel,Current balance,Saldo actual,Saldo attuale,Saldo atual
+club_tokens.history.previous_balance,Tokens déjà obtenus,Tokens already earned,Tokens ya obtenidos,Token già ottenuti,Tokens já obtidos
+club_tokens.history.reason.reward,Récompense Tokens,Token reward,Recompensa de Tokens,Ricompensa Token,Recompensa de Tokens
+club_tokens.history.reason.mission,Mission terminée,Mission completed,Misión completada,Missione completata,Missão concluída
+club_tokens.history.reason.tournament,Récompense de tournoi,Tournament reward,Recompensa de torneo,Ricompensa torneo,Recompensa de torneio
+club_tokens.history.reason.token_pack,Pack de Tokens,Token pack,Pack de Tokens,Pacchetto Token,Pacote de Tokens
+club_tokens.history.reason.club_identity,Club Identity,Club Identity,Club Identity,Club Identity,Club Identity
+club_tokens.history.reason.auto_save_lineup,Auto Save Lineup,Auto Save Lineup,Auto Save Lineup,Auto Save Lineup,Auto Save Lineup
+club_tokens.history.reason.skip_match_summary,Résumé de match passé,Skip Match Summary,Saltar resumen del partido,Salta riepilogo partita,Saltar resumo do jogo
+club_tokens.nav.overview,Overview,Overview,Resumen,Panoramica,Resumo
+club_tokens.nav.comfort,Confort,Comfort,Comodidad,Comfort,Conforto
+club_tokens.nav.development,Développement,Development,Desarrollo,Sviluppo,Desenvolvimento
+club_tokens.nav.premium,Premium,Premium,Premium,Premium,Premium
+home_arena.title,HOME ARENA,HOME ARENA,HOME ARENA,HOME ARENA,HOME ARENA
+home_arena.overview_subtitle,Transforme tes matchs à domicile en arena premium.,Transform your home games into a premium arena.,Transforma tus partidos en casa en una arena premium.,Trasforma le partite in casa in un'arena premium.,Transforma os teus jogos em casa numa arena premium.
+home_arena.setup_cta,SET UP HOME ARENA,SET UP HOME ARENA,CONFIGURAR HOME ARENA,CONFIGURA HOME ARENA,CONFIGURAR HOME ARENA
+home_arena.placeholder_cta,BIENTÔT DISPONIBLE,COMING SOON,PRÓXIMAMENTE,IN ARRIVO,EM BREVE
+home_arena.select,SÉLECTIONNER,SELECT,SELECCIONAR,SELEZIONA,SELECIONAR
+home_arena.selected,SÉLECTIONNÉE,SELECTED,SELECCIONADA,SELEZIONATA,SELECIONADA
+home_arena.confirm_select,Sélectionner Home Arena pour {cost} Tokens ?,Select Home Arena for {cost} Tokens?,¿Seleccionar Home Arena por {cost} Tokens?,Selezionare Home Arena per {cost} Token?,Selecionar Home Arena por {cost} Tokens?
+home_arena.congratulations,Félicitations !,Congratulations!,¡Felicidades!,Congratulazioni!,Parabéns!
+sponsors.title,SPONSORS,SPONSORS,PATROCINADORES,SPONSOR,PATROCINADORES
+sponsors.subtitle,Augmente les revenus de ton club en signant des contrats de sponsoring.,Increase your club revenue by signing sponsorship contracts.,Aumenta los ingresos de tu club firmando contratos de patrocinio.,Aumenta le entrate del club firmando contratti di sponsorizzazione.,Aumente a receita do seu clube assinando contratos de patrocínio.
+sponsors.current_title,SPONSOR ACTUEL,CURRENT SPONSOR,PATROCINADOR ACTUAL,SPONSOR ATTUALE,PATROCINADOR ATUAL
+sponsors.current_empty,Aucun sponsor actif.,No active sponsor.,No hay patrocinador activo.,Nessuno sponsor attivo.,Nenhum patrocinador ativo.
+sponsors.available_title,OFFRES DISPONIBLES,AVAILABLE OFFERS,OFERTAS DISPONIBLES,OFFERTE DISPONIBILI,OFERTAS DISPONÍVEIS
+sponsors.available_empty,Aucune offre disponible pour le moment.,No offers available yet.,Aún no hay ofertas disponibles.,Nessuna offerta disponibile per ora.,Ainda não há ofertas disponíveis.
+sponsors.info,De nouvelles opportunités de sponsoring seront disponibles à mesure que ton club grandira.,New sponsorship opportunities will become available as your club grows.,Nuevas oportunidades de patrocinio estarán disponibles a medida que tu club crezca.,Nuove opportunità di sponsorizzazione saranno disponibili man mano che il club cresce.,Novas oportunidades de patrocínio ficarão disponíveis à medida que seu clube crescer.
+sponsors.sign_contract,SIGN CONTRACT,SIGN CONTRACT,FIRMAR CONTRATO,FIRMA CONTRATTO,ASSINAR CONTRATO
+sponsors.active,ACTIVE,ACTIVE,ACTIVO,ATTIVO,ATIVO
+sponsors.unavailable,INDISPONIBLE,UNAVAILABLE,NO DISPONIBLE,NON DISPONIBILE,INDISPONÍVEL
+sponsors.remaining,Restant,Remaining,Restante,Rimanente,Restante
+sponsors.remaining_matches,matchs,games,partidos,partite,partidas
+sponsors.remaining_seasons,saison,season,temporada,stagione,temporada
+sponsors.expired,EXPIRÉ,EXPIRED,EXPIRADO,SCADUTO,EXPIRADO
+sponsors.no_active_contract,Aucun contrat sponsor actif. De nouvelles offres seront disponibles au début de la prochaine saison.,No active sponsor contract. New offers will be available at the start of next season.,No hay contrato de patrocinio activo. Habrá nuevas ofertas al inicio de la próxima temporada.,Nessun contratto sponsor attivo. Nuove offerte saranno disponibili all'inizio della prossima stagione.,Nenhum contrato de patrocínio ativo. Novas ofertas estarão disponíveis no início da próxima temporada.
+sponsors.confirm_title,Engagement sponsor,Sponsor agreement,Acuerdo de patrocinio,Accordo sponsor,Acordo de patrocínio
+sponsors.confirm_message,Confirmer l'engagement avec ce sponsor ?,Confirm agreement with this sponsor?,¿Confirmar acuerdo con este patrocinador?,Confermare l'accordo con questo sponsor?,Confirmar acordo com este patrocinador?
+sponsors.family.local,Local,Local,Local,Locale,Local
+sponsors.family.national,National,National,Nacional,Nazionale,Nacional
+sponsors.family.premium,Premium,Premium,Premium,Premium,Premium
+sponsors.payment.per_match,par match,per match,por partido,per partita,por partida
+sponsors.payment.per_season,par saison,per season,por temporada,per stagione,por temporada
+sponsors.unit.match,match,game,partido,partita,partida
+sponsors.unit.matches,matchs,games,partidos,partite,partidas
+sponsors.unit.season,saison,season,temporada,stagione,temporada
+sponsors.unit.seasons,saisons,seasons,temporadas,stagioni,temporadas
+sponsors.bonus.top_10,Top 10,Top 10,Top 10,Top 10,Top 10
+sponsors.bonus.top_5,Top 5,Top 5,Top 5,Top 5,Top 5
+sponsors.bonus.top_3,Top 3,Top 3,Top 3,Top 3,Top 3
+sponsors.bonus.finalist,Finaliste,Finalist,Finalista,Finalista,Finalista
+sponsors.bonus.champion,Champion,Champion,Campeón,Campione,Campeão
+sponsors.bonus.tournament_winner,Vainqueur tournoi,Tournament winner,Ganador de torneo,Vincitore torneo,Vencedor do torneio
+sponsors.bonus.none,Aucun,None,Ninguno,Nessuno,Nenhum
+sponsors.field.revenue,Revenu,Revenue,Ingresos,Entrate,Receita
+sponsors.field.duration,Durée,Duration,Duración,Durata,Duração
+sponsors.field.bonus,Bonus,Bonus,Bonus,Bonus,Bônus
+sponsors.name.local_pizzeria,FastBurger,FastBurger,FastBurger,FastBurger,FastBurger
+sponsors.name.local_sports_shop,City Garage,City Garage,City Garage,City Garage,City Garage
+sponsors.name.local_cafe,SportOne,SportOne,SportOne,SportOne,SportOne
+sponsors.name.national_bank,Blue Cola,Blue Cola,Blue Cola,Blue Cola,Blue Cola
+sponsors.name.national_media,Voltix,Voltix,Voltix,Voltix,Voltix
+sponsors.name.national_airline,NeoBank,NeoBank,NeoBank,NeoBank,NeoBank
+sponsors.name.premium_global_tech,AeroTech,AeroTech,AeroTech,AeroTech,AeroTech
+sponsors.name.premium_sportswear,Titan Energy,Titan Energy,Titan Energy,Titan Energy,Titan Energy
+sponsors.name.premium_global_motors,Global Motors,Global Motors,Global Motors,Global Motors,Global Motors
 STADIUM_RESUME,Reprendre la partie,Resume,Reanudar,Riprendi,Rettomare
 STADIUM_SIGNUP,S'inscrire / Créer Cloud Team,Sign Up / Create Cloud Team,Registrarse / Crear Cloud Team,Iscriversi / Creare Cloud Team,Inscrever / Criar Cloud Team
 STADIUM_CREATE_MY_TEAM,Créer mon équipe,Create My Team,Crear mi equipo,Crea la mia squadra,Criar minha equipa
@@ -115,6 +244,20 @@ popup_match_season_title,>> Suivez votre saison,>> Follow your season,>> Sigue t
 popup_match_season_body,Consultez le classement et suivez la progression de votre club.,Check the standings and track your club’s progress.,Consulta la clasificación y sigue el progreso de tu club.,Controlla la classifica e segui i progressi del tuo club.,Veja a classificação e acompanhe o progresso do seu clube.
 popup_match_extra_title,>> Relevez des défis supplémentaires,>> Take on extra challenges,>> Acepta nuevos desafíos,>> Affronta nuove sfide,>> Enfrente novos desafios
 popup_match_extra_body,Participez aux tournois et accomplissez des missions pour développer votre club.,Join tournaments and complete missions to grow your club.,Participa en torneos y completa misiones para desarrollar tu club.,Partecipa ai tornei e completa missioni per far crescere il tuo club.,Participe de torneios e complete missões para desenvolver seu clube.
+popup.sponsors.title,New Sponsorship Opportunities,New Sponsorship Opportunities,New Sponsorship Opportunities,New Sponsorship Opportunities,New Sponsorship Opportunities
+popup.sponsors.body,Your club is starting to attract attention.\nChoose the contract that best fits your ambitions.,Your club is starting to attract attention.\nChoose the contract that best fits your ambitions.,Your club is starting to attract attention.\nChoose the contract that best fits your ambitions.,Your club is starting to attract attention.\nChoose the contract that best fits your ambitions.,Your club is starting to attract attention.\nChoose the contract that best fits your ambitions.
+popup.sponsors_expired.title,New Sponsorship Opportunities,New Sponsorship Opportunities,New Sponsorship Opportunities,New Sponsorship Opportunities,New Sponsorship Opportunities
+popup.sponsors_expired.body,Your sponsorship contract has ended.\nNew partnership opportunities are now available.,Your sponsorship contract has ended.\nNew partnership opportunities are now available.,Your sponsorship contract has ended.\nNew partnership opportunities are now available.,Your sponsorship contract has ended.\nNew partnership opportunities are now available.,Your sponsorship contract has ended.\nNew partnership opportunities are now available.
+popup.club_tokens.title,Club Tokens,Club Tokens,Club Tokens,Club Tokens,Club Tokens
+popup.club_tokens.body,"Tes premiers tokens sont prêts !
+Gagne-les grâce aux missions, aux tournois et aux récompenses.","Your first tokens are ready!
+Earn them through missions, tournaments and rewards.","¡Tus primeros tokens están listos!
+Consíguelos con misiones, torneos y recompensas.","I tuoi primi token sono pronti!
+Ottienili con missioni, tornei e ricompense.","Os teus primeiros tokens estão prontos!
+Ganha-os em missões, torneios e recompensas."
+startup.preparing_club,Préparation de ton club...,Preparing your club...,Preparando tu club...,Preparazione del tuo club...,A preparar o teu clube...
+startup.just_seconds_more,Encore quelques secondes :),Just a few seconds more :),Solo unos segundos más :),Ancora qualche secondo :),Só mais alguns segundos :)
+startup.ready_to_manage_full_team,Prêt pour manager ton équipe de basketball de bout en bout ?,Ready to manage your basketball team from start to finish?,¿Listo para gestionar tu equipo de baloncesto de principio a fin?,Pronto a gestire la tua squadra di basket dall’inizio alla fine?,Pronto para gerir a tua equipa de basquetebol do início ao fim?
 stadium.level,Niveau,Level,Nivel,Livello,Nível
 stadium.target_level,Niveau cible,Target level,Nivel objetivo,Livello obiettivo,Nível alvo
 stadium.capacity,Capacité,Capacity,Capacidad,Capacità,Capacidade
@@ -126,6 +269,11 @@ stadium.work_duration,Work duration,Work duration,Work duration,Work duration,Wo
 stadium.duration_one_game,1 game,1 game,1 game,1 game,1 game
 stadium.basic_improvements,Basic Improvements,Basic Improvements,Basic Improvements,Basic Improvements,Basic Improvements
 stadium.basic_improvements_desc,Improve seating and refresh the facilities.,Improve seating and refresh the facilities.,Improve seating and refresh the facilities.,Improve seating and refresh the facilities.,Improve seating and refresh the facilities.
+stadium.capacity_bonus.basic,Better fan comfort,Better fan comfort,Better fan comfort,Better fan comfort,Better fan comfort
+stadium.capacity_bonus.1_2,VIP seating,VIP seating,VIP seating,VIP seating,VIP seating
+stadium.capacity_bonus.1_3,New food court,New food court,New food court,New food court,New food court
+stadium.capacity_bonus.2_1,Covered stands,Covered stands,Covered stands,Covered stands,Covered stands
+stadium.capacity_bonus.2_2,Premium hospitality,Premium hospitality,Premium hospitality,Premium hospitality,Premium hospitality
 stadium.confirm_upgrade,Confirmer l'évolution,Confirm upgrade,Confirmar mejora,Conferma miglioramento,Confirmar melhoria
 stadium.upgrade.save_missing,Save introuvable.,Save not found.,Guardado no encontrado.,Salvataggio non trovato.,Save não encontrado.
 stadium.upgrade.next_level_missing,Fonction stadium_next_level introuvable.,stadium_next_level function not found.,Función stadium_next_level no encontrada.,Funzione stadium_next_level non trovata.,Função stadium_next_level não encontrada.
@@ -200,6 +348,7 @@ tournois.reward_subtitle,Gain d'argent,Prize money,Premio en dinero,Premio in de
 
 selection.avg_age,Âge moyen,Average age,Edad media,Età media,Idade média
 selection.avg_salary,Salaire moyen,Average salary,Salario medio,Salario medio,Salário médio
+finance.income.sponsors,Revenus sponsors,Sponsor revenue,Ingresos de patrocinadores,Entrate sponsor,Receita de patrocinadores
 finance.income.tournaments,Tournois,Tournaments,Torneos,Tornei,Torneios
 selection.avg_perf,Perf moyenne,Average performance,Rendimiento medio,Prestazione media,Performance média
 tournois.info.teams,Équipes,Teams,Equipos,Squadre,Equipes
@@ -248,6 +397,7 @@ mercato.new_salaries_total,Nouveaux salaires,New salaries,Nuevos salarios,Nuovi 
 mercato.team_full_warning,Effectif complet : 12 joueurs maximum,Squad full: 12 players maximum,Plantilla completa: máximo 12 jugadores,Rosa al completo: massimo 12 giocatori,Plantel completo: máximo de 12 jogadores
 mercato.team_full_sell_before,Tu dois vendre des joueurs avant,You must sell players first,Debes vender jugadores antes,Devi vendere giocatori prima,Você deve vender jogadores antes
 myteam.btn.sell,Vendre,Sell,Vender,Vendi,Vender
+myteam.header.sell_player,Vendre joueur,Sell Player,Vender jugador,Vendi giocatore,Vender jogador
 myteam.btn.sold,Vendu,Sold,Vendido,Venduto,Vendido
 myteam.btn.confirm,Confirmer,Confirm,Confirmar,Conferma,Confirmar
 myteam.btn.confirm_sell,Confirmer la vente,Confirm sell,Confirmar venta,Conferma la vendita,Confirmar venda
@@ -408,6 +558,32 @@ teamname.confirm_team_name,Confirmer le nom de l’équipe,Confirm team name,Con
 matchsim.get_final_result,Obtenir le résultat final,Get Final Result,Obtener resultado final,Ottieni risultato finale,Obter resultado final
 matchsim.unlock,Débloquer,Unlock,Desbloquear,Sblocca,Desbloquear
 club_identity.not_enough_tokens,Pas assez de tokens,Not enough tokens,No tienes suficientes tokens,Token insufficienti,Tokens insuficientes
+club_identity.title,IDENTITÉ DU CLUB,CLUB IDENTITY,IDENTIDAD DEL CLUB,IDENTITÀ DEL CLUB,IDENTIDADE DO CLUBE
+club_identity.open,Ouvrir,Open,Abrir,Apri,Abrir
+club_identity.badge_name,Blason {number},Badge {number},Escudo {number},Stemma {number},Emblema {number}
+club_identity.level,Niveau {level},Level {level},Nivel {level},Livello {level},Nível {level}
+club_identity.locked,Verrouillé,Locked,Bloqueado,Bloccato,Bloqueado
+club_identity.equipped,Équipé,Equipped,Equipado,Equipaggiato,Equipado
+club_identity.equip,Équiper,Equip,Equipar,Equipaggia,Equipar
+club_identity.owned,Possédé,Owned,En propiedad,Posseduto,Possuído
+club_identity.not_owned,Non possédé,Not Owned,No poseído,Non posseduto,Não possuído
+club_identity.owned_badges,Sélectionner le blason principal,Select Main Badge,Seleccionar escudo principal,Seleziona stemma principale,Selecionar emblema principal
+club_identity.select,Sélectionner,Select,Seleccionar,Seleziona,Selecionar
+club_identity.selected,Sélectionné,Selected,Seleccionado,Selezionato,Selecionado
+club_identity.unlock,Débloquer,Unlock,Desbloquear,Sblocca,Desbloquear
+club_identity.upgrade,Améliorer,Upgrade,Mejorar,Migliora,Melhorar
+club_identity.action_change,Changer,Change,Cambiar,Cambia,Alterar
+club_identity.action_upgrade,Améliorer,Upgrade,Mejorar,Migliora,Melhorar
+club_identity.action_change_upgrade,Changer + améliorer,Change + Upgrade,Cambiar + mejorar,Cambia + migliora,Alterar + melhorar
+club_identity.action_confirm,{action} pour {cost} Tokens ?,{action} for {cost} Tokens?,¿{action} por {cost} Tokens?,{action} per {cost} Token?,{action} por {cost} Tokens?
+club_identity.unavailable,Étape suivante,Next step,Siguiente paso,Passo successivo,Próximo passo
+club_identity.unlock_cost,Débloquer {cost} Tokens,Unlock {cost} Tokens,Desbloquear {cost} Tokens,Sblocca {cost} Token,Desbloquear {cost} Tokens
+club_identity.upgrade_cost,Améliorer {cost} Tokens,Upgrade {cost} Tokens,Mejorar {cost} Tokens,Migliora {cost} Token,Melhorar {cost} Tokens
+club_identity.unlock_confirm,Débloquer ce blason pour {cost} Tokens ?,Unlock this badge for {cost} Tokens?,¿Desbloquear este escudo por {cost} Tokens?,Sbloccare questo stemma per {cost} Token?,Desbloquear este emblema por {cost} Tokens?
+club_identity.upgrade_confirm,Améliorer ce blason pour {cost} Tokens ?,Upgrade this badge for {cost} Tokens?,¿Mejorar este escudo por {cost} Tokens?,Migliorare questo stemma per {cost} Token?,Melhorar este emblema por {cost} Tokens?
+club_identity.cancel,Annuler,Cancel,Cancelar,Annulla,Cancelar
+club_identity.confirm,Confirmer,Confirm,Confirmar,Conferma,Confirmar
+club_identity.premium_placeholder,Collection Premium — plus tard,Premium Collection — coming later,Colección Premium — más adelante,Collezione Premium — più avanti,Coleção Premium — mais tarde
 menu.continue_team.tooltip,Continuez votre progression avec {team},Continue your progress with {team},Continúa tu progreso con {team},Continua i tuoi progressi con {team},Continua o teu progresso com {team}
 teamname.create_new_team,Créer une nouvelle équipe,Create New Team,Crear nuevo equipo,Crea nuova squadra,Criar nova equipa
 teamname.create_new_team.tooltip,Créer une nouvelle équipe et repartir de zéro.,Create a new team and start from scratch.,Crear un equipo nuevo y empezar desde cero.,Crea una nuova squadra e ricomincia da zero.,Criar uma nova equipa e começar do zero.
@@ -416,5 +592,44 @@ player.card.graph.defense,Défense,Defense,Defensa,Difesa,Defesa
 player.card.graph.mental,Mental,Mental,Mental,Mentale,Mental
 player.card.graph.physical,Physique,Physical,Físico,Fisico,Físico
 player.card.graph.tooltip,"Profil du joueur\n\nAttaque :\nTir, précision et efficacité offensive.\n\nDéfense :\nCapacité à défendre son adversaire.\n\nPhysique :\nVitesse, endurance et fraîcheur.\n\nMental :\nMotivation et état d'esprit.","Player profile\n\nAttack:\nShooting, accuracy and offensive efficiency.\n\nDefense:\nAbility to defend the opponent.\n\nPhysical:\nSpeed, endurance and freshness.\n\nMental:\nMotivation and mindset.","Perfil del jugador\n\nAtaque:\nTiro, precisión y eficacia ofensiva.\n\nDefensa:\nCapacidad para defender al rival.\n\nFísico:\nVelocidad, resistencia y frescura.\n\nMental:\nMotivación y estado de ánimo.","Profilo giocatore\n\nAttacco:\nTiro, precisione ed efficacia offensiva.\n\nDifesa:\nCapacità di difendere sull’avversario.\n\nFisico:\nVelocità, resistenza e freschezza.\n\nMentale:\nMotivazione e stato mentale.","Perfil do jogador\n\nAtaque:\nArremesso, precisão e eficiência ofensiva.\n\nDefesa:\nCapacidade de defender o adversário.\n\nFísico:\nVelocidade, resistência e frescor.\n\nMental:\nMotivação e estado de espírito."
-player.card.graph.tooltip.attack_defense,"Attaque =\nTir + Précision + Réussite à 2 pts + Réussite à 3 pts\n\nDéfense =\nvaleur Défense du joueur","Attack =\nShooting + Accuracy + 2-point success rate + 3-point success rate\n\nDefense =\nplayer Defense value","Ataque =\nTiro + Precisión + Acierto de 2 pts + Acierto de 3 pts\n\nDefensa =\nvalor Defensa del jugador","Attacco =\nTiro + Precisione + Percentuale da 2 punti + Percentuale da 3 punti\n\nDifesa =\nvalore Difesa del giocatore","Ataque =\nArremesso + Precisão + Aproveitamento de 2 pts + Aproveitamento de 3 pts\n\nDefesa =\nvalor de Defesa do jogador"
-player.card.graph.tooltip.physical_mental,"Physique =\nVitesse + Endurance + Fraîcheur (100 - fatigue)\n\nMental =\nvaleur Motivation du joueur","Physical =\nSpeed + Endurance + Freshness (100 - fatigue)\n\nMental =\nplayer Motivation value","Físico =\nVelocidad + Resistencia + Frescura (100 - fatiga)\n\nMental =\nvalor Motivación del jugador","Fisico =\nVelocità + Resistenza + Freschezza (100 - fatica)\n\nMentale =\nvalore Motivazione del giocatore","Físico =\nVelocidade + Resistência + Frescor (100 - fadiga)\n\nMental =\nvalor de Motivação do jogador"
+player.card.graph.tooltip.attack_defense,Attaque =\nTir + Précision + Réussite à 2 pts + Réussite à 3 pts\n\nDéfense =\nvaleur Défense du joueur,Attack =\nShooting + Accuracy + 2-point success rate + 3-point success rate\n\nDefense =\nplayer Defense value,Ataque =\nTiro + Precisión + Acierto de 2 pts + Acierto de 3 pts\n\nDefensa =\nvalor Defensa del jugador,Attacco =\nTiro + Precisione + Percentuale da 2 punti + Percentuale da 3 punti\n\nDifesa =\nvalore Difesa del giocatore,Ataque =\nArremesso + Precisão + Aproveitamento de 2 pts + Aproveitamento de 3 pts\n\nDefesa =\nvalor de Defesa do jogador
+player.card.graph.tooltip.physical_mental,Physique =\nVitesse + Endurance + Fraîcheur (100 - fatigue)\n\nMental =\nvaleur Motivation du joueur,Physical =\nSpeed + Endurance + Freshness (100 - fatigue)\n\nMental =\nplayer Motivation value,Físico =\nVelocidad + Resistencia + Frescura (100 - fatiga)\n\nMental =\nvalor Motivación del jugador,Fisico =\nVelocità + Resistenza + Freschezza (100 - fatica)\n\nMentale =\nvalore Motivazione del giocatore,Físico =\nVelocidade + Resistência + Frescor (100 - fadiga)\n\nMental =\nvalor de Motivação do jogador
+matchsim.progress_info.line1,Le score du match évoluera minute après minute.,The match score will evolve minute by minute.,El marcador del partido evolucionará minuto a minuto.,Il punteggio della partita evolverà minuto dopo minuto.,O resultado do jogo evoluirá minuto a minuto.
+matchsim.progress_info.line2,1 seconde correspond à 1 minute de jeu.,1 second equals 1 minute of play.,1 segundo corresponde a 1 minuto de juego.,1 secondo corrisponde a 1 minuto di gioco.,1 segundo corresponde a 1 minuto de jogo.
+club_tokens.stripe.buy_pack,Acheter {amount} Club Tokens - {price},Buy {amount} Club Tokens - {price},Comprar {amount} Club Tokens - {price},Acquista {amount} Club Token - {price},Comprar {amount} Club Tokens - {price}
+club_tokens.stripe.payment_opened,"Page de paiement ouverte
+Termine ton paiement dans le nouvel onglet, puis reviens ici.","Payment page opened
+Complete your payment in the new tab, then return here.","Página de pago abierta
+Completa el pago en la nueva pestaña y vuelve aquí.","Pagina di pagamento aperta
+Completa il pagamento nella nuova scheda, poi torna qui.","Página de pagamento aberta
+Conclui o pagamento no novo separador e volta aqui."
+club_tokens.stripe.payment_opened_status,"Page de paiement ouverte. Termine ton paiement dans le nouvel onglet, puis reviens ici.","Payment page opened. Complete your payment in the new tab, then return here.",Página de pago abierta. Completa el pago en la nueva pestaña y vuelve aquí.,"Pagina di pagamento aperta. Completa il pagamento nella nuova scheda, poi torna qui.",Página de pagamento aberta. Conclui o pagamento no novo separador e volta aqui.
+club_tokens.stripe.check_refresh,Vérifier le paiement et rafraîchir les Tokens,Check payment and refresh tokens,Comprobar pago y actualizar tokens,Controlla pagamento e aggiorna token,Verificar pagamento e atualizar tokens
+club_tokens.stripe.close,Fermer,Close,Cerrar,Chiudi,Fechar
+club_tokens.stripe.payment_confirmed,"Paiement confirmé
+{tokens_added} Club Tokens ajoutés
+Nouveau solde : {new_balance} Club Tokens","Payment confirmed
+{tokens_added} Club Tokens added
+New balance: {new_balance} Club Tokens","Pago confirmado
+{tokens_added} Club Tokens añadidos
+Nuevo saldo: {new_balance} Club Tokens","Pagamento confermato
+{tokens_added} Club Token aggiunti
+Nuovo saldo: {new_balance} Club Token","Pagamento confirmado
+{tokens_added} Club Tokens adicionados
+Novo saldo: {new_balance} Club Tokens"
+club_tokens.stripe.added_status,{tokens_added} Club Tokens ajoutés.,{tokens_added} Club Tokens added.,{tokens_added} Club Tokens añadidos.,{tokens_added} Club Token aggiunti.,{tokens_added} Club Tokens adicionados.
+club_tokens.stripe.loading_title,Paiement sécurisé Basket Manager,Basket Manager secure payment,Pago seguro Basket Manager,Pagamento sicuro Basket Manager,Pagamento seguro Basket Manager
+club_tokens.stripe.loading_message,Préparation du paiement sécurisé...,Preparing secure payment...,Preparando pago seguro...,Preparazione pagamento sicuro...,A preparar pagamento seguro...
+club_tokens.stripe.creating_session,Préparation du paiement sécurisé...,Preparing secure payment...,Preparando pago seguro...,Preparazione pagamento sicuro...,A preparar pagamento seguro...
+club_tokens.stripe.open_secure_payment,Ouvrir le paiement sécurisé,Open secure payment,Abrir pago seguro,Apri pagamento sicuro,Abrir pagamento seguro
+club_tokens.stripe.open_blocked,Le paiement sécurisé est prêt. Touche Ouvrir le paiement sécurisé.,Secure payment is ready. Tap Open secure payment.,El pago seguro está listo. Toca Abrir pago seguro.,Il pagamento sicuro è pronto. Tocca Apri pagamento sicuro.,O pagamento seguro está pronto. Toca Abrir pagamento seguro.
+club_tokens.stripe.session_failed,La demande de paiement a échoué. Réessaie.,Payment request failed. Please try again.,La solicitud de pago falló. Inténtalo de nuevo.,La richiesta di pagamento non è riuscita. Riprova.,O pedido de pagamento falhou. Tenta novamente.
+club_tokens.stripe.response_invalid,Réponse de paiement invalide. Réessaie.,Payment response invalid. Please try again.,Respuesta de pago no válida. Inténtalo de nuevo.,Risposta di pagamento non valida. Riprova.,Resposta de pagamento inválida. Tenta novamente.
+club_tokens.stripe.url_missing,URL de paiement manquante. Réessaie.,Payment URL missing. Please try again.,Falta la URL de pago. Inténtalo de nuevo.,URL di pagamento mancante. Riprova.,URL de pagamento em falta. Tenta novamente.
+club_tokens.stripe.refreshing,Vérification du paiement et rafraîchissement des Tokens...,Checking payment and refreshing tokens...,Comprobando pago y actualizando tokens...,Controllo pagamento e aggiornamento token...,A verificar pagamento e atualizar tokens...
+club_tokens.stripe.refresh_failed,Le rafraîchissement du paiement a échoué. Réessaie.,Payment refresh failed. Please try again.,La actualización del pago falló. Inténtalo de nuevo.,Aggiornamento pagamento non riuscito. Riprova.,A atualização do pagamento falhou. Tenta novamente.
+club_tokens.stripe.still_confirming,Le paiement est encore en cours de confirmation. Cela prend généralement quelques secondes.,Payment is still being confirmed. This usually takes only a few seconds.,El pago aún se está confirmando. Normalmente tarda solo unos segundos.,Il pagamento è ancora in conferma. Di solito bastano pochi secondi.,O pagamento ainda está a ser confirmado. Normalmente demora apenas alguns segundos.
+club_tokens.stripe.login_required,Connexion requise,Login required,Inicio de sesión requerido,Accesso richiesto,Início de sessão necessário
+club_tokens.stripe.no_pending_pack,Aucun pack en attente,No pending package,No hay paquete pendiente,Nessun pacchetto in attesa,Nenhum pacote pendente
+club_tokens.stripe.unknown_pack,Pack de Tokens inconnu,Unknown token package,Pack de tokens desconocido,Pacchetto token sconosciuto,Pacote de tokens desconhecido
+club_tokens.stripe.cancelled,Paiement annulé,Payment cancelled,Pago cancelado,Pagamento annullato,Pagamento cancelado

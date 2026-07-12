@@ -1,0 +1,155 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/Sponsors.gd" id="1_sponsors"]
+[ext_resource type="Texture2D" path="res://assets/images/backgrounds/finance_fond.png" id="2_bg"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes/btn_back_red.tres" id="3_btn_back_red"]
+[ext_resource type="StyleBox" path="res://ui/styleboxes_nba/btn_back_pressed.tres" id="4_btn_back_pressed"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.04, 0.07, 0.12, 0)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+content_margin_left = 32
+content_margin_top = 28
+content_margin_right = 32
+content_margin_bottom = 28
+
+[node name="Sponsors" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_sponsors")
+
+[node name="Bg" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_bg")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Veil" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.22)
+
+[node name="UI" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Title" type="Label" parent="UI"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -300.0
+offset_top = 28.0
+offset_right = 300.0
+offset_bottom = 86.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.45)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 3
+theme_override_font_sizes/font_size = 42
+text = "sponsors.title"
+horizontal_alignment = 1
+
+[node name="Panel" type="PanelContainer" parent="UI"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -660.0
+offset_top = -230.0
+offset_right = 660.0
+offset_bottom = 260.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Margin" type="MarginContainer" parent="UI/Panel"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="UI/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="Subtitle" type="Label" parent="UI/Panel/Margin/VBox"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.94, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "sponsors.subtitle"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="CurrentSponsorTitle" type="Label" parent="UI/Panel/Margin/VBox"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.86, 0.28, 1)
+theme_override_font_sizes/font_size = 30
+text = "sponsors.current_title"
+horizontal_alignment = 1
+
+[node name="CurrentSponsorEmpty" type="Label" parent="UI/Panel/Margin/VBox"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.88)
+theme_override_font_sizes/font_size = 25
+text = "sponsors.current_empty"
+horizontal_alignment = 1
+
+[node name="AvailableOffersTitle" type="Label" parent="UI/Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.86, 0.28, 1)
+theme_override_font_sizes/font_size = 30
+text = "sponsors.available_title"
+horizontal_alignment = 1
+
+[node name="AvailableOffersEmpty" type="Label" parent="UI/Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.88)
+theme_override_font_sizes/font_size = 25
+text = "sponsors.available_empty"
+horizontal_alignment = 1
+
+[node name="Info" type="Label" parent="UI/Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.88, 1, 0.92)
+theme_override_font_sizes/font_size = 23
+text = "sponsors.info"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="BtnRetour" type="Button" parent="UI"]
+layout_mode = 0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 34.0
+offset_top = -92.0
+offset_right = 240.0
+offset_bottom = -30.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = ExtResource("3_btn_back_red")
+theme_override_styles/pressed = ExtResource("4_btn_back_pressed")
+text = "menu.back"

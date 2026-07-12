@@ -1,5 +1,6 @@
 extends Control
 const PlayerLife := preload("res://scripts/PlayerLife.gd")
+const SponsorDataRef := preload("res://scripts/SponsorData.gd")
 
 # BM_SKIP_FINAL_RESULT_TOKEN_MODE_V1
 # false = mode test actuel inchangé.
@@ -8,6 +9,7 @@ const BM_SKIP_FINAL_RESULT_TOKEN_MODE := true
 const BM_SKIP_FINAL_RESULT_TOKEN_COST := 1
 const BM_GENERIC_FUNNEL_URL := "https://api.basketmanager-game.com/v1/funnel/event"
 const BM_GENERIC_FUNNEL_MAX_RETRIES := 2
+const HOME_ARENA_MATCH_BACKGROUND_PATH := "res://assets/images/backgrounds/home_arena.png"
 
 @onready var lbl_temps: Label = $LabelTemps
 @onready var lbl_score: Label = $LabelScore
@@ -16,6 +18,7 @@ const BM_GENERIC_FUNNEL_MAX_RETRIES := 2
 @onready var btn_retour: Button = $BtnRetour
 
 var lbl_match_result: Label = null
+var _match_progress_info_after_countdown: String = ""
 
 
 func _bm_make_back_button_style(bg: Color, glow: Color, bottom_w: int, shadow_size: int) -> StyleBoxFlat:
@@ -734,6 +737,31 @@ var _user_team_name: String = ""
 var _opp_team_name: String = ""
 
 
+func _is_home_arena_selected_for_match(save: Dictionary) -> bool:
+	var arena_any: Variant = save.get("arena_identity", {})
+	if typeof(arena_any) != TYPE_DICTIONARY:
+		return false
+	var arena := arena_any as Dictionary
+	return bool(arena.get("home_arena_selected", false))
+
+
+func _apply_home_arena_background_if_needed() -> void:
+	if not _user_is_home:
+		return
+
+	var save := PlayerLife.load_savegame()
+	if not _is_home_arena_selected_for_match(save):
+		return
+
+	var bg := get_node_or_null("BG") as TextureRect
+	if bg == null:
+		return
+	if not ResourceLoader.exists(HOME_ARENA_MATCH_BACKGROUND_PATH):
+		return
+
+	bg.texture = load(HOME_ARENA_MATCH_BACKGROUND_PATH) as Texture2D
+
+
 func _ensure_translations_loaded() -> void:
 	var key_test := "matchsim.summary_loss_close"
 	var paths := [
@@ -909,6 +937,7 @@ func _ready() -> void:
 	print("[DBG READY] before _init_team_names")
 	_init_team_names()
 	print("[DBG READY] after _init_team_names")
+	_apply_home_arena_background_if_needed()
 
 	print("[DBG READY] before _fade_in_scoreboard")
 	_fade_in_scoreboard()
@@ -923,12 +952,20 @@ func _ready() -> void:
 	await _bm_play_match_intro_countdown()
 	print("[DBG READY] before timer.start")
 	timer.start()
+	call_deferred("_bm_show_match_progress_info_after_start")
 	_bm_track_first_match_started()
 	if _bm_should_show_skip_final_result_button():
 		_bm_style_btn_skip_final_result_active()
 	print("[DBG READY] after timer.start")
 
 func _bm_play_match_intro_countdown() -> void:
+	_match_progress_info_after_countdown = ""
+	var match_progress_save: Dictionary = PlayerLife.load_savegame()
+	if typeof(match_progress_save) == TYPE_DICTIONARY and not bool(match_progress_save.get("match_progress_info_seen", false)) and int(match_progress_save.get("season_number", 1)) == 1 and int(match_progress_save.get("season_round", 0)) == 0:
+		match_progress_save["match_progress_info_seen"] = true
+		PlayerLife.write_savegame(match_progress_save)
+		_match_progress_info_after_countdown = tr("matchsim.progress_info.line1") + "\n" + tr("matchsim.progress_info.line2")
+
 	var overlay := Control.new()
 	overlay.name = "MatchIntroCountdown"
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -964,6 +1001,7 @@ func _bm_play_match_intro_countdown() -> void:
 	count_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay.add_child(count_lbl)
 
+
 	for n in ["3", "2", "1", "0"]:
 		count_lbl.text = n
 		count_lbl.scale = Vector2(0.82, 0.82)
@@ -978,7 +1016,7 @@ func _bm_play_match_intro_countdown() -> void:
 		tw.chain().tween_property(ball, "position:y", get_viewport_rect().size.y * 0.5 + 30.0, 0.24).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 		await get_tree().create_timer(0.54).timeout
 
-	await get_tree().create_timer(0.50).timeout
+	await get_tree().create_timer(2.0).timeout
 
 	var fade_tw := create_tween()
 	fade_tw.tween_property(overlay, "modulate:a", 0.0, 0.18)
@@ -986,6 +1024,43 @@ func _bm_play_match_intro_countdown() -> void:
 
 	overlay.queue_free()
 	await get_tree().process_frame
+
+
+func _bm_show_match_progress_info_after_start() -> void:
+	var match_progress_info_text := _match_progress_info_after_countdown.strip_edges()
+	_match_progress_info_after_countdown = ""
+	if match_progress_info_text == "":
+		return
+
+	var overlay := Control.new()
+	overlay.name = "MatchProgressInfoAfterStart"
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.z_index = 5001
+	add_child(overlay)
+
+	var progress_info_lbl := Label.new()
+	progress_info_lbl.text = match_progress_info_text
+	progress_info_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	progress_info_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	progress_info_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	progress_info_lbl.size = Vector2(760, 82)
+	progress_info_lbl.position = Vector2((get_viewport_rect().size.x - progress_info_lbl.size.x) * 0.5, get_viewport_rect().size.y * 0.5 - 111.0)
+	progress_info_lbl.add_theme_font_size_override("font_size", 25)
+	progress_info_lbl.add_theme_color_override("font_color", Color(1.0, 0.84, 0.28, 1.0))
+	progress_info_lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.08, 0.20, 1.0))
+	progress_info_lbl.add_theme_constant_override("outline_size", 6)
+	progress_info_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(progress_info_lbl)
+
+	await get_tree().create_timer(4.16).timeout
+	if not is_instance_valid(overlay):
+		return
+	var fade_tw := create_tween()
+	fade_tw.tween_property(overlay, "modulate:a", 0.0, 0.18)
+	await get_tree().create_timer(0.20).timeout
+	if is_instance_valid(overlay):
+		overlay.queue_free()
 
 
 func _bm_get_active_coach_match_bonus(save_override: Dictionary = {}) -> float:
@@ -2393,6 +2468,7 @@ func _fin_match() -> void:
 				c90["pts_100_plus"] = int(c90.get("pts_100_plus", 0)) + 1
 			ms90["counters"] = c90
 			save["missions_state"] = ms90
+		SponsorDataRef.apply_per_match_revenue_to_save(save)
 
 	# Revenus boutique déjà cumulés plus haut dans le bloc domicile.
 

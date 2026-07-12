@@ -1986,6 +1986,27 @@ func _on_validate() -> void:
 
 	Save.write_dict(d)
 
+
+	var bm_debug_selection_save: Dictionary = Save.read_dict()
+	if typeof(bm_debug_selection_save) == TYPE_DICTIONARY and not bm_debug_selection_save.is_empty():
+		var bm_debug_selection_club_name := ""
+		if bm_debug_selection_save.has("club") and typeof(bm_debug_selection_save["club"]) == TYPE_DICTIONARY:
+			bm_debug_selection_club_name = str((bm_debug_selection_save["club"] as Dictionary).get("name", "")).strip_edges()
+		var bm_debug_selection_selected_size := -1
+		if bm_debug_selection_save.has("roster") and typeof(bm_debug_selection_save["roster"]) == TYPE_DICTIONARY:
+			var bm_debug_selection_roster: Dictionary = bm_debug_selection_save["roster"] as Dictionary
+			if bm_debug_selection_roster.has("selected_ids") and typeof(bm_debug_selection_roster["selected_ids"]) == TYPE_ARRAY:
+				bm_debug_selection_selected_size = (bm_debug_selection_roster["selected_ids"] as Array).size()
+		var bm_debug_selection_players_size := -1
+		if bm_debug_selection_save.has("players") and typeof(bm_debug_selection_save["players"]) == TYPE_ARRAY:
+			bm_debug_selection_players_size = (bm_debug_selection_save["players"] as Array).size()
+		print("[BM_DEBUG][SELECTION_SAVE] team_name=", str(bm_debug_selection_save.get("team_name", "")), " club.name=", bm_debug_selection_club_name, " popup_bienvenue_club_deja_vu=", bool(bm_debug_selection_save.get("popup_bienvenue_club_deja_vu", false)), " roster.selected_ids.size=", bm_debug_selection_selected_size, " players.size=", bm_debug_selection_players_size)
+		var bm_debug_selection_legacy_file := FileAccess.open("user://savegame.json", FileAccess.WRITE)
+		if bm_debug_selection_legacy_file != null:
+			bm_debug_selection_legacy_file.store_string(JSON.stringify(bm_debug_selection_save, "	"))
+			bm_debug_selection_legacy_file.close()
+			print("BM_DEBUG legacy savegame synced after selection")
+
 	_bm_send_generic_funnel_event("selection-validated", "funnel_selection_validated_sent", {})
 
 	print("[SELECTION] saved roster.selected_ids=", (d["roster"] as Dictionary).get("selected_ids", []))

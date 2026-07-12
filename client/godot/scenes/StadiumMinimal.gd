@@ -4,6 +4,15 @@ extends Control
 # --- SHOP / BOUTIQUE (TOP-LEVEL CONSTS) --------------------------------------
 const SHOP_BG_PATH: String = "res://assets/images/backgrounds/boutique.png"
 const UPGRADE_BG_PATH: String = "res://assets/images/stades/stade_11.png"
+const UPGRADE_CAPACITY_ICON_PATH: String = "res://assets/images/capacity.png"
+const UPGRADE_COST_ICON_PATH: String = "res://assets/images/cost.png"
+const UPGRADE_DURATION_ICON_PATH: String = "res://assets/images/duration.png"
+const UPGRADE_CAPACITY_ICON_SIZE: int = 34
+const UPGRADE_SMALL_INFO_ICON_SIZE: int = 34
+const UPGRADE_INFO_ROWS_SIZE: Vector2 = Vector2(420, 180)
+const UPGRADE_INFO_ROW_HEIGHT: int = 60
+const UPGRADE_INFO_CARD_SIZE: Vector2 = Vector2(400, 56)
+const UPGRADE_TIMELINE_ICON_SIZE: int = 74
 
 const SHOP_PRODUCTS: Array = [
 	{"id":"ballon",	  "label":"Ballon"},
@@ -763,7 +772,7 @@ var _upgrade_target_ns: int = 0
 var _upgrade_accel_mode: bool = false
 const UPGRADE_PANEL_ALPHA: float = 0.42
 const UPGRADE_PANEL_RADIUS: int = 18
-const UPGRADE_NEXT_IMAGE_SIZE: Vector2 = Vector2(640, 300)
+const UPGRADE_NEXT_IMAGE_SIZE: Vector2 = Vector2(620, 240)
 
 func _apply_upgrade_readability_panel_style(frame: PanelContainer) -> void:
 	if frame == null:
@@ -801,7 +810,7 @@ func _stadium_current_image_path() -> String:
 func _apply_upgrade_confirm_button_style(btn: Button) -> void:
 	if btn == null:
 		return
-	btn.custom_minimum_size = Vector2(0, 54)
+	btn.custom_minimum_size = Vector2(260, 54)
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	btn.add_theme_font_size_override("font_size", 26)
 	var sb_n := StyleBoxFlat.new()
@@ -842,7 +851,7 @@ func _apply_upgrade_confirm_button_style(btn: Button) -> void:
 func _apply_upgrade_cancel_button_style(btn: Button) -> void:
 	if btn == null:
 		return
-	btn.custom_minimum_size = Vector2(0, 54)
+	btn.custom_minimum_size = Vector2(260, 54)
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	btn.add_theme_font_size_override("font_size", 26)
 	var sb_n := StyleBoxFlat.new()
@@ -1332,6 +1341,253 @@ func _stadium_current_matchs_saison() -> int:
 				return maxi(0, journee - 1)
 	return 0
 
+func _make_upgrade_info_card(icon_path: String, icon_size: int, title: String, value: String, bonus_text: String = "") -> PanelContainer:
+	var card := PanelContainer.new()
+	card.custom_minimum_size = UPGRADE_INFO_CARD_SIZE
+	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var card_style := StyleBoxFlat.new()
+	card_style.bg_color = Color(1, 1, 1, 0.54)
+	card_style.border_width_left = 0
+	card_style.border_width_right = 0
+	card_style.border_width_top = 0
+	card_style.border_width_bottom = 0
+	card_style.corner_radius_top_left = 14
+	card_style.corner_radius_top_right = 14
+	card_style.corner_radius_bottom_left = 14
+	card_style.corner_radius_bottom_right = 14
+	card_style.content_margin_left = 14
+	card_style.content_margin_right = 18
+	card_style.content_margin_top = 2
+	card_style.content_margin_bottom = 2
+	card_style.shadow_size = 5
+	card_style.shadow_offset = Vector2(0, 2)
+	card_style.shadow_color = Color(0, 0, 0, 0.16)
+	card.add_theme_stylebox_override("panel", card_style)
+
+	var stack := VBoxContainer.new()
+	stack.alignment = BoxContainer.ALIGNMENT_CENTER
+	stack.add_theme_constant_override("separation", 0)
+	stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(stack)
+
+	var title_row := HBoxContainer.new()
+	title_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	title_row.add_theme_constant_override("separation", 10)
+	title_row.custom_minimum_size = Vector2(0, 34)
+	title_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stack.add_child(title_row)
+
+	var display_icon_size: int = int(round(float(icon_size) * 1.27))
+	var icon_cell := CenterContainer.new()
+	icon_cell.custom_minimum_size = Vector2(display_icon_size, display_icon_size)
+	icon_cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_row.add_child(icon_cell)
+	if ResourceLoader.exists(icon_path):
+		var tex := load(icon_path) as Texture2D
+		if tex != null:
+			var icon := TextureRect.new()
+			icon.texture = tex
+			icon.custom_minimum_size = Vector2(display_icon_size, display_icon_size)
+			icon.size = Vector2(display_icon_size, display_icon_size)
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			icon_cell.add_child(icon)
+
+	var title_label := Label.new()
+	title_label.text = title
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_label.add_theme_font_size_override("font_size", 20)
+	title_label.add_theme_color_override("font_color", Color(0, 0, 0, 0.62))
+	title_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0))
+	title_label.add_theme_constant_override("outline_size", 0)
+	title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_row.add_child(title_label)
+
+	var value_row := HBoxContainer.new()
+	value_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	value_row.add_theme_constant_override("separation", 14)
+	value_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stack.add_child(value_row)
+
+	var value_label := Label.new()
+	value_label.text = value
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	value_label.add_theme_font_size_override("font_size", 24)
+	value_label.add_theme_color_override("font_color", Color(0, 0, 0, 1))
+	value_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0))
+	value_label.add_theme_constant_override("outline_size", 0)
+	value_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	value_row.add_child(value_label)
+
+	if bonus_text.strip_edges() != "":
+		var bonus_label := Label.new()
+		bonus_label.text = "+ " + bonus_text
+		bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		bonus_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		bonus_label.add_theme_font_size_override("font_size", 22)
+		bonus_label.add_theme_color_override("font_color", Color(0, 0, 0, 1))
+		bonus_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0))
+		bonus_label.add_theme_constant_override("outline_size", 0)
+		bonus_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		value_row.add_child(bonus_label)
+
+	return card
+
+func _stadium_capacity_bonus_key(level: Vector2i) -> String:
+	var bonus_keys := {
+		"1_1": "stadium.capacity_bonus.basic",
+		"1_2": "stadium.capacity_bonus.1_2",
+		"1_3": "stadium.capacity_bonus.1_3",
+		"2_1": "stadium.capacity_bonus.2_1",
+		"2_2": "stadium.capacity_bonus.2_2",
+	}
+	return str(bonus_keys.get(str(level.x) + "_" + str(level.y), ""))
+
+func _hide_upgrade_progress_timeline() -> void:
+	for timeline_node in find_children("UpgradeProgressTimeline", "", true, false):
+		if timeline_node != null:
+			timeline_node.queue_free()
+
+func _stadium_upgrade_level_label(level: Vector2i) -> String:
+	if level.x == 1 and level.y == 0:
+		return "Level 1.1"
+	if level.x == 1 and level.y == 1:
+		return _stadium_tr("stadium.basic_improvements")
+	return _stadium_tr("stadium.level") + " " + str(level.x) + "." + str(level.y)
+
+func _stadium_level_from_string(level_text: String) -> Vector2i:
+	var parts := level_text.split(".")
+	if parts.size() >= 2:
+		return Vector2i(int(parts[0]), int(parts[1]))
+	return Vector2i(1, 0)
+
+func _make_upgrade_progress_timeline(current_level_text: String, target_level: Vector2i) -> PanelContainer:
+	var current_level := _stadium_level_from_string(current_level_text)
+	var levels: Array = StadiumDataRef.get_all_levels()
+	var current_index: int = 0
+	var target_index: int = 0
+	for i in range(levels.size()):
+		var lv: Vector2i = levels[i]
+		if lv == current_level:
+			current_index = i
+		if lv == target_level:
+			target_index = i
+
+	var start_index: int = max(0, min(current_index, target_index))
+	var end_index: int = min(levels.size() - 1, max(start_index + 4, target_index + 3))
+	if end_index - start_index < 4:
+		start_index = max(0, end_index - 4)
+
+	var timeline := PanelContainer.new()
+	timeline.name = "UpgradeProgressTimeline"
+	timeline.custom_minimum_size = Vector2(536, 498)
+	timeline.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	timeline.offset_left = 36
+	timeline.offset_top = 170
+	timeline.position = Vector2(36, 170)
+	timeline.size = Vector2(536, 498)
+	timeline.z_index = 80
+	timeline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var timeline_style := StyleBoxFlat.new()
+	timeline_style.bg_color = Color(1, 1, 1, 0.0)
+	timeline_style.border_width_left = 0
+	timeline_style.border_width_right = 0
+	timeline_style.border_width_top = 0
+	timeline_style.border_width_bottom = 0
+	timeline_style.corner_radius_top_left = 18
+	timeline_style.corner_radius_top_right = 18
+	timeline_style.corner_radius_bottom_left = 18
+	timeline_style.corner_radius_bottom_right = 18
+	timeline_style.content_margin_left = 24
+	timeline_style.content_margin_right = 24
+	timeline_style.content_margin_top = 14
+	timeline_style.content_margin_bottom = 14
+	timeline.add_theme_stylebox_override("panel", timeline_style)
+
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 0)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	timeline.add_child(box)
+
+	for i in range(start_index, end_index + 1):
+		var lv2: Vector2i = levels[i]
+		var item := VBoxContainer.new()
+		item.alignment = BoxContainer.ALIGNMENT_CENTER
+		item.add_theme_constant_override("separation", 2)
+		item.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(item)
+
+		var icon_wrap := CenterContainer.new()
+		icon_wrap.custom_minimum_size = Vector2(129, 78)
+		icon_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		item.add_child(icon_wrap)
+		if ResourceLoader.exists(UPGRADE_CAPACITY_ICON_PATH):
+			var tex := load(UPGRADE_CAPACITY_ICON_PATH) as Texture2D
+			if tex != null:
+				var icon := TextureRect.new()
+				icon.texture = tex
+				icon.custom_minimum_size = Vector2(UPGRADE_TIMELINE_ICON_SIZE, UPGRADE_TIMELINE_ICON_SIZE)
+				icon.size = Vector2(UPGRADE_TIMELINE_ICON_SIZE, UPGRADE_TIMELINE_ICON_SIZE)
+				icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				if lv2 == target_level:
+					icon.modulate = Color(1, 1, 1, 1)
+				elif i > target_index:
+					icon.modulate = Color(0.72, 0.72, 0.72, 0.42)
+				else:
+					icon.modulate = Color(1, 1, 1, 0.78)
+				icon_wrap.add_child(icon)
+
+		var lbl := Label.new()
+		lbl.text = _stadium_upgrade_level_label(lv2)
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.add_theme_font_size_override("font_size", 28)
+		lbl.add_theme_color_override("font_color", Color(0, 0, 0, 0.92 if lv2 == target_level else 0.66))
+		lbl.add_theme_color_override("font_outline_color", Color(1, 1, 1, 0.0))
+		lbl.add_theme_constant_override("outline_size", 0)
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		item.add_child(lbl)
+
+		if lv2 == target_level:
+			var halo := StyleBoxFlat.new()
+			halo.bg_color = Color(1, 1, 1, 0.42)
+			halo.border_width_left = 1
+			halo.border_width_right = 1
+			halo.border_width_top = 1
+			halo.border_width_bottom = 1
+			halo.border_color = Color(0.03, 0.16, 0.38, 0.34)
+			halo.corner_radius_top_left = 10
+			halo.corner_radius_top_right = 10
+			halo.corner_radius_bottom_left = 10
+			halo.corner_radius_bottom_right = 10
+			item.add_theme_stylebox_override("panel", halo)
+
+		if i < end_index:
+			var line_wrap := CenterContainer.new()
+			line_wrap.custom_minimum_size = Vector2(129, 32)
+			line_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			var dotted_line := VBoxContainer.new()
+			dotted_line.alignment = BoxContainer.ALIGNMENT_CENTER
+			dotted_line.add_theme_constant_override("separation", 5)
+			dotted_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			for _dot_idx in range(5):
+				var dot := ColorRect.new()
+				dot.custom_minimum_size = Vector2(6, 6)
+				dot.color = Color(0, 0, 0, 0.82)
+				dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				dotted_line.add_child(dot)
+			line_wrap.add_child(dotted_line)
+			box.add_child(line_wrap)
+
+	return timeline
+
 func _ensure_upgrade_dialogs() -> void:
 	if _upgrade_confirm_dialog == null:
 		var cd := ConfirmationDialog.new()
@@ -1588,13 +1844,13 @@ func _refresh_upgrade_works_ui(ng_cur: int, ns_cur: int, rem: int, total: int) -
 		frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	if root != null:
 		root.scale = Vector2(1, 1)
-		root.offset_left = 80
-		root.offset_top = 70
-		root.offset_right = -80
-		root.offset_bottom = -70
+		root.offset_left = 210
+		root.offset_top = 74
+		root.offset_right = -58
+		root.offset_bottom = -64
 	if upgrade_box != null:
 		upgrade_box.alignment = BoxContainer.ALIGNMENT_CENTER
-		upgrade_box.add_theme_constant_override("separation", 58)
+		upgrade_box.add_theme_constant_override("separation", 14)
 
 	var accel_tokens: int = int(StadiumDataRef.ACCELERATION_TOKENS.get(StadiumDataRef.level_key(ng_cur, ns_cur), 0))
 	var tokens_now: int = 0
@@ -1704,6 +1960,7 @@ func _prompt_upgrade_acceleration(rem: int, ng_cur: int, ns_cur: int) -> void:
 
 
 func _on_upgrade_accelerate_pressed() -> void:
+	_hide_upgrade_progress_timeline()
 	if save_node_check != null and save_node_check.has_method("read_dict"):
 		var d_any: Variant = save_node_check.call("read_dict")
 		if typeof(d_any) == TYPE_DICTIONARY:
@@ -1927,23 +2184,23 @@ func _on_tab_upgrade() -> void:
 				(vbox_up as BoxContainer).alignment = BoxContainer.ALIGNMENT_CENTER
 			vbox_up.mouse_filter = Control.MOUSE_FILTER_PASS
 			vbox_up.scale = Vector2(1, 1)
-			vbox_up.offset_left = 80
-			vbox_up.offset_top = 70
-			vbox_up.offset_right = -80
-			vbox_up.offset_bottom = -70
+			vbox_up.offset_left = 210
+			vbox_up.offset_top = 74
+			vbox_up.offset_right = -58
+			vbox_up.offset_bottom = -64
 			var spacer := vbox_up.get_node_or_null("UpgradeTopSpacer") as Control
 			if spacer == null:
 				spacer = Control.new()
 				spacer.name = "UpgradeTopSpacer"
-				spacer.custom_minimum_size = Vector2(0, 10)
+				spacer.custom_minimum_size = Vector2(0, 30)
 				vbox_up.add_child(spacer)
 				vbox_up.move_child(spacer, 0)
 			else:
-				spacer.custom_minimum_size = Vector2(0, 10)
+				spacer.custom_minimum_size = Vector2(0, 30)
 			var upgrade_frame := vbox_up.get_node_or_null("UpgradeInfoFrame") as PanelContainer
 			if upgrade_frame != null:
 				_apply_upgrade_readability_panel_style(upgrade_frame)
-				upgrade_frame.custom_minimum_size = Vector2(960, 680)
+				upgrade_frame.custom_minimum_size = Vector2(1080, 700)
 				upgrade_frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 				upgrade_frame.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 				var upgrade_box := upgrade_frame.get_node_or_null("UpgradeInfoBox") as VBoxContainer
@@ -1952,7 +2209,7 @@ func _on_tab_upgrade() -> void:
 					upgrade_box.name = "UpgradeInfoBox"
 					upgrade_frame.add_child(upgrade_box)
 				upgrade_box.alignment = BoxContainer.ALIGNMENT_CENTER
-				upgrade_box.add_theme_constant_override("separation", 18)
+				upgrade_box.add_theme_constant_override("separation", 14)
 				var old_info := upgrade_frame.get_node_or_null("LblUpgradeInfo") as RichTextLabel
 				if old_info != null:
 					upgrade_frame.remove_child(old_info)
@@ -1978,26 +2235,62 @@ func _on_tab_upgrade() -> void:
 			LblStadiumLevel.visible = false
 
 		# BM_EVOL_STADE_CURRENT_BG_V1: image du stade actuel en fond de l'écran Evol Stade
+		var info: RichTextLabel = null
+		var upgrade_target_title: Label = null
+		var upgrade_info_box: VBoxContainer = null
+		var next_image_frame: PanelContainer = null
+		var next_image: TextureRect = null
 		var upgrade_bg := panel.get_node_or_null("UpgradeBG") as TextureRect
 		if upgrade_bg != null:
 			var current_bg_path := _stadium_current_image_path()
 			if ResourceLoader.exists(current_bg_path):
 				upgrade_bg.texture = load(current_bg_path) as Texture2D
 
-		var info := panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox/LblUpgradeInfo") as RichTextLabel
-		var upgrade_target_title := panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox/LblUpgradeTargetTitle") as Label
-		var upgrade_info_box := panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox") as VBoxContainer
-		var next_image := panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox/UpgradeNextImage") as TextureRect
+		info = panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox/LblUpgradeInfo") as RichTextLabel
+		upgrade_target_title = panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox/LblUpgradeTargetTitle") as Label
+		upgrade_info_box = panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox") as VBoxContainer
+		next_image_frame = panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox/UpgradeNextImageFrame") as PanelContainer
+		next_image = panel.get_node_or_null("VBoxUpgrade/UpgradeInfoFrame/UpgradeInfoBox/UpgradeNextImageFrame/UpgradeNextImage") as TextureRect
+		if next_image_frame == null and upgrade_info_box != null:
+			next_image_frame = PanelContainer.new()
+			next_image_frame.name = "UpgradeNextImageFrame"
+			next_image_frame.custom_minimum_size = UPGRADE_NEXT_IMAGE_SIZE
+			next_image_frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			var next_image_frame_style := StyleBoxFlat.new()
+			next_image_frame_style.bg_color = Color(1, 1, 1, 0.08)
+			next_image_frame_style.border_width_left = 0
+			next_image_frame_style.border_width_right = 0
+			next_image_frame_style.border_width_top = 0
+			next_image_frame_style.border_width_bottom = 0
+			next_image_frame_style.corner_radius_top_left = 12
+			next_image_frame_style.corner_radius_top_right = 12
+			next_image_frame_style.corner_radius_bottom_left = 12
+			next_image_frame_style.corner_radius_bottom_right = 12
+			next_image_frame_style.shadow_size = 7
+			next_image_frame_style.shadow_offset = Vector2(0, 3)
+			next_image_frame_style.shadow_color = Color(0, 0, 0, 0.18)
+			next_image_frame.add_theme_stylebox_override("panel", next_image_frame_style)
+			upgrade_info_box.add_child(next_image_frame)
+			var old_direct_image := upgrade_info_box.get_node_or_null("UpgradeNextImage") as TextureRect
+			if old_direct_image != null:
+				upgrade_info_box.remove_child(old_direct_image)
+				next_image_frame.add_child(old_direct_image)
+				next_image = old_direct_image
 		if next_image == null and upgrade_info_box != null:
 			next_image = TextureRect.new()
 			next_image.name = "UpgradeNextImage"
-			upgrade_info_box.add_child(next_image)
-		if next_image != null and upgrade_info_box != null:
-			upgrade_info_box.move_child(next_image, mini(1, upgrade_info_box.get_child_count() - 1))
+			if next_image_frame != null:
+				next_image_frame.add_child(next_image)
+			else:
+				upgrade_info_box.add_child(next_image)
+		if next_image_frame != null and upgrade_info_box != null:
+			upgrade_info_box.move_child(next_image_frame, mini(1, upgrade_info_box.get_child_count() - 1))
 		if next_image != null:
 			var next_image_path := _stadium_image_path_for_level(ng, ns)
 			if ResourceLoader.exists(next_image_path):
 				next_image.texture = load(next_image_path) as Texture2D
+			if next_image_frame != null:
+				next_image_frame.custom_minimum_size = UPGRADE_NEXT_IMAGE_SIZE
 			next_image.custom_minimum_size = UPGRADE_NEXT_IMAGE_SIZE
 			next_image.size = UPGRADE_NEXT_IMAGE_SIZE
 			next_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -2005,6 +2298,18 @@ func _on_tab_upgrade() -> void:
 			next_image.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 			next_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			next_image.visible = true
+
+		for old_timeline_node in find_children("UpgradeProgressTimeline", "", true, false):
+			if old_timeline_node != null:
+				old_timeline_node.queue_free()
+		var timeline := _make_upgrade_progress_timeline(current_level, Vector2i(ng, ns))
+		add_child(timeline)
+		timeline.set_as_top_level(true)
+		timeline.global_position = panel.get_global_rect().position + Vector2(55, 185)
+		timeline.z_as_relative = false
+		timeline.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+		timeline.visible = true
+
 		if upgrade_target_title != null:
 			var target_label := _stadium_tr("stadium.basic_improvements") if is_basic_improvements else str(ng) + "." + str(ns)
 			upgrade_target_title.text = _stadium_tr("stadium.target_level") + " : " + target_label
@@ -2044,16 +2349,33 @@ func _on_tab_upgrade() -> void:
 			info.add_theme_constant_override("outline_size", 0)
 			info.bbcode_enabled = false
 			info.clear()
-			info.push_paragraph(HORIZONTAL_ALIGNMENT_LEFT)
-			info.add_text(_stadium_tr("stadium.capacity") + " : " + _format_int(target_capacity))
-			info.newline()
-			info.add_text(_stadium_tr("stadium.cost") + " : " + _format_int(cost) + " €")
-			info.newline()
-			if is_basic_improvements:
-				info.add_text(_stadium_tr("stadium.work_duration") + " : " + _stadium_tr("stadium.duration_one_game"))
-			else:
-				info.add_text(_stadium_tr("stadium.duration") + " : " + str(duration) + " " + _stadium_tr("stadium.duration_unit"))
-			info.pop()
+			info.visible = false
+			var info_parent := info.get_parent() as VBoxContainer
+			if info_parent != null:
+				var old_rows := info_parent.get_node_or_null("UpgradeInfoRows")
+				if old_rows != null:
+					info_parent.remove_child(old_rows)
+					old_rows.queue_free()
+				var rows := VBoxContainer.new()
+				rows.name = "UpgradeInfoRows"
+				rows.custom_minimum_size = UPGRADE_INFO_ROWS_SIZE
+				rows.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+				rows.add_theme_constant_override("separation", 0)
+				info_parent.add_child(rows)
+				info_parent.move_child(rows, info.get_index() + 1)
+				rows.add_theme_constant_override("separation", 8)
+				var capacity_bonus_key := _stadium_capacity_bonus_key(Vector2i(ng, ns))
+				var capacity_bonus_text := ""
+				if capacity_bonus_key != "":
+					capacity_bonus_text = _stadium_tr(capacity_bonus_key)
+				rows.add_child(_make_upgrade_info_card(UPGRADE_CAPACITY_ICON_PATH, UPGRADE_CAPACITY_ICON_SIZE, _stadium_tr("stadium.capacity"), _format_int(target_capacity), capacity_bonus_text))
+				rows.add_child(_make_upgrade_info_card(UPGRADE_COST_ICON_PATH, UPGRADE_SMALL_INFO_ICON_SIZE, _stadium_tr("stadium.cost"), _format_int(cost) + " €"))
+				var duration_text := ""
+				if is_basic_improvements:
+					duration_text = _stadium_tr("stadium.duration_one_game")
+				else:
+					duration_text = str(duration) + " " + _stadium_tr("stadium.duration_unit")
+				rows.add_child(_make_upgrade_info_card(UPGRADE_DURATION_ICON_PATH, UPGRADE_SMALL_INFO_ICON_SIZE, _stadium_tr("stadium.work_duration"), duration_text))
 			var accel_cost_text := str(accel_tokens) + " tokens"
 			# BM_HIDE_ACCELERATION_AVAILABLE_TEXT_V1
 			# info.add_text(_stadium_fmt("stadium.upgrade.acceleration_available", {"tokens": accel_tokens}).replace(accel_cost_text, "").strip_edges() + " ")
@@ -2121,6 +2443,7 @@ func _on_tab_upgrade() -> void:
 			btn_accel.visible = false
 
 func _on_upgrade_confirmed() -> void:
+	_hide_upgrade_progress_timeline()
 	print("[STADIUM][CONFIRM] entered | accel_mode=", _upgrade_accel_mode, " | target=", _upgrade_target_ng, ".", _upgrade_target_ns)
 	if _upgrade_accel_mode:
 		_upgrade_accel_mode = false
@@ -2498,15 +2821,15 @@ func _ensure_upgrade_panel() -> void:
 
 		# IMPORTANT: l'overlay de fermeture doit rester devant le contenu interactif
 		panel.move_child(upgrade_overlay, panel.get_child_count() - 1)
-		root.offset_left = 80
-		root.offset_top = 70
-		root.offset_right = -80
-		root.offset_bottom = -70
-		root.add_theme_constant_override("separation", 16)
+		root.offset_left = 210
+		root.offset_top = 74
+		root.offset_right = -58
+		root.offset_bottom = -64
+		root.add_theme_constant_override("separation", 18)
 
 		var frame := PanelContainer.new()
 		frame.name = "UpgradeInfoFrame"
-		frame.custom_minimum_size = Vector2(960, 680)
+		frame.custom_minimum_size = Vector2(1080, 700)
 		frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		frame.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
@@ -2523,12 +2846,32 @@ func _ensure_upgrade_panel() -> void:
 		var frame_box := VBoxContainer.new()
 		frame_box.name = "UpgradeInfoBox"
 		frame_box.alignment = BoxContainer.ALIGNMENT_CENTER
-		frame_box.add_theme_constant_override("separation", 18)
+		frame_box.add_theme_constant_override("separation", 14)
 
 		root.add_child(frame)
 		frame.add_child(frame_box)
 		frame_box.add_child(target_title_label)
 		_apply_upgrade_readability_panel_style(frame)
+
+		var next_image_frame := PanelContainer.new()
+		next_image_frame.name = "UpgradeNextImageFrame"
+		next_image_frame.custom_minimum_size = UPGRADE_NEXT_IMAGE_SIZE
+		next_image_frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		var next_image_frame_style := StyleBoxFlat.new()
+		next_image_frame_style.bg_color = Color(1, 1, 1, 0.08)
+		next_image_frame_style.border_width_left = 0
+		next_image_frame_style.border_width_right = 0
+		next_image_frame_style.border_width_top = 0
+		next_image_frame_style.border_width_bottom = 0
+		next_image_frame_style.corner_radius_top_left = 12
+		next_image_frame_style.corner_radius_top_right = 12
+		next_image_frame_style.corner_radius_bottom_left = 12
+		next_image_frame_style.corner_radius_bottom_right = 12
+		next_image_frame_style.shadow_size = 7
+		next_image_frame_style.shadow_offset = Vector2(0, 3)
+		next_image_frame_style.shadow_color = Color(0, 0, 0, 0.18)
+		next_image_frame.add_theme_stylebox_override("panel", next_image_frame_style)
+		frame_box.add_child(next_image_frame)
 
 		var next_image := TextureRect.new()
 		next_image.name = "UpgradeNextImage"
@@ -2539,7 +2882,7 @@ func _ensure_upgrade_panel() -> void:
 		next_image.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		next_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		next_image.visible = false
-		frame_box.add_child(next_image)
+		next_image_frame.add_child(next_image)
 
 		var info := RichTextLabel.new()
 		info.name = "LblUpgradeInfo"
@@ -4233,23 +4576,34 @@ func _stadium_boost_ticketing_fonts() -> void:
 		c.add_theme_font_size_override("font_size", boosted)
 
 	if _bm_stadium_is_mobile_layout():
+		for pp_box: String in [
+			"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceA",
+			"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceB",
+			"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceC",
+			"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsA",
+			"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsB",
+			"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsC"
+		]:
+			var box_mobile := get_node_or_null(pp_box) as Control
+			if box_mobile != null:
+				box_mobile.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		for pp: String in btn_paths:
 			var btn_mobile := get_node_or_null(pp) as Button
 			if btn_mobile != null:
-				btn_mobile.custom_minimum_size = Vector2(52, 44)
+				btn_mobile.custom_minimum_size = Vector2(52, 38)
+				btn_mobile.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		for pp_value: String in [
 			"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceA/PriceA",
 			"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceB/PriceB",
 			"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceC/PriceC",
 			"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsA/SeatsA",
 			"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsB/SeatsB",
-			"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsC/SeatsC",
-			"Content/CenterTicketing/PanelTicketing/VBox/Grid/SpacerA",
-			"Content/CenterTicketing/PanelTicketing/VBox/Grid/SpacerB",
-			"Content/CenterTicketing/PanelTicketing/VBox/Grid/SpacerC"
+			"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsC/SeatsC"
 		]:
 			var value_ctrl := get_node_or_null(pp_value) as Control
 			if value_ctrl != null:
+				value_ctrl.custom_minimum_size = Vector2(maxf(value_ctrl.custom_minimum_size.x, 102.0), 38)
+				value_ctrl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 				value_ctrl.add_theme_font_size_override("font_size", value_ctrl.get_theme_font_size("font_size") + 2)
 
 
