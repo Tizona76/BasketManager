@@ -216,7 +216,6 @@ ranking.loading,Chargement…,Loading…,Cargando…,Caricamento…,Carregando�
 ranking.me_suffix,(Moi),(Me),(Yo),(Io),(Eu)
 ranking.invalid_json,JSON invalide,Invalid JSON,JSON inválido,JSON non valido,JSON inválido
 ranking.http_error_prefix,Erreur: ,Error: ,Error: ,Errore: ,Erro: 
-
 menu.btn_save,Sauvegarder,Save,Guardar,Salva,Guardar
 menu.save_ok,Sauvegarde OK,Save OK,Guardado correcto,Salvataggio OK,Guardado OK
 saison.tab.standings,Classement,Standings,Clasificación,Classifica,Classificação
@@ -225,15 +224,14 @@ saison.tab.calendar,Calendrier,Calendar,Calendario,Calendario,Calendário
 saisons.tab.standings,Classement,Standings,Clasificación,Classifica,Classificação
 saisons.tab.stats,Statistiques,Stats,Estadísticas,Statistiche,Estatísticas
 saisons.tab.calendar,Calendrier,Calendar,Calendario,Calendario,Calendário
-
 saison.tab.missions,Missions,Missions,Misiones,Missioni,Missões
 saison.tab.tournois,Tournois,Tournaments,Torneos,Tornei,Torneios
 popup_intro_title,Build Your Roster,Build Your Roster,Build Your Roster,Build Your Roster,Build Your Roster
 popup_intro_build_title,🏟 Construisez votre club,🏟 Build your club,🏟 Construye tu club,🏟 Costruisci il tuo club,🏟 Construa seu clube
-popup_intro_build_body,Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.,Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.,Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.,Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.,Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.
+popup_intro_build_body,"Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.","Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.","Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.","Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.","Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players."
 popup_intro_select_players,Select Players,Select Players,Select Players,Select Players,Select Players
 popup_intro_decisions_title,📊 Prenez les bonnes décisions,📊 Make the right decisions,📊 Toma las decisiones correctas,📊 Prendi le decisioni giuste,📊 Tome as decisões certas
-popup_intro_decisions_body,Recrutez des joueurs, développez votre popularité : plus elle est élevée, plus les spectateurs viendront au stade.,Recruit players, grow your popularity: the higher it is, the more spectators will come to the stadium.,Ficha jugadores y aumenta tu popularidad: cuanto más alta sea, más espectadores vendrán al estadio.,Ingaggia giocatori e aumenta la tua popolarità: più è alta, più spettatori verranno allo stadio.,Contrate jogadores e aumente sua popularidade: quanto mais alta ela for, mais espectadores virão ao estádio.
+popup_intro_decisions_body,"Recrutez des joueurs, développez votre popularité : plus elle est élevée, plus les spectateurs viendront au stade.","Recruit players, grow your popularity: the higher it is, the more spectators will come to the stadium.","Ficha jugadores y aumenta tu popularidad: cuanto más alta sea, más espectadores vendrán al estadio.","Ingaggia giocatori e aumenta la tua popolarità: più è alta, più spettatori verranno allo stadio.","Contrate jogadores e aumente sua popularidade: quanto mais alta ela for, mais espectadores virão ao estádio."
 popup_intro_sim_title,>> Les matchs sont simulés,>> Gamees are simulated,>> Los partidos se simulan,>> Le partite sono simulate,>> As partidas são simuladas
 popup_intro_sim_body,Développez votre équipe : votre stratégie et votre effectif déterminent le résultat.,Develop your team: your strategy and squad determine the result.,Desarrolla tu equipo: tu estrategia y tu plantilla determinan el resultado.,Sviluppa la tua squadra: la tua strategia e la tua rosa determinano il risultato.,Desenvolva sua equipe: sua estratégia e seu elenco determinam o resultado.
 popup_intro_close,Fermer,Close,Cerrar,Chiudi,Fechar
@@ -288,7 +286,6 @@ stadium.upgrade.impossible,Évolution impossible.,Upgrade impossible.,Mejora imp
 stadium.upgrade.applied,Évolution du stade appliquée.,Stadium upgrade applied.,Mejora del estadio aplicada.,Miglioramento dello stadio applicato.,Melhoria do estádio aplicada.
 stadium.upgrade.started,Travaux lancés pour {duration} match(s).,Upgrade started for {duration} game(es).,Obras iniciadas por {duration} partido(s).,Lavori avviati per {duration} partita/e.,Obras iniciadas por {duration} partida(s).
 club.popularity,Popularité,Popularity,Popularidad,Popolarità,Popularidade
-
 btn.confirm,Confirmer,Confirm,Confirmar,Conferma,Confirmar
 season.ball.season,Saison,Season,Temporada,Stagione,Temporada
 season.ball.matches,Matchs,Gamees,Partidos,Partite,Partidas
@@ -320,25 +317,19 @@ tournois.round,Tour,Round,Ronda,Turno,Rodada
 tournois.tournament_a,Tournoi A,Tournament A,Torneo A,Torneo A,Torneio A
 tournois.intermediate,Intermédiaire,Intermediate,Intermedio,Intermedio,Intermediário
 tournois.elite,Élite,Elite,Élite,Élite,Elite
-
 myteam.poste,Poste,Position,Posición,Posizione,Posição
 myteam.age,Âge,Age,Edad,Età,Idade
 myteam.performance,Performance,Performance,Rendimiento,Prestazione,Desempenho
 myteam.salary,Salaire,Salary,Salario,Salario,Salário
-
 myteam.header.poste,Poste,Position,Posición,Posizione,Posição
 myteam.header.age,Âge,Age,Edad,Età,Idade
 myteam.header.performance,Performance,Performance,Rendimiento,Prestazione,Desempenho
 myteam.header.salary,Salaire,Salary,Salario,Salario,Salário
-
 myteam.motivation,Motivation,Motivation,Motivación,Motivazione,Motivação
 myteam.header.motivation,Motivation,Motivation,Motivación,Motivazione,Motivação
-
 classement.evolution,Évolution classement,Ranking evolution,Evolución clasificación,Evoluzione classifica,Evolução classificação
-
 standings.graph.title,Évolution classement,Ranking evolution,Evolución clasificación,Evoluzione classifica,Evolução classificação
 standings.team_header,Équipe,Team,Equipo,Squadra,Equipe
-
 tournois.intermediate_selected_info,Intermédiaire sélectionné (écran bracket à brancher ensuite).,Intermediate selected (bracket screen to be connected later).,Intermedio seleccionado (pantalla del cuadro por conectar después).,Intermedio selezionato (schermata del tabellone da collegare in seguito).,Intermediário selecionado (tela da chave a conectar depois).
 tournois.elite_selected_info,Élite sélectionné (écran bracket à brancher ensuite).,Elite selected (bracket screen to be connected later).,Élite seleccionado (pantalla del cuadro por conectar después).,Élite selezionato (schermata del tabellone da collegare in seguito).,Elite selecionado (tela da chave a conectar depois).
 tournois.victory_title,Victoire !,Victory!,¡Victoria!,Vittoria!,Vitória!
@@ -346,7 +337,6 @@ tournois.victory_subtitle,Victoire dans le Tournoi A,Victory in Tournament A,Vic
 common.close,Fermer,Close,Cerrar,Chiudi,Fechar
 tournois.reward_title,Récompense du tournoi,Tournament reward,Recompensa del torneo,Ricompensa del torneo,Recompensa do torneio
 tournois.reward_subtitle,Gain d'argent,Prize money,Premio en dinero,Premio in denaro,Prémio em dinheiro
-
 selection.avg_age,Âge moyen,Average age,Edad media,Età media,Idade média
 selection.avg_salary,Salaire moyen,Average salary,Salario medio,Salario medio,Salário médio
 finance.income.sponsors,Revenus sponsors,Sponsor revenue,Ingresos de patrocinadores,Entrate sponsor,Receita de patrocinadores
@@ -405,7 +395,6 @@ myteam.btn.confirm_sell,Confirmer la vente,Confirm sell,Confirmar venta,Conferma
 myteam.sell.tooltip,Le Mercato pour les achats sera ouvert dès le match 1 de la Saison 2.,The transfer market for purchases opens from game 1 of Season 2.,El mercado para compras se abrirá desde el partido 1 de la Temporada 2.,Il mercato per gli acquisti sarà aperto dalla partita 1 della Stagione 2.,O mercado para compras abrirá a partir do jogo 1 da Temporada 2.
 myteam.lineup_save.tooltip,Sauvegarde cette compo pour le reste de la saison. Tu peux la changer à tout moment.,Save this lineup for the rest of the season. You can change it anytime.,Guarda esta alineación para el resto de la temporada. Puedes cambiarla en cualquier momento.,Salva questa formazione per il resto della stagione. Puoi cambiarla in qualsiasi momento.,Guarda esta formação para o resto da temporada. Podes alterá-la a qualquer momento.
 mercato.closed.open_from_season2,Ouvert à partir de la saison 2 !,Open from Season 2!,¡Abierto desde la temporada 2!,Aperto dalla stagione 2!,Aberto a partir da temporada 2!
-
 player.position.point_guard,Meneur,Point Guard,Base,Playmaker,Base
 player.position.shooting_guard,Arrière,Shooting Guard,Escolta,Guardia tiratore,Escolta
 player.position.small_forward,Ailier,Small Forward,Alero,Ala piccola,Ala
@@ -426,11 +415,8 @@ popup.match_compo.cta,Faire la compo,Set lineup,Hacer la alineación,Crea la for
 myteam.btn.select_to_play,Sélectionner pour jouer,Select to play,Seleccionar para jugar,Seleziona per giocare,Selecionar para jogar
 myteam.selected_to_play_count,Joueurs sélectionnés pour jouer,Selected to play,Seleccionados para jugar,Giocatori selezionati per giocare,Selecionados para jogar
 myteam.btn.confirm_match_selection,Confirmer la composition,Confirm lineup,Confirmar quinteto,Conferma quintetto,Confirmar escalação
-
 myteam.header.fatigue,Fatigue,Fatigue,Fatiga,Fatica,Fadiga
-
 myteam.header.fatigue,Fatigue,Fitness,Fatiga,Fatica,Fadiga
-
 selection.header.motivation,Motivation,Motivation,Motivación,Motivazione,Motivação
 tooltip.selection.player,Joueur et avatar.,Player and avatar.,Jugador y avatar.,Giocatore e avatar.,Jogador e avatar.
 tooltip.selection.position,Poste du joueur.,Player position.,Posición del jugador.,Ruolo del giocatore.,Posição do jogador.
@@ -441,8 +427,8 @@ tooltip.selection.defense,Capacité défensive.,Defensive ability.,Capacidad def
 tooltip.selection.accuracy,Précision du joueur.,Player precision.,Precisión del jugador.,Precisione del giocatore.,Precisão do jogador.
 tooltip.selection.motivation,Motivation actuelle.,Current motivation.,Motivación actual.,Motivazione attuale.,Motivação atual.
 tooltip.selection.salary,Salaire payé par match.,Salary paid per game.,Salario pagado por partido.,Stipendio pagato a partita.,Salário pago por jogo.
-ui.popularity.tooltip,"Indice qui indique le taux de remplissage du stade. Il évolue au gré des victoires/défaites de ton équipe, et représente le taux de succès de tes supporters."
-club.popularity.tooltip,Indice qui indique le taux de remplissage du stade. Il évolue au gré des victoires et défaites de ton équipe, et représente le soutien de tes supporters.,Indicator showing the stadium fill rate. It changes with your team's wins and losses, and reflects your supporters' backing.,Índice que indica la tasa de llenado del estadio. Evoluciona según las victorias y derrotas de tu equipo, y representa el apoyo de tus aficionados.,Indicatore che mostra il tasso di riempimento dello stadio. Si evolve in base alle vittorie e sconfitte della tua squadra e rappresenta il sostegno dei tuoi tifosi.,Indicador que mostra a taxa de lotação do estádio. Evolui conforme as vitórias e derrotas da tua equipa e representa o apoio dos teus adeptos.
+ui.popularity.tooltip,"Indice qui indique le taux de remplissage du stade. Il évolue au gré des victoires/défaites de ton équipe, et représente le taux de succès de tes supporters.",,,,
+club.popularity.tooltip,"Indice qui indique le taux de remplissage du stade. Il évolue au gré des victoires et défaites de ton équipe, et représente le soutien de tes supporters.","Indicator showing the stadium fill rate. It changes with your team's wins and losses, and reflects your supporters' backing.","Índice que indica la tasa de llenado del estadio. Evoluciona según las victorias y derrotas de tu equipo, y representa el apoyo de tus aficionados.",Indicatore che mostra il tasso di riempimento dello stadio. Si evolve in base alle vittorie e sconfitte della tua squadra e rappresenta il sostegno dei tuoi tifosi.,Indicador que mostra a taxa de lotação do estádio. Evolui conforme as vitórias e derrotas da tua equipa e representa o apoio dos teus adeptos.
 coach.quote.junior,Je sécurise ta composition en évitant les erreurs majeures. Ton équipe devient stable et fiable.,I secure your lineup by avoiding major mistakes. Your team becomes stable and reliable.,Aseguro tu alineación evitando errores graves. Tu equipo se vuelve estable y fiable.,Rendo la tua formazione sicura evitando errori gravi. La tua squadra diventa stabile e affidabile.,Asseguro a tua formação evitando erros graves. A tua equipa torna-se estável e fiável.
 coach.quote.confirme,J’optimise ta composition selon la forme et la fatigue des joueurs. Ton équipe devient plus performante.,I optimize your lineup using player form and fatigue. Your team performs more consistently.,Optimizo tu alineación según la forma y la fatiga de los jugadores. Tu equipo rinde mejor.,Ottimizzo la tua formazione in base a forma e fatica dei giocatori. La tua squadra è più performante.,Otimizo a tua formação com base na forma e fadiga dos jogadores. A tua equipa rende melhor.
 coach.quote.elite,Je sélectionne en continu la meilleure composition et donne un vrai avantage en match.,I constantly select the best possible lineup and give your team a real edge in matches.,Selecciono continuamente la mejor alineación y doy una ventaja real en los partidos.,Seleziono continuamente la migliore formazione e do un vero vantaggio in partita.,Seleciono continuamente a melhor formação e dou uma vantagem real nos jogos.
@@ -475,36 +461,36 @@ stadium.shop.col.estimated_revenue,Recettes estimées,Estimated revenue,Ingresos
 stadium.shop.total_estimate,Estimation totale,Total estimate,Estimación total,Stima totale,Estimativa total
 goal.climb_standings_once,You are {rank}.<br>Next game matters !,You are {rank}.<br>Next game matters !,You are {rank}.<br>Next game matters !,You are {rank}.<br>Next game matters !,You are {rank}.<br>Next game matters !
 goal.climb_standings_match17,You are {rank}.<br>La fin de saison arrive dans 4 matchs !,You are {rank}.<br>The end of the season is coming in 4 games!,You are {rank}.<br>¡El final de la temporada llega en 4 partidos!,You are {rank}.<br>La fine della stagione arriva tra 4 partite!,You are {rank}.<br>O fim da temporada chega em 4 jogos!
-finance.trend.negative.1,Expenses outpacing income (high salaries),Expenses outpacing income (high salaries)
-finance.trend.negative.2,Losing money each match (low ticket sales),Losing money each match (low ticket sales)
-finance.trend.negative.3,Costs too high (player wages),Costs too high (player wages)
-finance.trend.negative.4,Revenue too low (poor pricing),Revenue too low (poor pricing)
-finance.trend.negative.5,Finances declining (weak attendance),Finances declining (weak attendance)
-finance.trend.negative.6,Negative balance growing (high expenses),Negative balance growing (high expenses)
-finance.trend.negative.7,Budget under pressure (low income),Budget under pressure (low income)
-finance.trend.negative.8,Losses increasing (shop underperforming),Losses increasing (shop underperforming)
-finance.trend.negative.9,Spending too much (no sponsor income),Spending too much (no sponsor income)
-finance.trend.negative.10,Income dropping (fan interest falling),Income dropping (fan interest falling)
-finance.trend.stable.1,Finances stable (balanced income and costs),Finances stable (balanced income and costs)
-finance.trend.stable.2,No major change (steady performance),No major change (steady performance)
-finance.trend.stable.3,Income matches expenses,Income matches expenses
-finance.trend.stable.4,Stable revenue (consistent ticket sales),Stable revenue (consistent ticket sales)
-finance.trend.stable.5,Balanced budget (no major shifts),Balanced budget (no major shifts)
-finance.trend.stable.6,Steady finances (no clear trend),Steady finances (no clear trend)
-finance.trend.stable.7,Performance holding steady,Performance holding steady
-finance.trend.stable.8,"No growth, no loss (neutral phase)","No growth, no loss (neutral phase)"
-finance.trend.stable.9,Finances unchanged (same strategy),Finances unchanged (same strategy)
-finance.trend.stable.10,Stable situation (predictable results),Stable situation (predictable results)
-finance.trend.positive.1,Revenue growing (ticket pricing working),Revenue growing (ticket pricing working)
-finance.trend.positive.2,Profits increasing (strong attendance),Profits increasing (strong attendance)
-finance.trend.positive.3,Income exceeds expenses,Income exceeds expenses
-finance.trend.positive.4,Finances improving (good strategy),Finances improving (good strategy)
-finance.trend.positive.5,Positive balance rising,Positive balance rising
-finance.trend.positive.6,Strong revenue (fans engaged),Strong revenue (fans engaged)
-finance.trend.positive.7,Good profit (optimized pricing),Good profit (optimized pricing)
-finance.trend.positive.8,Growth accelerating (better results),Growth accelerating (better results)
-finance.trend.positive.9,Income boosted (shop performing well),Income boosted (shop performing well)
-finance.trend.positive.10,Financial situation improving,Financial situation improving
+finance.trend.negative.1,Expenses outpacing income (high salaries),Expenses outpacing income (high salaries),,,
+finance.trend.negative.2,Losing money each match (low ticket sales),Losing money each match (low ticket sales),,,
+finance.trend.negative.3,Costs too high (player wages),Costs too high (player wages),,,
+finance.trend.negative.4,Revenue too low (poor pricing),Revenue too low (poor pricing),,,
+finance.trend.negative.5,Finances declining (weak attendance),Finances declining (weak attendance),,,
+finance.trend.negative.6,Negative balance growing (high expenses),Negative balance growing (high expenses),,,
+finance.trend.negative.7,Budget under pressure (low income),Budget under pressure (low income),,,
+finance.trend.negative.8,Losses increasing (shop underperforming),Losses increasing (shop underperforming),,,
+finance.trend.negative.9,Spending too much (no sponsor income),Spending too much (no sponsor income),,,
+finance.trend.negative.10,Income dropping (fan interest falling),Income dropping (fan interest falling),,,
+finance.trend.stable.1,Finances stable (balanced income and costs),Finances stable (balanced income and costs),,,
+finance.trend.stable.2,No major change (steady performance),No major change (steady performance),,,
+finance.trend.stable.3,Income matches expenses,Income matches expenses,,,
+finance.trend.stable.4,Stable revenue (consistent ticket sales),Stable revenue (consistent ticket sales),,,
+finance.trend.stable.5,Balanced budget (no major shifts),Balanced budget (no major shifts),,,
+finance.trend.stable.6,Steady finances (no clear trend),Steady finances (no clear trend),,,
+finance.trend.stable.7,Performance holding steady,Performance holding steady,,,
+finance.trend.stable.8,"No growth, no loss (neutral phase)","No growth, no loss (neutral phase)",,,
+finance.trend.stable.9,Finances unchanged (same strategy),Finances unchanged (same strategy),,,
+finance.trend.stable.10,Stable situation (predictable results),Stable situation (predictable results),,,
+finance.trend.positive.1,Revenue growing (ticket pricing working),Revenue growing (ticket pricing working),,,
+finance.trend.positive.2,Profits increasing (strong attendance),Profits increasing (strong attendance),,,
+finance.trend.positive.3,Income exceeds expenses,Income exceeds expenses,,,
+finance.trend.positive.4,Finances improving (good strategy),Finances improving (good strategy),,,
+finance.trend.positive.5,Positive balance rising,Positive balance rising,,,
+finance.trend.positive.6,Strong revenue (fans engaged),Strong revenue (fans engaged),,,
+finance.trend.positive.7,Good profit (optimized pricing),Good profit (optimized pricing),,,
+finance.trend.positive.8,Growth accelerating (better results),Growth accelerating (better results),,,
+finance.trend.positive.9,Income boosted (shop performing well),Income boosted (shop performing well),,,
+finance.trend.positive.10,Financial situation improving,Financial situation improving,,,
 matchsim.live.minute10.lineup_positive,Votre composition semble bien entrer dans le match.,Your lineup looks settled early.,Tu composición parece entrar bien en el partido.,La tua formazione sembra entrare bene in partita.,A tua composição parece entrar bem no jogo.
 matchsim.live.minute10.lineup_positive_2,Votre cinq trouve rapidement ses automatismes.,Your five is finding chemistry quickly.,Tu quinteto encuentra rápido sus automatismos.,Il tuo quintetto trova subito intesa.,O teu cinco encontra entrosamento rapidamente.
 matchsim.live.minute10.lineup_negative,Le groupe sélectionné tente de répondre au défi.,The selected group is trying to meet the challenge.,El grupo elegido intenta responder al desafío.,Il gruppo scelto prova a rispondere alla sfida.,O grupo escolhido tenta responder ao desafio.
