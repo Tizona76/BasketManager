@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bvo48flrt70wt"
-path="res://.godot/imported/blason_7.png-ad67e606c6be7caeaaaca3eccd627b9b.ctex"
+path="res://godot/imported/blason_7.png-ad67e606c6be7caeaaaca3eccd627b9b.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/blasons/blason_7.png"
-dest_files=["res://.godot/imported/blason_7.png-ad67e606c6be7caeaaaca3eccd627b9b.ctex"]
+dest_files=["res://godot/imported/blason_7.png-ad67e606c6be7caeaaaca3eccd627b9b.ctex"]
 
 [params]
 

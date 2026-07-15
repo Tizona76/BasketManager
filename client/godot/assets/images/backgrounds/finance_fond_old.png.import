@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://d2u77dd3hbcgd"
-path="res://.godot/imported/finance_fond_old.png-2a0f4cb15ee204b0b1c2b008506edbfd.ctex"
+path="res://godot/imported/finance_fond_old.png-2a0f4cb15ee204b0b1c2b008506edbfd.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/backgrounds/finance_fond_old.png"
-dest_files=["res://.godot/imported/finance_fond_old.png-2a0f4cb15ee204b0b1c2b008506edbfd.ctex"]
+dest_files=["res://godot/imported/finance_fond_old.png-2a0f4cb15ee204b0b1c2b008506edbfd.ctex"]
 
 [params]
 

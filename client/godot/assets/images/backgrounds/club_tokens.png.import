@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cu0tchy6u0pa0"
-path="res://.godot/imported/club_tokens.png-01676f5de86dab81d3fa0b72fd39a33f.ctex"
+path="res://godot/imported/club_tokens.png-01676f5de86dab81d3fa0b72fd39a33f.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/backgrounds/club_tokens.png"
-dest_files=["res://.godot/imported/club_tokens.png-01676f5de86dab81d3fa0b72fd39a33f.ctex"]
+dest_files=["res://godot/imported/club_tokens.png-01676f5de86dab81d3fa0b72fd39a33f.ctex"]
 
 [params]
 

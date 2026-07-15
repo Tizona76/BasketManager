@@ -3,12 +3,12 @@
 importer="wav"
 type="AudioStreamWAV"
 uid="uid://dn3fxkw4fc560"
-path="res://.godot/imported/victory_jingle copie.wav-98f22915d620f12a79aebb48c4c378b9.sample"
+path="res://godot/imported/victory_jingle copie.wav-98f22915d620f12a79aebb48c4c378b9.sample"
 
 [deps]
 
 source_file="res://audio/music/victory_jingle copie.wav"
-dest_files=["res://.godot/imported/victory_jingle copie.wav-98f22915d620f12a79aebb48c4c378b9.sample"]
+dest_files=["res://godot/imported/victory_jingle copie.wav-98f22915d620f12a79aebb48c4c378b9.sample"]
 
 [params]
 

@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c6ptx45k68m2m"
-path="res://.godot/imported/fond_carousel.jpg-a94e5fa653842b234a0fbcf18f4acd6a.ctex"
+path="res://godot/imported/fond_carousel.jpg-a94e5fa653842b234a0fbcf18f4acd6a.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/carousel/fond_carousel.jpg"
-dest_files=["res://.godot/imported/fond_carousel.jpg-a94e5fa653842b234a0fbcf18f4acd6a.ctex"]
+dest_files=["res://godot/imported/fond_carousel.jpg-a94e5fa653842b234a0fbcf18f4acd6a.ctex"]
 
 [params]
 

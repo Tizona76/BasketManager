@@ -3,12 +3,12 @@
 importer="mp3"
 type="AudioStreamMP3"
 uid="uid://dgdwslgdb5pbo"
-path="res://.godot/imported/whistle.mp3-e370e6ba7a6f076473edf872194ab301.mp3str"
+path="res://godot/imported/whistle.mp3-e370e6ba7a6f076473edf872194ab301.mp3str"
 
 [deps]
 
 source_file="res://audio/sfx/whistle.mp3"
-dest_files=["res://.godot/imported/whistle.mp3-e370e6ba7a6f076473edf872194ab301.mp3str"]
+dest_files=["res://godot/imported/whistle.mp3-e370e6ba7a6f076473edf872194ab301.mp3str"]
 
 [params]
 

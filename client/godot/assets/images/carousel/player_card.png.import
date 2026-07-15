@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bcvtds0wlf7ee"
-path="res://.godot/imported/player_card.png-2303090355c5a66c7e28b5d32a53a68b.ctex"
+path="res://godot/imported/player_card.png-2303090355c5a66c7e28b5d32a53a68b.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/carousel/player_card.png"
-dest_files=["res://.godot/imported/player_card.png-2303090355c5a66c7e28b5d32a53a68b.ctex"]
+dest_files=["res://godot/imported/player_card.png-2303090355c5a66c7e28b5d32a53a68b.ctex"]
 
 [params]
 

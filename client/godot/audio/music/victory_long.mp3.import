@@ -3,12 +3,12 @@
 importer="mp3"
 type="AudioStreamMP3"
 uid="uid://cpq6wjxhu60fp"
-path="res://.godot/imported/victory_long.mp3-da4ba244ad8002fee23821ff4ac3c581.mp3str"
+path="res://godot/imported/victory_long.mp3-da4ba244ad8002fee23821ff4ac3c581.mp3str"
 
 [deps]
 
 source_file="res://audio/music/victory_long.mp3"
-dest_files=["res://.godot/imported/victory_long.mp3-da4ba244ad8002fee23821ff4ac3c581.mp3str"]
+dest_files=["res://godot/imported/victory_long.mp3-da4ba244ad8002fee23821ff4ac3c581.mp3str"]
 
 [params]
 

@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://wvn0it1813ti"
-path="res://.godot/imported/hair_mask.png-b991ab4dd5110036c52f3a66ba029ee8.ctex"
+path="res://godot/imported/hair_mask.png-b991ab4dd5110036c52f3a66ba029ee8.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/avatars/layers/F_bun/hair_mask.png"
-dest_files=["res://.godot/imported/hair_mask.png-b991ab4dd5110036c52f3a66ba029ee8.ctex"]
+dest_files=["res://godot/imported/hair_mask.png-b991ab4dd5110036c52f3a66ba029ee8.ctex"]
 
 [params]
 

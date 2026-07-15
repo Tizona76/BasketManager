@@ -323,6 +323,7 @@ func _bm_club_tr_or_fallback(key: String, fallback: String = "") -> String:
 func _bm_club_popup_intro_text() -> String:
 	var title := _bm_club_tr_or_fallback("popup_intro_title", "Build Your Roster")
 	var body := _bm_club_tr_or_fallback("popup_intro_build_body", "Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.").replace("\\n", "\n")
+	body = body.replace("\n", "\n\n")
 	return "[center][font_size=34][b]" + title + "[/b][/font_size][/center]\n\n[font_size=27][color=#EAF2FF]" + body + "[/color][/font_size]"
 
 
@@ -765,7 +766,7 @@ func _ready() -> void:
 		lbl_bienvenue_club.text = _bm_club_popup_intro_text()
 		lbl_bienvenue_club.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		lbl_bienvenue_club.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		lbl_bienvenue_club.position.y -= 8
+		lbl_bienvenue_club.position.y -= 18
 	if popup_bienvenue_club != null:
 		var bienvenue_sb := popup_bienvenue_club.get_theme_stylebox("panel")
 		if bienvenue_sb != null and bienvenue_sb is StyleBoxFlat:
@@ -3657,23 +3658,78 @@ func _bm_get_mercato_current_journee() -> int:
 
 
 func _bm_show_mercato_closed_popup() -> void:
-	var popup := AcceptDialog.new()
-	popup.title = tr("mercato.closed.title")
+	var title := tr("mercato.closed.title")
 	var body := tr("mercato.closed.body")
 	if body == "" or body == "mercato.closed.body":
 		body = "Le Mercato est fermé actuellement. Il ouvre avant les matchs 1 et 2, puis avant les matchs 10, 11 et 12."
-	popup.dialog_text = body
-	popup.ok_button_text = "OK"
-	popup.min_size = Vector2i(760, 0)
+
+	var old_popup := get_node_or_null("MercatoClosedPopup")
+	if old_popup != null:
+		old_popup.queue_free()
+
+	var popup := Control.new()
+	popup.name = "MercatoClosedPopup"
+	popup.set_anchors_preset(Control.PRESET_FULL_RECT)
+	popup.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.z_index = 9999
+	popup.set_as_top_level(true)
 	add_child(popup)
-	await get_tree().process_frame
-	if popup.get_label() != null:
-		popup.get_label().autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		popup.get_label().add_theme_font_size_override("font_size", 20)
-		popup.get_label().custom_minimum_size = Vector2(680, 0)
-	popup.confirmed.connect(func(): popup.queue_free())
-	popup.canceled.connect(func(): popup.queue_free())
-	popup.popup_centered()
+
+	var panel := Panel.new()
+	var popup_size := Vector2(760, 320)
+	if _bm_menu_is_mobile_layout():
+		popup_size *= 1.15
+	panel.custom_minimum_size = popup_size
+	panel.size = popup_size
+	panel.position = (get_viewport_rect().size - popup_size) * 0.5
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.055, 0.065, 0.095, 0.90)
+	sb.corner_radius_top_left = 18
+	sb.corner_radius_top_right = 18
+	sb.corner_radius_bottom_left = 18
+	sb.corner_radius_bottom_right = 18
+	sb.border_width_left = 2
+	sb.border_width_top = 2
+	sb.border_width_right = 2
+	sb.border_width_bottom = 2
+	sb.border_color = Color(0.85, 0.75, 0.25, 0.24)
+	panel.add_theme_stylebox_override("panel", sb)
+	popup.add_child(panel)
+
+	var label := RichTextLabel.new()
+	label.bbcode_enabled = true
+	label.scroll_active = false
+	label.fit_content = true
+	label.position = Vector2(24, 20)
+	label.size = Vector2(popup_size.x - 48.0, popup_size.y - 104.0)
+	label.text = "[center][font_size=24][b]" + title + "[/b][/font_size][/center]\n\n[font_size=24]" + body + "[/font_size]"
+	panel.add_child(label)
+
+	var btn := Button.new()
+	btn.text = "OK"
+	btn.custom_minimum_size = Vector2(140, 48)
+	btn.size = Vector2(140, 48)
+	btn.position = Vector2((popup_size.x - 140.0) * 0.5, popup_size.y - 62.0)
+	var btn_sb := StyleBoxFlat.new()
+	btn_sb.bg_color = Color(0.20, 0.55, 0.95, 1.0)
+	btn_sb.corner_radius_top_left = 12
+	btn_sb.corner_radius_top_right = 12
+	btn_sb.corner_radius_bottom_left = 12
+	btn_sb.corner_radius_bottom_right = 12
+	btn_sb.content_margin_left = 16
+	btn_sb.content_margin_right = 16
+	btn_sb.content_margin_top = 8
+	btn_sb.content_margin_bottom = 8
+	btn.add_theme_stylebox_override("normal", btn_sb)
+	var btn_hover := btn_sb.duplicate()
+	btn_hover.bg_color = Color(0.25, 0.62, 1.0, 1.0)
+	btn.add_theme_stylebox_override("hover", btn_hover)
+	btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	btn.add_theme_font_size_override("font_size", 22)
+	btn.pressed.connect(func(): popup.queue_free())
+	panel.add_child(btn)
 
 func _bm_menu_is_mobile_layout() -> bool:
 	var vp: Vector2 = get_viewport_rect().size

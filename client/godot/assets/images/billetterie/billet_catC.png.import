@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cs6mkcgmcs0wm"
-path="res://.godot/imported/billet_catC.png-298ae473e1c2072be0533eb2baf01f03.ctex"
+path="res://godot/imported/billet_catC.png-298ae473e1c2072be0533eb2baf01f03.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/billetterie/billet_catC.png"
-dest_files=["res://.godot/imported/billet_catC.png-298ae473e1c2072be0533eb2baf01f03.ctex"]
+dest_files=["res://godot/imported/billet_catC.png-298ae473e1c2072be0533eb2baf01f03.ctex"]
 
 [params]
 

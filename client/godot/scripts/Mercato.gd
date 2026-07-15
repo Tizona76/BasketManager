@@ -231,20 +231,8 @@ func _fill_rows() -> void:
 		if PL != null and PL.has_method("ensure_mercato_schema"):
 			PL.ensure_mercato_schema(save)
 
-		var selected_ids = []
-		if save.has("roster") and save["roster"] is Dictionary:
-			var r = save["roster"]
-			if r.has("selected_ids"):
-				selected_ids = r["selected_ids"]
-
-		var purchased_ids = []
-		if save.has("mercato") and save["mercato"] is Dictionary:
-			var m = save["mercato"]
-			if m.has("purchased_ids"):
-				purchased_ids = m["purchased_ids"]
-
-		var total = selected_ids.size() + purchased_ids.size()
-		var display_total = mini(total, 12)
+		var licensed_ids := _get_mercato_licensed_id_set(save)
+		var display_total = mini(licensed_ids.size(), 12)
 		lbl_licensed_players.text = tr("mercato.licensed_players") % display_total
 		lbl_licensed_players.add_theme_font_size_override("font_size", 24)
 		lbl_licensed_players.add_theme_color_override("font_color", Color(0.20, 0.55, 0.95, 1.0))
@@ -594,38 +582,9 @@ func _toggle_player_bought(pid: String) -> bool:
 		if purchased.size() >= 4:
 			return false
 
-		var selected_ids: Array = []
-		if save.has("roster") and save["roster"] is Dictionary:
-			var roster_cap: Dictionary = save["roster"]
-			if roster_cap.has("selected_ids") and roster_cap["selected_ids"] is Array:
-				selected_ids = (roster_cap["selected_ids"] as Array).duplicate()
-
-		var effective_ids := {}
-		if save.has("roster") and save["roster"] is Dictionary:
-			var roster_players_cap: Variant = (save["roster"] as Dictionary).get("players", [])
-			if roster_players_cap is Array:
-				for raw_player in roster_players_cap:
-					if raw_player is Dictionary:
-						var player_id_txt := str((raw_player as Dictionary).get("id", "")).strip_edges()
-						if player_id_txt != "":
-							effective_ids[str(int(float(player_id_txt)))] = true
-		for raw_sid in selected_ids:
-			var sid_txt := str(raw_sid).strip_edges()
-			if sid_txt == "":
-				continue
-			var key_sid := str(int(float(sid_txt)))
-			effective_ids[key_sid] = true
-
-		for raw_pid in purchased:
-			var pid_txt := str(raw_pid).strip_edges()
-			if pid_txt == "":
-				continue
-			var key_pid := str(int(float(pid_txt)))
-			effective_ids[key_pid] = true
-
-		var new_pid_txt := str(pid).strip_edges()
-		if new_pid_txt != "":
-			var new_key := str(int(float(new_pid_txt)))
+		var effective_ids := _get_mercato_licensed_id_set(save)
+		var new_key := _mercato_normalized_id_key(pid)
+		if new_key != "":
 			if not effective_ids.has(new_key) and effective_ids.size() >= 12:
 				if lbl_team_full_warning != null:
 					lbl_team_full_warning.text = _tr_any(["mercato.team_full_warning"], "Squad full: 12 players maximum") + "\n" + _tr_any(["mercato.team_full_sell_before"], "You must sell players first")
@@ -1241,6 +1200,32 @@ func _get_purchased_ids() -> Array:
 	return []
 
 
+func _mercato_normalized_id_key(raw_id: Variant) -> String:
+	var id_txt := str(raw_id).strip_edges()
+	if id_txt == "":
+		return ""
+	return str(int(float(id_txt)))
+
+
+func _get_mercato_licensed_id_set(save: Dictionary) -> Dictionary:
+	var effective_ids := {}
+	if save.has("roster") and save["roster"] is Dictionary:
+		var roster: Dictionary = save["roster"]
+		if roster.has("selected_ids") and roster["selected_ids"] is Array:
+			for raw_sid in (roster["selected_ids"] as Array):
+				var sid_key := _mercato_normalized_id_key(raw_sid)
+				if sid_key != "":
+					effective_ids[sid_key] = true
+	if save.has("mercato") and save["mercato"] is Dictionary:
+		var mercato: Dictionary = save["mercato"]
+		if mercato.has("purchased_ids") and mercato["purchased_ids"] is Array:
+			for raw_pid in (mercato["purchased_ids"] as Array):
+				var pid_key := _mercato_normalized_id_key(raw_pid)
+				if pid_key != "":
+					effective_ids[pid_key] = true
+	return effective_ids
+
+
 func _get_new_salaries_total() -> int:
 	var PL = load("res://scripts/PlayerLife.gd")
 	if PL == null:
@@ -1270,24 +1255,7 @@ func _get_current_licensed_count() -> int:
 	var save: Dictionary = {}
 	if PL.has_method("load_savegame"):
 		save = PL.load_savegame()
-	if not save.has("roster") or not (save["roster"] is Dictionary):
-		return 0
-	var roster: Dictionary = save["roster"]
-
-	if roster.has("players") and (roster["players"] is Array):
-		return (roster["players"] as Array).size()
-
-	if not roster.has("selected_ids") or not (roster["selected_ids"] is Array):
-		return 0
-	var selected_ids: Array = (roster["selected_ids"] as Array).duplicate()
-	var effective_ids := {}
-	for raw_sid in selected_ids:
-		var sid_txt := str(raw_sid).strip_edges()
-		if sid_txt == "":
-			continue
-		var key_sid := str(int(float(sid_txt)))
-		effective_ids[key_sid] = true
-	return effective_ids.size()
+	return _get_mercato_licensed_id_set(save).size()
 
 func _update_new_salaries_ui() -> void:
 	var total := _get_new_salaries_total()

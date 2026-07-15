@@ -373,30 +373,124 @@ func _show_preparing_club_label() -> void:
 		return
 	var preparing_layer := CanvasLayer.new()
 	preparing_layer.name = "PreparingClubLayer"
-	preparing_layer.layer = 100
+	preparing_layer.layer = 4096
 	add_child(preparing_layer)
+
+	var overlay := Control.new()
+	overlay.name = "PreparingClubOverlay"
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.size = get_viewport_rect().size
+	overlay.visible = true
+	preparing_layer.add_child(overlay)
+
+	var card := Panel.new()
+	card.name = "PreparingClubCard"
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.visible = true
+	card.z_index = 0
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.025, 0.03, 0.055, 0.94)
+	sb.border_width_left = 3
+	sb.border_width_top = 3
+	sb.border_width_right = 3
+	sb.border_width_bottom = 3
+	sb.border_color = Color(1.0, 0.78, 0.22, 0.88)
+	sb.corner_radius_top_left = 22
+	sb.corner_radius_top_right = 22
+	sb.corner_radius_bottom_left = 22
+	sb.corner_radius_bottom_right = 22
+	sb.shadow_color = Color(0, 0, 0, 0.45)
+	sb.shadow_size = 22
+	sb.shadow_offset = Vector2(0, 8)
+	card.add_theme_stylebox_override("panel", sb)
+	overlay.add_child(card)
 
 	var preparing_label := Label.new()
 	preparing_label.name = "PreparingClubLabel"
-	preparing_label.text = tr("startup.preparing_club")
 	preparing_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	preparing_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	preparing_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	preparing_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	preparing_label.offset_left = 0
-	preparing_label.offset_top = 0
-	preparing_label.offset_right = 0
-	preparing_label.offset_bottom = 0
+	preparing_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	preparing_label.z_index = 10
 	preparing_label.add_theme_font_size_override("font_size", 34)
-	preparing_label.add_theme_color_override("font_color", Color(0.10, 0.36, 0.92, 1.0))
-	preparing_label.add_theme_color_override("font_outline_color", Color(0.90, 0.04, 0.10, 1.0))
-	preparing_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.88))
-	preparing_label.add_theme_constant_override("outline_size", 5)
-	preparing_label.add_theme_constant_override("shadow_offset_x", 3)
-	preparing_label.add_theme_constant_override("shadow_offset_y", 3)
-	preparing_label.add_theme_constant_override("shadow_outline_size", 10)
-	preparing_layer.add_child(preparing_label)
+	preparing_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.28, 1.0))
+	preparing_label.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 1.0))
+	preparing_label.add_theme_constant_override("outline_size", 8)
+	preparing_label.visible = true
+	overlay.add_child(preparing_label)
+	_bm_set_preparing_club_text(tr("startup.preparing_club"), true)
+	call_deferred("_bm_refresh_preparing_club_initial_text")
 	call_deferred("_bm_update_preparing_club_label_after_delay")
+
+
+func _bm_refresh_preparing_club_initial_text() -> void:
+	if get_node_or_null("PreparingClubLayer") == null:
+		return
+	_bm_set_preparing_club_text(tr("startup.preparing_club"), true)
+
+
+func _bm_set_preparing_club_text(text_value: String, show_ball: bool = false, align_left: bool = false) -> void:
+	var preparing_layer := get_node_or_null("PreparingClubLayer")
+	if preparing_layer == null:
+		return
+	var overlay := preparing_layer.get_node_or_null("PreparingClubOverlay") as Control
+	if overlay == null:
+		return
+	overlay.size = get_viewport_rect().size
+	overlay.visible = true
+	var card := overlay.get_node_or_null("PreparingClubCard") as Panel
+	var preparing_label := overlay.get_node_or_null("PreparingClubLabel") as Label
+	if preparing_label == null:
+		return
+	preparing_label.text = text_value
+	preparing_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if align_left else HORIZONTAL_ALIGNMENT_CENTER
+	preparing_label.visible = true
+	var vp := get_viewport_rect().size
+	if vp.x <= 1.0 or vp.y <= 1.0:
+		var win_size := DisplayServer.window_get_size()
+		vp = Vector2(maxf(vp.x, float(win_size.x)), maxf(vp.y, float(win_size.y)))	
+	var char_count := text_value.length()
+	var font_size := 32.0
+	if char_count > 260:
+		font_size = 17.0
+	elif char_count > 150:
+		font_size = 20.0
+	elif char_count > 70:
+		font_size = 24.0
+	preparing_label.scale = Vector2.ONE
+	preparing_label.add_theme_font_size_override("font_size", int(font_size))
+	var max_w := minf(1320.0, vp.x * 0.86)
+	var min_w := 520.0 if char_count > 70 else 430.0
+	var estimated_w := float(char_count) * font_size * 0.42 + 120.0
+	var label_w := clampf(estimated_w, min_w, max_w)
+	var usable_chars_per_line := maxf(20.0, (label_w - 80.0) / (font_size * 0.44))
+	var visual_lines := maxi(1, int(ceil(float(char_count) / usable_chars_per_line)))
+	var label_h := float(visual_lines) * font_size * 1.62 + 48.0
+	label_h = clampf(label_h, 96.0, minf(vp.y * 0.72, 620.0))
+	var label_size := Vector2(label_w, label_h)
+	var label_pos := (vp - label_size) * 0.5
+	preparing_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	preparing_label.position = label_pos
+	preparing_label.size = label_size
+	preparing_label.custom_minimum_size = label_size
+	preparing_label.offset_left = label_pos.x
+	preparing_label.offset_top = label_pos.y
+	preparing_label.offset_right = label_pos.x + label_size.x
+	preparing_label.offset_bottom = label_pos.y + label_size.y
+	if card != null:
+		card.scale = Vector2.ONE
+		var card_pos := label_pos - Vector2(34.0, 24.0)
+		var card_size := label_size + Vector2(68.0, 48.0)
+		card.visible = true
+		card.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		card.position = card_pos
+		card.size = card_size
+		card.custom_minimum_size = card_size
+		card.offset_left = card_pos.x
+		card.offset_top = card_pos.y
+		card.offset_right = card_pos.x + card_size.x
+		card.offset_bottom = card_pos.y + card_size.y
 
 
 func _bm_update_preparing_club_label_after_delay() -> void:
@@ -404,18 +498,12 @@ func _bm_update_preparing_club_label_after_delay() -> void:
 	var preparing_layer := get_node_or_null("PreparingClubLayer")
 	if preparing_layer == null:
 		return
-	var preparing_label := preparing_layer.get_node_or_null("PreparingClubLabel") as Label
-	if preparing_label == null:
-		return
-	preparing_label.text = tr("startup.just_seconds_more")
+	_bm_set_preparing_club_text(tr("startup.just_seconds_more"), false)
 	await get_tree().create_timer(12.0).timeout
 	preparing_layer = get_node_or_null("PreparingClubLayer")
 	if preparing_layer == null:
 		return
-	preparing_label = preparing_layer.get_node_or_null("PreparingClubLabel") as Label
-	if preparing_label == null:
-		return
-	preparing_label.text = tr("startup.ready_to_manage_full_team")
+	_bm_set_preparing_club_text(tr("startup.ready_to_manage_full_team"), false, true)
 
 
 func _hide_preparing_club_label() -> void:

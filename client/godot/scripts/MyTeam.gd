@@ -35,13 +35,17 @@ var lineup_summary_card: Panel = null
 var _sell_tooltip_popup: Panel = null
 var _lineup_save_tooltip_popup: Panel = null
 
-const AUTO_SAVE_MATCH_SELECTION_TOKENS: int = 8
+const SAVE_LINEUP_MATCH_COUNT: int = 5
+const SAVE_LINEUP_TOKEN_COST: int = 8
+const BM_MYTEAM_SCREEN_IDENTITY_META := "bm_myteam_screen_identity"
+
+var _bm_screen_identity: String = "my_team"
 
 
 func _bm_has_auto_save_lineup_token() -> bool:
 	Save.ensure_exists(str(Session.profile_uuid))
 	var d: Dictionary = Save.read_dict()
-	return PlayerLife.get_tokens(d) >= AUTO_SAVE_MATCH_SELECTION_TOKENS
+	return PlayerLife.get_tokens(d) >= SAVE_LINEUP_TOKEN_COST
 
 
 func _bm_make_back_button_style(bg: Color, glow: Color, bottom_w: int, shadow_size: int) -> StyleBoxFlat:
@@ -401,6 +405,7 @@ func _bm_setup_mobile_scroll() -> void:
 	
 
 func _ready() -> void:
+	_bm_init_screen_identity()
 	_bm_setup_mobile_scroll()
 	call_deferred("_bm_myteam_apply_mobile_landscape_scroll")
 	if btn_back != null and not btn_back.pressed.is_connected(_on_back_pressed):
@@ -444,8 +449,12 @@ func _ready() -> void:
 		call_deferred("_bm_myteam_apply_mobile_landscape_confirm_sell_right")
 
 	_load_avatar_meta()
-	_load_pending_match_ids()
-	_ensure_match_selection_footer()
+	if _bm_is_lineup_screen():
+		_load_pending_match_ids()
+		_ensure_match_selection_footer()
+	else:
+		pending_match_ids.clear()
+		_bm_close_lineup_summary_popup()
 	_build_team()
 
 func _on_back_pressed() -> void:
@@ -557,7 +566,7 @@ func _ensure_match_selection_footer() -> void:
 	btn_confirm_match_selection.visible = false
 	btn_confirm_match_selection.disabled = true
 
-	btn_auto_save_match_selection.text = "Save lineup = " + str(AUTO_SAVE_MATCH_SELECTION_TOKENS)
+	btn_auto_save_match_selection.text = "Save lineup = " + str(SAVE_LINEUP_TOKEN_COST)
 	btn_auto_save_match_selection.size = Vector2(265, 48)
 	btn_auto_save_match_selection.position = Vector2(size.x * 0.5 - 275.0, size.y - 48.0)
 	btn_auto_save_match_selection.add_theme_font_size_override("font_size", 20)
@@ -617,6 +626,19 @@ func _refresh_match_selection_footer() -> void:
 	btn_auto_save_match_selection.disabled = not show_auto_save
 	if img_auto_save_token != null:
 		img_auto_save_token.visible = show_auto_save
+
+
+func _bm_init_screen_identity() -> void:
+	_bm_screen_identity = "my_team"
+	if Session != null and Session.has_meta(BM_MYTEAM_SCREEN_IDENTITY_META):
+		var requested_identity := str(Session.get_meta(BM_MYTEAM_SCREEN_IDENTITY_META, "my_team")).strip_edges().to_lower()
+		if requested_identity == "lineup":
+			_bm_screen_identity = "lineup"
+		Session.set_meta(BM_MYTEAM_SCREEN_IDENTITY_META, "my_team")
+
+
+func _bm_is_lineup_screen() -> bool:
+	return _bm_screen_identity == "lineup"
 
 
 func _bm_myteam_tr_or_fallback(key: String, fallback: String) -> String:
@@ -679,6 +701,125 @@ func _bm_add_lineup_summary_label(parent: Control, text_value: String, pos: Vect
 	return lbl
 
 
+func _bm_lineup_preview_player_metrics(player_data: Dictionary) -> Dictionary:
+	var tir := float(player_data.get("tir", 0.0))
+	var precision := float(player_data.get("precision", player_data.get("accuracy", 0.0)))
+	if precision <= 1.5:
+		precision *= 100.0
+	var vitesse := float(player_data.get("vitesse", player_data.get("speed", 0.0)))
+	var defense := float(player_data.get("defense", 0.0))
+	var motivation := float(player_data.get("motivation", 0.0))
+	return {
+		"attack": int(round((tir + precision) * 0.5)),
+		"defense": int(round(defense)),
+		"energy": int(round((vitesse + motivation) * 0.5))
+	}
+
+
+func _bm_lineup_button_line(parent: Button, node_name: String, text_value: String, y: float, fs: int, color: Color) -> void:
+	var lbl := parent.get_node_or_null(node_name) as Label
+	if lbl == null:
+		lbl = Label.new()
+		lbl.name = node_name
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(lbl)
+	lbl.text = text_value
+	lbl.position = Vector2(0, y)
+	lbl.size = Vector2(parent.size.x, 24)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_size_override("font_size", fs)
+	lbl.add_theme_color_override("font_color", color)
+	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.04, 0.08, 0.80))
+	lbl.add_theme_constant_override("outline_size", 2)
+
+
+func _bm_apply_lineup_popup_button_text(btn: Button, primary_text: String, secondary_text: String) -> void:
+	btn.text = ""
+	_bm_lineup_button_line(btn, "LineupButtonPrimary", primary_text, 5.0, 20, Color(1, 1, 1, 1))
+	_bm_lineup_button_line(btn, "LineupButtonSecondary", secondary_text, 27.0, 18, Color(1, 1, 1, 0.78))
+
+
+func _bm_save_lineup_secondary_text() -> String:
+	var match_word := "game" if SAVE_LINEUP_MATCH_COUNT == 1 else "matches"
+	return "For " + str(SAVE_LINEUP_MATCH_COUNT) + " " + match_word + " = " + str(SAVE_LINEUP_TOKEN_COST)
+
+
+func _bm_get_current_lineup_preview_players() -> Array:
+	var by_id := {}
+	for p_raw in _get_selected_players_real():
+		if typeof(p_raw) != TYPE_DICTIONARY:
+			continue
+		var pd: Dictionary = p_raw
+		by_id[int(pd.get("id", -1))] = pd
+	var out: Array = []
+	for pid in pending_match_ids:
+		if by_id.has(int(pid)):
+			out.append((by_id[int(pid)] as Dictionary).duplicate(true))
+	return out
+
+
+func _bm_add_lineup_preview_player_row(parent: Control, player_data: Dictionary, y: float, row_w: float) -> void:
+	var row := Panel.new()
+	row.position = Vector2(0, y)
+	row.size = Vector2(row_w, 40)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(1, 1, 1, 0.055)
+	sb.corner_radius_top_left = 8
+	sb.corner_radius_top_right = 8
+	sb.corner_radius_bottom_left = 8
+	sb.corner_radius_bottom_right = 8
+	sb.border_width_left = 1
+	sb.border_width_top = 1
+	sb.border_width_right = 1
+	sb.border_width_bottom = 1
+	sb.border_color = Color(1, 1, 1, 0.10)
+	row.add_theme_stylebox_override("panel", sb)
+	parent.add_child(row)
+
+	var avatar := TextureRect.new()
+	avatar.position = Vector2(10, 5)
+	avatar.size = Vector2(30, 30)
+	avatar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var avatar_path := str(player_data.get("avatar_path", ""))
+	if avatar_path != "" and ResourceLoader.exists(avatar_path):
+		avatar.texture = load(avatar_path) as Texture2D
+	row.add_child(avatar)
+
+	var player_name := str(player_data.get("name", player_data.get("nom", "Player"))).strip_edges()
+	var metrics := _bm_lineup_preview_player_metrics(player_data)
+	_bm_add_lineup_summary_label(row, player_name, Vector2(50, 4), Vector2(row_w - 370.0, 32), 18, Color(0.94, 0.96, 1.0, 1.0), false)
+	_bm_add_lineup_summary_label(row, _tr_poste(str(player_data.get("poste", player_data.get("pos", "")))), Vector2(row_w - 320.0, 4), Vector2(70, 32), 17, Color(1, 1, 1, 0.94), true)
+	_bm_add_lineup_summary_label(row, str(int(metrics.get("attack", 0))), Vector2(row_w - 242.0, 4), Vector2(64, 32), 16, Color(1, 1, 1, 0.94), true)
+	_bm_add_lineup_summary_label(row, str(int(metrics.get("defense", 0))), Vector2(row_w - 170.0, 4), Vector2(70, 32), 16, Color(1, 1, 1, 0.94), true)
+	_bm_add_lineup_summary_label(row, str(int(metrics.get("energy", 0))), Vector2(row_w - 92.0, 4), Vector2(64, 32), 16, Color(1, 1, 1, 0.94), true)
+
+
+func _bm_add_lineup_preview_header(parent: Control, y: float, row_w: float) -> void:
+	var header_color := Color(0.76, 0.84, 0.96, 0.82)
+	_bm_add_lineup_summary_label(parent, _bm_myteam_tr_or_fallback("mercato.col.position", "Position"), Vector2(row_w - 320.0, y), Vector2(70, 20), 13, header_color, true)
+	_bm_add_lineup_summary_label(parent, _bm_myteam_tr_or_fallback("player.card.graph.attack", "Attack"), Vector2(row_w - 242.0, y), Vector2(64, 20), 13, header_color, true)
+	_bm_add_lineup_summary_label(parent, _bm_myteam_tr_or_fallback("player.card.graph.defense", "Defense"), Vector2(row_w - 170.0, y), Vector2(70, 20), 13, header_color, true)
+	_bm_add_lineup_summary_label(parent, _bm_myteam_tr_or_fallback("matchsim.energy", "Energy"), Vector2(row_w - 92.0, y), Vector2(64, 20), 13, header_color, true)
+
+
+func _bm_add_lineup_preview_section(parent: Control, title_text: String, players: Array, y: float, row_w: float, show_header: bool = false) -> float:
+	var section_title := title_text + " (" + str(players.size()) + ")"
+	_bm_add_lineup_summary_label(parent, section_title, Vector2(0, y), Vector2(row_w, 24), 17, Color(1.0, 0.72, 0.20, 1.0), false)
+	var row_y := y + 30.0
+	if show_header:
+		_bm_add_lineup_preview_header(parent, y + 27.0, row_w)
+		row_y = y + 52.0
+	for p_raw in players:
+		if typeof(p_raw) == TYPE_DICTIONARY:
+			_bm_add_lineup_preview_player_row(parent, p_raw as Dictionary, row_y, row_w)
+			row_y += 44.0
+	return row_y
+
+
 func _bm_close_lineup_summary_popup() -> void:
 	if btn_confirm_match_selection != null and is_instance_valid(btn_confirm_match_selection):
 		var parent_now := btn_confirm_match_selection.get_parent()
@@ -725,6 +866,9 @@ func _bm_refresh_lineup_summary_popup(ready: bool) -> void:
 	var defense := float(summary.get("defense", 0.0))
 	var energy := float(summary.get("energy", 0.0))
 	var show_auto_save := _bm_has_auto_save_lineup_token()
+	var lineup_players := _bm_get_current_lineup_preview_players()
+	var starting := lineup_players.slice(0, mini(5, lineup_players.size()))
+	var bench := lineup_players.slice(mini(5, lineup_players.size()), lineup_players.size())
 
 	lineup_summary_popup = Control.new()
 	lineup_summary_popup.name = "LineupSummaryPopup"
@@ -733,8 +877,8 @@ func _bm_refresh_lineup_summary_popup(ready: bool) -> void:
 	lineup_summary_popup.z_index = 220
 	add_child(lineup_summary_popup)
 
-	var card_w := 560.0
-	var card_h := 214.0
+	var card_w := 640.0
+	var card_h := 690.0
 	lineup_summary_card = Panel.new()
 	lineup_summary_card.name = "LineupSummaryCard"
 	lineup_summary_card.size = Vector2(card_w, card_h)
@@ -743,7 +887,7 @@ func _bm_refresh_lineup_summary_popup(ready: bool) -> void:
 	lineup_summary_card.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.03, 0.04, 0.08, 0.96)
+	sb.bg_color = Color(0.025, 0.035, 0.075, 0.98)
 	sb.corner_radius_top_left = 18
 	sb.corner_radius_top_right = 18
 	sb.corner_radius_bottom_left = 18
@@ -752,29 +896,45 @@ func _bm_refresh_lineup_summary_popup(ready: bool) -> void:
 	sb.border_width_top = 2
 	sb.border_width_right = 2
 	sb.border_width_bottom = 2
-	sb.border_color = Color(0.95, 0.62, 0.12, 0.50)
+	sb.border_color = Color(0.95, 0.58, 0.14, 0.72)
 	sb.shadow_color = Color(0, 0, 0, 0.38)
 	sb.shadow_size = 12
 	sb.shadow_offset = Vector2(0, 5)
 	lineup_summary_card.add_theme_stylebox_override("panel", sb)
 	lineup_summary_popup.add_child(lineup_summary_card)
 
-	_bm_add_lineup_summary_label(lineup_summary_card, _bm_myteam_tr_or_fallback("myteam.lineup_summary.title", "Lineup ready"), Vector2(24, 14), Vector2(card_w - 48, 34), 26, Color(1, 1, 1, 1))
-	_bm_add_lineup_summary_label(lineup_summary_card, _bm_myteam_tr_or_fallback("myteam.lineup_summary.subtitle", "Decision impact preview"), Vector2(24, 48), Vector2(card_w - 48, 24), 18, Color(0.82, 0.88, 1.0, 0.92))
+	_bm_add_lineup_summary_label(lineup_summary_card, _bm_myteam_tr_or_fallback("matchsim.game_lineup", "Game Lineup"), Vector2(24, 16), Vector2(card_w - 48, 34), 28, Color(1, 1, 1, 1))
+	_bm_add_lineup_summary_label(lineup_summary_card, _bm_myteam_tr_or_fallback("myteam.lineup_summary.subtitle", "Decision impact preview"), Vector2(24, 50), Vector2(card_w - 48, 24), 16, Color(0.76, 0.84, 0.96, 0.88))
 
 	var col_w := 150.0
-	var start_x := 50.0
+	var start_x := (card_w - 510.0) * 0.5
 	var row_y := 86.0
 	_bm_add_lineup_summary_label(lineup_summary_card, "Attack\n" + str(int(round(attack))), Vector2(start_x, row_y), Vector2(col_w, 58), 20, Color(1.00, 0.72, 0.20, 1.0))
-	_bm_add_lineup_summary_label(lineup_summary_card, "Defense\n" + str(int(round(defense))), Vector2(start_x + col_w + 5.0, row_y), Vector2(col_w, 58), 20, Color(0.42, 0.92, 1.00, 1.0))
-	_bm_add_lineup_summary_label(lineup_summary_card, "Energy\n" + str(int(round(energy))), Vector2(start_x + (col_w + 5.0) * 2.0, row_y), Vector2(col_w, 58), 20, Color(0.35, 1.00, 0.55, 1.0))
+	_bm_add_lineup_summary_label(lineup_summary_card, "Defense\n" + str(int(round(defense))), Vector2(start_x + 180.0, row_y), Vector2(col_w, 58), 20, Color(0.42, 0.92, 1.00, 1.0))
+	_bm_add_lineup_summary_label(lineup_summary_card, "Energy\n" + str(int(round(energy))), Vector2(start_x + 360.0, row_y), Vector2(col_w, 58), 20, Color(0.35, 1.00, 0.55, 1.0))
+
+	var content := Control.new()
+	content.position = Vector2(38, 158)
+	content.size = Vector2(card_w - 76.0, card_h - 236.0)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lineup_summary_card.add_child(content)
+
+	var section_y := 0.0
+	section_y = _bm_add_lineup_preview_section(content, _bm_myteam_tr_or_fallback("matchsim.starting_five", "STARTING FIVE"), starting, section_y, content.size.x, true)
+	section_y += 8.0
+	_bm_add_lineup_preview_section(content, _bm_myteam_tr_or_fallback("matchsim.bench", "BENCH"), bench, section_y, content.size.x)
 
 	var old_parent_auto := btn_auto_save_match_selection.get_parent()
 	if old_parent_auto != null:
 		old_parent_auto.remove_child(btn_auto_save_match_selection)
 	lineup_summary_card.add_child(btn_auto_save_match_selection)
-	btn_auto_save_match_selection.position = Vector2((card_w * 0.5) - 260.0, card_h - 58.0)
-	btn_auto_save_match_selection.size = Vector2(220, 48)
+	btn_auto_save_match_selection.position = Vector2((card_w * 0.5) - 260.0, card_h - 66.0)
+	btn_auto_save_match_selection.size = Vector2(220, 54)
+	_bm_apply_lineup_popup_button_text(btn_auto_save_match_selection, "Save Lineup", _bm_save_lineup_secondary_text())
+	var save_secondary_lbl := btn_auto_save_match_selection.get_node_or_null("LineupButtonSecondary") as Label
+	if save_secondary_lbl != null:
+		save_secondary_lbl.position = Vector2(-6.0, 27.0)
+		save_secondary_lbl.size = Vector2(btn_auto_save_match_selection.size.x - 22.0, 24.0)
 	btn_auto_save_match_selection.visible = show_auto_save
 	btn_auto_save_match_selection.disabled = not show_auto_save
 	var sb_auto := StyleBoxFlat.new()
@@ -802,17 +962,18 @@ func _bm_refresh_lineup_summary_popup(ready: bool) -> void:
 		if old_parent_token != null:
 			old_parent_token.remove_child(img_auto_save_token)
 			lineup_summary_card.add_child(img_auto_save_token)
-			img_auto_save_token.custom_minimum_size = Vector2(30.36, 30.36)
-			img_auto_save_token.size = Vector2(30.36, 30.36)
-			img_auto_save_token.position = Vector2(btn_auto_save_match_selection.position.x + 184.0, btn_auto_save_match_selection.position.y + 10.2)
+			img_auto_save_token.custom_minimum_size = Vector2(18.0, 18.0)
+			img_auto_save_token.size = Vector2(18.0, 18.0)
+			img_auto_save_token.position = Vector2(btn_auto_save_match_selection.position.x + 174.0, btn_auto_save_match_selection.position.y + 30.0)
 			img_auto_save_token.visible = show_auto_save
 
 	var old_parent := btn_confirm_match_selection.get_parent()
 	if old_parent != null:
 		old_parent.remove_child(btn_confirm_match_selection)
 	lineup_summary_card.add_child(btn_confirm_match_selection)
-	btn_confirm_match_selection.position = Vector2((card_w * 0.5) + 20.0, card_h - 58.0)
-	btn_confirm_match_selection.size = Vector2(240, 48)
+	btn_confirm_match_selection.position = Vector2((card_w * 0.5) + 20.0, card_h - 66.0)
+	btn_confirm_match_selection.size = Vector2(240, 54)
+	_bm_apply_lineup_popup_button_text(btn_confirm_match_selection, "Confirm Lineup", _bm_myteam_tr_or_fallback("myteam.lineup_confirm.for_one_game", "for 1 game"))
 	btn_confirm_match_selection.visible = true
 	btn_confirm_match_selection.disabled = false
 	_bm_style_confirm_lineup_button(btn_confirm_match_selection)
@@ -1004,7 +1165,7 @@ func _on_auto_save_match_selection_pressed() -> void:
 	if not d_confirm.has("roster") or typeof(d_confirm["roster"]) != TYPE_DICTIONARY:
 		d_confirm["roster"] = {}
 	var roster_confirm: Dictionary = d_confirm["roster"]
-	if not PlayerLife.spend_tokens(d_confirm, AUTO_SAVE_MATCH_SELECTION_TOKENS, "auto_save_match_selection_season"):
+	if not PlayerLife.spend_tokens(d_confirm, SAVE_LINEUP_TOKEN_COST, "auto_save_match_selection_season"):
 		_refresh_match_selection_footer()
 		return
 	roster_confirm["auto_save_match_selection_paid"] = true
@@ -1040,7 +1201,7 @@ func _show_auto_save_match_selection_popup() -> void:
 		return
 
 	var tokens_balance: int = PlayerLife.get_tokens(d)
-	var can_pay: bool = PlayerLife.can_spend_tokens(d, AUTO_SAVE_MATCH_SELECTION_TOKENS)
+	var can_pay: bool = PlayerLife.can_spend_tokens(d, SAVE_LINEUP_TOKEN_COST)
 
 	var popup := Control.new()
 	popup.name = "AutoSaveMatchSelectionPopup"
@@ -1105,7 +1266,7 @@ func _show_auto_save_match_selection_popup() -> void:
 	card.add_child(body)
 
 	var cost_lbl := Label.new()
-	cost_lbl.text = "Cost: " + str(AUTO_SAVE_MATCH_SELECTION_TOKENS)
+	cost_lbl.text = "Cost: " + str(SAVE_LINEUP_TOKEN_COST)
 	cost_lbl.position = Vector2(56, 190)
 	cost_lbl.size = Vector2(popup_w - 112, 28)
 	cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1178,12 +1339,12 @@ func _show_auto_save_match_selection_popup() -> void:
 			d_confirm["roster"] = {}
 		var roster_confirm: Dictionary = d_confirm["roster"]
 
-		if not PlayerLife.can_spend_tokens(d_confirm, AUTO_SAVE_MATCH_SELECTION_TOKENS):
+		if not PlayerLife.can_spend_tokens(d_confirm, SAVE_LINEUP_TOKEN_COST):
 			popup.queue_free()
 			_refresh_match_selection_footer()
 			return
 
-		if not PlayerLife.spend_tokens(d_confirm, AUTO_SAVE_MATCH_SELECTION_TOKENS, "auto_save_match_selection_season"):
+		if not PlayerLife.spend_tokens(d_confirm, SAVE_LINEUP_TOKEN_COST, "auto_save_match_selection_season"):
 			popup.queue_free()
 			_refresh_match_selection_footer()
 			return
@@ -1294,7 +1455,8 @@ func _build_team() -> void:
 		lbl_total_salary.text = "Total = " + _fmt_salary(total_salary)
 
 	if btn_confirm_sell != null:
-		btn_confirm_sell.disabled = pending_sell_ids.is_empty()
+		btn_confirm_sell.visible = not _bm_is_lineup_screen()
+		btn_confirm_sell.disabled = _bm_is_lineup_screen() or pending_sell_ids.is_empty()
 
 	if count > 0:
 		if lbl_avg_age != null:
@@ -1422,12 +1584,13 @@ func _ensure_table_header() -> void:
 	myteam_table_header.add_child(_make_header_column(_make_header_button(tr("selection.header.motivation"), 64.0, Callable(self, "_on_sort_motivation_pressed"), false), 82.0))
 	myteam_table_header.add_child(_make_header_column(_make_header_button("SALARY", 60.0, Callable(self, "_on_sort_salaire_pressed"), false), 92.0))
 
-	if _is_match_selection_unlocked():
+	if _bm_is_lineup_screen() and _is_match_selection_unlocked():
 		myteam_table_header.add_child(_make_header_column(_make_header_visual_button(tr("myteam.btn.select_to_play"), 112.0), 120.0))
-	var sell_header := _make_header_visual_button(tr("myteam.header.sell_player"), 90.0)
-	sell_header.mouse_filter = Control.MOUSE_FILTER_PASS
-	_bm_bind_sell_tooltip(sell_header)
-	myteam_table_header.add_child(_make_header_column(sell_header, 110.0))
+	if not _bm_is_lineup_screen():
+		var sell_header := _make_header_visual_button(tr("myteam.header.sell_player"), 90.0)
+		sell_header.mouse_filter = Control.MOUSE_FILTER_PASS
+		_bm_bind_sell_tooltip(sell_header)
+		myteam_table_header.add_child(_make_header_column(sell_header, 110.0))
 
 	add_child(myteam_table_header)
 
@@ -1717,7 +1880,7 @@ func _create_player_row(p: Dictionary) -> Control:
 	h.add_child(_cell(str(int(p.get("motivation", 0))), 82.0, _myteam_stat_color(int(p.get("motivation", 0))), true))
 	h.add_child(_cell(_fmt_salary(_myteam_display_salary_annual_from_player(p)), 92.0))
 
-	if _is_match_selection_unlocked():
+	if _bm_is_lineup_screen() and _is_match_selection_unlocked():
 		var btn_match_select := Button.new()
 		btn_match_select.custom_minimum_size = Vector2(46, 46)
 		btn_match_select.add_theme_font_size_override("font_size", 18)
@@ -1730,16 +1893,17 @@ func _create_player_row(p: Dictionary) -> Control:
 		match_select_cell.add_child(btn_match_select)
 		h.add_child(match_select_cell)
 
-	var btn_sell := Button.new()
-	btn_sell.custom_minimum_size = Vector2(37, 37)
-	btn_sell.text = ""
-	_bm_style_sell_row_button(btn_sell, pid in pending_sell_ids)
-	btn_sell.pressed.connect(func(): _toggle_pending_sell(pid))
-	var sell_cell := CenterContainer.new()
-	sell_cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sell_cell.custom_minimum_size = Vector2(110.0, 0)
-	sell_cell.add_child(btn_sell)
-	h.add_child(sell_cell)
+	if not _bm_is_lineup_screen():
+		var btn_sell := Button.new()
+		btn_sell.custom_minimum_size = Vector2(37, 37)
+		btn_sell.text = ""
+		_bm_style_sell_row_button(btn_sell, pid in pending_sell_ids)
+		btn_sell.pressed.connect(func(): _toggle_pending_sell(pid))
+		var sell_cell := CenterContainer.new()
+		sell_cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sell_cell.custom_minimum_size = Vector2(110.0, 0)
+		sell_cell.add_child(btn_sell)
+		h.add_child(sell_cell)
 
 	return panel
 

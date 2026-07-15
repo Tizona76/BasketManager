@@ -414,6 +414,7 @@ func _ready() -> void:
 	_ensure_ticket_cat_a_icon()
 	_ensure_ticket_cat_b_icon()
 	_ensure_ticket_cat_c_icon()
+	_update_ticketing_capacity_labels()
 	_stadium_boost_ticketing_fonts()
 	_ensure_ticketing_close_button()
 	call_deferred("_ensure_capacity_label")
@@ -509,6 +510,7 @@ func _bm_stadium_mobile_entry_buttons_plus20_textplus2() -> void:
 		btn.add_theme_font_size_override("font_size", 30)
 
 func _on_btn_retour_pressed() -> void:
+	_hide_upgrade_progress_timeline()
 	if _bm_has_confirmed_stadium_setup():
 		var d_unlock: Dictionary = PlayerLife.load_savegame()
 		if typeof(d_unlock) == TYPE_DICTIONARY:
@@ -652,6 +654,7 @@ func _stadium_tr(key: String) -> String:
 					"stadium.ticketing.col.category": {"fr":"Catégorie","en":"Category","es":"Categoría","it":"Categoria","pt":"Categoria"},
 					"stadium.ticketing.col.price": {"fr":"Prix","en":"Price","es":"Precio","it":"Prezzo","pt":"Preço"},
 			"stadium.ticketing.col.seats": {"fr":"Places","en":"Seats","es":"Asientos","it":"Posti","pt":"Lugares"},
+				"stadium.ticketing.col.estimated_revenue_short": {"fr":"Rev. est.","en":"Est. Revenue","es":"Ing. est.","it":"Ric. stim.","pt":"Rec. est."},
 			"stadium.duration_unit": {"fr":"match(s)","en":"games","es":"partidos","it":"partite","pt":"jogos"},
 			"stadium.ticketing.tooltip.category": {"fr":"Chaque catégorie a un nombre de places et de prix réservés.","en":"Each category has a reserved number of seats and prices.","es":"Cada categoría tiene un número reservado de asientos y precios.","it":"Ogni categoria ha un numero riservato di posti e prezzi.","pt":"Cada categoria tem um número reservado de lugares e preços."},
 					"stadium.ticketing.tooltip.price": {"fr":"Le prix est défini par catégorie et limité par le niveau du stade.","en":"Price is set by category and limited by stadium level.","es":"El precio se define por categoría y está limitado por el nivel del estadio.","it":"Il prezzo è impostato per categoria ed è limitato dal livello dello stadio.","pt":"O preço é definido por categoria e limitado pelo nível do estádio."},
@@ -2368,8 +2371,8 @@ func _on_tab_upgrade() -> void:
 				var capacity_bonus_text := ""
 				if capacity_bonus_key != "":
 					capacity_bonus_text = _stadium_tr(capacity_bonus_key)
-				rows.add_child(_make_upgrade_info_card(UPGRADE_CAPACITY_ICON_PATH, UPGRADE_CAPACITY_ICON_SIZE, _stadium_tr("stadium.capacity"), _format_int(target_capacity), capacity_bonus_text))
-				rows.add_child(_make_upgrade_info_card(UPGRADE_COST_ICON_PATH, UPGRADE_SMALL_INFO_ICON_SIZE, _stadium_tr("stadium.cost"), _format_int(cost) + " €"))
+				rows.add_child(_make_upgrade_info_card(UPGRADE_CAPACITY_ICON_PATH, UPGRADE_CAPACITY_ICON_SIZE, _stadium_tr("stadium.capacity"), _format_int(target_capacity).replace(" ", "."), capacity_bonus_text))
+				rows.add_child(_make_upgrade_info_card(UPGRADE_COST_ICON_PATH, UPGRADE_SMALL_INFO_ICON_SIZE, _stadium_tr("stadium.cost"), _format_int(cost).replace(" ", ".") + " €"))
 				var duration_text := ""
 				if is_basic_improvements:
 					duration_text = _stadium_tr("stadium.duration_one_game")
@@ -2597,6 +2600,7 @@ func _ticketing_debug_hover() -> void:
 # ---------------------------------------------------------------------------
 
 func _on_tab_ticketing() -> void:
+	_hide_upgrade_progress_timeline()
 	_ensure_ticketing_screen_bg()
 	if TicketingScreenBG != null:
 		TicketingScreenBG.visible = true
@@ -2649,6 +2653,9 @@ func _on_tab_ticketing() -> void:
 			if not hdr_seats.mouse_entered.is_connected(func(): pass):
 				hdr_seats.mouse_entered.connect(func(): _bm_show_limits_tooltip(_stadium_tr("stadium.ticketing.tooltip.seats")))
 				hdr_seats.mouse_exited.connect(_bm_hide_limits_tooltip)
+		var hdr_estimated := get_node_or_null("Content/CenterTicketing/PanelTicketing/VBox/Grid/HdrSpacer") as Label
+		if hdr_estimated != null:
+			hdr_estimated.text = _stadium_tr("stadium.ticketing.col.estimated_revenue_short")
 		PanelTicketing.z_index = 20
 		# Rebind + force clickable (Billetterie only)
 		_stadium_bind_ticketing_inputs()
@@ -2665,6 +2672,7 @@ func _on_tab_ticketing() -> void:
 		_ensure_capacity_label()
 		_stadium_fix_popularity_badges_visual()
 		_stadium_apply_ticketing_limits(_stadium_current_capacity_value())
+		_update_ticketing_capacity_labels()
 		_stadium_set_active_panel(PanelTicketing)
 		_stadium_make_panel_full_screen(PanelTicketing)
 		_ensure_ticketing_confirm_button()
@@ -2968,6 +2976,7 @@ func _ensure_upgrade_panel() -> void:
 
 
 func _on_close_upgrade_pressed() -> void:
+	_hide_upgrade_progress_timeline()
 	var panel := get_node_or_null("Content/CenterUpgrade/PanelUpgrade") as CanvasItem
 	if panel != null:
 		panel.visible = false
@@ -3715,6 +3724,7 @@ func _ensure_shop_panel() -> void:
 		(panel as CanvasItem).visible = false
 
 func _on_tab_shop() -> void:
+	_hide_upgrade_progress_timeline()
 	if TicketingScreenBG != null:
 		TicketingScreenBG.visible = false
 
@@ -4385,31 +4395,93 @@ func _ensure_ticket_cat_icon(label_name: String, wrap_name: String, img_name: St
 	var parent := lbl.get_parent()
 	var idx := lbl.get_index()
 
-	var wrap := HBoxContainer.new()
+	var wrap := VBoxContainer.new()
 	wrap.name = wrap_name
 	wrap.alignment = BoxContainer.ALIGNMENT_CENTER
 	wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	wrap.custom_minimum_size = Vector2(0, 0)
+	wrap.add_theme_constant_override("separation", 2)
+
+	var row := HBoxContainer.new()
+	row.name = "CatIconRow"
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 4)
+	wrap.add_child(row)
+
+	var cat_box := VBoxContainer.new()
+	cat_box.name = "CatTextBox"
+	cat_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	cat_box.add_theme_constant_override("separation", 5)
+	row.add_child(cat_box)
 
 	parent.remove_child(lbl)
-	wrap.add_child(lbl)
+	cat_box.add_child(lbl)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.add_theme_font_size_override("font_size", 44)
 
 	var img := TextureRect.new()
 	img.name = img_name
-	img.custom_minimum_size = Vector2(160, 100)
-	img.size = Vector2(160, 100)
+	img.custom_minimum_size = Vector2(184, 115)
+	img.size = Vector2(184, 115)
 	img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	img.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if ResourceLoader.exists(img_path):
 		img.texture = load(img_path) as Texture2D
 
-	wrap.add_child(img)
+	row.add_child(img)
 	parent.add_child(wrap)
 	parent.move_child(wrap, idx)
+
+
+
+func _ticket_capacity_text(cat: String, cap_total: int, max_map: Dictionary) -> String:
+	var cat_cap: int = int(max_map.get(cat, 0))
+	var pct: int = 0
+	if cap_total > 0:
+		pct = int(round(float(cat_cap) / float(cap_total) * 100.0))
+	return "Capacity = " + _format_int(cat_cap).replace(" ", ".") + " - " + str(pct) + "%"
+
+
+func _set_ticket_capacity_label(wrap_name: String, label_name: String, cat: String, cap_total: int, max_map: Dictionary) -> void:
+	var wrap := get_node_or_null("Content/CenterTicketing/PanelTicketing/VBox/Grid/%s" % wrap_name) as Container
+	if wrap == null:
+		return
+	var parent: Container = wrap
+	var lbl := parent.get_node_or_null(label_name) as Label
+	if lbl == null:
+		lbl = Label.new()
+		lbl.name = label_name
+		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl.add_theme_font_size_override("font_size", 22)
+		var courier := SystemFont.new()
+		courier.font_names = PackedStringArray(["Courier New", "Courier", "monospace"])
+		lbl.add_theme_font_override("font", courier)
+		lbl.add_theme_color_override("font_color", Color.WHITE)
+		lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.65))
+		lbl.add_theme_constant_override("outline_size", 2)
+		parent.add_child(lbl)
+	var gap_name := label_name + "BottomGap"
+	var gap := parent.get_node_or_null(gap_name) as Control
+	if gap == null:
+		gap = Control.new()
+		gap.name = gap_name
+		gap.custom_minimum_size = Vector2(0, 8)
+		parent.add_child(gap)
+	lbl.text = _ticket_capacity_text(cat, cap_total, max_map)
+
+
+func _update_ticketing_capacity_labels() -> void:
+	var cap_total: int = _stadium_current_capacity_value()
+	var pack: Dictionary = _compute_ticketing_limits(cap_total)
+	var max_map: Dictionary = pack.get("max", {}) as Dictionary
+	_set_ticket_capacity_label("CatAIconWrap", "LblCatACapacity", CAT_A, cap_total, max_map)
+	_set_ticket_capacity_label("CatBIconWrap", "LblCatBCapacity", CAT_B, cap_total, max_map)
+	_set_ticket_capacity_label("CatCIconWrap", "LblCatCCapacity", CAT_C, cap_total, max_map)
 
 
 func _ensure_ticket_cat_a_icon() -> void:

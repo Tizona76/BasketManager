@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://coug7ghqnhkq3"
-path="res://.godot/imported/accessory_mask.png-b396057b2dd24703fb9d5f57ce3a097a.ctex"
+path="res://godot/imported/accessory_mask.png-b396057b2dd24703fb9d5f57ce3a097a.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/avatars/layers/M_fade/accessory_mask.png"
-dest_files=["res://.godot/imported/accessory_mask.png-b396057b2dd24703fb9d5f57ce3a097a.ctex"]
+dest_files=["res://godot/imported/accessory_mask.png-b396057b2dd24703fb9d5f57ce3a097a.ctex"]
 
 [params]
 

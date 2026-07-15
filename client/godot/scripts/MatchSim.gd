@@ -10,6 +10,7 @@ const BM_SKIP_FINAL_RESULT_TOKEN_COST := 1
 const BM_GENERIC_FUNNEL_URL := "https://api.basketmanager-game.com/v1/funnel/event"
 const BM_GENERIC_FUNNEL_MAX_RETRIES := 2
 const HOME_ARENA_MATCH_BACKGROUND_PATH := "res://assets/images/backgrounds/home_arena.png"
+const BM_COACH_INSIGHTS_DEBUG := true
 
 @onready var lbl_temps: Label = $LabelTemps
 @onready var lbl_score: Label = $LabelScore
@@ -18,7 +19,11 @@ const HOME_ARENA_MATCH_BACKGROUND_PATH := "res://assets/images/backgrounds/home_
 @onready var btn_retour: Button = $BtnRetour
 
 var lbl_match_result: Label = null
+var btn_current_lineup: Button = null
+var current_lineup_popup: Control = null
 var _match_progress_info_after_countdown: String = ""
+static var _bm_last_coach_insight_family: String = ""
+static var _bm_last_coach_insight_player: String = ""
 
 
 func _bm_make_back_button_style(bg: Color, glow: Color, bottom_w: int, shadow_size: int) -> StyleBoxFlat:
@@ -148,6 +153,302 @@ func _bm_apply_i18n_btn_retour() -> void:
 		I18nSvc.apply_node(btn_retour)
 		_bm_style_btn_retour()
 
+
+func _bm_make_game_lineup_button_style(bg: Color, glow: Color, bottom_w: int, shadow_size: int) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.corner_radius_top_left = 14
+	sb.corner_radius_top_right = 14
+	sb.corner_radius_bottom_left = 14
+	sb.corner_radius_bottom_right = 14
+	sb.border_width_bottom = bottom_w
+	sb.border_color = glow
+	sb.shadow_color = Color(glow.r, glow.g, glow.b, 0.34)
+	sb.shadow_size = shadow_size
+	sb.shadow_offset = Vector2(0, 5)
+	sb.content_margin_left = 22
+	sb.content_margin_right = 22
+	sb.content_margin_top = 12
+	sb.content_margin_bottom = 12
+	return sb
+
+
+func _bm_style_current_lineup_button() -> void:
+	if btn_current_lineup == null:
+		return
+	var normal := _bm_make_game_lineup_button_style(Color(0.95, 0.48, 0.12, 1.0), Color(0.72, 0.28, 0.04, 1.0), 4, 8)
+	var hover := _bm_make_game_lineup_button_style(Color(1.0, 0.58, 0.18, 1.0), Color(0.88, 0.38, 0.06, 1.0), 6, 14)
+	var pressed := _bm_make_game_lineup_button_style(Color(0.82, 0.36, 0.08, 1.0), Color(0.58, 0.22, 0.03, 1.0), 5, 6)
+	btn_current_lineup.add_theme_stylebox_override("normal", normal)
+	btn_current_lineup.add_theme_stylebox_override("hover", hover)
+	btn_current_lineup.add_theme_stylebox_override("pressed", pressed)
+	btn_current_lineup.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	btn_current_lineup.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
+	btn_current_lineup.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
+	btn_current_lineup.add_theme_font_size_override("font_size", 22)
+
+
+func _bm_apply_game_lineup_close_button_style(button: Button) -> void:
+	if button == null:
+		return
+	var normal := _bm_make_back_button_style(Color(0.90, 0.05, 0.05, 1.0), Color(0, 0, 0, 0.35), 3, 6)
+	var hover := _bm_make_back_button_style(Color(1.0, 0.10, 0.10, 1.0), Color(0, 0, 0, 0.45), 4, 8)
+	var pressed := _bm_make_back_button_style(Color(0.70, 0.02, 0.02, 1.0), Color(0, 0, 0, 0.25), 2, 4)
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	button.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
+	button.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
+	button.add_theme_font_size_override("font_size", 22)
+
+
+func _bm_place_current_lineup_button() -> void:
+	if btn_current_lineup == null:
+		return
+	var vp := get_viewport_rect().size
+	var w := 202.0 if _bm_matchsim_is_mobile_layout() else 184.0
+	var h := 58.0 if _bm_matchsim_is_mobile_layout() else 52.0
+	btn_current_lineup.custom_minimum_size = Vector2(w, h)
+	btn_current_lineup.size = Vector2(w, h)
+	btn_current_lineup.position = Vector2(vp.x - w - 24.0, 24.0)
+	btn_current_lineup.z_index = 80
+
+
+func _bm_ensure_current_lineup_button() -> void:
+	if btn_current_lineup != null and is_instance_valid(btn_current_lineup):
+		_bm_place_current_lineup_button()
+		return
+	btn_current_lineup = Button.new()
+	btn_current_lineup.name = "BtnCurrentLineup"
+	btn_current_lineup.text = _bm_matchsim_tr_fallback("matchsim.game_lineup", "Game Lineup")
+	btn_current_lineup.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn_current_lineup.focus_mode = Control.FOCUS_NONE
+	btn_current_lineup.pressed.connect(_bm_show_current_lineup_popup)
+	add_child(btn_current_lineup)
+	_bm_style_current_lineup_button()
+	_bm_place_current_lineup_button()
+
+
+func _bm_current_lineup_style_panel(bg: Color, border: Color) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.set_corner_radius_all(10)
+	sb.set_border_width_all(1)
+	sb.border_color = border
+	sb.shadow_color = Color(0, 0, 0, 0.42)
+	sb.shadow_size = 12
+	sb.shadow_offset = Vector2(0, 5)
+	return sb
+
+
+func _bm_current_lineup_label(parent: Control, text_value: String, pos: Vector2, sz: Vector2, fs: int, color: Color, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
+	var lbl := Label.new()
+	lbl.text = text_value
+	lbl.position = pos
+	lbl.size = sz
+	lbl.horizontal_alignment = align
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.clip_text = true
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lbl.add_theme_font_size_override("font_size", fs)
+	lbl.add_theme_color_override("font_color", color)
+	lbl.add_theme_color_override("font_outline_color", Color(0.01, 0.02, 0.05, 0.95))
+	lbl.add_theme_constant_override("outline_size", 2)
+	parent.add_child(lbl)
+	return lbl
+
+
+func _bm_current_lineup_attr_color(metric: String) -> Color:
+	match metric:
+		"shooting", "accuracy", "attack":
+			return Color(0.95, 0.50, 0.12, 1.0)
+		"speed", "energy":
+			return Color(0.88, 0.62, 0.18, 1.0)
+		"defense":
+			return Color(0.24, 0.47, 0.68, 1.0)
+		"motivation":
+			return Color(0.72, 0.52, 0.92, 1.0)
+		_:
+			return Color(0.92, 0.95, 1.0, 1.0)
+
+
+func _bm_current_lineup_attr(parent: Control, label_text: String, value: Variant, pos: Vector2, metric: String) -> void:
+	_bm_current_lineup_label(parent, label_text, pos, Vector2(84, 16), 11, Color(0.68, 0.76, 0.90, 0.95))
+	var value_text := ("%.2f" % float(value)) if metric == "accuracy" else str(int(round(float(value))))
+	_bm_current_lineup_label(parent, value_text, pos + Vector2(0, 15), Vector2(84, 22), 18, _bm_current_lineup_attr_color(metric), HORIZONTAL_ALIGNMENT_CENTER)
+
+
+func _bm_current_lineup_player_metrics(pd: Dictionary) -> Dictionary:
+	return {
+		"attack": int(round((float(pd.get("tir", 0.0)) + float(pd.get("precision", 0.0))) / 2.0)),
+		"defense": int(round(float(pd.get("defense", 0.0)))),
+		"energy": int(round((float(pd.get("vitesse", 0.0)) + float(pd.get("motivation", 0.0)) + maxf(0.0, 100.0 - float(pd.get("fatigue", 0.0)))) / 3.0))
+	}
+
+
+func _bm_current_lineup_player_avatar(pd: Dictionary, parent: Control, pos: Vector2) -> void:
+	var tex := TextureRect.new()
+	tex.position = pos
+	tex.size = Vector2(38, 38)
+	tex.custom_minimum_size = tex.size
+	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var path := str(pd.get("avatar_path", "")).strip_edges()
+	if path != "" and ResourceLoader.exists(path):
+		tex.texture = load(path) as Texture2D
+	parent.add_child(tex)
+
+
+func _bm_current_lineup_player_row(parent: Control, pd: Dictionary, y: float, row_w: float) -> void:
+	var row := Panel.new()
+	row.position = Vector2(0, y)
+	row.size = Vector2(row_w, 44)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_stylebox_override("panel", _bm_current_lineup_style_panel(Color(0.02, 0.04, 0.08, 0.72), Color(1, 1, 1, 0.10)))
+	parent.add_child(row)
+
+	_bm_current_lineup_player_avatar(pd, row, Vector2(8, 3))
+	_bm_current_lineup_label(row, _bm_player_display_name(pd), Vector2(54, 7), Vector2(row_w - 602.0, 30), 17, Color(1, 1, 1, 1))
+	var pos_text := str(pd.get("poste", pd.get("pos", ""))).strip_edges()
+	var metrics := _bm_current_lineup_player_metrics(pd)
+	_bm_current_lineup_label(row, pos_text, Vector2(row_w - 530.0, 7), Vector2(84, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(row, str(int(metrics.get("attack", 0))), Vector2(row_w - 350.0, 7), Vector2(70, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(row, str(int(metrics.get("defense", 0))), Vector2(row_w - 235.0, 7), Vector2(76, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(row, str(int(metrics.get("energy", 0))), Vector2(row_w - 112.0, 7), Vector2(68, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
+
+
+func _bm_current_lineup_header(parent: Control, y: float, row_w: float) -> void:
+	var header_color := Color(0.76, 0.84, 0.96, 0.82)
+	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("mercato.col.position", "Position"), Vector2(row_w - 530.0, y), Vector2(84, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("player.card.graph.attack", "Attack"), Vector2(row_w - 350.0, y), Vector2(70, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("player.card.graph.defense", "Defense"), Vector2(row_w - 235.0, y), Vector2(76, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("matchsim.energy", "Energy"), Vector2(row_w - 112.0, y), Vector2(68, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
+
+
+func _bm_current_lineup_players() -> Array[Dictionary]:
+	var save: Dictionary = PlayerLife.load_savegame()
+	var played_ids: Array = _bm_get_effective_played_ids(save)
+	var out: Array[Dictionary] = []
+	if played_ids.is_empty():
+		return out
+	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
+		return out
+	var by_id: Dictionary = save["players_by_id"] as Dictionary
+	for raw_id in played_ids:
+		var sid := str(raw_id).strip_edges()
+		if sid == "":
+			continue
+		var key := str(int(round(float(sid))))
+		if not by_id.has(key) or typeof(by_id[key]) != TYPE_DICTIONARY:
+			continue
+		out.append((by_id[key] as Dictionary).duplicate(true))
+	return out
+
+
+func _bm_current_lineup_summary(players: Array[Dictionary]) -> Dictionary:
+	var total_attack := 0.0
+	var total_defense := 0.0
+	var total_energy := 0.0
+	for pd in players:
+		total_attack += (float(pd.get("tir", 0.0)) + float(pd.get("precision", 0.0))) / 2.0
+		total_defense += float(pd.get("defense", 0.0))
+		total_energy += (float(pd.get("vitesse", 0.0)) + float(pd.get("motivation", 0.0)) + maxf(0.0, 100.0 - float(pd.get("fatigue", 0.0)))) / 3.0
+	var count := maxf(1.0, float(players.size()))
+	return {
+		"attack": int(round(total_attack / count)),
+		"defense": int(round(total_defense / count)),
+		"energy": int(round(total_energy / count))
+	}
+
+
+func _bm_current_lineup_summary_item(parent: Control, label_text: String, value: int, x: float, metric: String) -> void:
+	_bm_current_lineup_label(parent, label_text, Vector2(x, 0), Vector2(150, 24), 15, Color(0.78, 0.85, 0.95, 0.95), HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(parent, str(value), Vector2(x, 24), Vector2(150, 34), 28, _bm_current_lineup_attr_color(metric), HORIZONTAL_ALIGNMENT_CENTER)
+
+
+func _bm_show_current_lineup_popup() -> void:
+	if current_lineup_popup != null and is_instance_valid(current_lineup_popup):
+		return
+	var players := _bm_current_lineup_players()
+	var popup := Control.new()
+	popup.name = "CurrentLineupPopup"
+	popup.set_anchors_preset(Control.PRESET_FULL_RECT)
+	popup.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.z_index = 620
+	add_child(popup)
+	current_lineup_popup = popup
+
+	var dark := ColorRect.new()
+	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dark.color = Color(0, 0, 0, 0.50)
+	dark.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.add_child(dark)
+
+	var vp := get_viewport_rect().size
+	var card_w := minf(820.0, vp.x - 64.0)
+	var card_h := minf(710.0, vp.y - 56.0)
+	var card := Panel.new()
+	card.size = Vector2(card_w, card_h)
+	card.position = Vector2((vp.x - card_w) * 0.5, (vp.y - card_h) * 0.5)
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.add_theme_stylebox_override("panel", _bm_current_lineup_style_panel(Color(0.025, 0.035, 0.075, 0.98), Color(0.95, 0.58, 0.14, 0.72)))
+	popup.add_child(card)
+
+	_bm_current_lineup_label(card, _bm_matchsim_tr_fallback("matchsim.game_lineup", "Game Lineup"), Vector2(0, 18), Vector2(card_w, 38), 30, Color(1, 1, 1, 1), HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(card, _bm_matchsim_tr_fallback("matchsim.match_in_progress", "Match in progress") + "  |  " + _bm_matchsim_tr_fallback("matchsim.read_only", "Read only"), Vector2(0, 54), Vector2(card_w, 26), 16, Color(0.76, 0.84, 0.96, 0.88), HORIZONTAL_ALIGNMENT_CENTER)
+
+	var summary := _bm_current_lineup_summary(players)
+	var summary_row := Control.new()
+	summary_row.position = Vector2((card_w - 510.0) * 0.5, 84.0)
+	summary_row.size = Vector2(510, 58)
+	summary_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(summary_row)
+	_bm_current_lineup_summary_item(summary_row, _bm_matchsim_tr_fallback("player.card.graph.attack", "Attack"), int(summary.get("attack", 0)), 0, "attack")
+	_bm_current_lineup_summary_item(summary_row, _bm_matchsim_tr_fallback("player.card.graph.defense", "Defense"), int(summary.get("defense", 0)), 180, "defense")
+	_bm_current_lineup_summary_item(summary_row, _bm_matchsim_tr_fallback("matchsim.energy", "Energy"), int(summary.get("energy", 0)), 360, "energy")
+
+	var content := VBoxContainer.new()
+	content.position = Vector2(34, 154)
+	content.size = Vector2(card_w - 68.0, card_h - 246.0)
+	content.add_theme_constant_override("separation", 6)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(content)
+
+	var row_w := content.size.x
+	var starting := players.slice(0, mini(5, players.size()))
+	var bench := players.slice(mini(5, players.size()), players.size())
+
+	var start_section := Control.new()
+	start_section.custom_minimum_size = Vector2(row_w, 26.0 + float(starting.size()) * 46.0)
+	content.add_child(start_section)
+	_bm_current_lineup_label(start_section, _bm_matchsim_tr_fallback("matchsim.starting_five", "STARTING FIVE"), Vector2(0, 0), Vector2(row_w, 22), 17, Color(1.0, 0.72, 0.20, 1.0))
+	_bm_current_lineup_header(start_section, 0.0, row_w)
+	for i in range(starting.size()):
+		_bm_current_lineup_player_row(start_section, starting[i], 26.0 + float(i) * 46.0, row_w)
+
+	var bench_section := Control.new()
+	bench_section.custom_minimum_size = Vector2(row_w, 26.0 + float(bench.size()) * 46.0)
+	content.add_child(bench_section)
+	_bm_current_lineup_label(bench_section, _bm_matchsim_tr_fallback("matchsim.bench", "BENCH"), Vector2(0, 0), Vector2(row_w, 22), 17, Color(1.0, 0.72, 0.20, 1.0))
+	for i in range(bench.size()):
+		_bm_current_lineup_player_row(bench_section, bench[i], 26.0 + float(i) * 46.0, row_w)
+
+	var btn := Button.new()
+	btn.text = _bm_matchsim_tr_fallback("common.close", "Close")
+	btn.custom_minimum_size = Vector2(170, 56)
+	btn.size = Vector2(170, 56)
+	btn.position = Vector2(card_w - 198.0, card_h - 72.0)
+	btn.focus_mode = Control.FOCUS_NONE
+	_bm_apply_game_lineup_close_button_style(btn)
+	btn.pressed.connect(func():
+		if current_lineup_popup != null and is_instance_valid(current_lineup_popup):
+			current_lineup_popup.queue_free()
+		current_lineup_popup = null
+	)
+	card.add_child(btn)
+
 @onready var btn_skip: Button = get_node_or_null("BtnSkip") as Button
 @onready var lbl_team_dom: Label = get_node_or_null("ScoreBoardPanel/LabelTeamDom") as Label
 @onready var lbl_team_ext: Label = get_node_or_null("ScoreBoardPanel/LabelTeamExt") as Label
@@ -235,8 +536,9 @@ func _bm_place_match_result_label(text_value: String, color_value: Color) -> voi
 		lbl_match_result.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(lbl_match_result)
 	lbl_match_result.text = text_value
-	lbl_match_result.position = lbl_info.position
-	lbl_match_result.size = Vector2(lbl_info.size.x, 48.0 if _bm_matchsim_is_mobile_layout() else 38.0)
+	var result_height := 56.0 if _bm_matchsim_is_mobile_layout() else 44.0
+	lbl_match_result.position = lbl_info.position - Vector2(0.0, result_height + 18.0)
+	lbl_match_result.size = Vector2(lbl_info.size.x, result_height)
 	lbl_match_result.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl_match_result.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl_match_result.z_index = 21
@@ -893,6 +1195,8 @@ func _ready() -> void:
 
 	# UI init
 	lbl_info.text = ""
+	if info_panel != null:
+		info_panel.visible = false
 	if stats_end != null:
 		stats_end.visible = false
 
@@ -912,6 +1216,8 @@ func _ready() -> void:
 	if not btn_retour.pressed.is_connected(_on_btn_retour_pressed):
 		btn_retour.pressed.connect(_on_btn_retour_pressed)
 
+	_bm_ensure_current_lineup_button()
+
 	# BtnSkip (fast-forward fin de match)
 	if btn_skip != null:
 		btn_skip.visible = false
@@ -921,6 +1227,7 @@ func _ready() -> void:
 			btn_skip.pressed.connect(_on_btn_skip_gate_pressed)
 	_bm_matchsim_apply_mobile_texts_plus2()
 	call_deferred("_bm_matchsim_apply_mobile_layout")
+	call_deferred("_bm_place_current_lineup_button")
 
 
 	# Timer (1 sec = 1 minute)
@@ -1002,8 +1309,9 @@ func _bm_play_match_intro_countdown() -> void:
 	overlay.add_child(count_lbl)
 
 
-	for n in ["3", "2", "1", "0"]:
+	for n in ["3", "2", "1", "GO !"]:
 		count_lbl.text = n
+		count_lbl.add_theme_font_size_override("font_size", 78 if n == "GO !" else 92)
 		count_lbl.scale = Vector2(0.82, 0.82)
 		count_lbl.modulate.a = 0.0
 		ball.position.y = get_viewport_rect().size.y * 0.5 + 30.0
@@ -1016,7 +1324,7 @@ func _bm_play_match_intro_countdown() -> void:
 		tw.chain().tween_property(ball, "position:y", get_viewport_rect().size.y * 0.5 + 30.0, 0.24).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 		await get_tree().create_timer(0.54).timeout
 
-	await get_tree().create_timer(2.0).timeout
+	await get_tree().create_timer(0.16).timeout
 
 	var fade_tw := create_tween()
 	fade_tw.tween_property(overlay, "modulate:a", 0.0, 0.18)
@@ -1210,20 +1518,20 @@ func _bm_get_effective_played_ids(save: Dictionary) -> Array:
 	if roster.has("selected_ids") and typeof(roster["selected_ids"]) == TYPE_ARRAY:
 		selected_ids = (roster["selected_ids"] as Array).duplicate()
 	var season_round_now: int = int(save.get("season_round", 0))
+	var season_number_now: int = int(save.get("season_number", 1))
+	var match_selection_unlocked := season_round_now >= 5 if season_number_now <= 1 else season_round_now >= 0
 	var active_coach_id: String = ""
 	if save.has("coachs") and typeof(save["coachs"]) == TYPE_DICTIONARY:
 		var coachs_pre: Dictionary = save["coachs"] as Dictionary
 		active_coach_id = str(coachs_pre.get("active", "")).strip_edges()
 
-	if active_coach_id == "":
-		if season_round_now < 5:
-			return selected_ids
-		if match_ids.size() == 8:
-			return match_ids
-		return []
-
 	if match_ids.size() == 8:
 		return match_ids
+	if match_selection_unlocked:
+		return []
+	if active_coach_id == "":
+		return selected_ids
+
 	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
 		return []
 	var by_id: Dictionary = save["players_by_id"] as Dictionary
@@ -1517,6 +1825,7 @@ func _fade_in_scoreboard() -> void:
 		return
 
 	scoreboard_panel.modulate.a = 0.0
+	info_panel.visible = lbl_info != null and lbl_info.text.strip_edges() != ""
 	info_panel.modulate.a = 0.0
 
 	var tw := create_tween()
@@ -1630,21 +1939,32 @@ func _bm_show_live_match_comment(trigger_minute: int) -> void:
 	var display_text := "“" + text_value + "”"
 	lbl_info.text = display_text
 	print("[LIVE_PROBE] show after_write lbl_text=", lbl_info.text, " text_matches=", lbl_info.text == display_text, " lbl_visible=", lbl_info.visible, " lbl_visible_tree=", lbl_info.is_visible_in_tree(), " lbl_global_position=", lbl_info.global_position, " lbl_size=", lbl_info.size, " viewport_size=", get_viewport_rect().size)
+	var live_info_pos := lbl_info.position
 	lbl_info.visible = true
-	lbl_info.modulate.a = 1.0
+	lbl_info.modulate.a = 0.0
+	lbl_info.position = live_info_pos + Vector2(0.0, 6.0)
 	lbl_info.z_index = 20
 	lbl_info.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	lbl_info.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
 	lbl_info.add_theme_constant_override("outline_size", 8)
 	lbl_info.add_theme_font_size_override("font_size", 34)
+	var live_panel_pos := Vector2.ZERO
 	if info_panel != null:
 		info_panel.visible = true
-		info_panel.modulate.a = 1.0
+		info_panel.modulate.a = 0.0
 		info_panel.z_index = 19
 		lbl_info.z_index = 20
 		info_panel.self_modulate = Color(0, 0, 0, 0.82)
-		info_panel.position = lbl_info.position - Vector2(28.0, 18.0)
+		live_panel_pos = live_info_pos - Vector2(28.0, 18.0)
+		info_panel.position = live_panel_pos + Vector2(0.0, 6.0)
 		info_panel.size = lbl_info.size + Vector2(56.0, 78.0)
+	var live_tw := create_tween()
+	live_tw.set_parallel(true)
+	live_tw.tween_property(lbl_info, "modulate:a", 1.0, 0.16)
+	live_tw.tween_property(lbl_info, "position", live_info_pos, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	if info_panel != null:
+		live_tw.tween_property(info_panel, "modulate:a", 1.0, 0.16)
+		live_tw.tween_property(info_panel, "position", live_panel_pos, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	call_deferred("_bm_live_probe_next_frame", display_text)
 
 func _bm_live_probe_next_frame(expected_text: String) -> void:
@@ -1901,16 +2221,23 @@ func _resolve_and_tr_summary(raw: String) -> String:
 func _bm_build_match_impact_reason() -> String:
 	var save: Dictionary = PlayerLife.load_savegame()
 	var played_ids: Array = _bm_get_effective_played_ids(save)
+	if BM_COACH_INSIGHTS_DEBUG:
+		print("[COACH_INSIGHTS_DEBUG][PLAYED_IDS] ", played_ids)
 	if played_ids.is_empty():
+		if BM_COACH_INSIGHTS_DEBUG:
+			print("[COACH_INSIGHTS_DEBUG][STOP] no played_ids")
 		return ""
 
 	var by_id: Dictionary = {}
 	if save.has("players_by_id") and typeof(save["players_by_id"]) == TYPE_DICTIONARY:
 		by_id = save["players_by_id"] as Dictionary
 
+	var played_profiles: Array[Dictionary] = []
 	var total_motivation: float = 0.0
 	var total_fatigue: float = 0.0
-	var count: int = 0
+	var total_offense: float = 0.0
+	var total_defense: float = 0.0
+	var total_rating: float = 0.0
 
 	for raw_id in played_ids:
 		var sid := str(raw_id).strip_edges()
@@ -1920,15 +2247,27 @@ func _bm_build_match_impact_reason() -> String:
 		if not by_id.has(key) or typeof(by_id[key]) != TYPE_DICTIONARY:
 			continue
 		var pd: Dictionary = by_id[key] as Dictionary
-		total_motivation += float(pd.get("motivation", 50))
-		total_fatigue += float(pd.get("fatigue", 0))
-		count += 1
+		var profile := _bm_build_coach_insight_player_profile(pd)
+		played_profiles.append(profile)
+		if BM_COACH_INSIGHTS_DEBUG:
+			print("[COACH_INSIGHTS_DEBUG][PLAYER] id=", key, " name=", str(profile.get("name", "")), " offense=", snapped(float(profile.get("offense", 0.0)), 0.1), " defense=", snapped(float(profile.get("defense", 0.0)), 0.1), " motivation=", snapped(float(profile.get("motivation", 0.0)), 0.1), " fatigue=", snapped(float(profile.get("fatigue", 0.0)), 0.1), " rating=", snapped(float(profile.get("rating", 0.0)), 0.1))
+		total_motivation += float(profile.get("motivation", 50.0))
+		total_fatigue += float(profile.get("fatigue", 0.0))
+		total_offense += float(profile.get("offense", 0.0))
+		total_defense += float(profile.get("defense", 0.0))
+		total_rating += float(profile.get("rating", 0.0))
 
-	if count <= 0:
+	if played_profiles.is_empty():
+		if BM_COACH_INSIGHTS_DEBUG:
+			print("[COACH_INSIGHTS_DEBUG][STOP] played_ids resolved, but no player profile found in players_by_id")
 		return ""
 
-	var avg_motivation: float = total_motivation / float(count)
-	var avg_fatigue: float = total_fatigue / float(count)
+	var count: float = float(played_profiles.size())
+	var avg_motivation: float = total_motivation / count
+	var avg_fatigue: float = total_fatigue / count
+	var avg_offense: float = total_offense / count
+	var avg_defense: float = total_defense / count
+	var avg_rating: float = total_rating / count
 	var gap: float = _estimate_strength_dom() - _estimate_strength_ext()
 	if not _user_is_home:
 		gap = -gap
@@ -1937,38 +2276,637 @@ func _bm_build_match_impact_reason() -> String:
 	var opp_score: int = int(score_ext if _user_is_home else score_dom)
 	var score_margin: int = abs(user_score - opp_score)
 	var user_won: bool = user_score > opp_score
-	var user_lost: bool = user_score < opp_score
+	var context_seed: int = user_score * 31 + opp_score * 17 + int(avg_motivation * 3.0) + int(avg_fatigue * 5.0) + int(abs(gap) * 11.0)
 
-	var reasons: Array[String] = []
-	var reason_seed: int = int(Time.get_ticks_msec() % 100000)
-
-	if gap >= 1.5:
-		reasons.append(_bm_pick_match_reason([tr("matchsim.impact.lineup_positive.1"), tr("matchsim.impact.lineup_positive.2"), tr("matchsim.impact.lineup_positive.3")], reason_seed + 1))
-	elif gap <= -1.5:
-		reasons.append(_bm_pick_match_reason([tr("matchsim.impact.lineup_negative.1"), tr("matchsim.impact.lineup_negative.2"), tr("matchsim.impact.lineup_negative.3")], reason_seed + 2))
-	elif score_margin <= 5 and abs(gap) < 1.5:
-		if user_won:
-			reasons.append(_bm_pick_match_reason([tr("matchsim.impact.close_positive.1"), tr("matchsim.impact.close_positive.2"), tr("matchsim.impact.close_positive.3")], reason_seed + 7))
-		elif user_lost:
-			reasons.append(_bm_pick_match_reason([tr("matchsim.impact.close_negative.1"), tr("matchsim.impact.close_negative.2"), tr("matchsim.impact.close_negative.3")], reason_seed + 8))
-
-	if avg_motivation >= 78.0:
-		reasons.append(_bm_pick_match_reason([tr("matchsim.impact.motivation_positive.1"), tr("matchsim.impact.motivation_positive.2"), tr("matchsim.impact.motivation_positive.3")], reason_seed + 3))
-	elif avg_motivation <= 60.0:
-		reasons.append(_bm_pick_match_reason([tr("matchsim.impact.motivation_negative.1"), tr("matchsim.impact.motivation_negative.2"), tr("matchsim.impact.motivation_negative.3")], reason_seed + 4))
-
-	if reasons.size() < 2:
-		if avg_fatigue >= 18.0:
-			reasons.append(_bm_pick_match_reason([tr("matchsim.impact.fatigue_negative.1"), tr("matchsim.impact.fatigue_negative.2"), tr("matchsim.impact.fatigue_negative.3")], reason_seed + 5))
-		elif avg_fatigue <= 6.0:
-			reasons.append(_bm_pick_match_reason([tr("matchsim.impact.fatigue_positive.1"), tr("matchsim.impact.fatigue_positive.2"), tr("matchsim.impact.fatigue_positive.3")], reason_seed + 6))
-
-	if reasons.is_empty():
+	var candidates: Array[Dictionary] = _bm_build_coach_insight_candidates(
+		played_profiles,
+		avg_motivation,
+		avg_fatigue,
+		avg_offense,
+		avg_defense,
+		avg_rating,
+		gap,
+		score_margin,
+		user_won
+	)
+	if BM_COACH_INSIGHTS_DEBUG:
+		var individual_candidates: Array[String] = []
+		var collective_candidates: Array[String] = []
+		for debug_candidate in candidates:
+			var family := str(debug_candidate.get("family", ""))
+			var player_name := str(debug_candidate.get("player_name", ""))
+			if player_name != "":
+				individual_candidates.append(family + ":" + player_name)
+			else:
+				collective_candidates.append(family)
+		print("[COACH_INSIGHTS_DEBUG][CANDIDATES_INDIVIDUAL] ", individual_candidates)
+		print("[COACH_INSIGHTS_DEBUG][CANDIDATES_COLLECTIVE] ", collective_candidates)
+	var selected_candidate := _bm_select_coach_insight_candidate(
+		candidates,
+		played_profiles,
+		avg_motivation,
+		avg_fatigue,
+		avg_offense,
+		avg_defense,
+		avg_rating,
+		gap,
+		score_margin
+	)
+	if selected_candidate.is_empty():
+		if BM_COACH_INSIGHTS_DEBUG:
+			print("[COACH_INSIGHTS_DEBUG][STOP] no selectable candidate variants")
 		return ""
 
-	if reasons.size() >= 2:
-		return reasons[0] + "\n" + reasons[1]
-	return reasons[0]
+	var variants_raw: Variant = selected_candidate.get("variants", [])
+	var variants: Array[String] = []
+	if typeof(variants_raw) == TYPE_ARRAY:
+		for variant_value in variants_raw:
+			variants.append(str(variant_value))
+	if variants.is_empty():
+		if BM_COACH_INSIGHTS_DEBUG:
+			print("[COACH_INSIGHTS_DEBUG][STOP] selected candidate has no variants family=", str(selected_candidate.get("family", "")))
+		return ""
+
+	var selected_family := str(selected_candidate.get("family", ""))
+	var selected_player := str(selected_candidate.get("player_name", ""))
+	var seed_text := selected_family + selected_player
+	var selected_text := _bm_pick_match_reason(variants, context_seed + _bm_text_seed(seed_text))
+	_bm_last_coach_insight_family = selected_family
+	_bm_last_coach_insight_player = selected_player
+	if BM_COACH_INSIGHTS_DEBUG:
+		print("[COACH_INSIGHTS_DEBUG][SELECTED] family=", selected_family, " player=", selected_player, " text=", selected_text)
+	return selected_text
+
+func _bm_build_coach_insight_player_profile(pd: Dictionary) -> Dictionary:
+	var precision: float = _bm_normalized_player_value(pd.get("precision", 50.0))
+	var pct_2pts: float = _bm_normalized_player_value(pd.get("pct_2pts", precision))
+	var pct_3pts: float = _bm_normalized_player_value(pd.get("pct_3pts", precision))
+	var offense: float = (_bm_get_effective_tir(pd) + precision + pct_2pts + pct_3pts) / 4.0
+	return {
+		"name": _bm_player_display_name(pd),
+		"offense": offense,
+		"defense": float(pd.get("defense", 50.0)),
+		"fatigue": float(pd.get("fatigue", 0.0)),
+		"motivation": float(pd.get("motivation", 50.0)),
+		"rating": float(pd.get("overall", pd.get("rating", pd.get("pondération", pd.get("ponderation", 50.0))))),
+		"age": float(pd.get("age", 0.0)),
+		"salary": float(pd.get("salaire", pd.get("salary", 0.0))),
+		"position": str(pd.get("poste", pd.get("pos", "")))
+	}
+
+func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_motivation: float, avg_fatigue: float, avg_offense: float, avg_defense: float, avg_rating: float, gap: float, score_margin: int, user_won: bool) -> Array[Dictionary]:
+	var candidates: Array[Dictionary] = []
+
+	var fatigue_player := _bm_get_distinct_coach_insight_player(played_profiles, "fatigue", 24.0, 3.0, 8.0, true)
+	if not fatigue_player.is_empty():
+		var name := str(fatigue_player.get("name", ""))
+		candidates.append({
+			"family": "fatigue_player",
+			"player_name": name,
+			"variants": [
+				"Your lineup had value, but its physical balance was stretched by %s." % name,
+				"Your selection worked on paper, though %s made the fatigue risk clear." % name,
+				"%s brought quality to the lineup, with a clear fatigue cost." % name
+			]
+		})
+
+	var motivation_player := _bm_get_distinct_coach_insight_player(played_profiles, "motivation", 78.0, 3.0, 8.0, true)
+	if not motivation_player.is_empty():
+		var name := str(motivation_player.get("name", ""))
+		candidates.append({
+			"family": "motivation_player",
+			"player_name": name,
+			"variants": [
+				"Your lineup had a stronger edge with %s involved." % name,
+				"Your selection gained energy from %s." % name,
+				"Your group looked more engaged with %s in the mix." % name
+			]
+		})
+
+	var offense_player := _bm_get_distinct_coach_insight_player(played_profiles, "offense", 68.0, 3.0, 7.0, true)
+	if not offense_player.is_empty():
+		var name := str(offense_player.get("name", ""))
+		candidates.append({
+			"family": "offense_player",
+			"player_name": name,
+			"variants": [
+				"Your selection leaned toward offense, with %s giving it the clearest attacking profile." % name,
+				"Your lineup gained a sharper attacking identity with %s." % name,
+				"Your group had more offensive shape when %s was part of it." % name
+			]
+		})
+
+	var defense_player := _bm_get_distinct_coach_insight_player(played_profiles, "defense", 68.0, 3.0, 7.0, true)
+	if not defense_player.is_empty():
+		var name := str(defense_player.get("name", ""))
+		candidates.append({
+			"family": "defense_player",
+			"player_name": name,
+			"variants": [
+				"Your selection had more defensive structure with %s involved." % name,
+				"Your lineup gained a clearer defensive identity through %s." % name,
+				"Your group looked more stable with %s in the selection." % name
+			]
+		})
+
+	var level_player := _bm_get_distinct_coach_insight_player(played_profiles, "rating", 68.0, 3.0, 7.0, true)
+	if not level_player.is_empty():
+		var name := str(level_player.get("name", ""))
+		candidates.append({
+			"family": "level_player",
+			"player_name": name,
+			"variants": [
+				"Your selection had its clearest overall base with %s involved." % name,
+				"Your lineup had a stronger current profile with %s in the group." % name,
+				"Your group leaned on %s as its most complete profile." % name
+			]
+		})
+
+	for context_candidate in _bm_build_player_context_insight_candidates(played_profiles, avg_rating):
+		candidates.append(context_candidate)
+
+	if BM_COACH_INSIGHTS_DEBUG:
+		if candidates.is_empty():
+			print("[COACH_INSIGHTS_DEBUG][FLOW] no individual candidate retained; evaluating collective fallback")
+		else:
+			print("[COACH_INSIGHTS_DEBUG][FLOW] individual candidates retained; collective context still evaluated")
+
+	if avg_fatigue >= 22.0:
+		candidates.append({
+			"family": "fatigue_group",
+			"variants": [
+				"Your lineup looked short on freshness.",
+				"Your selection had quality, but the group lacked freshness.",
+				"The group profile was solid, but fatigue limited its balance."
+			]
+		})
+	elif avg_motivation <= 58.0:
+		candidates.append({
+			"family": "motivation_group_low",
+			"variants": [
+				"Your selected group lacked a real motivation edge.",
+				"The lineup did not show a strong mental profile.",
+				"The group had structure, but not enough edge."
+			]
+		})
+	elif avg_offense - avg_defense >= 10.0:
+		candidates.append({
+			"family": "offense_balance",
+			"variants": [
+				"Your lineup clearly leaned toward offense.",
+				"Your selection gave the team a stronger attacking identity.",
+				"The group offered more attacking profile than defensive cover."
+			]
+		})
+	elif avg_defense - avg_offense >= 10.0:
+		candidates.append({
+			"family": "defense_balance",
+			"variants": [
+				"Your lineup had a clear defensive base.",
+				"Your selection gave the team more structure than creation.",
+				"The group looked built to contain first."
+			]
+		})
+	elif gap >= 1.5 or avg_rating >= 72.0:
+		candidates.append({
+			"family": "group_level_positive",
+			"variants": [
+				"Your selection gave the team a strong enough base.",
+				"The result reflected the quality of the group you chose.",
+				"Your lineup had enough overall level to support this outcome."
+			]
+		})
+	elif gap <= -1.5 or avg_rating <= 58.0:
+		candidates.append({
+			"family": "group_level_negative",
+			"variants": [
+				"Your selection exposed the current limits of the group.",
+				"The lineup lacked enough overall level to tilt this kind of matchup.",
+				"The core group lacked enough quality to control the matchup."
+			]
+		})
+	elif score_margin <= 5:
+		candidates.append({
+			"family": "close_collective",
+			"variants": [
+				"In a close matchup, your lineup balance mattered.",
+				"Small differences in the selected group shaped this result.",
+				"Your selection left very little margin."
+			]
+		})
+	else:
+		candidates.append({
+			"family": "fallback_collective",
+			"variants": [
+				"The main takeaway was the balance of the group you selected.",
+				"Your lineup gave a clear picture of the team's current identity.",
+				"This result reflected the profile of the group you chose."
+			]
+		})
+
+	return candidates
+
+func _bm_build_player_context_insight_candidates(played_profiles: Array[Dictionary], avg_rating: float) -> Array[Dictionary]:
+	var candidates: Array[Dictionary] = []
+	if played_profiles.is_empty():
+		return candidates
+
+	var total_age := 0.0
+	var valid_age_count := 0
+	var youngest: Dictionary = {}
+	var oldest: Dictionary = {}
+	var highest_salary: Dictionary = {}
+	var youngest_age := INF
+	var oldest_age := -INF
+	var highest_salary_value := -INF
+	var second_salary_value := -INF
+	for profile in played_profiles:
+		var age := float(profile.get("age", 0.0))
+		var salary := float(profile.get("salary", 0.0))
+		if age > 0.0:
+			total_age += age
+			valid_age_count += 1
+			if age < youngest_age:
+				youngest = profile
+				youngest_age = age
+			if age > oldest_age:
+				oldest = profile
+				oldest_age = age
+		if salary > highest_salary_value:
+			if not highest_salary.is_empty():
+				second_salary_value = highest_salary_value
+			highest_salary = profile
+			highest_salary_value = salary
+		elif salary > second_salary_value:
+			second_salary_value = salary
+
+	var avg_age := total_age / float(maxi(1, valid_age_count))
+	if not youngest.is_empty():
+		var young_rating := float(youngest.get("rating", 0.0))
+		if youngest_age <= 22.0 and young_rating >= 68.0 and young_rating >= avg_rating + 2.0:
+			var name := str(youngest.get("name", ""))
+			candidates.append({
+				"family": "context_young_anchor",
+				"player_name": name,
+				"context_score": 49.0 + maxf(0.0, 22.0 - youngest_age) * 2.0 + maxf(0.0, young_rating - 68.0) * 0.7 + maxf(0.0, young_rating - avg_rating) * 1.1,
+				"variants": [
+					"Your selection gave a young profile real weight, with %s already important to the group." % name,
+					"One of your youngest players held a clear place in this lineup through %s." % name,
+					"Your lineup had a younger identity without losing level, with %s involved." % name
+				]
+			})
+
+	if not oldest.is_empty():
+		var veteran_rating := float(oldest.get("rating", 0.0))
+		if oldest_age >= 32.0 and veteran_rating >= 68.0 and veteran_rating >= avg_rating + 2.0:
+			var name := str(oldest.get("name", ""))
+			candidates.append({
+				"family": "context_veteran_anchor",
+				"player_name": name,
+				"context_score": 48.0 + maxf(0.0, oldest_age - 32.0) * 1.4 + maxf(0.0, veteran_rating - 68.0) * 0.7 + maxf(0.0, veteran_rating - avg_rating) * 1.1,
+				"variants": [
+					"Your lineup kept an experienced base, with %s still carrying real weight in the selection." % name,
+					"The group had a veteran reference point through %s." % name,
+					"Your selection leaned on experience without losing current level, led by %s." % name
+				]
+			})
+
+	if not highest_salary.is_empty() and highest_salary_value > 0.0:
+		var salary_gap := highest_salary_value - second_salary_value if played_profiles.size() > 1 else highest_salary_value
+		var responsibility_rating := float(highest_salary.get("rating", 0.0))
+		if responsibility_rating >= 70.0 and salary_gap >= 18000.0 and responsibility_rating >= avg_rating + 2.0:
+			var name := str(highest_salary.get("name", ""))
+			candidates.append({
+				"family": "context_responsibility_player",
+				"player_name": name,
+				"context_score": 46.0 + minf(8.0, salary_gap / 10000.0) + maxf(0.0, responsibility_rating - avg_rating) * 0.9,
+				"variants": [
+					"Your selection placed one of its major profiles at the heart of the group through %s." % name,
+					"The lineup gave %s a role that matched his importance in the squad." % name,
+					"Your group leaned on one of its key current profiles with %s involved." % name
+				]
+			})
+
+	if valid_age_count >= 3:
+		if avg_age <= 24.0 and avg_rating >= 60.0:
+			candidates.append({
+				"family": "context_young_group",
+				"context_score": 37.0 + maxf(0.0, 24.0 - avg_age) * 1.3 + maxf(0.0, avg_rating - 60.0) * 0.3,
+				"variants": [
+					"Your lineup had a noticeably young profile.",
+					"The selected group brought a younger identity to the floor.",
+					"Your selection leaned into youth while keeping a coherent team shape."
+				]
+			})
+		elif avg_age >= 31.0 and avg_rating >= 60.0:
+			candidates.append({
+				"family": "context_experienced_group",
+				"context_score": 37.0 + maxf(0.0, avg_age - 31.0) * 1.2 + maxf(0.0, avg_rating - 60.0) * 0.3,
+				"variants": [
+					"Your lineup clearly leaned on experience.",
+					"The selected group had an experienced core.",
+					"Your selection gave the team a more mature profile."
+				]
+			})
+		elif oldest_age - youngest_age >= 11.0 and avg_rating >= 60.0:
+			candidates.append({
+				"family": "context_generation_mix",
+				"context_score": 38.0 + minf(8.0, (oldest_age - youngest_age - 10.0) * 0.8) + maxf(0.0, avg_rating - 60.0) * 0.25,
+				"variants": [
+					"Your lineup combined experience with younger profiles.",
+					"The selected group showed a clear mix of ages.",
+					"Your selection balanced younger legs with experienced profiles."
+				]
+			})
+
+	return candidates
+
+func _bm_select_coach_insight_candidate(candidates: Array[Dictionary], played_profiles: Array[Dictionary], avg_motivation: float, avg_fatigue: float, avg_offense: float, avg_defense: float, avg_rating: float, gap: float, score_margin: int) -> Dictionary:
+	var best_candidate: Dictionary = {}
+	var best_score: float = -INF
+	var editorial_player_pick := false
+	var scored_candidates: Array[Dictionary] = []
+	for candidate in candidates:
+		var variants_raw: Variant = candidate.get("variants", [])
+		if typeof(variants_raw) != TYPE_ARRAY or (variants_raw as Array).is_empty():
+			continue
+		var score := _bm_score_coach_insight_candidate(candidate, played_profiles, avg_motivation, avg_fatigue, avg_offense, avg_defense, avg_rating, gap, score_margin)
+		scored_candidates.append({"candidate": candidate, "score": score})
+		if BM_COACH_INSIGHTS_DEBUG:
+			print("[COACH_INSIGHTS_DEBUG][SCORE] family=", str(candidate.get("family", "")), " player=", str(candidate.get("player_name", "")), " score=", snapped(score, 0.1), " last_family=", _bm_last_coach_insight_family, " last_player=", _bm_last_coach_insight_player)
+		if score > best_score:
+			best_score = score
+			best_candidate = candidate
+
+	var best_player_scored := _bm_best_scored_coach_insight_candidate(scored_candidates, true)
+	if not best_player_scored.is_empty():
+		var best_player_candidate: Dictionary = best_player_scored.get("candidate", {})
+		var best_player_score := float(best_player_scored.get("score", -INF))
+		var player_margin := 14.0
+		if not _bm_is_player_coach_insight_candidate(best_candidate):
+			var player_is_exceptional := _bm_is_exceptional_coach_insight_candidate(best_player_candidate, played_profiles)
+			if player_is_exceptional or best_score - best_player_score <= player_margin:
+				best_candidate = best_player_candidate
+				best_score = best_player_score
+				editorial_player_pick = true
+				if BM_COACH_INSIGHTS_DEBUG:
+					print("[COACH_INSIGHTS_DEBUG][EDITORIAL_PLAYER_PICK] family=", str(best_candidate.get("family", "")), " player=", str(best_candidate.get("player_name", "")), " score=", snapped(best_score, 0.1))
+
+	var close_margin := 6.0
+	var best_novelty: float = _bm_coach_insight_novelty_score(best_candidate)
+	for scored in scored_candidates:
+		var candidate: Dictionary = scored.get("candidate", {})
+		var score: float = float(scored.get("score", -INF))
+		if candidate.is_empty() or best_score - score > close_margin:
+			continue
+		if editorial_player_pick and not _bm_is_player_coach_insight_candidate(candidate):
+			continue
+		if _bm_is_exceptional_coach_insight_candidate(best_candidate, played_profiles) and score < best_score:
+			continue
+		var novelty := _bm_coach_insight_novelty_score(candidate)
+		if novelty > best_novelty:
+			best_novelty = novelty
+			best_candidate = candidate
+			if BM_COACH_INSIGHTS_DEBUG:
+				print("[COACH_INSIGHTS_DEBUG][NOVELTY_TIEBREAK] family=", str(candidate.get("family", "")), " player=", str(candidate.get("player_name", "")), " score=", snapped(score, 0.1), " novelty=", snapped(novelty, 0.1))
+	best_candidate = _bm_reduce_repeated_player_coach_insight(best_candidate, best_score, scored_candidates, played_profiles)
+	return best_candidate
+
+func _bm_best_scored_coach_insight_candidate(scored_candidates: Array[Dictionary], player_only: bool) -> Dictionary:
+	var best_scored: Dictionary = {}
+	var best_score: float = -INF
+	for scored in scored_candidates:
+		var candidate: Dictionary = scored.get("candidate", {})
+		if candidate.is_empty():
+			continue
+		if player_only and not _bm_is_player_coach_insight_candidate(candidate):
+			continue
+		var score := float(scored.get("score", -INF))
+		if score > best_score:
+			best_score = score
+			best_scored = scored
+	return best_scored
+
+func _bm_is_player_coach_insight_candidate(candidate: Dictionary) -> bool:
+	return str(candidate.get("player_name", "")) != ""
+
+func _bm_reduce_repeated_player_coach_insight(best_candidate: Dictionary, best_score: float, scored_candidates: Array[Dictionary], played_profiles: Array[Dictionary]) -> Dictionary:
+	var player_name := str(best_candidate.get("player_name", ""))
+	if player_name == "" or player_name != _bm_last_coach_insight_player:
+		return best_candidate
+	if _bm_is_exceptional_coach_insight_candidate(best_candidate, played_profiles):
+		return best_candidate
+	var alternate_margin := 8.0
+	var best_alternate: Dictionary = best_candidate
+	var best_alternate_changed := false
+	var best_alternate_novelty := _bm_coach_insight_novelty_score(best_candidate)
+	for scored in scored_candidates:
+		var candidate: Dictionary = scored.get("candidate", {})
+		if candidate.is_empty() or not _bm_is_player_coach_insight_candidate(candidate):
+			continue
+		if str(candidate.get("player_name", "")) == player_name:
+			continue
+		var score := float(scored.get("score", -INF))
+		if best_score - score > alternate_margin:
+			continue
+		var novelty := _bm_coach_insight_novelty_score(candidate)
+		if novelty > best_alternate_novelty:
+			best_alternate_novelty = novelty
+			best_alternate = candidate
+			best_alternate_changed = true
+	if BM_COACH_INSIGHTS_DEBUG and best_alternate_changed:
+		print("[COACH_INSIGHTS_DEBUG][REPEAT_PLAYER_TIEBREAK] family=", str(best_alternate.get("family", "")), " player=", str(best_alternate.get("player_name", "")))
+	return best_alternate
+
+func _bm_coach_insight_novelty_score(candidate: Dictionary) -> float:
+	var family := str(candidate.get("family", ""))
+	var player_name := str(candidate.get("player_name", ""))
+	var novelty := 0.0
+	if family != "" and family != _bm_last_coach_insight_family:
+		novelty += 2.0
+	if player_name != "" and player_name != _bm_last_coach_insight_player:
+		novelty += 3.0
+	match family:
+		"fatigue_player", "motivation_player":
+			novelty += 1.5
+		"offense_player", "defense_player":
+			novelty += 1.0
+		"context_young_anchor", "context_veteran_anchor", "context_responsibility_player", "context_young_group", "context_experienced_group", "context_generation_mix":
+			novelty += 1.0
+	return novelty
+
+
+func _bm_score_coach_insight_candidate(candidate: Dictionary, played_profiles: Array[Dictionary], avg_motivation: float, avg_fatigue: float, avg_offense: float, avg_defense: float, avg_rating: float, gap: float, score_margin: int) -> float:
+	var family := str(candidate.get("family", ""))
+	var player_name := str(candidate.get("player_name", ""))
+	var score: float = 34.0
+	match family:
+		"fatigue_player":
+			score = 62.0 + _bm_coach_insight_metric_score(played_profiles, "fatigue", 24.0, true, avg_fatigue)
+		"motivation_player":
+			score = 58.0 + _bm_coach_insight_metric_score(played_profiles, "motivation", 78.0, true, avg_motivation)
+		"offense_player":
+			score = 56.0 + _bm_coach_insight_metric_score(played_profiles, "offense", 68.0, true, avg_offense)
+		"defense_player":
+			score = 56.0 + _bm_coach_insight_metric_score(played_profiles, "defense", 68.0, true, avg_defense)
+		"level_player":
+			score = 54.0 + _bm_coach_insight_metric_score(played_profiles, "rating", 68.0, true, avg_rating)
+		"context_young_anchor", "context_veteran_anchor", "context_responsibility_player", "context_young_group", "context_experienced_group", "context_generation_mix":
+			score = float(candidate.get("context_score", 36.0))
+		"fatigue_group":
+			score = 42.0 + maxf(0.0, avg_fatigue - 22.0) * 1.4
+		"motivation_group_low":
+			score = 42.0 + maxf(0.0, 58.0 - avg_motivation) * 1.4
+		"offense_balance":
+			score = 40.0 + maxf(0.0, avg_offense - avg_defense) * 1.1
+		"defense_balance":
+			score = 40.0 + maxf(0.0, avg_defense - avg_offense) * 1.1
+		"group_level_positive":
+			score = 38.0 + maxf(0.0, avg_rating - 72.0) * 0.7 + maxf(0.0, gap) * 2.0
+		"group_level_negative":
+			score = 38.0 + maxf(0.0, 58.0 - avg_rating) * 0.7 + maxf(0.0, -gap) * 2.0
+		"close_collective":
+			score = 38.0 + maxf(0.0, 6.0 - float(score_margin)) * 2.0
+		"fallback_collective":
+			score = 30.0
+		_:
+			score = 30.0
+
+	var is_exceptional_candidate := _bm_is_exceptional_coach_insight_candidate(candidate, played_profiles)
+	if family != "" and family == _bm_last_coach_insight_family and not is_exceptional_candidate:
+		score -= 3.0
+	if player_name != "" and player_name == _bm_last_coach_insight_player and not is_exceptional_candidate:
+		score -= 5.0
+	return score
+
+func _bm_coach_insight_metric_score(played_profiles: Array[Dictionary], metric: String, min_value: float, higher_is_better: bool, group_average: float) -> float:
+	var metric_signal := _bm_get_coach_insight_metric_signal(played_profiles, metric, higher_is_better)
+	if metric_signal.is_empty():
+		return 0.0
+	var best_value := float(metric_signal.get("best_value", 0.0))
+	var signal_gap := float(metric_signal.get("gap", 0.0))
+	var threshold_strength := maxf(0.0, best_value - min_value) if higher_is_better else maxf(0.0, min_value - best_value)
+	var group_strength := absf(best_value - group_average)
+	return signal_gap * 1.7 + threshold_strength * 0.55 + group_strength * 0.35
+
+func _bm_is_exceptional_coach_insight_candidate(candidate: Dictionary, played_profiles: Array[Dictionary]) -> bool:
+	var family := str(candidate.get("family", ""))
+	var metric := ""
+	var min_value := 0.0
+	match family:
+		"fatigue_player":
+			metric = "fatigue"
+			min_value = 24.0
+		"motivation_player":
+			metric = "motivation"
+			min_value = 78.0
+		"offense_player":
+			metric = "offense"
+			min_value = 68.0
+		"defense_player":
+			metric = "defense"
+			min_value = 68.0
+		"level_player":
+			metric = "rating"
+			min_value = 68.0
+		_:
+			return false
+	var metric_signal := _bm_get_coach_insight_metric_signal(played_profiles, metric, true)
+	if metric_signal.is_empty():
+		return false
+	var best_value := float(metric_signal.get("best_value", 0.0))
+	var signal_gap := float(metric_signal.get("gap", 0.0))
+	return signal_gap >= 14.0 or best_value >= min_value + 14.0
+
+func _bm_get_coach_insight_metric_signal(played_profiles: Array[Dictionary], metric: String, higher_is_better: bool) -> Dictionary:
+	var best: Dictionary = {}
+	var second_value: float = -INF if higher_is_better else INF
+	var best_value: float = -INF if higher_is_better else INF
+	for profile in played_profiles:
+		var value: float = float(profile.get(metric, 0.0))
+		var is_better: bool = value > best_value if higher_is_better else value < best_value
+		if is_better:
+			if not best.is_empty():
+				second_value = best_value
+			best = profile
+			best_value = value
+		else:
+			var is_second: bool = value > second_value if higher_is_better else value < second_value
+			if is_second:
+				second_value = value
+	if best.is_empty():
+		return {}
+	var signal_gap := 0.0
+	if played_profiles.size() > 1:
+		signal_gap = best_value - second_value if higher_is_better else second_value - best_value
+	return {
+		"best": best,
+		"best_value": best_value,
+		"second_value": second_value,
+		"gap": signal_gap
+	}
+
+
+func _bm_get_distinct_coach_insight_player(played_profiles: Array[Dictionary], metric: String, min_value: float, min_gap: float, strong_gap: float, higher_is_better: bool) -> Dictionary:
+	var best: Dictionary = {}
+	var second_value: float = -INF if higher_is_better else INF
+	var best_value: float = -INF if higher_is_better else INF
+	for profile in played_profiles:
+		var value: float = float(profile.get(metric, 0.0))
+		var is_better: bool = value > best_value if higher_is_better else value < best_value
+		if is_better:
+			if not best.is_empty():
+				second_value = best_value
+			best = profile
+			best_value = value
+		else:
+			var is_second: bool = value > second_value if higher_is_better else value < second_value
+			if is_second:
+				second_value = value
+	if best.is_empty():
+		if BM_COACH_INSIGHTS_DEBUG:
+			print("[COACH_INSIGHTS_DEBUG][REJECT] metric=", metric, " reason=candidate_not_generated no_profiles")
+		return {}
+	if played_profiles.size() <= 1:
+		var single_ok := (higher_is_better and best_value >= min_value) or ((not higher_is_better) and best_value <= min_value)
+		if BM_COACH_INSIGHTS_DEBUG:
+			print("[COACH_INSIGHTS_DEBUG][CHECK] metric=", metric, " best=", str(best.get("name", "")), " best_value=", snapped(best_value, 0.1), " min=", min_value, " result=", "accepted" if single_ok else "rejected", " reason=", "single_player_signal" if single_ok else "threshold_not_met")
+		if single_ok:
+			return best
+		return {}
+
+	var gap: float = best_value - second_value if higher_is_better else second_value - best_value
+	var threshold_ok: bool = best_value >= min_value if higher_is_better else best_value <= min_value
+	var absolute_signal: bool = threshold_ok and gap >= min_gap
+	var relative_signal: bool = gap >= strong_gap
+	if BM_COACH_INSIGHTS_DEBUG:
+		var status := "accepted" if absolute_signal or relative_signal else "rejected"
+		var reason := "absolute_signal" if absolute_signal else ("relative_signal" if relative_signal else ("gap_insufficient" if threshold_ok else "threshold_not_met"))
+		print("[COACH_INSIGHTS_DEBUG][CHECK] metric=", metric, " best=", str(best.get("name", "")), " best_value=", snapped(best_value, 0.1), " second=", snapped(second_value, 0.1), " gap=", snapped(gap, 0.1), " min=", min_value, " min_gap=", min_gap, " strong_gap=", strong_gap, " result=", status, " reason=", reason)
+	if not absolute_signal and not relative_signal:
+		return {}
+	return best
+
+func _bm_player_display_name(pd: Dictionary) -> String:
+	for key in ["name", "display_name", "nom", "first_name", "prenom"]:
+		if pd.has(key):
+			var value := str(pd.get(key, "")).strip_edges()
+			if value != "":
+				return value
+	return "Player"
+
+func _bm_normalized_player_value(raw_value) -> float:
+	var value: float = float(raw_value)
+	if value <= 1.5:
+		value *= 100.0
+	return value
+
+func _bm_text_seed(value: String) -> int:
+	var total: int = 0
+	var bytes := value.to_utf8_buffer()
+	for i in range(bytes.size()):
+		total += int(bytes[i]) * (i + 1)
+	return total
 
 
 func _bm_pick_match_reason(options: Array[String], seed: int) -> String:
@@ -2178,8 +3116,15 @@ func _fin_match() -> void:
 	print("[MATCHSIM][DBG] summary_raw_before_resolve=", str(resume))
 	resume = _resolve_and_tr_summary(str(resume))
 	var impact_reason := _bm_build_match_impact_reason()
-	lbl_info.text = "\n" + resume + ("\n\n" + impact_reason if impact_reason != "" else "")
+	lbl_info.text = resume + ("\n\n" + impact_reason if impact_reason != "" else "")
+	var end_summary_width: float = minf(lbl_info.size.x, 760.0)
+	lbl_info.position += Vector2((lbl_info.size.x - end_summary_width) * 0.5, 30.0)
+	lbl_info.size = Vector2(end_summary_width, lbl_info.size.y + 36.0)
+	lbl_info.add_theme_constant_override("line_spacing", 8)
 	lbl_info.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	if info_panel != null:
+		info_panel.position = lbl_info.position - Vector2(28.0, 18.0)
+		info_panel.size = lbl_info.size + Vector2(56.0, 86.0)
 
 	# BM_MOBILE_MATCH_END_INFO_BG_FORCE_V2
 	if _bm_matchsim_is_mobile_layout():
@@ -2198,6 +3143,7 @@ func _fin_match() -> void:
 
 	_bm_matchsim_apply_mobile_texts_plus2()
 	call_deferred("_bm_matchsim_apply_mobile_layout")
+	call_deferred("_bm_place_current_lineup_button")
 
 	if stats_end != null:
 		_compute_end_stats_and_show(_team_dom_name, _team_ext_name)

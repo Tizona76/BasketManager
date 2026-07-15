@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bv4u2mjlr448u"
-path="res://.godot/imported/tshirt_dessin.png-8fa84b1d61253bfb7ace8d5df6543f9f.ctex"
+path="res://godot/imported/tshirt_dessin.png-8fa84b1d61253bfb7ace8d5df6543f9f.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/boutique/tshirt_dessin.png"
-dest_files=["res://.godot/imported/tshirt_dessin.png-8fa84b1d61253bfb7ace8d5df6543f9f.ctex"]
+dest_files=["res://godot/imported/tshirt_dessin.png-8fa84b1d61253bfb7ace8d5df6543f9f.ctex"]
 
 [params]
 

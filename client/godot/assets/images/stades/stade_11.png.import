@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://htjmlu74qnks"
-path="res://.godot/imported/stade_11.png-5e5f3bb329522b2dcccf61508771d006.ctex"
+path="res://godot/imported/stade_11.png-5e5f3bb329522b2dcccf61508771d006.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/stades/stade_11.png"
-dest_files=["res://.godot/imported/stade_11.png-5e5f3bb329522b2dcccf61508771d006.ctex"]
+dest_files=["res://godot/imported/stade_11.png-5e5f3bb329522b2dcccf61508771d006.ctex"]
 
 [params]
 

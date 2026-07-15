@@ -64,6 +64,12 @@ var _btn_match_tween: Tween = null
 var _btn_match_base_scale: Vector2 = Vector2.ONE
 var _btn_match_halo: Panel = null
 var _btn_match_halo_tween: Tween = null
+var _btn_match_opponent_content: VBoxContainer = null
+var _btn_match_title_label: Label = null
+var _btn_match_vs_label: Label = null
+var _btn_match_opponent_line: HBoxContainer = null
+var _btn_match_opponent_crest: TextureRect = null
+var _btn_match_opponent_label: Label = null
 @onready var btn_retour: Button = get_node("UI/BtnRetour") as Button
 
 var _unlock_glow_tweens: Dictionary = {}
@@ -195,6 +201,12 @@ func _bm_style_btn_match_action() -> void:
 	btn_match.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
 	btn_match.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.55))
 	btn_match.add_theme_font_size_override("font_size", 26)
+	var match_center := btn_match.position + btn_match.size * 0.5
+	btn_match.custom_minimum_size = Vector2(430, 136)
+	btn_match.size = Vector2(maxf(btn_match.size.x, 430.0), 136.0)
+	var vp_size := get_viewport_rect().size
+	btn_match.position = Vector2((vp_size.x - btn_match.size.x) * 0.5, match_center.y - btn_match.size.y * 0.5)
+	btn_match.pivot_offset = btn_match.size * 0.5
 
 func _bm_style_btn_retour() -> void:
 	if btn_retour == null:
@@ -645,22 +657,32 @@ func _bm_maybe_show_shop_restock_notice_match14() -> void:
 	var dark := ColorRect.new()
 	dark.name = "ShopRestockNoticeBackdrop"
 	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dark.color = Color(0, 0, 0, 0.38)
+	dark.color = Color(0, 0, 0, 1.0)
 	dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay.add_child(dark)
 
+	var notice_text: String = "Demand is growing.\nBefore the next game, check your Shop stocks and prices."
+	var notice_font_size: int = 44 if not mobile else 36
+	var notice_lines: int = maxi(1, notice_text.split("\n").size())
+	var notice_max_line_chars: int = 0
+	for notice_line in notice_text.split("\n"):
+		notice_max_line_chars = maxi(notice_max_line_chars, str(notice_line).length())
+	var card_w: float = clampf(float(notice_max_line_chars) * float(notice_font_size) * 0.58 + 96.0, 560.0, minf(vp.x * 0.90, 920.0))
+	var card_h: float = clampf(float(notice_lines) * float(notice_font_size) * 1.35 + 76.0, 170.0, minf(vp.y * 0.42, 340.0))
+	if mobile:
+		card_w = minf(card_w, vp.x * 0.88)
+		card_h = maxf(card_h, 178.0)
+
 	var card := Panel.new()
 	card.name = "ShopRestockNoticeCard"
-	var card_size := Vector2(780, 190)
-	if mobile:
-		card_size = Vector2(minf(vp.x * 0.88, 720.0), 178.0)
+	var card_size := Vector2(card_w, card_h)
 	card.size = card_size
 	card.custom_minimum_size = card_size
 	card.position = (vp - card_size) * 0.5
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.025, 0.03, 0.055, 0.94)
+	sb.bg_color = Color(0.0, 0.0, 0.0, 1.0)
 	sb.border_width_left = 3
 	sb.border_width_top = 3
 	sb.border_width_right = 3
@@ -681,12 +703,16 @@ func _bm_maybe_show_shop_restock_notice_match14() -> void:
 	overlay.call_deferred("move_to_front")
 
 	var lbl := Label.new()
-	lbl.text = "Demand is growing.\nBefore the next game, check your Shop stocks and prices."
+	lbl.text = notice_text
 	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lbl.offset_left = 28.0
+	lbl.offset_top = 20.0
+	lbl.offset_right = -28.0
+	lbl.offset_bottom = -20.0
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lbl.add_theme_font_size_override("font_size", 44 if not mobile else 36)
+	lbl.add_theme_font_size_override("font_size", notice_font_size)
 	lbl.add_theme_color_override("font_color", Color(1.0, 0.86, 0.28, 1.0))
 	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 1.0))
 	lbl.add_theme_constant_override("outline_size", 8)
@@ -739,7 +765,7 @@ func _bm_maybe_show_climb_standings_goal_match17() -> void:
 	var dark := ColorRect.new()
 	dark.name = "GoalClimbStandingsBackdrop"
 	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dark.color = Color(0, 0, 0, 0.38)
+	dark.color = Color(0, 0, 0, 1.0)
 	dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay.add_child(dark)
 
@@ -819,7 +845,7 @@ func _bm_show_auto_info_popup(title_key: String, body_key: String, overlay_name:
 	var dark := ColorRect.new()
 	dark.name = overlay_name + "Backdrop"
 	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dark.color = Color(0, 0, 0, 0.38)
+	dark.color = Color(0, 0, 0, 1.0)
 	dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay.add_child(dark)
 
@@ -1766,6 +1792,8 @@ func _ready() -> void:
 		PL.write_savegame(save)
 
 	_ensure_season_day_label()
+	_bm_ensure_match_button_opponent_line()
+	_bm_refresh_match_button_opponent_line()
 	var save_after := PL.load_savegame()
 	if save_after.has("pending_season_reward") and typeof(save_after["pending_season_reward"]) == TYPE_DICTIONARY:
 		var r: Dictionary = save_after["pending_season_reward"] as Dictionary
@@ -1841,6 +1869,7 @@ func _ready() -> void:
 	call_deferred("_bm_saison_apply_mobile_hud_layout")
 	call_deferred("_bm_saison_apply_mobile_top_left_buttons_plus20_text_plus2")
 	call_deferred("_bm_saison_apply_mobile_play_button_plus20_text_plus2")
+	call_deferred("_bm_refresh_match_button_opponent_line")
 	call_deferred("_bm_saison_apply_mobile_day_and_popularity_texts")
 	call_deferred("_bm_saison_align_mobile_play_and_day")
 
@@ -2294,9 +2323,145 @@ func _ensure_season_day_label() -> void:
 	lbl_season_day.text = _get_current_season_day_text()
 	lbl_season_day.size = Vector2(320, 48)
 	lbl_season_day.position = Vector2(
-		btn_match.position.x + (btn_match.size.x - lbl_season_day.size.x) * 0.5,
-		btn_match.position.y - 68
+		btn_match.position.x + (btn_match.size.x - lbl_season_day.size.x) * 0.5 + 24.0,
+		btn_match.position.y - 88
 	)
+
+
+
+func _bm_match_button_team_name(save: Dictionary) -> String:
+	var my_name := str(save.get("team_name", save.get("club_name", ""))).strip_edges()
+	if my_name == "" and save.has("club") and typeof(save["club"]) == TYPE_DICTIONARY:
+		my_name = str((save["club"] as Dictionary).get("name", "")).strip_edges()
+	if my_name == "":
+		my_name = "BM Club"
+	return my_name
+
+
+func _bm_match_button_fixture(save: Dictionary) -> Dictionary:
+	var my_name := _bm_match_button_team_name(save)
+	var round_index := int(save.get("season_round", int(SeasonState.matchs_joues)))
+	var ss := get_node_or_null("/root/SeasonState")
+	if ss != null and ss.has_method("get_user_fixture_for_round"):
+		var fx: Dictionary = ss.call("get_user_fixture_for_round", my_name, round_index)
+		if not fx.is_empty():
+			return fx
+	return {"opponent": SeasonState.compute_next_opponent_name(my_name), "user_is_home": true}
+
+
+func _bm_match_button_rank(team_name: String) -> int:
+	if team_name.strip_edges() == "":
+		return 0
+	if SeasonState.has_method("get_current_club_rank"):
+		return int(SeasonState.get_current_club_rank(team_name))
+	return 0
+
+
+func _bm_ensure_match_button_opponent_line() -> void:
+	if btn_match == null:
+		return
+	if _btn_match_opponent_content != null and is_instance_valid(_btn_match_opponent_content):
+		return
+
+	btn_match.text = ""
+
+	_btn_match_opponent_content = VBoxContainer.new()
+	_btn_match_opponent_content.name = "BtnMatchOpponentContent"
+	_btn_match_opponent_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_btn_match_opponent_content.alignment = BoxContainer.ALIGNMENT_CENTER
+	_btn_match_opponent_content.add_theme_constant_override("separation", 5)
+	_btn_match_opponent_content.z_index = 20
+	btn_match.add_child(_btn_match_opponent_content)
+
+	_btn_match_title_label = Label.new()
+	_btn_match_title_label.name = "BtnMatchTitleLabel"
+	_btn_match_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_btn_match_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_btn_match_title_label.add_theme_font_size_override("font_size", 28)
+	_btn_match_title_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	_btn_match_title_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
+	_btn_match_title_label.add_theme_constant_override("shadow_offset_x", 1)
+	_btn_match_title_label.add_theme_constant_override("shadow_offset_y", 1)
+	_btn_match_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_btn_match_opponent_content.add_child(_btn_match_title_label)
+
+	_btn_match_vs_label = Label.new()
+	_btn_match_vs_label.name = "BtnMatchVsLabel"
+	_btn_match_vs_label.text = "vs."
+	_btn_match_vs_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_btn_match_vs_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_btn_match_vs_label.add_theme_font_size_override("font_size", 19)
+	_btn_match_vs_label.add_theme_color_override("font_color", Color(0.88, 0.94, 1.0, 1.0))
+	_btn_match_vs_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
+	_btn_match_vs_label.add_theme_constant_override("shadow_offset_x", 1)
+	_btn_match_vs_label.add_theme_constant_override("shadow_offset_y", 1)
+	_btn_match_vs_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_btn_match_opponent_content.add_child(_btn_match_vs_label)
+
+	_btn_match_opponent_line = HBoxContainer.new()
+	_btn_match_opponent_line.name = "BtnMatchOpponentLine"
+	_btn_match_opponent_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_btn_match_opponent_line.alignment = BoxContainer.ALIGNMENT_CENTER
+	_btn_match_opponent_line.add_theme_constant_override("separation", 8)
+	_btn_match_opponent_content.add_child(_btn_match_opponent_line)
+
+	_btn_match_opponent_crest = TextureRect.new()
+	_btn_match_opponent_crest.name = "BtnMatchOpponentCrest"
+	_btn_match_opponent_crest.custom_minimum_size = Vector2(40, 40)
+	_btn_match_opponent_crest.size = Vector2(40, 40)
+	_btn_match_opponent_crest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_btn_match_opponent_crest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_btn_match_opponent_crest.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_btn_match_opponent_line.add_child(_btn_match_opponent_crest)
+
+	_btn_match_opponent_label = Label.new()
+	_btn_match_opponent_label.name = "BtnMatchOpponentLabel"
+	_btn_match_opponent_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_btn_match_opponent_label.add_theme_font_size_override("font_size", 22)
+	_btn_match_opponent_label.add_theme_color_override("font_color", Color(0.94, 0.98, 1.0, 1.0))
+	_btn_match_opponent_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
+	_btn_match_opponent_label.add_theme_constant_override("shadow_offset_x", 1)
+	_btn_match_opponent_label.add_theme_constant_override("shadow_offset_y", 1)
+	_btn_match_opponent_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_btn_match_opponent_line.add_child(_btn_match_opponent_label)
+
+
+func _bm_refresh_match_button_opponent_line() -> void:
+	_bm_ensure_match_button_opponent_line()
+	if btn_match == null or _btn_match_opponent_content == null or not is_instance_valid(_btn_match_opponent_content):
+		return
+	btn_match.text = ""
+	if _btn_match_title_label != null:
+		_btn_match_title_label.text = tr("season.btn_play_match")
+	var save: Dictionary = PL.load_savegame()
+	if typeof(save) != TYPE_DICTIONARY:
+		_btn_match_opponent_content.visible = false
+		return
+	var fx: Dictionary = _bm_match_button_fixture(save)
+	var opponent: String = str(fx.get("opponent", "")).strip_edges()
+	if opponent == "":
+		_btn_match_opponent_content.visible = false
+		return
+
+	var rank: int = _bm_match_button_rank(opponent)
+	var rank_text: String = "#" + (str(rank) if rank > 0 else "-")
+	var crest_path: String = PL.get_display_crest_path(save, opponent)
+	if _btn_match_opponent_crest != null:
+		if crest_path != "" and ResourceLoader.exists(crest_path):
+			_btn_match_opponent_crest.texture = load(crest_path) as Texture2D
+			_btn_match_opponent_crest.visible = true
+		else:
+			_btn_match_opponent_crest.texture = null
+			_btn_match_opponent_crest.visible = false
+	if _btn_match_opponent_label != null:
+		_btn_match_opponent_label.text = opponent + "  " + rank_text
+
+	var bw: float = max(300.0, btn_match.size.x)
+	var bh: float = max(112.0, btn_match.size.y)
+	_btn_match_opponent_content.size = Vector2(bw, bh)
+	_btn_match_opponent_content.position = Vector2(0, 0)
+	_btn_match_opponent_content.visible = true
+
 
 func _close_end_season_popup() -> void:
 	if popup_fin_saison != null and is_instance_valid(popup_fin_saison):
@@ -2959,6 +3124,7 @@ func _notification(what: int) -> void:
 		call_deferred("_bm_saison_apply_mobile_hud_layout")
 		call_deferred("_bm_saison_apply_mobile_top_left_buttons_plus20_text_plus2")
 		call_deferred("_bm_saison_apply_mobile_play_button_plus20_text_plus2")
+		call_deferred("_bm_refresh_match_button_opponent_line")
 		call_deferred("_bm_saison_apply_mobile_day_and_popularity_texts")
 		call_deferred("_bm_saison_align_mobile_play_and_day")
 		return
@@ -3770,6 +3936,8 @@ func _bm_show_match_compo_popup_on_play() -> void:
 	btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
 	btn.pressed.connect(func():
 		popup.queue_free()
+		if Session != null:
+			Session.set_meta("bm_myteam_screen_identity", "lineup")
 		var tree := get_tree()
 		if tree != null and ResourceLoader.exists("res://scenes/MyTeam.tscn"):
 			tree.call_deferred("change_scene_to_file", "res://scenes/MyTeam.tscn")
@@ -3797,20 +3965,76 @@ func _bm_show_match_compo_popup_on_play() -> void:
 	card.add_child(btn)
 
 func _bm_show_mercato_closed_popup() -> void:
-	var popup := AcceptDialog.new()
-	popup.title = _bm_tr_or_fallback("mercato.closed.title", "Mercato fermé")
-	popup.dialog_text = _bm_tr_or_fallback("mercato.closed.body", "Mercato fermé. Ouverture : avant la saison jusqu'au match 2 inclus, puis pendant les matchs 10, 11 et 12.")
-	popup.ok_button_text = "OK"
-	popup.min_size = Vector2i(760, 0)
+	var title := _bm_tr_or_fallback("mercato.closed.title", "Mercato fermé")
+	var body := _bm_tr_or_fallback("mercato.closed.body", "Mercato fermé. Ouverture : avant la saison jusqu'au match 2 inclus, puis pendant les matchs 10, 11 et 12.")
+
+	var old_popup := get_node_or_null("MercatoClosedPopup")
+	if old_popup != null:
+		old_popup.queue_free()
+
+	var popup := Control.new()
+	popup.name = "MercatoClosedPopup"
+	popup.set_anchors_preset(Control.PRESET_FULL_RECT)
+	popup.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.z_index = 9999
+	popup.set_as_top_level(true)
 	add_child(popup)
-	await get_tree().process_frame
-	if popup.get_label() != null:
-		popup.get_label().autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		popup.get_label().add_theme_font_size_override("font_size", 20)
-		popup.get_label().custom_minimum_size = Vector2(680, 0)
-	popup.confirmed.connect(func(): popup.queue_free())
-	popup.canceled.connect(func(): popup.queue_free())
-	popup.popup_centered()
+
+	var panel := Panel.new()
+	var popup_size := Vector2(760, 320)
+	if _bm_saison_is_mobile_layout():
+		popup_size *= 1.15
+	panel.custom_minimum_size = popup_size
+	panel.size = popup_size
+	panel.position = (get_viewport_rect().size - popup_size) * 0.5
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.055, 0.065, 0.095, 0.90)
+	sb.corner_radius_top_left = 18
+	sb.corner_radius_top_right = 18
+	sb.corner_radius_bottom_left = 18
+	sb.corner_radius_bottom_right = 18
+	sb.border_width_left = 2
+	sb.border_width_top = 2
+	sb.border_width_right = 2
+	sb.border_width_bottom = 2
+	sb.border_color = Color(0.85, 0.75, 0.25, 0.24)
+	panel.add_theme_stylebox_override("panel", sb)
+	popup.add_child(panel)
+
+	var label := RichTextLabel.new()
+	label.bbcode_enabled = true
+	label.scroll_active = false
+	label.fit_content = true
+	label.position = Vector2(24, 20)
+	label.size = Vector2(popup_size.x - 48.0, popup_size.y - 104.0)
+	label.text = "[center][font_size=24][b]" + title + "[/b][/font_size][/center]\n\n[font_size=24]" + body + "[/font_size]"
+	panel.add_child(label)
+
+	var btn := Button.new()
+	btn.text = "OK"
+	btn.custom_minimum_size = Vector2(140, 48)
+	btn.size = Vector2(140, 48)
+	btn.position = Vector2((popup_size.x - 140.0) * 0.5, popup_size.y - 62.0)
+	var btn_sb := StyleBoxFlat.new()
+	btn_sb.bg_color = Color(0.20, 0.55, 0.95, 1.0)
+	btn_sb.corner_radius_top_left = 12
+	btn_sb.corner_radius_top_right = 12
+	btn_sb.corner_radius_bottom_left = 12
+	btn_sb.corner_radius_bottom_right = 12
+	btn_sb.content_margin_left = 16
+	btn_sb.content_margin_right = 16
+	btn_sb.content_margin_top = 8
+	btn_sb.content_margin_bottom = 8
+	btn.add_theme_stylebox_override("normal", btn_sb)
+	var btn_hover := btn_sb.duplicate()
+	btn_hover.bg_color = Color(0.25, 0.62, 1.0, 1.0)
+	btn.add_theme_stylebox_override("hover", btn_hover)
+	btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	btn.add_theme_font_size_override("font_size", 22)
+	btn.pressed.connect(func(): popup.queue_free())
+	panel.add_child(btn)
 
 
 func _bm_saison_is_mobile_layout() -> bool:
@@ -3970,8 +4194,8 @@ func _bm_saison_align_mobile_play_and_day() -> void:
 
 	lbl_season_day.size = Vector2(match_size.x, lbl_season_day.size.y)
 	lbl_season_day.position = Vector2(
-		btn_match.position.x,
-		btn_match.position.y - lbl_season_day.size.y - 20.0
+		btn_match.position.x + 24.0,
+		btn_match.position.y - lbl_season_day.size.y - 36.0
 	)
 	lbl_season_day.pivot_offset = lbl_season_day.size * 0.5
 	btn_match.pivot_offset = btn_match.size * 0.5

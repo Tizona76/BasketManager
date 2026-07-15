@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c1p1clrjpd4tp"
-path="res://.godot/imported/joueurs.png-46f21be47b33dc6e6199757888e3dae9.ctex"
+path="res://godot/imported/joueurs.png-46f21be47b33dc6e6199757888e3dae9.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/backgrounds/joueurs.png"
-dest_files=["res://.godot/imported/joueurs.png-46f21be47b33dc6e6199757888e3dae9.ctex"]
+dest_files=["res://godot/imported/joueurs.png-46f21be47b33dc6e6199757888e3dae9.ctex"]
 
 [params]
 

@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dbjsffokfq0k6"
-path="res://.godot/imported/avatar_07.png-07dc8b0964dbb69e935302409d9563c7.ctex"
+path="res://godot/imported/avatar_07.png-07dc8b0964dbb69e935302409d9563c7.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/avatars/avatar_07.png"
-dest_files=["res://.godot/imported/avatar_07.png-07dc8b0964dbb69e935302409d9563c7.ctex"]
+dest_files=["res://godot/imported/avatar_07.png-07dc8b0964dbb69e935302409d9563c7.ctex"]
 
 [params]
 

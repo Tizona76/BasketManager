@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dphi3rbb2n3xt"
-path="res://.godot/imported/outline.png-376948e406cd9fa35e6fa31309395c73.ctex"
+path="res://godot/imported/outline.png-376948e406cd9fa35e6fa31309395c73.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/avatars/layers/outline.png"
-dest_files=["res://.godot/imported/outline.png-376948e406cd9fa35e6fa31309395c73.ctex"]
+dest_files=["res://godot/imported/outline.png-376948e406cd9fa35e6fa31309395c73.ctex"]
 
 [params]
 

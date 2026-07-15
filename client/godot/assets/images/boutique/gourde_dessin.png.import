@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dfm1tdqp371wl"
-path="res://.godot/imported/gourde_dessin.png-6bf95fd22da02e0b9e9c0331409cc710.ctex"
+path="res://godot/imported/gourde_dessin.png-6bf95fd22da02e0b9e9c0331409cc710.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/boutique/gourde_dessin.png"
-dest_files=["res://.godot/imported/gourde_dessin.png-6bf95fd22da02e0b9e9c0331409cc710.ctex"]
+dest_files=["res://godot/imported/gourde_dessin.png-6bf95fd22da02e0b9e9c0331409cc710.ctex"]
 
 [params]
 

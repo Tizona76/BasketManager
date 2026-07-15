@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b7swnm8wbk27c"
-path="res://.godot/imported/skin_highlight.png-34d784c0c43559f4d7cedb8007b7162d.ctex"
+path="res://godot/imported/skin_highlight.png-34d784c0c43559f4d7cedb8007b7162d.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/avatars/layers/skin_highlight.png"
-dest_files=["res://.godot/imported/skin_highlight.png-34d784c0c43559f4d7cedb8007b7162d.ctex"]
+dest_files=["res://godot/imported/skin_highlight.png-34d784c0c43559f4d7cedb8007b7162d.ctex"]
 
 [params]
 

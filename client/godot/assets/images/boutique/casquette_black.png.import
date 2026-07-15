@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://d1vdu1x28xapi"
-path="res://.godot/imported/casquette_black.png-9cd7a6e48b4426cbf3449fa770cb292d.ctex"
+path="res://godot/imported/casquette_black.png-9cd7a6e48b4426cbf3449fa770cb292d.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/boutique/casquette_black.png"
-dest_files=["res://.godot/imported/casquette_black.png-9cd7a6e48b4426cbf3449fa770cb292d.ctex"]
+dest_files=["res://godot/imported/casquette_black.png-9cd7a6e48b4426cbf3449fa770cb292d.ctex"]
 
 [params]
 

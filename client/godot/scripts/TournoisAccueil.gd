@@ -468,7 +468,7 @@ func _bm_format_int_spaces(value: int) -> String:
 		digits = digits.substr(0, digits.length() - 3)
 	if digits.length() > 0:
 		parts.insert(0, digits)
-	var out := " ".join(parts)
+	var out := ".".join(parts)
 	if neg:
 		out = "-" + out
 	return out

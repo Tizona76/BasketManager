@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dk4u4tunrcvcm"
-path="res://.godot/imported/skin_mask.png-986b3aee740d2e48adef77b282117446.ctex"
+path="res://godot/imported/skin_mask.png-986b3aee740d2e48adef77b282117446.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/avatars/layers/F_base/skin_mask.png"
-dest_files=["res://.godot/imported/skin_mask.png-986b3aee740d2e48adef77b282117446.ctex"]
+dest_files=["res://godot/imported/skin_mask.png-986b3aee740d2e48adef77b282117446.ctex"]
 
 [params]
 

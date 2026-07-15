@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://d0a48bmn6doh6"
-path="res://.godot/imported/coupe.png-f3633709f2812bb81b7d3a04db6e37f9.ctex"
+path="res://godot/imported/coupe.png-f3633709f2812bb81b7d3a04db6e37f9.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/recompenses/coupe.png"
-dest_files=["res://.godot/imported/coupe.png-f3633709f2812bb81b7d3a04db6e37f9.ctex"]
+dest_files=["res://godot/imported/coupe.png-f3633709f2812bb81b7d3a04db6e37f9.ctex"]
 
 [params]
 

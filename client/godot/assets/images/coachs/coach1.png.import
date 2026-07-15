@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://d0yeeoiusf744"
-path="res://.godot/imported/coach1.png-8672cf58135836d66a91a621fa4379f8.ctex"
+path="res://godot/imported/coach1.png-8672cf58135836d66a91a621fa4379f8.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/images/coachs/coach1.png"
-dest_files=["res://.godot/imported/coach1.png-8672cf58135836d66a91a621fa4379f8.ctex"]
+dest_files=["res://godot/imported/coach1.png-8672cf58135836d66a91a621fa4379f8.ctex"]
 
 [params]
 

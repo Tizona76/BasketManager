@@ -199,6 +199,7 @@ stadium.ticketing.title,Billetterie,Ticketing,,,
 stadium.ticketing.col.category,Cat.,Cat.,,,
 stadium.ticketing.col.price,Prix,Price,,,
 stadium.ticketing.col.seats,Places,Seats,,,
+stadium.ticketing.col.estimated_revenue_short,Rev. est.,Est. Revenue,Ing. est.,Ric. stim.,Rec. est.
 stadium.ticketing.cat.a,A,A,,,
 stadium.ticketing.cat.b,B,B,,,
 stadium.ticketing.cat.c,C,C,,,
@@ -256,8 +257,8 @@ Consíguelos con misiones, torneos y recompensas.","I tuoi primi token sono pron
 Ottienili con missioni, tornei e ricompense.","Os teus primeiros tokens estão prontos!
 Ganha-os em missões, torneios e recompensas."
 startup.preparing_club,Préparation de ton club...,Preparing your club...,Preparando tu club...,Preparazione del tuo club...,A preparar o teu clube...
-startup.just_seconds_more,Encore quelques secondes :),Just a few seconds more :),Solo unos segundos más :),Ancora qualche secondo :),Só mais alguns segundos :)
-startup.ready_to_manage_full_team,Prêt pour manager ton équipe de basketball de bout en bout ?,Ready to manage your basketball team from start to finish?,¿Listo para gestionar tu equipo de baloncesto de principio a fin?,Pronto a gestire la tua squadra di basket dall’inizio alla fine?,Pronto para gerir a tua equipa de basquetebol do início ao fim?
+startup.just_seconds_more,"Chaque match fait avancer ton club : finances, stade, sponsors, tokens, mercato et coachs se débloquent progressivement. 22 matchs / saison.","Each game moves your club forward: finances, stadium, sponsors, tokens, transfer market and coaches unlock progressively. 22 games per season.","Cada partido hace avanzar tu club: finanzas, estadio, patrocinadores, tokens, mercado y entrenadores se desbloquean progresivamente. 22 partidos por temporada.","Ogni partita fa avanzare il tuo club: finanze, stadio, sponsor, token, mercato e coach si sbloccano progressivamente. 22 partite a stagione.","Cada jogo faz o teu clube avançar: finanças, estádio, patrocinadores, tokens, mercado e treinadores desbloqueiam-se progressivamente. 22 jogos por época."
+startup.ready_to_manage_full_team,"Chaque décision compte : composition, fatigue, motivation, finances et progression du club influencent tes résultats.\nParticipe aux tournois pendant la saison pour gagner plus d'argent et faire évoluer ton stade pour accueillir plus de public.\nCustomise ton équipe et profite de l'arrivée des sponsors pour améliorer tes performances.\nCompare tes résultats avec les autres équipes.","Every decision matters: lineup, fatigue, motivation, finances and club progression influence your results.\nJoin tournaments during the season to earn more money and upgrade your stadium to welcome bigger crowds.\nCustomize your team and use incoming sponsors to improve your performances.\nCompare your results with other teams.","Cada decisión cuenta: alineación, fatiga, motivación, finanzas y progresión del club influyen en tus resultados.\nParticipa en torneos durante la temporada para ganar más dinero y mejorar tu estadio para recibir más público.\nPersonaliza tu equipo y aprovecha la llegada de patrocinadores para mejorar tu rendimiento.\nCompara tus resultados con otros equipos.","Ogni decisione conta: formazione, fatica, motivazione, finanze e crescita del club influenzano i tuoi risultati.\nPartecipa ai tornei durante la stagione per guadagnare più denaro e far evolvere lo stadio per accogliere più pubblico.\nPersonalizza la tua squadra e sfrutta l’arrivo degli sponsor per migliorare le prestazioni.\nConfronta i tuoi risultati con le altre squadre.","Cada decisão conta: composição, fadiga, motivação, finanças e evolução do clube influenciam os teus resultados.\nParticipa em torneios durante a época para ganhar mais dinheiro e melhorar o estádio para receber mais público.\nPersonaliza a tua equipa e aproveita a chegada dos patrocinadores para melhorar as tuas prestações.\nCompara os teus resultados com outras equipas."
 stadium.level,Niveau,Level,Nivel,Livello,Nível
 stadium.target_level,Niveau cible,Target level,Nivel objetivo,Livello obiettivo,Nível alvo
 stadium.capacity,Capacité,Capacity,Capacidad,Capacità,Capacidade
@@ -633,3 +634,9 @@ club_tokens.stripe.login_required,Connexion requise,Login required,Inicio de ses
 club_tokens.stripe.no_pending_pack,Aucun pack en attente,No pending package,No hay paquete pendiente,Nessun pacchetto in attesa,Nenhum pacote pendente
 club_tokens.stripe.unknown_pack,Pack de Tokens inconnu,Unknown token package,Pack de tokens desconocido,Pacchetto token sconosciuto,Pacote de tokens desconhecido
 club_tokens.stripe.cancelled,Paiement annulé,Payment cancelled,Pago cancelado,Pagamento annullato,Pagamento cancelado
+matchsim.game_lineup,Composition du match,Game Lineup,Alineación del partido,Formazione partita,Escalação do jogo
+matchsim.match_in_progress,Match en cours,Match in progress,Partido en curso,Partita in corso,Jogo em andamento
+matchsim.read_only,Lecture seule,Read only,Solo lectura,Sola lettura,Apenas leitura
+matchsim.starting_five,CINQ MAJEUR,STARTING FIVE,CINCO INICIAL,QUINTETTO BASE,CINCO INICIAL
+matchsim.bench,BANC,BENCH,BANQUILLO,PANCHINA,BANCO
+matchsim.energy,Énergie,Energy,Energía,Energia,Energia

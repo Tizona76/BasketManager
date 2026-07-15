@@ -3,12 +3,12 @@
 importer="mp3"
 type="AudioStreamMP3"
 uid="uid://dh7lnhdhl8pd7"
-path="res://.godot/imported/playoffs.mp3-19457192b012e1f22b727f93cfcd5ec4.mp3str"
+path="res://godot/imported/playoffs.mp3-19457192b012e1f22b727f93cfcd5ec4.mp3str"
 
 [deps]
 
 source_file="res://audio/sfx/playoffs.mp3"
-dest_files=["res://.godot/imported/playoffs.mp3-19457192b012e1f22b727f93cfcd5ec4.mp3str"]
+dest_files=["res://godot/imported/playoffs.mp3-19457192b012e1f22b727f93cfcd5ec4.mp3str"]
 
 [params]
 
