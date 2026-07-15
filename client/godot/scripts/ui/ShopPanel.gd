@@ -50,7 +50,7 @@ func _build_rows() -> void:
 
 	# Lignes fixes
 	for i in range(ITEM_IDS.size()):
-		var id := ITEM_IDS[i]
+		var id: String = str(ITEM_IDS[i])
 		var unlocked := i < active_items_count
 
 		# --- Colonne 1 : icon + nom ---
@@ -126,7 +126,7 @@ func _set_price(id: String, value: int) -> void:
 	_refresh_total()
 
 func _stock_for(id: String) -> int:
-	var d := STOCKS_BY_LEVEL.get(club_level, STOCKS_BY_LEVEL.get(1, {}))
+	var d: Dictionary = STOCKS_BY_LEVEL.get(club_level, STOCKS_BY_LEVEL.get(1, {}))
 	return int(d.get(id, 0))
 
 func _refresh_total() -> void:
