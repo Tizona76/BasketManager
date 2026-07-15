@@ -1102,7 +1102,7 @@ func _bm_format_int_spaces(v: int) -> String:
 	return out
 
 func _season_reward_menu_fmt_amount(v: int) -> String:
-	return "+" + _bm_format_int_spaces(int(v)) + " €"
+	return "+" + _bm_format_int_spaces(int(v)) + " $"
 
 func _season_reward_menu_animate_amount(lbl: Label, euros_gain: int) -> void:
 	if lbl == null:
@@ -1291,7 +1291,7 @@ func _last_match_finance_fmt_signed_amount(v: int) -> String:
 	var sign := "+"
 	if v < 0:
 		sign = "-"
-	return sign + _bm_format_int_spaces(abs(v)) + " €"
+	return sign + _bm_format_int_spaces(abs(v)) + " $"
 
 func _last_match_finance_animate_xp(lbl: Label, xp_gain: int) -> void:
 	if lbl == null or not is_instance_valid(lbl):
@@ -1543,7 +1543,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	card.add_child(income_lbl)
 
 	var expenses_lbl := Label.new()
-	expenses_lbl.text = "-0 €"
+	expenses_lbl.text = "-0 $"
 	expenses_lbl.position = Vector2(260, 150)
 	expenses_lbl.size = Vector2(180, 52)
 	expenses_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1652,7 +1652,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	var dep_abs: int = abs(depenses_gain)
 	if dep_abs <= 0:
 		if is_instance_valid(expenses_lbl) and expenses_lbl.is_inside_tree():
-			expenses_lbl.text = "-0 €"
+			expenses_lbl.text = "-0 $"
 	else:
 		var displayed: int = 0
 		while displayed < dep_abs and is_instance_valid(expenses_lbl) and expenses_lbl.is_inside_tree() and is_inside_tree():
@@ -1660,10 +1660,10 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 			if not is_instance_valid(expenses_lbl) or not expenses_lbl.is_inside_tree():
 				return
 			displayed = mini(dep_abs, displayed + maxi(1, int(ceil(float(dep_abs) / 40.0))))
-			expenses_lbl.text = "-" + _bm_format_int_spaces(displayed) + " €"
+			expenses_lbl.text = "-" + _bm_format_int_spaces(displayed) + " $"
 		if not is_instance_valid(expenses_lbl) or not expenses_lbl.is_inside_tree():
 			return
-		expenses_lbl.text = "-" + _bm_format_int_spaces(dep_abs) + " €"
+		expenses_lbl.text = "-" + _bm_format_int_spaces(dep_abs) + " $"
 
 	_last_match_finance_animate_xp(xp_lbl, xp_gain)
 
@@ -3976,9 +3976,18 @@ func _bm_show_mercato_closed_popup() -> void:
 	popup.name = "MercatoClosedPopup"
 	popup.set_anchors_preset(Control.PRESET_FULL_RECT)
 	popup.mouse_filter = Control.MOUSE_FILTER_STOP
-	popup.z_index = 9999
+	popup.z_index = 500
 	popup.set_as_top_level(true)
 	add_child(popup)
+
+	var restore_btn_match_visible := false
+	if btn_match != null:
+		restore_btn_match_visible = btn_match.visible
+		btn_match.visible = false
+	var restore_halo_visible := false
+	if _btn_match_halo != null and is_instance_valid(_btn_match_halo):
+		restore_halo_visible = _btn_match_halo.visible
+		_btn_match_halo.visible = false
 
 	var panel := Panel.new()
 	var popup_size := Vector2(760, 320)
@@ -4033,7 +4042,13 @@ func _bm_show_mercato_closed_popup() -> void:
 	btn.add_theme_stylebox_override("hover", btn_hover)
 	btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	btn.add_theme_font_size_override("font_size", 22)
-	btn.pressed.connect(func(): popup.queue_free())
+	btn.pressed.connect(func():
+		if btn_match != null:
+			btn_match.visible = restore_btn_match_visible
+		if _btn_match_halo != null and is_instance_valid(_btn_match_halo):
+			_btn_match_halo.visible = restore_halo_visible
+		popup.queue_free()
+	)
 	panel.add_child(btn)
 
 

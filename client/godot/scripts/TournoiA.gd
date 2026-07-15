@@ -301,7 +301,7 @@ func _fmt_reward_amount(v: int) -> String:
 	while s.length() > 3:
 		out = " " + s.substr(s.length() - 3, 3) + out
 		s = s.substr(0, s.length() - 3)
-	out = s + out + " €"
+	out = s + out + " $"
 	if negative:
 		out = "-" + out
 	return out

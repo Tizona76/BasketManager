@@ -2,7 +2,7 @@
 
 [ext_resource type="Theme" uid="uid://xs5xp8el4jec" path="res://ui/theme_main.tres" id="1_h2yge"]
 [ext_resource type="Script" uid="uid://c1ckjjusxqwn" path="res://scripts/Main.gd" id="1_ig7tw"]
-[ext_resource type="Texture2D" path="res://assets/images/stades/stade_13.png" id="2_0xm2m"]
+[ext_resource type="Texture2D" uid="uid://yw72hidqah3p" path="res://assets/images/stades/stade_13.png" id="2_0xm2m"]
 
 [node name="Main" type="Control"]
 layout_mode = 3

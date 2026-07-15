@@ -44,7 +44,7 @@ func _tr_key(key: String) -> String:
 
 
 func _money(value: Variant) -> String:
-	return _format_bonus_amount(value) + " €"
+	return _format_bonus_amount(value) + " $"
 
 
 func _format_bonus_amount(value: Variant) -> String:
@@ -203,7 +203,7 @@ func _make_sponsor_card(sponsor: Dictionary, can_sign: bool) -> PanelContainer:
 	box.add_child(_make_label(_tr_key(str(SponsorDataRef.FAMILY_I18N.get(str(sponsor.get("family", "")), ""))), 23, TEXT_GOLD, true))
 	box.add_child(_make_detail_label("sponsors.field.revenue", _money(sponsor.get("payment_amount", 0)) + " / " + _format_payment_unit(str(sponsor.get("payment_type", "")))))
 	if int(sponsor.get("bonus_amount", 0)) > 0:
-		box.add_child(_make_label(_tr_key("sponsors.field.bonus") + " " + _tr_key(str(SponsorDataRef.BONUS_I18N.get(str(sponsor.get("bonus_type", "")), ""))) + ": + " + _format_bonus_amount(sponsor.get("bonus_amount", 0)) + " €", 22, TEXT_DETAIL, false))
+		box.add_child(_make_label(_tr_key("sponsors.field.bonus") + " " + _tr_key(str(SponsorDataRef.BONUS_I18N.get(str(sponsor.get("bonus_type", "")), ""))) + ": + " + _format_bonus_amount(sponsor.get("bonus_amount", 0)) + " $", 22, TEXT_DETAIL, false))
 	else:
 		box.add_child(_make_detail_label("sponsors.field.bonus", _tr_key("sponsors.bonus.none")))
 	box.add_child(_make_detail_label("sponsors.field.duration", str(int(sponsor.get("duration_value", 0))) + " " + _format_duration_unit(str(sponsor.get("duration_type", "")), int(sponsor.get("duration_value", 0)))))

@@ -1096,7 +1096,7 @@ func _bm_player_card_salary(n: int) -> String:
 		count += 1
 		if count % 3 == 0 and i > 0:
 			out = " " + out
-	return out + " €"
+	return out + " $"
 
 
 func _bm_player_card_percent(value: Variant) -> float:
@@ -2182,7 +2182,7 @@ func _fmt_salary_selection(n: int) -> String:
 		count += 1
 		if count % 3 == 0 and i > 0:
 			out = " " + out
-	return out + " €"
+	return out + " $"
 
 func _bm_force_team_name_top_left() -> void:
 	var wanted := _selection_team_name_text().strip_edges()

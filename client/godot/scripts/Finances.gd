@@ -722,7 +722,7 @@ func _fmt_eur(v: int) -> String:
 			result = " " + result
 			count = 0
 
-	return sign + result + " €"
+	return sign + result + " $"
 
 
 func _refresh_amounts_from_save() -> void:
@@ -767,13 +767,13 @@ func _refresh_amounts_from_save() -> void:
 
 	_ensure_revenue_donut_charts()
 	if _donut_tickets != null:
-		_donut_tickets.set_data(_tr_or_fallback("finance.income.tickets"), tickets, recettes, Color(0.42, 0.92, 1.00, 1))
+		_donut_tickets.set_data(_tr_or_fallback("finance.income.tickets"), tickets, recettes, Color(0.20, 0.95, 0.55, 1))
 	if _donut_shop != null:
-		_donut_shop.set_data(_tr_or_fallback("finance.income.shop"), shop, recettes, Color(1.00, 0.72, 0.20, 1))
+		_donut_shop.set_data(_tr_or_fallback("finance.income.shop"), shop, recettes, Color(0.20, 0.95, 0.55, 1))
 	if _donut_sponsors != null:
 		_donut_sponsors.set_data(_tr_or_fallback("finance.income.sponsors"), sponsors, recettes, Color(0.20, 0.95, 0.55, 1))
 	if _donut_tournaments != null:
-		_donut_tournaments.set_data(_tr_or_fallback("finance.income.tournaments"), tournois, recettes, Color(0.70, 0.48, 1.00, 1))
+		_donut_tournaments.set_data(_tr_or_fallback("finance.income.tournaments"), tournois, recettes, Color(0.20, 0.95, 0.55, 1))
 
 	if expenses_total != null:
 		expenses_total.text = _fmt_eur(depenses_aff)
@@ -791,11 +791,11 @@ func _refresh_amounts_from_save() -> void:
 	if _expense_donut_salaries != null:
 		_expense_donut_salaries.set_data(_tr_or_fallback("finance.expenses.salaries"), salaires, depenses_aff, Color(0.92, 0.28, 0.28, 1))
 	if _expense_donut_staff != null:
-		_expense_donut_staff.set_data(_tr_or_fallback("finance.expenses.tournament_fees"), tournois_fees_total, depenses_aff, Color(1.00, 0.55, 0.25, 1))
+		_expense_donut_staff.set_data(_tr_or_fallback("finance.expenses.tournament_fees"), tournois_fees_total, depenses_aff, Color(0.92, 0.28, 0.28, 1))
 	if _expense_donut_maintenance != null:
-		_expense_donut_maintenance.set_data(_tr_or_fallback("finance.expenses.maintenance"), shop_restock_cost, depenses_aff, Color(0.95, 0.85, 0.30, 1))
+		_expense_donut_maintenance.set_data(_tr_or_fallback("finance.expenses.maintenance"), shop_restock_cost, depenses_aff, Color(0.92, 0.28, 0.28, 1))
 	if _expense_donut_stadium_works != null:
-		_expense_donut_stadium_works.set_data(_tr_or_fallback("finance.expenses.stadium_works"), travaux_stade, depenses_aff, Color(0.75, 0.40, 1.00, 1))
+		_expense_donut_stadium_works.set_data(_tr_or_fallback("finance.expenses.stadium_works"), travaux_stade, depenses_aff, Color(0.92, 0.28, 0.28, 1))
 
 	_bm_update_finance_trend_text(recettes, depenses_aff, tickets, shop, salaires, travaux_stade, solde)
 

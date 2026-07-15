@@ -197,7 +197,7 @@ func _apply_i18n() -> void:
 	if btn_confirmer_mercato != null:
 		btn_confirmer_mercato.text = _tr_any(["mercato.btn.confirm_buy"], "Confirm buy")
 	if lbl_new_salaries_total != null:
-		lbl_new_salaries_total.text = _tr_any(["mercato.new_salaries_total"], "New salaries") + " : 0 €"
+		lbl_new_salaries_total.text = _tr_any(["mercato.new_salaries_total"], "New salaries") + " : 0 $"
 	if lbl_team_full_warning != null:
 		lbl_team_full_warning.text = ""
 		lbl_team_full_warning.visible = false
@@ -1097,7 +1097,7 @@ func _player_salary_value(p: Dictionary) -> int:
 	return salaire
 
 func _player_salary_text(p: Dictionary) -> String:
-	return _fmt_int_spaces(_player_salary_value(p)) + " €"
+	return _fmt_int_spaces(_player_salary_value(p)) + " $"
 
 func _sync_mercato_owned_players_into_roster(save: Dictionary) -> void:
 	if not save.has("roster") or not (save["roster"] is Dictionary):
@@ -1260,7 +1260,7 @@ func _get_current_licensed_count() -> int:
 func _update_new_salaries_ui() -> void:
 	var total := _get_new_salaries_total()
 	if lbl_new_salaries_total != null:
-		lbl_new_salaries_total.text = _tr_any(["mercato.new_salaries_total"], "New salaries") + " : " + _fmt_int_spaces(total) + " €"
+		lbl_new_salaries_total.text = _tr_any(["mercato.new_salaries_total"], "New salaries") + " : " + _fmt_int_spaces(total) + " $"
 	if btn_confirmer_mercato != null:
 		var purchased_count: int = _get_purchased_ids().size()
 		var licensed_count: int = _get_current_licensed_count()

@@ -197,7 +197,7 @@ stadium.tab.cafe,Cafétéria,Cafeteria,,,
 stadium.tab.upgrade,Évolution Stade,Stadium Upgrade,Mejora del estadio,Evoluzione stadio,Evolução do estádio
 stadium.ticketing.title,Billetterie,Ticketing,,,
 stadium.ticketing.col.category,Cat.,Cat.,,,
-stadium.ticketing.col.price,Prix,Price,,,
+stadium.ticketing.col.price,Prix ($),Price ($),,,
 stadium.ticketing.col.seats,Places,Seats,,,
 stadium.ticketing.col.estimated_revenue_short,Rev. est.,Est. Revenue,Ing. est.,Ric. stim.,Rec. est.
 stadium.ticketing.cat.a,A,A,,,
@@ -282,7 +282,7 @@ stadium.upgrade.none_available,Aucune évolution de stade disponible.,No stadium
 stadium.upgrade.works_in_progress,Travaux en cours vers le niveau {level}\nMatchs restants : {remaining},Upgrade in progress to level {level}\nGamees remaining: {remaining},Mejora en curso hacia el nivel {level}\nPartidos restantes: {remaining},Lavori in corso verso il livello {level}\nPartite rimanenti: {remaining},Obras em curso para o nível {level}\nPartidas restantes: {remaining}
 stadium.upgrade.launch_missing,Fonction stadium_launch_upgrade introuvable.,stadium_launch_upgrade function not found.,Función stadium_launch_upgrade no encontrada.,Funzione stadium_launch_upgrade non trovata.,Função stadium_launch_upgrade não encontrada.
 stadium.upgrade.invalid_response,Réponse invalide.,Invalid response.,Respuesta no válida.,Risposta non valida.,Resposta inválida.
-stadium.upgrade.insufficient_funds,Fonds insuffisants.\nWallet disponible : {wallet} €,Insufficient funds.\nAvailable wallet: {wallet} €,Fondos insuficientes.\nWallet disponible: {wallet} €,Fondi insufficienti.\nWallet disponibile: {wallet} €,Fundos insuficientes.\nWallet disponível: {wallet} €
+stadium.upgrade.insufficient_funds,Fonds insuffisants.\nWallet disponible : {wallet} $,Insufficient funds.\nAvailable wallet: {wallet} $,Fondos insuficientes.\nWallet disponible: {wallet} $,Fondi insufficienti.\nWallet disponibile: {wallet} $,Fundos insuficientes.\nWallet disponível: {wallet} $
 stadium.upgrade.invalid_step,Palier invalide.,Invalid tier.,Nivel no válido.,Livello non valido.,Patamar inválido.
 stadium.upgrade.impossible,Évolution impossible.,Upgrade impossible.,Mejora imposible.,Miglioramento impossibile.,Melhoria impossível.
 stadium.upgrade.applied,Évolution du stade appliquée.,Stadium upgrade applied.,Mejora del estadio aplicada.,Miglioramento dello stadio applicato.,Melhoria do estádio aplicada.
@@ -411,6 +411,11 @@ player.position.shooting_guard,Arrière,Shooting Guard,Escolta,Guardia tiratore,
 player.position.small_forward,Ailier,Small Forward,Alero,Ala piccola,Ala
 player.position.center,Pivot,Center,Pívot,Centro,Pivô
 player.position.point_forward,Ailier fort,Power Forward,Ala-pívot,Ala grande,Ala-pivô
+player.position.short.point_guard,P.G.,P.G.,P.G.,P.G.,P.G.
+player.position.short.shooting_guard,S.G.,S.G.,S.G.,S.G.,S.G.
+player.position.short.small_forward,S.F.,S.F.,S.F.,S.F.,S.F.
+player.position.short.point_forward,P.F.,P.F.,P.F.,P.F.,P.F.
+player.position.short.center,C.,C.,C.,C.,C.
 popup.last_match_finance.title,Bilan financier du dernier match,Last game financial summary,Balance financiero del último partido,Bilancio finanziario dell'ultima partita,Balanço financeiro da última partida
 popup.last_match_finance.cta_finances,Voir les finances du club,See club finance,Ver las finanzas del club,Vedi le finanze del club,Ver as finanças do clube
 teamname.placeholder,Créer le nom de l’équipe,Create team name,Crear nombre del equipo,Crea nome squadra,Criar nome da equipa

@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/Mercato.gd" id="1_mercato"]
 [ext_resource type="Texture2D" path="res://assets/images/backgrounds/mercato.png" id="2_bg"]
@@ -7,6 +7,25 @@
 [ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_match_normal.tres" id="5_match_blue_normal"]
 [ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_match_hover.tres" id="6_match_blue_hover"]
 [ext_resource type="StyleBox" path="res://ui/styleboxes_nba/menu_match_pressed.tres" id="7_match_blue_pressed"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_licensed_players"]
+bg_color = Color(0.045, 0.075, 0.13, 0.96)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.26, 0.58, 0.98, 0.78)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.42)
+shadow_size = 8
+shadow_offset = Vector2(0, 2)
+content_margin_left = 12
+content_margin_right = 12
+content_margin_top = 6
+content_margin_bottom = 6
 
 [node name="Mercato" type="Control"]
 layout_mode = 3
@@ -71,7 +90,7 @@ theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.35)
 theme_override_constants/shadow_offset_x = 0
 theme_override_constants/shadow_offset_y = 2
 theme_override_font_sizes/font_size = 24
-text = "New salaries: 0 €"
+text = "New salaries: 0 $"
 horizontal_alignment = 2
 
 [node name="Panel" type="PanelContainer" parent="UI"]
@@ -252,7 +271,7 @@ text = "Confirmer"
 visible = false
 
 
-[node name="BgLicensedPlayers" type="ColorRect" parent="UI"]
+[node name="BgLicensedPlayers" type="Panel" parent="UI"]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -263,7 +282,7 @@ offset_left = -190.0
 offset_right = 190.0
 offset_top = -46.0
 offset_bottom = -4.0
-color = Color(1, 1, 1, 0.92)
+theme_override_styles/panel = SubResource("StyleBoxFlat_licensed_players")
 
 [node name="LblLicensedPlayers" type="Label" parent="UI"]
 layout_mode = 1

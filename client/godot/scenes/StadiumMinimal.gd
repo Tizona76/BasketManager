@@ -652,7 +652,7 @@ func _stadium_tr(key: String) -> String:
 		"stadium.ticketing.total": {"fr":"Total","en":"Total","es":"Total","it":"Totale","pt":"Total"},
 
 					"stadium.ticketing.col.category": {"fr":"Catégorie","en":"Category","es":"Categoría","it":"Categoria","pt":"Categoria"},
-					"stadium.ticketing.col.price": {"fr":"Prix","en":"Price","es":"Precio","it":"Prezzo","pt":"Preço"},
+					"stadium.ticketing.col.price": {"fr":"Prix ($)","en":"Price ($)","es":"Precio ($)","it":"Prezzo ($)","pt":"Preço ($)"},
 			"stadium.ticketing.col.seats": {"fr":"Places","en":"Seats","es":"Asientos","it":"Posti","pt":"Lugares"},
 				"stadium.ticketing.col.estimated_revenue_short": {"fr":"Rev. est.","en":"Est. Revenue","es":"Ing. est.","it":"Ric. stim.","pt":"Rec. est."},
 			"stadium.duration_unit": {"fr":"match(s)","en":"games","es":"partidos","it":"partite","pt":"jogos"},
@@ -1624,7 +1624,7 @@ func _show_upgrade_info(message: String, alert_red: bool = false) -> void:
 		_upgrade_info_dialog.remove_theme_stylebox_override("panel")
 		_upgrade_info_dialog.remove_theme_stylebox_override("embedded_border")
 		_upgrade_info_dialog.remove_theme_stylebox_override("embedded_unfocused_border")
-		var dialog_message := message.replace("[/color] €", " €[/color]").replace("[color=#F21F1F]", "").replace("[/color]", "")
+		var dialog_message := message.replace("[/color] $", " $[/color]").replace("[color=#F21F1F]", "").replace("[/color]", "")
 		var _dialog_label := _upgrade_info_dialog.get_label()
 		if _dialog_label != null:
 			_dialog_label.visible = true
@@ -1692,7 +1692,7 @@ func _show_upgrade_insufficient_funds_popup(message: String) -> void:
 
 	var body := Label.new()
 	body.name = "LblUpgradeInsufficientFundsBody"
-	body.text = message.replace("[/color] €", " €[/color]").replace("[color=#F21F1F]", "").replace("[/color]", "")
+	body.text = message.replace("[/color] $", " $[/color]").replace("[color=#F21F1F]", "").replace("[/color]", "")
 	body.position = Vector2(44, 96)
 	body.size = Vector2(672, 92)
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2372,7 +2372,7 @@ func _on_tab_upgrade() -> void:
 				if capacity_bonus_key != "":
 					capacity_bonus_text = _stadium_tr(capacity_bonus_key)
 				rows.add_child(_make_upgrade_info_card(UPGRADE_CAPACITY_ICON_PATH, UPGRADE_CAPACITY_ICON_SIZE, _stadium_tr("stadium.capacity"), _format_int(target_capacity).replace(" ", "."), capacity_bonus_text))
-				rows.add_child(_make_upgrade_info_card(UPGRADE_COST_ICON_PATH, UPGRADE_SMALL_INFO_ICON_SIZE, _stadium_tr("stadium.cost"), _format_int(cost).replace(" ", ".") + " €"))
+				rows.add_child(_make_upgrade_info_card(UPGRADE_COST_ICON_PATH, UPGRADE_SMALL_INFO_ICON_SIZE, _stadium_tr("stadium.cost"), _format_int(cost).replace(" ", ".") + " $"))
 				var duration_text := ""
 				if is_basic_improvements:
 					duration_text = _stadium_tr("stadium.duration_one_game")
@@ -3383,7 +3383,7 @@ func _ensure_shop_panel() -> void:
 				_pop = int(save.get("popularite", 50))
 			var _coef := float(clampi(_pop, 30, 100)) / 100.0
 			var _price := int(_shop_price_by_id.get(pid2, 0))
-			lbl_estimated_revenue.text = _format_int(int(round(float(stock * _price) * _coef))) + " €"
+			lbl_estimated_revenue.text = _format_int(int(round(float(stock * _price) * _coef))) + " $"
 			lbl_estimated_revenue.custom_minimum_size.x = 190
 			lbl_estimated_revenue.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			lbl_estimated_revenue.modulate = Color(0,0,0,1)
@@ -4011,7 +4011,7 @@ func _shop_price_step(pid: String, delta: int) -> void:
 		var est_lbl := (row_any as Node).get_node_or_null("LblEstimatedRevenue") as Label
 		if est_lbl != null:
 			var stock := _get_shop_stock_for_level(_shop_level_cached, pid)
-			est_lbl.text = _format_int(stock * cur) + " €"
+			est_lbl.text = _format_int(stock * cur) + " $"
 
 	_update_shop_total()
 
@@ -4032,7 +4032,7 @@ func _update_shop_total() -> void:
 			var _coef2 := float(clampi(_pop2, 30, 100)) / 100.0
 			total += int(round(float(stock * price) * _coef2))
 		idx += 1
-	_shop_total_label.text = _stadium_tr("stadium.shop.total_estimate") + " : " + _format_int(total) + " €"
+	_shop_total_label.text = _stadium_tr("stadium.shop.total_estimate") + " : " + _format_int(total) + " $"
 
 func _collect_shop_for_save() -> Dictionary:
 	var items := {}
@@ -4183,16 +4183,16 @@ func _update_ticketing_total() -> void:
 	var sb := _safe_int(SeatsB.text)
 	var sc := _safe_int(SeatsC.text)
 	var total := pa*sa + pb*sb + pc*sc
-	LblTicketingTotal.text = _stadium_tr("stadium.shop.total_estimate") + " : " + _format_int(total) + " €"
+	LblTicketingTotal.text = _stadium_tr("stadium.shop.total_estimate") + " : " + _format_int(total) + " $"
 	var est_a := get_node_or_null("Content/CenterTicketing/PanelTicketing/VBox/Grid/SpacerA") as Label
 	var est_b := get_node_or_null("Content/CenterTicketing/PanelTicketing/VBox/Grid/SpacerB") as Label
 	var est_c := get_node_or_null("Content/CenterTicketing/PanelTicketing/VBox/Grid/SpacerC") as Label
 	if est_a != null:
-		est_a.text = _format_int(pa * sa) + " €"
+		est_a.text = _format_int(pa * sa) + " $"
 	if est_b != null:
-		est_b.text = _format_int(pb * sb) + " €"
+		est_b.text = _format_int(pb * sb) + " $"
 	if est_c != null:
-		est_c.text = _format_int(pc * sc) + " €"
+		est_c.text = _format_int(pc * sc) + " $"
 
 
 # --- Ticketing hold-repeat helpers ---
@@ -4636,6 +4636,78 @@ func _stadium_boost_ticketing_fonts() -> void:
 		var b2 := get_node_or_null(pp) as Control
 		if b2 != null: nodes.append(b2)
 
+	var sb_ticket_input := StyleBoxFlat.new()
+	sb_ticket_input.bg_color = Color(0.03, 0.055, 0.085, 0.92)
+	sb_ticket_input.border_width_left = 1
+	sb_ticket_input.border_width_top = 1
+	sb_ticket_input.border_width_right = 1
+	sb_ticket_input.border_width_bottom = 1
+	sb_ticket_input.border_color = Color(0.38, 0.55, 0.82, 0.62)
+	sb_ticket_input.corner_radius_top_left = 8
+	sb_ticket_input.corner_radius_top_right = 8
+	sb_ticket_input.corner_radius_bottom_left = 8
+	sb_ticket_input.corner_radius_bottom_right = 8
+	sb_ticket_input.shadow_color = Color(0, 0, 0, 0.34)
+	sb_ticket_input.shadow_size = 5
+	sb_ticket_input.content_margin_left = 10
+	sb_ticket_input.content_margin_right = 10
+	sb_ticket_input.content_margin_top = 5
+	sb_ticket_input.content_margin_bottom = 5
+
+	var sb_ticket_input_focus := sb_ticket_input.duplicate() as StyleBoxFlat
+	sb_ticket_input_focus.border_color = Color(0.95, 0.58, 0.12, 0.86)
+
+	var sb_ticket_button := StyleBoxFlat.new()
+	sb_ticket_button.bg_color = Color(0.11, 0.22, 0.38, 0.92)
+	sb_ticket_button.border_width_left = 1
+	sb_ticket_button.border_width_top = 1
+	sb_ticket_button.border_width_right = 1
+	sb_ticket_button.border_width_bottom = 1
+	sb_ticket_button.border_color = Color(0.95, 0.58, 0.12, 0.58)
+	sb_ticket_button.corner_radius_top_left = 7
+	sb_ticket_button.corner_radius_top_right = 7
+	sb_ticket_button.corner_radius_bottom_left = 7
+	sb_ticket_button.corner_radius_bottom_right = 7
+	sb_ticket_button.shadow_color = Color(0, 0, 0, 0.32)
+	sb_ticket_button.shadow_size = 4
+	sb_ticket_button.content_margin_left = 8
+	sb_ticket_button.content_margin_right = 8
+	sb_ticket_button.content_margin_top = 4
+	sb_ticket_button.content_margin_bottom = 4
+
+	var sb_ticket_button_hover := sb_ticket_button.duplicate() as StyleBoxFlat
+	sb_ticket_button_hover.bg_color = Color(0.16, 0.30, 0.50, 0.96)
+	sb_ticket_button_hover.border_color = Color(1.0, 0.68, 0.18, 0.82)
+	var sb_ticket_button_pressed := sb_ticket_button.duplicate() as StyleBoxFlat
+	sb_ticket_button_pressed.bg_color = Color(0.07, 0.15, 0.27, 0.98)
+	sb_ticket_button_pressed.border_color = Color(0.95, 0.46, 0.08, 0.78)
+
+	for pp_value_style: String in [
+		"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceA/PriceA",
+		"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceB/PriceB",
+		"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceC/PriceC",
+		"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsA/SeatsA",
+		"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsB/SeatsB",
+		"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsC/SeatsC"
+	]:
+		var ticket_input := get_node_or_null(pp_value_style) as LineEdit
+		if ticket_input != null:
+			ticket_input.add_theme_stylebox_override("normal", sb_ticket_input)
+			ticket_input.add_theme_stylebox_override("focus", sb_ticket_input_focus)
+			ticket_input.add_theme_stylebox_override("read_only", sb_ticket_input)
+			ticket_input.add_theme_color_override("font_color", Color(1, 1, 1, 0.96))
+			ticket_input.add_theme_color_override("caret_color", Color(0.95, 0.58, 0.12, 1))
+
+	for pp_button_style: String in btn_paths:
+		var ticket_button := get_node_or_null(pp_button_style) as Button
+		if ticket_button != null:
+			ticket_button.add_theme_stylebox_override("normal", sb_ticket_button)
+			ticket_button.add_theme_stylebox_override("hover", sb_ticket_button_hover)
+			ticket_button.add_theme_stylebox_override("pressed", sb_ticket_button_pressed)
+			ticket_button.add_theme_color_override("font_color", Color(1, 1, 1, 0.96))
+			ticket_button.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
+			ticket_button.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 0.90))
+
 	# Application du boost
 	for c: Control in nodes:
 		if c == null:
@@ -5026,7 +5098,7 @@ func _apply_shop_restock_purchase(pid: String, units: int, total_cost: int) -> v
 			var pop := int(save.get("popularite", 50))
 			var coef := float(clampi(pop, 30, 100)) / 100.0
 			var price := int(_shop_price_by_id.get(pid, int(SHOP_DEFAULT_PRICES.get(pid, 0))))
-			est_lbl.text = _format_int(int(round(float(int(st.get("current", base_stock)) * price) * coef))) + " €"
+			est_lbl.text = _format_int(int(round(float(int(st.get("current", base_stock)) * price) * coef))) + " $"
 	_update_shop_total()
 
 
@@ -5142,7 +5214,7 @@ func _show_shop_restock_popup(pid: String) -> void:
 	card.add_child(small_units_lbl)
 
 	var small_unit_cost_lbl := Label.new()
-	small_unit_cost_lbl.text = _format_int(int(round(float(small_cost) / float(maxi(1, small_units))))) + " €"
+	small_unit_cost_lbl.text = _format_int(int(round(float(small_cost) / float(maxi(1, small_units))))) + " $"
 	small_unit_cost_lbl.position = Vector2(330, 122)
 	small_unit_cost_lbl.size = Vector2(120, 38)
 	small_unit_cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -5150,7 +5222,7 @@ func _show_shop_restock_popup(pid: String) -> void:
 	card.add_child(small_unit_cost_lbl)
 
 	var small_cost_lbl := Label.new()
-	small_cost_lbl.text = _format_int(small_cost) + " €"
+	small_cost_lbl.text = _format_int(small_cost) + " $"
 	small_cost_lbl.position = Vector2(465, 122)
 	small_cost_lbl.size = Vector2(130, 38)
 	small_cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -5181,7 +5253,7 @@ func _show_shop_restock_popup(pid: String) -> void:
 	card.add_child(large_units_lbl)
 
 	var large_unit_cost_lbl := Label.new()
-	large_unit_cost_lbl.text = _format_int(int(round(float(large_cost) / float(maxi(1, large_units))))) + " €"
+	large_unit_cost_lbl.text = _format_int(int(round(float(large_cost) / float(maxi(1, large_units))))) + " $"
 	large_unit_cost_lbl.position = Vector2(330, 182)
 	large_unit_cost_lbl.size = Vector2(120, 38)
 	large_unit_cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -5189,7 +5261,7 @@ func _show_shop_restock_popup(pid: String) -> void:
 	card.add_child(large_unit_cost_lbl)
 
 	var large_cost_lbl := Label.new()
-	large_cost_lbl.text = _format_int(large_cost) + " €"
+	large_cost_lbl.text = _format_int(large_cost) + " $"
 	large_cost_lbl.position = Vector2(465, 182)
 	large_cost_lbl.size = Vector2(130, 38)
 	large_cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

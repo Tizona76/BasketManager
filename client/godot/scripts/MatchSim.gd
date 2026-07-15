@@ -22,6 +22,9 @@ var lbl_match_result: Label = null
 var btn_current_lineup: Button = null
 var current_lineup_popup: Control = null
 var _match_progress_info_after_countdown: String = ""
+var _bm_lbl_info_base_position: Vector2 = Vector2.ZERO
+var _bm_lbl_info_base_size: Vector2 = Vector2.ZERO
+var _bm_lbl_info_base_font_size: int = 22
 static var _bm_last_coach_insight_family: String = ""
 static var _bm_last_coach_insight_player: String = ""
 
@@ -287,6 +290,22 @@ func _bm_current_lineup_player_metrics(pd: Dictionary) -> Dictionary:
 	}
 
 
+func _bm_current_lineup_position_text(poste: String) -> String:
+	match String(poste).strip_edges().to_lower():
+		"meneur", "point guard", "p.g.", "pg":
+			return _bm_matchsim_tr_fallback("player.position.short.point_guard", "P.G.")
+		"arrière", "arriere", "shooting guard", "s.g.", "sg":
+			return _bm_matchsim_tr_fallback("player.position.short.shooting_guard", "S.G.")
+		"ailier", "small forward", "s.f.", "sf":
+			return _bm_matchsim_tr_fallback("player.position.short.small_forward", "S.F.")
+		"ailier fort", "power forward", "p.f.", "pf":
+			return _bm_matchsim_tr_fallback("player.position.short.point_forward", "P.F.")
+		"pivot", "center", "c.", "c":
+			return _bm_matchsim_tr_fallback("player.position.short.center", "C.")
+		_:
+			return poste
+
+
 func _bm_current_lineup_player_avatar(pd: Dictionary, parent: Control, pos: Vector2) -> void:
 	var tex := TextureRect.new()
 	tex.position = pos
@@ -311,7 +330,7 @@ func _bm_current_lineup_player_row(parent: Control, pd: Dictionary, y: float, ro
 
 	_bm_current_lineup_player_avatar(pd, row, Vector2(8, 3))
 	_bm_current_lineup_label(row, _bm_player_display_name(pd), Vector2(54, 7), Vector2(row_w - 602.0, 30), 17, Color(1, 1, 1, 1))
-	var pos_text := str(pd.get("poste", pd.get("pos", ""))).strip_edges()
+	var pos_text := _bm_current_lineup_position_text(str(pd.get("poste", pd.get("pos", ""))))
 	var metrics := _bm_current_lineup_player_metrics(pd)
 	_bm_current_lineup_label(row, pos_text, Vector2(row_w - 530.0, 7), Vector2(84, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
 	_bm_current_lineup_label(row, str(int(metrics.get("attack", 0))), Vector2(row_w - 350.0, 7), Vector2(70, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
@@ -821,7 +840,7 @@ func _bm_format_int_spaces(value: int) -> String:
 	return out
 
 func _season_reward_fmt_amount(v: int) -> String:
-	return "+" + _bm_format_int_spaces(int(v)) + " €"
+	return "+" + _bm_format_int_spaces(int(v)) + " $"
 
 func _season_reward_play_money_tick_once() -> void:
 	var click_path := "res://audio/sfx/click.mp3"
@@ -1211,6 +1230,10 @@ func _ready() -> void:
 	print("[DBG] before _center_stats_end_horizontally")
 	_center_stats_end_horizontally()
 	print("[DBG] after _center_stats_end_horizontally")
+	if lbl_info != null:
+		_bm_lbl_info_base_position = lbl_info.position
+		_bm_lbl_info_base_size = lbl_info.size
+		_bm_lbl_info_base_font_size = int(lbl_info.get_theme_font_size("font_size"))
 
 	btn_retour.disabled = true
 	if not btn_retour.pressed.is_connected(_on_btn_retour_pressed):
@@ -3110,6 +3133,11 @@ func _fin_match() -> void:
 		result_color = Color(0.20, 1.0, 0.38, 1.0)
 	elif user_score < opp_score:
 		result_color = Color(1.0, 0.16, 0.16, 1.0)
+
+	if lbl_info != null:
+		lbl_info.position = _bm_lbl_info_base_position
+		lbl_info.size = _bm_lbl_info_base_size
+		lbl_info.add_theme_font_size_override("font_size", _bm_lbl_info_base_font_size)
 
 	var resume_raw := _build_match_summary(user_score, opp_score)
 	var resume := tr(resume_raw) # ✅ si resume_raw est une clé => traduit, sinon inchangé

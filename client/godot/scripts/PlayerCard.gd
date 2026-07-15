@@ -90,7 +90,7 @@ func _fmt_salary(n: int) -> String:
 		count += 1
 		if count % 3 == 0 and i > 0:
 			out = " " + out
-	return out + " €"
+	return out + " $"
 
 func _ensure_btn_connected() -> void:
 	if btn == null:

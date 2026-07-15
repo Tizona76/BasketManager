@@ -1,4 +1,4 @@
-[gd_scene load_steps=5 format=3 uid="uid://cnwk65pv2sa21"]
+[gd_scene load_steps=8 format=3 uid="uid://cnwk65pv2sa21"]
 
 
 [ext_resource type="Script" path="res://scripts/PopularityBadge.gd" id="1"]
@@ -11,6 +11,52 @@
 [ext_resource type="Script" path="res://scripts/FinanceGraph.gd" id="2_graph"]
 [ext_resource type="StyleBox" path="res://ui/styleboxes_shared/hud_progress_panel.tres" id="ext_hud_progress_style"]
 [ext_resource type="Texture2D" path="res://assets/images/token.png" id="ext_token_icon"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_finance_income_panel"]
+bg_color = Color(0.045, 0.075, 0.065, 0.88)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.20, 0.85, 0.35, 0.34)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0, 0, 0.38)
+shadow_size = 9
+shadow_offset = Vector2(0, 3)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_finance_expenses_panel"]
+bg_color = Color(0.09, 0.055, 0.055, 0.88)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.92, 0.28, 0.28, 0.34)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0, 0, 0.38)
+shadow_size = 9
+shadow_offset = Vector2(0, 3)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_finance_balance_panel"]
+bg_color = Color(0.055, 0.065, 0.085, 0.90)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.95, 0.58, 0.12, 0.38)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0, 0, 0.38)
+shadow_size = 9
+shadow_offset = Vector2(0, 3)
+
 [node name="Finances" type="Control"]
 layout_mode = 3
 anchors_preset = 15
@@ -105,7 +151,7 @@ theme_override_font_sizes/font_size = 40
 text = "finance.title"
 horizontal_alignment = 1
 
-[node name="IncomePanel" type="ColorRect" parent="."]
+[node name="IncomePanel" type="Panel" parent="."]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
@@ -115,7 +161,7 @@ offset_top = 110.0
 offset_right = 200.0
 offset_bottom = 325.0
 grow_horizontal = 2
-color = Color(0.12, 0.12, 0.12, 0.85)
+theme_override_styles/panel = SubResource("StyleBoxFlat_finance_income_panel")
 
 [node name="IncomeTitle" type="Label" parent="IncomePanel"]
 theme_override_colors/font_color = Color(0.20, 0.85, 0.35, 1)
@@ -138,7 +184,7 @@ offset_right = -18.0
 offset_bottom = 56.0
 grow_horizontal = 0
 theme_override_font_sizes/font_size = 32
-text = "0 €"
+text = "0 $"
 horizontal_alignment = 2
 [node name="IncomeTicketsLabel" type="Label" parent="IncomePanel"]
 layout_mode = 1
@@ -160,7 +206,7 @@ offset_right = -22.0
 offset_bottom = 100.0
 grow_horizontal = 0
 theme_override_font_sizes/font_size = 22
-text = "0 €"
+text = "0 $"
 horizontal_alignment = 2
 
 [node name="IncomeShopLabel" type="Label" parent="IncomePanel"]
@@ -183,7 +229,7 @@ offset_right = -22.0
 offset_bottom = 138.0
 grow_horizontal = 0
 theme_override_font_sizes/font_size = 22
-text = "0 €"
+text = "0 $"
 horizontal_alignment = 2
 
 [node name="IncomeSponsorsLabel" type="Label" parent="IncomePanel"]
@@ -193,7 +239,7 @@ offset_top = 148.0
 offset_right = 320.0
 offset_bottom = 176.0
 theme_override_font_sizes/font_size = 22
-text = "finance.income.tournaments"
+text = "finance.income.sponsors"
 
 [node name="IncomeSponsorsValue" type="Label" parent="IncomePanel"]
 layout_mode = 1
@@ -206,7 +252,7 @@ offset_right = -22.0
 offset_bottom = 176.0
 grow_horizontal = 0
 theme_override_font_sizes/font_size = 22
-text = "0 €"
+text = "0 $"
 horizontal_alignment = 2
 
 
@@ -230,10 +276,10 @@ offset_right = -22.0
 offset_bottom = 214.0
 grow_horizontal = 0
 theme_override_font_sizes/font_size = 22
-text = "0 €"
+text = "0 $"
 horizontal_alignment = 2
 
-[node name="ExpensesPanel" type="ColorRect" parent="."]
+[node name="ExpensesPanel" type="Panel" parent="."]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
@@ -243,7 +289,7 @@ offset_top = 370.0
 offset_right = 200.0
 offset_bottom = 590.0
 grow_horizontal = 2
-color = Color(0.12, 0.12, 0.12, 0.85)
+theme_override_styles/panel = SubResource("StyleBoxFlat_finance_expenses_panel")
 
 [node name="ExpensesTitle" type="Label" parent="ExpensesPanel"]
 theme_override_colors/font_color = Color(0.92, 0.28, 0.28, 1)
@@ -266,7 +312,7 @@ offset_right = -18.0
 offset_bottom = 56.0
 grow_horizontal = 0
 theme_override_font_sizes/font_size = 32
-text = "0 €"
+text = "0 $"
 horizontal_alignment = 2
 [node name="ExpensesSalariesLabel" type="Label" parent="ExpensesPanel"]
 layout_mode = 1
@@ -288,7 +334,7 @@ offset_right = -22.0
 offset_bottom = 100.0
 grow_horizontal = 0
 theme_override_font_sizes/font_size = 22
-text = "0 €"
+text = "0 $"
 horizontal_alignment = 2
 
 [node name="ExpensesStaffLabel" type="Label" parent="ExpensesPanel"]
@@ -311,7 +357,7 @@ offset_right = -22.0
 offset_bottom = 138.0
 grow_horizontal = 0
 theme_override_font_sizes/font_size = 22
-text = "0 €"
+text = "0 $"
 horizontal_alignment = 2
 
 [node name="ExpensesMaintenanceLabel" type="Label" parent="ExpensesPanel"]
@@ -334,7 +380,7 @@ offset_right = -22.0
 offset_bottom = 176.0
 grow_horizontal = 0
 theme_override_font_sizes/font_size = 22
-text = "0 €"
+text = "0 $"
 horizontal_alignment = 2
 
 [node name="ExpensesStadiumWorksLabel" type="Label" parent="ExpensesPanel"]
@@ -357,10 +403,10 @@ offset_right = -22.0
 offset_bottom = 214.0
 grow_horizontal = 0
 theme_override_font_sizes/font_size = 22
-text = "0 €"
+text = "0 $"
 horizontal_alignment = 2
 
-[node name="BalancePanel" type="ColorRect" parent="."]
+[node name="BalancePanel" type="Panel" parent="."]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
@@ -370,7 +416,7 @@ offset_top = 610.0
 offset_right = 95.0
 offset_bottom = 685.6
 grow_horizontal = 2
-color = Color(0.12, 0.12, 0.12, 0.85)
+theme_override_styles/panel = SubResource("StyleBoxFlat_finance_balance_panel")
 
 [node name="BalanceTitle" type="Label" parent="BalancePanel"]
 layout_mode = 1
@@ -392,7 +438,7 @@ offset_right = -18.0
 offset_bottom = 70.0
 grow_horizontal = 0
 theme_override_font_sizes/font_size = 32
-text = "0 €"
+text = "0 $"
 horizontal_alignment = 2
 
 

@@ -433,13 +433,13 @@ func _bm_refresh_tournoi_info_panel() -> void:
 		lbl_tournoi_info_nb_equipes.text = "# " + tr("tournois.info.teams") + " : " + str(data.get("nb_equipes", 0))
 
 	if lbl_tournoi_info_prix != null:
-		lbl_tournoi_info_prix.text = tr("tournois.info.entry_fee") + " : " + _bm_format_int_spaces(_bm_get_entry_fee_from_tuning(tournoi_survole_id)) + " €"
+		lbl_tournoi_info_prix.text = tr("tournois.info.entry_fee") + " : " + _bm_format_int_spaces(_bm_get_entry_fee_from_tuning(tournoi_survole_id)) + " $"
 
 	if lbl_tournoi_info_finaliste != null:
 		var reward_f: Dictionary = _bm_get_reward_from_source(tournoi_survole_id, "finalist")
 		var euros_f := int(reward_f.get("euros", 0))
 		var tokens_f := int(reward_f.get("tokens", 0))
-		var txt_f := tr("tournois.info.runner_up") + " : " + _bm_format_int_spaces(euros_f) + " €"
+		var txt_f := tr("tournois.info.runner_up") + " : " + _bm_format_int_spaces(euros_f) + " $"
 		if tokens_f > 0:
 			txt_f += " + " + _bm_format_int_spaces(tokens_f) + " [img=26x26]res://assets/images/token.png[/img]"
 		lbl_tournoi_info_finaliste.text = txt_f
@@ -448,7 +448,7 @@ func _bm_refresh_tournoi_info_panel() -> void:
 		var reward_c: Dictionary = _bm_get_reward_from_source(tournoi_survole_id, "victory")
 		var euros_c := int(reward_c.get("euros", 0))
 		var tokens_c := int(reward_c.get("tokens", 0))
-		var txt_c := tr("tournois.info.champion") + " : " + _bm_format_int_spaces(euros_c) + " €"
+		var txt_c := tr("tournois.info.champion") + " : " + _bm_format_int_spaces(euros_c) + " $"
 		if tokens_c > 0:
 			txt_c += " + " + _bm_format_int_spaces(tokens_c) + " [img=26x26]res://assets/images/token.png[/img]"
 		lbl_tournoi_info_champion.text = txt_c

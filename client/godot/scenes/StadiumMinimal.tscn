@@ -258,7 +258,7 @@ text = "-"
 [node name="SpacerA" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "0 €"
+text = "0 $"
 horizontal_alignment = 1
 
 [node name="LblCatB" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
@@ -300,7 +300,7 @@ text = "-"
 [node name="SpacerB" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "0 €"
+text = "0 $"
 horizontal_alignment = 1
 
 [node name="LblCatC" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
@@ -342,7 +342,7 @@ text = "-"
 [node name="SpacerC" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox/Grid"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "0 €"
+text = "0 $"
 horizontal_alignment = 1
 
 [node name="LblTicketingTotal" type="Label" parent="Content/CenterTicketing/PanelTicketing/VBox"]
