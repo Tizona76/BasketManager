@@ -63,7 +63,7 @@ const ELITE_R4_SLOT_MAP := [2, 6]
 const ELITE_W_SLOT_MAP := [4]
 
 func _line_centered(text: String) -> String:
-	return "[center]" + str(text).strip_edges() + "[/center]"
+	return "[center][bgcolor=#07111FCC][color=#FFFFFF]  " + str(text).strip_edges() + "  [/color][/bgcolor][/center]"
 
 func _vs_centered() -> String:
 	return "[center][font_size=14][color=#FFFFFF]— VS —[/color][/font_size][/center]"

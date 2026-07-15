@@ -947,7 +947,7 @@ func _bm_update_finance_trend_text(income: int, expenses: int, tickets: int = -1
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lbl.add_theme_font_size_override("font_size", 22)
+	lbl.add_theme_font_size_override("font_size", 24)
 	lbl.add_theme_constant_override("outline_size", 1)
 	lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.55))
 	lbl.modulate = Color(1, 1, 1, 0.95)

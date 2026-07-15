@@ -42,7 +42,7 @@ var _money_tick_player: AudioStreamPlayer = null
 @onready var ui_root: Control = get_node("UI") as Control
 
 func _line_centered(text: String) -> String:
-	return "[center]" + str(text).strip_edges() + "[/center]"
+	return "[center][bgcolor=#07111FCC][color=#FFFFFF]  " + str(text).strip_edges() + "  [/color][/bgcolor][/center]"
 
 func _vs_centered() -> String:
 	return "[center][font_size=18][color=#FFFFFF]— VS —[/color][/font_size][/center]"
