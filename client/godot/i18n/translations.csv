@@ -344,6 +344,7 @@ finance.income.tournaments,Tournois,Tournaments,Torneos,Tornei,Torneios
 selection.avg_perf,Perf moyenne,Average performance,Rendimiento medio,Prestazione media,Performance média
 tournois.info.teams,Équipes,Teams,Equipos,Squadre,Equipes
 tournois.info.entry_fee,Adhésion,Entry fee,Inscripción,Iscrizione,Adesão
+tournois.info.registration,Inscription,Registration,Inscripción,Iscrizione,Inscrição
 tournois.info.runner_up,Finaliste,Runner-up,Finalista,Finalista,Finalista
 tournois.info.champion,Champion,Champion,Campeón,Campione,Campeão
 tournois.info.tokens,tokens,tokens,tokens,tokens,tokens
@@ -625,6 +626,8 @@ club_tokens.stripe.login_required,Connexion requise,Login required,Inicio de ses
 club_tokens.stripe.no_pending_pack,Aucun pack en attente,No pending package,No hay paquete pendiente,Nessun pacchetto in attesa,Nenhum pacote pendente
 club_tokens.stripe.unknown_pack,Pack de Tokens inconnu,Unknown token package,Pack de tokens desconocido,Pacchetto token sconosciuto,Pacote de tokens desconhecido
 club_tokens.stripe.cancelled,Paiement annulé,Payment cancelled,Pago cancelado,Pagamento annullato,Pagamento cancelado
+club_tokens.reward_earned.one,+{amount} Club Token gagné !,+{amount} Club Token earned !,+{amount} Club Token ganado !,+{amount} Club Token guadagnato !,+{amount} Club Token ganho !
+club_tokens.reward_earned.many,+{amount} Club Tokens gagnés !,+{amount} Club Tokens earned !,+{amount} Club Tokens ganados !,+{amount} Club Token guadagnati !,+{amount} Club Tokens ganhos !
 matchsim.game_lineup,Composition du match,Game Lineup,Alineación del partido,Formazione partita,Escalação do jogo
 matchsim.match_in_progress,Match en cours,Match in progress,Partido en curso,Partita in corso,Jogo em andamento
 matchsim.read_only,Lecture seule,Read only,Solo lectura,Sola lettura,Apenas leitura

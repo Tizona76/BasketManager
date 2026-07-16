@@ -1011,6 +1011,7 @@ func _on_ticketing_close_pressed() -> void:
 		# remet l’échelle (tu zoomes le panel actif)
 		PanelTicketing.scale = Vector2(1, 1)
 		PanelTicketing.set_as_top_level(false)
+		call_deferred("_ensure_capacity_label")
 	if BtnRetour != null:
 		var cb_ticketing := Callable(self, "_on_ticketing_close_pressed")
 		if BtnRetour.pressed.is_connected(cb_ticketing):
@@ -1240,7 +1241,7 @@ func _ensure_capacity_label() -> void:
 	LblCapacity.text = _stadium_tr("stadium.capacity") + " : " + _format_capacity(_stadium_current_capacity_value())
 	LblStadiumLevel.text = _stadium_current_level_text()
 
-	var info_color := Color(0, 0, 0, 1)
+	var info_color := Color(1, 1, 1, 1) if PanelTicketing != null and PanelTicketing.visible else Color(0, 0, 0, 1)
 	LblCapacity.modulate = info_color
 	LblCapacity.add_theme_color_override("font_color", info_color)
 	LblCapacity.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.70))

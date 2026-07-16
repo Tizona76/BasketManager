@@ -1958,7 +1958,14 @@ func _update_club_name_label_from_save() -> void:
 		tn = "BM Club"
 	if LblClubName != null:
 		LblClubName.text = tn
-		LblClubName.add_theme_font_size_override("font_size", 42)
+		if LblClubName.label_settings != null:
+			if not LblClubName.has_meta("bm_club_name_label_settings_local"):
+				var club_name_label_settings := LblClubName.label_settings.duplicate() as LabelSettings
+				club_name_label_settings.font_size = 40
+				LblClubName.label_settings = club_name_label_settings
+				LblClubName.set_meta("bm_club_name_label_settings_local", true)
+			else:
+				LblClubName.label_settings.font_size = 40
 		_bm_update_club_crest_header_menu(d)
 
 	# --- wallet

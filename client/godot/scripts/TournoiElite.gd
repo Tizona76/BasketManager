@@ -786,7 +786,7 @@ func _show_victory_popup() -> void:
 	popup.add_child(card)
 
 	var title := Label.new()
-	title.text = "🏆 " + _tr_or("tournois.victory_title", "Victoire !")
+	title.text = _tr_or("tournois.victory_title", "Victoire !")
 	title.position = Vector2(0, 28)
 	title.size = Vector2(560, 40)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -817,13 +817,15 @@ func _show_victory_popup() -> void:
 	subtitle.add_theme_font_size_override("font_size", 24)
 	card.add_child(subtitle)
 
-	var trophy := Label.new()
-	trophy.text = "🏆"
-	trophy.position = Vector2(0, 132)
-	trophy.size = Vector2(560, 70)
-	trophy.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	trophy.add_theme_font_size_override("font_size", 56)
+	var trophy := TextureRect.new()
+	trophy.texture = load("res://assets/images/coupe.png") as Texture2D
+	trophy.position = Vector2(245, 132)
+	trophy.size = Vector2(70, 70)
+	trophy.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	trophy.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	trophy.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(trophy)
+
 
 	var btn := Button.new()
 	btn.text = _tr_or("common.close", "Fermer")
@@ -1604,5 +1606,5 @@ func _bm_render_clean_elite_bracket() -> void:
 	if body_w != null:
 		var w_entries: Array[String] = []
 		if vainqueur != "":
-			w_entries.append("🏆 " + str(vainqueur))
+			w_entries.append(str(vainqueur))
 		body_w.text = _bm_build_centered_slot_text(w_entries, 8)

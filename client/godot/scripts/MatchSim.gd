@@ -283,25 +283,32 @@ func _bm_current_lineup_attr(parent: Control, label_text: String, value: Variant
 
 
 func _bm_current_lineup_player_metrics(pd: Dictionary) -> Dictionary:
+	var tir := float(pd.get("tir", 0.0))
+	var precision := float(pd.get("precision", pd.get("accuracy", 0.0)))
+	if precision <= 1.5:
+		precision *= 100.0
+	var vitesse := float(pd.get("vitesse", pd.get("speed", 0.0)))
+	var defense := float(pd.get("defense", 0.0))
+	var motivation := float(pd.get("motivation", 0.0))
 	return {
-		"attack": int(round((float(pd.get("tir", 0.0)) + float(pd.get("precision", 0.0))) / 2.0)),
-		"defense": int(round(float(pd.get("defense", 0.0)))),
-		"energy": int(round((float(pd.get("vitesse", 0.0)) + float(pd.get("motivation", 0.0)) + maxf(0.0, 100.0 - float(pd.get("fatigue", 0.0)))) / 3.0))
+		"attack": int(round((tir + precision) * 0.5)),
+		"defense": int(round(defense)),
+		"energy": int(round((vitesse + motivation) * 0.5))
 	}
 
 
 func _bm_current_lineup_position_text(poste: String) -> String:
 	match String(poste).strip_edges().to_lower():
 		"meneur", "point guard", "p.g.", "pg":
-			return _bm_matchsim_tr_fallback("player.position.short.point_guard", "P.G.")
+			return _bm_matchsim_tr_fallback("player.position.point_guard", "Point Guard")
 		"arrière", "arriere", "shooting guard", "s.g.", "sg":
-			return _bm_matchsim_tr_fallback("player.position.short.shooting_guard", "S.G.")
+			return _bm_matchsim_tr_fallback("player.position.shooting_guard", "Shooting Guard")
 		"ailier", "small forward", "s.f.", "sf":
-			return _bm_matchsim_tr_fallback("player.position.short.small_forward", "S.F.")
+			return _bm_matchsim_tr_fallback("player.position.small_forward", "Small Forward")
 		"ailier fort", "power forward", "p.f.", "pf":
-			return _bm_matchsim_tr_fallback("player.position.short.point_forward", "P.F.")
+			return _bm_matchsim_tr_fallback("player.position.point_forward", "Power Forward")
 		"pivot", "center", "c.", "c":
-			return _bm_matchsim_tr_fallback("player.position.short.center", "C.")
+			return _bm_matchsim_tr_fallback("player.position.center", "Center")
 		_:
 			return poste
 
@@ -332,7 +339,7 @@ func _bm_current_lineup_player_row(parent: Control, pd: Dictionary, y: float, ro
 	_bm_current_lineup_label(row, _bm_player_display_name(pd), Vector2(54, 7), Vector2(row_w - 602.0, 30), 17, Color(1, 1, 1, 1))
 	var pos_text := _bm_current_lineup_position_text(str(pd.get("poste", pd.get("pos", ""))))
 	var metrics := _bm_current_lineup_player_metrics(pd)
-	_bm_current_lineup_label(row, pos_text, Vector2(row_w - 530.0, 7), Vector2(84, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(row, pos_text, Vector2(row_w - 545.0, 7), Vector2(130, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
 	_bm_current_lineup_label(row, str(int(metrics.get("attack", 0))), Vector2(row_w - 350.0, 7), Vector2(70, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
 	_bm_current_lineup_label(row, str(int(metrics.get("defense", 0))), Vector2(row_w - 235.0, 7), Vector2(76, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
 	_bm_current_lineup_label(row, str(int(metrics.get("energy", 0))), Vector2(row_w - 112.0, 7), Vector2(68, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
@@ -340,7 +347,7 @@ func _bm_current_lineup_player_row(parent: Control, pd: Dictionary, y: float, ro
 
 func _bm_current_lineup_header(parent: Control, y: float, row_w: float) -> void:
 	var header_color := Color(0.76, 0.84, 0.96, 0.82)
-	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("mercato.col.position", "Position"), Vector2(row_w - 530.0, y), Vector2(84, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("mercato.col.position", "Position"), Vector2(row_w - 545.0, y), Vector2(130, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
 	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("player.card.graph.attack", "Attack"), Vector2(row_w - 350.0, y), Vector2(70, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
 	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("player.card.graph.defense", "Defense"), Vector2(row_w - 235.0, y), Vector2(76, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
 	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("matchsim.energy", "Energy"), Vector2(row_w - 112.0, y), Vector2(68, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
@@ -381,9 +388,12 @@ func _bm_current_lineup_summary(players: Array[Dictionary]) -> Dictionary:
 	var total_defense := 0.0
 	var total_energy := 0.0
 	for pd in players:
-		total_attack += (float(pd.get("tir", 0.0)) + float(pd.get("precision", 0.0))) / 2.0
+		var precision := float(pd.get("precision", pd.get("accuracy", 0.0)))
+		if precision <= 1.5:
+			precision *= 100.0
+		total_attack += (float(pd.get("tir", 0.0)) + precision) / 2.0
 		total_defense += float(pd.get("defense", 0.0))
-		total_energy += (float(pd.get("vitesse", 0.0)) + float(pd.get("motivation", 0.0)) + maxf(0.0, 100.0 - float(pd.get("fatigue", 0.0)))) / 3.0
+		total_energy += (float(pd.get("vitesse", pd.get("speed", 0.0))) + float(pd.get("motivation", 0.0))) / 2.0
 	var count := maxf(1.0, float(players.size()))
 	return {
 		"attack": int(round(total_attack / count)),
@@ -2399,7 +2409,9 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"variants": [
 				"Your lineup had value, but its physical balance was stretched by %s." % name,
 				"Your selection worked on paper, though %s made the fatigue risk clear." % name,
-				"%s brought quality to the lineup, with a clear fatigue cost." % name
+				"%s brought quality to the lineup, with a clear fatigue cost." % name,
+				"Your group kept its shape, but %s showed the physical load in this selection." % name,
+				"With %s involved, the lineup had quality and a visible freshness concern." % name
 			]
 		})
 
@@ -2412,11 +2424,13 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"variants": [
 				"Your lineup had a stronger edge with %s involved." % name,
 				"Your selection gained energy from %s." % name,
-				"Your group looked more engaged with %s in the mix." % name
+				"Your group looked more engaged with %s in the mix." % name,
+				"Your selection had more spark with %s part of the group." % name,
+				"%s gave the lineup a clearer mental edge." % name
 			]
 		})
 
-	var offense_player := _bm_get_distinct_coach_insight_player(played_profiles, "offense", 68.0, 3.0, 7.0, true)
+	var offense_player := _bm_get_adaptive_coach_insight_player(played_profiles, "offense", 52.0, 6.0, 2.0, 8.0, 65.0, 2.5)
 	if not offense_player.is_empty():
 		var name := str(offense_player.get("name", ""))
 		candidates.append({
@@ -2425,11 +2439,13 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"variants": [
 				"Your selection leaned toward offense, with %s giving it the clearest attacking profile." % name,
 				"Your lineup gained a sharper attacking identity with %s." % name,
-				"Your group had more offensive shape when %s was part of it." % name
+				"Your group had more offensive shape when %s was part of it." % name,
+				"With %s involved, your lineup had a more defined attacking profile." % name,
+				"Your selection found its strongest offensive identity through %s." % name
 			]
 		})
 
-	var defense_player := _bm_get_distinct_coach_insight_player(played_profiles, "defense", 68.0, 3.0, 7.0, true)
+	var defense_player := _bm_get_adaptive_coach_insight_player(played_profiles, "defense", 76.0, 6.0, 0.75, 7.0, 86.0, 0.75)
 	if not defense_player.is_empty():
 		var name := str(defense_player.get("name", ""))
 		candidates.append({
@@ -2438,11 +2454,13 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"variants": [
 				"Your selection had more defensive structure with %s involved." % name,
 				"Your lineup gained a clearer defensive identity through %s." % name,
-				"Your group looked more stable with %s in the selection." % name
+				"Your group looked more stable with %s in the selection." % name,
+				"With %s in the group, your lineup had a firmer defensive base." % name,
+				"Your selection carried more defensive balance through %s." % name
 			]
 		})
 
-	var level_player := _bm_get_distinct_coach_insight_player(played_profiles, "rating", 68.0, 3.0, 7.0, true)
+	var level_player := _bm_get_adaptive_coach_insight_player(played_profiles, "rating", 54.0, 5.5, 1.5, 8.0, 62.0, 2.0)
 	if not level_player.is_empty():
 		var name := str(level_player.get("name", ""))
 		candidates.append({
@@ -2451,7 +2469,9 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"variants": [
 				"Your selection had its clearest overall base with %s involved." % name,
 				"Your lineup had a stronger current profile with %s in the group." % name,
-				"Your group leaned on %s as its most complete profile." % name
+				"Your group leaned on %s as its most complete profile." % name,
+				"With %s included, the lineup had a more reliable overall shape." % name,
+				"Your selection drew its strongest all-around profile from %s." % name
 			]
 		})
 
@@ -2470,7 +2490,9 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"variants": [
 				"Your lineup looked short on freshness.",
 				"Your selection had quality, but the group lacked freshness.",
-				"The group profile was solid, but fatigue limited its balance."
+				"The group profile was solid, but fatigue limited its balance.",
+				"Your team shape was there, but the group looked physically stretched.",
+				"The selected group had enough structure, with freshness still the main concern."
 			]
 		})
 	elif avg_motivation <= 58.0:
@@ -2479,7 +2501,9 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"variants": [
 				"Your selected group lacked a real motivation edge.",
 				"The lineup did not show a strong mental profile.",
-				"The group had structure, but not enough edge."
+				"The group had structure, but not enough edge.",
+				"Your selection looked organized, but it lacked a sharper mental tone.",
+				"The group had a clear shape without much extra drive."
 			]
 		})
 	elif avg_offense - avg_defense >= 10.0:
@@ -2488,7 +2512,9 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"variants": [
 				"Your lineup clearly leaned toward offense.",
 				"Your selection gave the team a stronger attacking identity.",
-				"The group offered more attacking profile than defensive cover."
+				"The group offered more attacking profile than defensive cover.",
+				"Your chosen group carried a clear attacking tilt.",
+				"The lineup's identity was built more around creation than protection."
 			]
 		})
 	elif avg_defense - avg_offense >= 10.0:
@@ -2497,7 +2523,9 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"variants": [
 				"Your lineup had a clear defensive base.",
 				"Your selection gave the team more structure than creation.",
-				"The group looked built to contain first."
+				"The group looked built to contain first.",
+				"Your chosen group leaned into defensive stability.",
+				"The lineup carried a more protective identity than an attacking one."
 			]
 		})
 	elif gap >= 1.5 or avg_rating >= 72.0:
@@ -2506,7 +2534,9 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"variants": [
 				"Your selection gave the team a strong enough base.",
 				"The result reflected the quality of the group you chose.",
-				"Your lineup had enough overall level to support this outcome."
+				"Your lineup had enough overall level to support this outcome.",
+				"The group you selected had the overall profile to hold up.",
+				"Your lineup showed a solid enough current level."
 			]
 		})
 	elif gap <= -1.5 or avg_rating <= 58.0:
@@ -2515,7 +2545,9 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"variants": [
 				"Your selection exposed the current limits of the group.",
 				"The lineup lacked enough overall level to tilt this kind of matchup.",
-				"The core group lacked enough quality to control the matchup."
+				"The core group lacked enough quality to control the matchup.",
+				"Your chosen group showed where the current level still feels thin.",
+				"The lineup profile left the team short of control."
 			]
 		})
 	elif score_margin <= 5:
@@ -2524,7 +2556,9 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"variants": [
 				"In a close matchup, your lineup balance mattered.",
 				"Small differences in the selected group shaped this result.",
-				"Your selection left very little margin."
+				"Your selection left very little margin.",
+				"The balance of your lineup carried real weight in a tight game.",
+				"With so little between the teams, the selected group mattered."
 			]
 		})
 	else:
@@ -2533,7 +2567,9 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"variants": [
 				"The main takeaway was the balance of the group you selected.",
 				"Your lineup gave a clear picture of the team's current identity.",
-				"This result reflected the profile of the group you chose."
+				"This result reflected the profile of the group you chose.",
+				"Your selection offered a useful read on the team's current shape.",
+				"The group you chose gave a fair view of where the team stands."
 			]
 		})
 
@@ -2675,7 +2711,7 @@ func _bm_select_coach_insight_candidate(candidates: Array[Dictionary], played_pr
 	if not best_player_scored.is_empty():
 		var best_player_candidate: Dictionary = best_player_scored.get("candidate", {})
 		var best_player_score := float(best_player_scored.get("score", -INF))
-		var player_margin := 14.0
+		var player_margin := 8.0
 		if not _bm_is_player_coach_insight_candidate(best_candidate):
 			var player_is_exceptional := _bm_is_exceptional_coach_insight_candidate(best_player_candidate, played_profiles)
 			if player_is_exceptional or best_score - best_player_score <= player_margin:
@@ -2702,7 +2738,34 @@ func _bm_select_coach_insight_candidate(candidates: Array[Dictionary], played_pr
 			best_candidate = candidate
 			if BM_COACH_INSIGHTS_DEBUG:
 				print("[COACH_INSIGHTS_DEBUG][NOVELTY_TIEBREAK] family=", str(candidate.get("family", "")), " player=", str(candidate.get("player_name", "")), " score=", snapped(score, 0.1), " novelty=", snapped(novelty, 0.1))
+	best_candidate = _bm_restore_collective_story_if_close(best_candidate, scored_candidates, played_profiles, avg_fatigue)
 	best_candidate = _bm_reduce_repeated_player_coach_insight(best_candidate, best_score, scored_candidates, played_profiles)
+	return best_candidate
+
+func _bm_restore_collective_story_if_close(best_candidate: Dictionary, scored_candidates: Array[Dictionary], played_profiles: Array[Dictionary], avg_fatigue: float) -> Dictionary:
+	if best_candidate.is_empty() or not _bm_is_player_coach_insight_candidate(best_candidate):
+		return best_candidate
+	if _bm_is_exceptional_coach_insight_candidate(best_candidate, played_profiles):
+		return best_candidate
+	if avg_fatigue < 70.0:
+		return best_candidate
+	var best_score := -INF
+	var fatigue_group_score := -INF
+	var fatigue_group_candidate: Dictionary = {}
+	for scored in scored_candidates:
+		var candidate: Dictionary = scored.get("candidate", {})
+		var score := float(scored.get("score", -INF))
+		if candidate == best_candidate:
+			best_score = score
+		if str(candidate.get("family", "")) == "fatigue_group":
+			fatigue_group_score = score
+			fatigue_group_candidate = candidate
+	if fatigue_group_candidate.is_empty():
+		return best_candidate
+	if best_score - fatigue_group_score <= 4.0:
+		if BM_COACH_INSIGHTS_DEBUG:
+			print("[COACH_INSIGHTS_DEBUG][COLLECTIVE_STORY_TIEBREAK] family=fatigue_group score=", snapped(fatigue_group_score, 0.1), " player_family=", str(best_candidate.get("family", "")), " player=", str(best_candidate.get("player_name", "")), " player_score=", snapped(best_score, 0.1))
+		return fatigue_group_candidate
 	return best_candidate
 
 func _bm_best_scored_coach_insight_candidate(scored_candidates: Array[Dictionary], player_only: bool) -> Dictionary:
@@ -2779,15 +2842,15 @@ func _bm_score_coach_insight_candidate(candidate: Dictionary, played_profiles: A
 		"motivation_player":
 			score = 58.0 + _bm_coach_insight_metric_score(played_profiles, "motivation", 78.0, true, avg_motivation)
 		"offense_player":
-			score = 56.0 + _bm_coach_insight_metric_score(played_profiles, "offense", 68.0, true, avg_offense)
+			score = 56.0 + _bm_coach_insight_metric_score(played_profiles, "offense", 52.0, true, avg_offense)
 		"defense_player":
-			score = 56.0 + _bm_coach_insight_metric_score(played_profiles, "defense", 68.0, true, avg_defense)
+			score = 56.0 + _bm_coach_insight_metric_score(played_profiles, "defense", 76.0, true, avg_defense)
 		"level_player":
-			score = 54.0 + _bm_coach_insight_metric_score(played_profiles, "rating", 68.0, true, avg_rating)
+			score = 26.0 + _bm_coach_insight_metric_score(played_profiles, "rating", 54.0, true, avg_rating)
 		"context_young_anchor", "context_veteran_anchor", "context_responsibility_player", "context_young_group", "context_experienced_group", "context_generation_mix":
 			score = float(candidate.get("context_score", 36.0))
 		"fatigue_group":
-			score = 42.0 + maxf(0.0, avg_fatigue - 22.0) * 1.4
+			score = 42.0 + minf(35.0, maxf(0.0, avg_fatigue - 22.0)) * 0.70
 		"motivation_group_low":
 			score = 42.0 + maxf(0.0, 58.0 - avg_motivation) * 1.4
 		"offense_balance":
@@ -2838,7 +2901,7 @@ func _bm_is_exceptional_coach_insight_candidate(candidate: Dictionary, played_pr
 			min_value = 68.0
 		"defense_player":
 			metric = "defense"
-			min_value = 68.0
+			min_value = 76.0
 		"level_player":
 			metric = "rating"
 			min_value = 68.0
@@ -2879,6 +2942,51 @@ func _bm_get_coach_insight_metric_signal(played_profiles: Array[Dictionary], met
 		"gap": signal_gap
 	}
 
+
+func _bm_get_coach_insight_metric_average(played_profiles: Array[Dictionary], metric: String) -> float:
+	if played_profiles.is_empty():
+		return 0.0
+	var total := 0.0
+	for profile in played_profiles:
+		total += float(profile.get(metric, 0.0))
+	return total / float(played_profiles.size())
+
+func _bm_get_coach_insight_metric_median(played_profiles: Array[Dictionary], metric: String) -> float:
+	var values: Array[float] = []
+	for profile in played_profiles:
+		values.append(float(profile.get(metric, 0.0)))
+	if values.is_empty():
+		return 0.0
+	values.sort()
+	var middle := int(values.size() / 2)
+	if values.size() % 2 == 0:
+		return (values[middle - 1] + values[middle]) * 0.5
+	return values[middle]
+
+func _bm_get_adaptive_coach_insight_player(played_profiles: Array[Dictionary], metric: String, absolute_floor: float, avg_gap: float, min_second_gap: float, strong_second_gap: float, high_value_floor: float, high_value_second_gap: float) -> Dictionary:
+	var metric_signal := _bm_get_coach_insight_metric_signal(played_profiles, metric, true)
+	if metric_signal.is_empty():
+		if BM_COACH_INSIGHTS_DEBUG:
+			print("[COACH_INSIGHTS_DEBUG][REJECT] metric=", metric, " reason=candidate_not_generated no_profiles")
+		return {}
+	var best: Dictionary = metric_signal.get("best", {})
+	var best_value := float(metric_signal.get("best_value", 0.0))
+	var second_value := float(metric_signal.get("second_value", 0.0))
+	var signal_gap := float(metric_signal.get("gap", 0.0))
+	var avg_value := _bm_get_coach_insight_metric_average(played_profiles, metric)
+	var median_value := _bm_get_coach_insight_metric_median(played_profiles, metric)
+	var floor_ok := best_value >= absolute_floor
+	var avg_signal := best_value >= avg_value + avg_gap and signal_gap >= min_second_gap
+	var median_signal := best_value >= median_value + avg_gap and signal_gap >= min_second_gap
+	var clear_second_signal := signal_gap >= strong_second_gap
+	var high_value_signal := best_value >= high_value_floor and best_value >= avg_value + avg_gap * 0.5 and signal_gap >= high_value_second_gap
+	var accepted := floor_ok and (avg_signal or median_signal or clear_second_signal or high_value_signal)
+	if BM_COACH_INSIGHTS_DEBUG:
+		var reason := "adaptive_signal" if accepted else ("value_too_low" if not floor_ok else ("gap_insufficient" if signal_gap < min_second_gap else "group_gap_insufficient"))
+		print("[COACH_INSIGHTS_DEBUG][ADAPTIVE_CHECK] metric=", metric, " best=", str(best.get("name", "")), " best_value=", snapped(best_value, 0.1), " second=", snapped(second_value, 0.1), " gap=", snapped(signal_gap, 0.1), " avg=", snapped(avg_value, 0.1), " median=", snapped(median_value, 0.1), " floor=", absolute_floor, " result=", "accepted" if accepted else "rejected", " reason=", reason)
+	if not accepted:
+		return {}
+	return best
 
 func _bm_get_distinct_coach_insight_player(played_profiles: Array[Dictionary], metric: String, min_value: float, min_gap: float, strong_gap: float, higher_is_better: bool) -> Dictionary:
 	var best: Dictionary = {}

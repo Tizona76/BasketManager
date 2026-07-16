@@ -214,7 +214,7 @@ func _ready() -> void:
 			info_vbox.move_child(btn_tournoi_info_confirm, info_vbox.get_child_count() - 1)
 			btn_tournoi_info_confirm.custom_minimum_size = Vector2(260, 46)
 			btn_tournoi_info_confirm.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-			btn_tournoi_info_confirm.text = tr("btn.confirm") if tr("btn.confirm") != "btn.confirm" else "Confirm"
+			btn_tournoi_info_confirm.text = tr("tournois.info.registration") if tr("tournois.info.registration") != "tournois.info.registration" else "Registration"
 			btn_tournoi_info_confirm.add_theme_font_size_override("font_size", 24)
 			_bm_apply_pale_orange_tournament_button_style(btn_tournoi_info_confirm)
 			if not btn_tournoi_info_confirm.pressed.is_connected(_on_tournoi_info_confirm_pressed):
@@ -433,7 +433,7 @@ func _bm_refresh_tournoi_info_panel() -> void:
 		lbl_tournoi_info_nb_equipes.text = "# " + tr("tournois.info.teams") + " : " + str(data.get("nb_equipes", 0))
 
 	if lbl_tournoi_info_prix != null:
-		lbl_tournoi_info_prix.text = tr("tournois.info.entry_fee") + " : " + _bm_format_int_spaces(_bm_get_entry_fee_from_tuning(tournoi_survole_id)) + " $"
+		lbl_tournoi_info_prix.text = tr("tournois.info.entry_fee") + " : -" + _bm_format_int_spaces(_bm_get_entry_fee_from_tuning(tournoi_survole_id)) + " $"
 
 	if lbl_tournoi_info_finaliste != null:
 		var reward_f: Dictionary = _bm_get_reward_from_source(tournoi_survole_id, "finalist")
@@ -455,7 +455,7 @@ func _bm_refresh_tournoi_info_panel() -> void:
 
 	if btn_tournoi_info_confirm != null:
 		var played := (_bm_get_tournament_result_for_current_season(tournoi_survole_id) != "")
-		btn_tournoi_info_confirm.text = tr("btn.confirm") if tr("btn.confirm") != "btn.confirm" else "Confirm"
+		btn_tournoi_info_confirm.text = tr("tournois.info.registration") if tr("tournois.info.registration") != "tournois.info.registration" else "Registration"
 		btn_tournoi_info_confirm.visible = not played
 		btn_tournoi_info_confirm.disabled = played
 
@@ -513,7 +513,7 @@ func _bm_open_popup(tournoi_id: String) -> void:
 
 	var prix := _bm_get_entry_fee_from_tuning(tournoi_id)
 	if lbl_popup_text != null:
-		lbl_popup_text.text = "Pay " + tr("tournois.info.entry_fee") + " : " + _bm_format_int_spaces(prix) + " ?"
+		lbl_popup_text.text = "Pay " + tr("tournois.info.entry_fee") + " : -" + _bm_format_int_spaces(prix) + " ?"
 
 	popup_confirm.visible = false
 	popup_confirm.mouse_filter = Control.MOUSE_FILTER_IGNORE

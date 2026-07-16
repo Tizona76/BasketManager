@@ -842,13 +842,6 @@ func _bm_show_auto_info_popup(title_key: String, body_key: String, overlay_name:
 		add_child(overlay)
 		overlay.move_to_front()
 
-	var dark := ColorRect.new()
-	dark.name = overlay_name + "Backdrop"
-	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dark.color = Color(0, 0, 0, 1.0)
-	dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay.add_child(dark)
-
 	var card := Panel.new()
 	card.name = overlay_name + "Card"
 	var card_size := Vector2(780, 220)
@@ -1157,12 +1150,7 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 		return
 	if get_node_or_null("MissionTokensRewardPopup") != null:
 		return
-	# BM_TOKENS_POPUP_DISPLAY_HUD_TOTAL_V1
-	# Affichage UX : montrer le total réel de tokens, cohérent avec le HUD.
-	var save_tokens_popup: Dictionary = PL.load_savegame()
 	var tokens_display: int = tokens_gain
-	if typeof(save_tokens_popup) == TYPE_DICTIONARY:
-		tokens_display = PL.get_tokens(save_tokens_popup)
 
 	var popup := Control.new()
 	popup.name = "MissionTokensRewardPopup"
@@ -1182,6 +1170,19 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 	card.size = Vector2(430, 320)
 	card.position = (get_viewport_rect().size - card.size) * 0.5
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	var card_sb := StyleBoxFlat.new()
+	card_sb.bg_color = Color(0, 0, 0, 1)
+	card_sb.corner_radius_top_left = 18
+	card_sb.corner_radius_top_right = 18
+	card_sb.corner_radius_bottom_left = 18
+	card_sb.corner_radius_bottom_right = 18
+	card_sb.border_width_left = 1
+	card_sb.border_width_top = 1
+	card_sb.border_width_right = 1
+	card_sb.border_width_bottom = 1
+	card_sb.border_color = Color(0.20, 0.55, 0.95, 0.25)
+	card.add_theme_stylebox_override("panel", card_sb)
 	popup.add_child(card)
 
 	var mission_txt := _bm_tr_or_fallback("popup.tokens.first_reward.fallback_mission", "Mission completed.")
@@ -1204,7 +1205,9 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 	card.add_child(lbl_mission)
 
 	var lbl_line2 := Label.new()
-	lbl_line2.text = _bm_tr_or_fallback("popup.tokens.first_reward.line2", "You just earned {amount} tokens.").replace("{amount}", str(tokens_display))
+	var reward_key := "club_tokens.reward_earned.one" if tokens_display == 1 else "club_tokens.reward_earned.many"
+	var reward_fallback := "+{amount} Club Token earned!" if tokens_display == 1 else "+{amount} Club Tokens earned!"
+	lbl_line2.text = _bm_tr_or_fallback(reward_key, reward_fallback).replace("{amount}", str(tokens_display))
 	lbl_line2.position = Vector2(20, 155)
 	lbl_line2.size = Vector2(390, 30)
 	lbl_line2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
