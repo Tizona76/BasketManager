@@ -499,7 +499,7 @@ func _show_tournament_reward_popup(tournament_key: String, outcome: String) -> v
 
 	var dark := ColorRect.new()
 	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dark.color = Color(0, 0, 0, 0.55)
+	dark.color = Color(0, 0, 0, 0.0)
 	dark.mouse_filter = Control.MOUSE_FILTER_STOP
 	popup.add_child(dark)
 
@@ -511,6 +511,19 @@ func _show_tournament_reward_popup(tournament_key: String, outcome: String) -> v
 		(get_viewport_rect().size.y - 320.0) * 0.5
 	)
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.clip_contents = true
+	var card_style := StyleBoxFlat.new()
+	card_style.bg_color = Color(0.015, 0.018, 0.030, 1.0)
+	card_style.border_width_left = 2
+	card_style.border_width_top = 2
+	card_style.border_width_right = 2
+	card_style.border_width_bottom = 2
+	card_style.border_color = Color(0.95, 0.58, 0.14, 0.72)
+	card_style.corner_radius_top_left = 12
+	card_style.corner_radius_top_right = 12
+	card_style.corner_radius_bottom_left = 12
+	card_style.corner_radius_bottom_right = 12
+	card.add_theme_stylebox_override("panel", card_style)
 	popup.add_child(card)
 
 	var title := Label.new()
@@ -692,7 +705,7 @@ func _bm_show_tournament_final_cinematic(team_a: String, team_b: String, score_a
 	layer.add_child(score)
 
 	var champion := Label.new()
-	champion.text = "CHAMPIONS: " + winner_name
+	champion.text = tr("tournois.info.champion").to_upper() + ": " + winner_name
 	champion.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	champion.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	champion.add_theme_font_size_override("font_size", 38)
@@ -920,7 +933,7 @@ func _maybe_show_tournament_finalist_popup() -> void:
 
 	var dark := ColorRect.new()
 	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dark.color = Color(0, 0, 0, 0.55)
+	dark.color = Color(0, 0, 0, 0.0)
 	dark.mouse_filter = Control.MOUSE_FILTER_STOP
 	popup.add_child(dark)
 
@@ -932,10 +945,33 @@ func _maybe_show_tournament_finalist_popup() -> void:
 		(get_viewport_rect().size.y - 320.0) * 0.5
 	)
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.clip_contents = true
+	var card_style := StyleBoxFlat.new()
+	card_style.bg_color = Color(0.015, 0.018, 0.030, 1.0)
+	card_style.border_width_left = 2
+	card_style.border_width_top = 2
+	card_style.border_width_right = 2
+	card_style.border_width_bottom = 2
+	card_style.border_color = Color(0.95, 0.58, 0.14, 0.72)
+	card_style.corner_radius_top_left = 12
+	card_style.corner_radius_top_right = 12
+	card_style.corner_radius_bottom_left = 12
+	card_style.corner_radius_bottom_right = 12
+	card.add_theme_stylebox_override("panel", card_style)
 	popup.add_child(card)
 
+	var title_icon := TextureRect.new()
+	title_icon.texture = load("res://assets/images/medaille_argent.png") as Texture2D
+	title_icon.position = Vector2(166, 28)
+	title_icon.size = Vector2(40, 40)
+	title_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	title_icon.custom_minimum_size = Vector2(40, 40)
+	title_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	title_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(title_icon)
+
 	var title := Label.new()
-	title.text = "🥈 " + _tr_or("tournois.finalist_title", "2e place !")
+	title.text = _tr_or("tournois.finalist_title", "2e place !")
 	title.position = Vector2(0, 28)
 	title.size = Vector2(560, 40)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -950,12 +986,14 @@ func _maybe_show_tournament_finalist_popup() -> void:
 	subtitle.add_theme_font_size_override("font_size", 24)
 	card.add_child(subtitle)
 
-	var medal := Label.new()
-	medal.text = "🥈"
-	medal.position = Vector2(0, 132)
-	medal.size = Vector2(560, 70)
-	medal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	medal.add_theme_font_size_override("font_size", 56)
+	var medal := TextureRect.new()
+	medal.texture = load("res://assets/images/medaille_argent.png") as Texture2D
+	medal.position = Vector2(245, 132)
+	medal.size = Vector2(70, 70)
+	medal.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	medal.custom_minimum_size = Vector2(70, 70)
+	medal.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	medal.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(medal)
 
 	var btn := Button.new()
@@ -994,7 +1032,7 @@ func _maybe_show_tournament_victory_popup() -> void:
 
 	var dark := ColorRect.new()
 	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dark.color = Color(0, 0, 0, 0.55)
+	dark.color = Color(0, 0, 0, 0.0)
 	dark.mouse_filter = Control.MOUSE_FILTER_STOP
 	popup.add_child(dark)
 
@@ -1006,6 +1044,19 @@ func _maybe_show_tournament_victory_popup() -> void:
 		(get_viewport_rect().size.y - 320.0) * 0.5
 	)
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.clip_contents = true
+	var card_style := StyleBoxFlat.new()
+	card_style.bg_color = Color(0.015, 0.018, 0.030, 1.0)
+	card_style.border_width_left = 2
+	card_style.border_width_top = 2
+	card_style.border_width_right = 2
+	card_style.border_width_bottom = 2
+	card_style.border_color = Color(0.95, 0.58, 0.14, 0.72)
+	card_style.corner_radius_top_left = 12
+	card_style.corner_radius_top_right = 12
+	card_style.corner_radius_bottom_left = 12
+	card_style.corner_radius_bottom_right = 12
+	card.add_theme_stylebox_override("panel", card_style)
 	popup.add_child(card)
 
 	var title := Label.new()
@@ -1029,6 +1080,7 @@ func _maybe_show_tournament_victory_popup() -> void:
 	trophy.position = Vector2(245, 132)
 	trophy.size = Vector2(70, 70)
 	trophy.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	trophy.custom_minimum_size = Vector2(70, 70)
 	trophy.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	trophy.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(trophy)

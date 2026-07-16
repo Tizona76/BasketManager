@@ -792,7 +792,7 @@ func _bm_add_lineup_preview_player_row(parent: Control, player_data: Dictionary,
 	var player_name := str(player_data.get("name", player_data.get("nom", "Player"))).strip_edges()
 	var metrics := _bm_lineup_preview_player_metrics(player_data)
 	_bm_add_lineup_summary_label(row, player_name, Vector2(50, 4), Vector2(row_w - 370.0, 32), 18, Color(0.94, 0.96, 1.0, 1.0), false)
-	_bm_add_lineup_summary_label(row, _tr_poste(str(player_data.get("poste", player_data.get("pos", "")))), Vector2(row_w - 320.0, 4), Vector2(70, 32), 17, Color(1, 1, 1, 0.94), true)
+	_bm_add_lineup_summary_label(row, _bm_player_card_position_text(str(player_data.get("poste", player_data.get("pos", "")))), Vector2(row_w - 320.0, 4), Vector2(70, 32), 17, Color(1, 1, 1, 0.94), true)
 	_bm_add_lineup_summary_label(row, str(int(metrics.get("attack", 0))), Vector2(row_w - 242.0, 4), Vector2(64, 32), 16, Color(1, 1, 1, 0.94), true)
 	_bm_add_lineup_summary_label(row, str(int(metrics.get("defense", 0))), Vector2(row_w - 170.0, 4), Vector2(70, 32), 16, Color(1, 1, 1, 0.94), true)
 	_bm_add_lineup_summary_label(row, str(int(metrics.get("energy", 0))), Vector2(row_w - 92.0, 4), Vector2(64, 32), 16, Color(1, 1, 1, 0.94), true)
@@ -2554,36 +2554,74 @@ func _bm_myteam_apply_mobile_row_texts_plus2() -> void:
 			lbl_total_salary.add_theme_color_override("font_outline_color", Color(1, 1, 1, 1))
 
 
+func _bm_myteam_pointer_inside_scroll(pos: Vector2) -> bool:
+	if scroll == null:
+		return false
+	return scroll.get_global_rect().has_point(pos)
+
+
+func _bm_myteam_apply_scroll_delta(delta: Vector2) -> void:
+	if scroll == null:
+		return
+	var vbar := scroll.get_v_scroll_bar()
+	var hbar := scroll.get_h_scroll_bar()
+	scroll.scroll_vertical = clampi(
+		scroll.scroll_vertical + int(delta.y),
+		0,
+		int(vbar.max_value) if vbar != null else 999999
+	)
+	scroll.scroll_horizontal = clampi(
+		scroll.scroll_horizontal + int(delta.x),
+		0,
+		int(hbar.max_value) if hbar != null else 999999
+	)
+
+
 func _input(event: InputEvent) -> void:
+	if scroll == null:
+		return
+
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if not _bm_myteam_pointer_inside_scroll(mb.position):
+			return
+		if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
+			_bm_myteam_apply_scroll_delta(Vector2(0, 64))
+			get_viewport().set_input_as_handled()
+			return
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
+			_bm_myteam_apply_scroll_delta(Vector2(0, -64))
+			get_viewport().set_input_as_handled()
+			return
+		if _bm_myteam_is_mobile_layout() and mb.button_index == MOUSE_BUTTON_LEFT:
+			_bm_myteam_touch_scroll_active = mb.pressed
+			_bm_myteam_touch_last_y = mb.position.y
+			return
+
 	if not _bm_myteam_is_mobile_layout():
 		return
-	if scroll == null:
+
+	if event is InputEventMouseMotion and _bm_myteam_touch_scroll_active:
+		var mm := event as InputEventMouseMotion
+		if not _bm_myteam_pointer_inside_scroll(mm.position):
+			return
+		_bm_myteam_apply_scroll_delta(Vector2(-mm.relative.x, -mm.relative.y))
+		get_viewport().set_input_as_handled()
 		return
 
 	if event is InputEventScreenTouch:
 		var touch := event as InputEventScreenTouch
+		if not _bm_myteam_pointer_inside_scroll(touch.position):
+			return
 		_bm_myteam_touch_scroll_active = touch.pressed
 		_bm_myteam_touch_last_y = touch.position.y
 		return
 
 	if event is InputEventScreenDrag and _bm_myteam_touch_scroll_active:
 		var drag := event as InputEventScreenDrag
-
-		var vbar := scroll.get_v_scroll_bar()
-		var hbar := scroll.get_h_scroll_bar()
-
-		scroll.scroll_vertical = clampi(
-			scroll.scroll_vertical - int(drag.relative.y),
-			0,
-			int(vbar.max_value) if vbar != null else 999999
-		)
-
-		scroll.scroll_horizontal = clampi(
-			scroll.scroll_horizontal - int(drag.relative.x),
-			0,
-			int(hbar.max_value) if hbar != null else 999999
-		)
-
+		if not _bm_myteam_pointer_inside_scroll(drag.position):
+			return
+		_bm_myteam_apply_scroll_delta(Vector2(-drag.relative.x, -drag.relative.y))
 		get_viewport().set_input_as_handled()
 
 

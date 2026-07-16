@@ -2248,10 +2248,10 @@ func _on_scroll_gui_input(event: InputEvent) -> void:
 		if not mb.pressed:
 			return
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
-			sc.scroll_vertical = max(0, sc.scroll_vertical - 180)
+			sc.scroll_vertical = max(0, sc.scroll_vertical - 150)
 			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			sc.scroll_vertical = min(sc.get_v_scroll_bar().max_value, sc.scroll_vertical + 180)
+			sc.scroll_vertical = min(sc.get_v_scroll_bar().max_value, sc.scroll_vertical + 150)
 			accept_event()
 
 func _notification(what: int) -> void:

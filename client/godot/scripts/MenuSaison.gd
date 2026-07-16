@@ -640,7 +640,7 @@ func _bm_maybe_show_shop_restock_notice_match14() -> void:
 	overlay.name = "ShopRestockNoticeOverlay"
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	overlay.z_index = 30000
+	overlay.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
 	overlay.set_as_top_level(true)
 	overlay.z_as_relative = false
 	overlay.global_position = Vector2.ZERO
@@ -657,12 +657,12 @@ func _bm_maybe_show_shop_restock_notice_match14() -> void:
 	var dark := ColorRect.new()
 	dark.name = "ShopRestockNoticeBackdrop"
 	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dark.color = Color(0, 0, 0, 1.0)
+	dark.color = Color(0, 0, 0, 0.0)
 	dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay.add_child(dark)
 
 	var notice_text: String = "Demand is growing.\nBefore the next game, check your Shop stocks and prices."
-	var notice_font_size: int = 44 if not mobile else 36
+	var notice_font_size: int = 43 if not mobile else 35
 	var notice_lines: int = maxi(1, notice_text.split("\n").size())
 	var notice_max_line_chars: int = 0
 	for notice_line in notice_text.split("\n"):
@@ -701,6 +701,7 @@ func _bm_maybe_show_shop_restock_notice_match14() -> void:
 	card.move_to_front()
 	overlay.move_to_front()
 	overlay.call_deferred("move_to_front")
+	card.call_deferred("move_to_front")
 
 	var lbl := Label.new()
 	lbl.text = notice_text
@@ -749,7 +750,7 @@ func _bm_maybe_show_climb_standings_goal_match17() -> void:
 	overlay.name = "GoalClimbStandingsOverlay"
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	overlay.z_index = 30000
+	overlay.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
 	overlay.set_as_top_level(true)
 	overlay.z_as_relative = false
 	overlay.global_position = Vector2.ZERO
@@ -765,7 +766,7 @@ func _bm_maybe_show_climb_standings_goal_match17() -> void:
 	var dark := ColorRect.new()
 	dark.name = "GoalClimbStandingsBackdrop"
 	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dark.color = Color(0, 0, 0, 1.0)
+	dark.color = Color(0, 0, 0, 0.0)
 	dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay.add_child(dark)
 
@@ -779,7 +780,7 @@ func _bm_maybe_show_climb_standings_goal_match17() -> void:
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.025, 0.03, 0.055, 0.94)
+	sb.bg_color = Color(0.025, 0.03, 0.055, 1.0)
 	sb.border_width_left = 3
 	sb.border_width_top = 3
 	sb.border_width_right = 3
@@ -797,6 +798,9 @@ func _bm_maybe_show_climb_standings_goal_match17() -> void:
 	card.position = (vp - card.size) * 0.5
 	card.z_index = 1
 	overlay.add_child(card)
+	card.move_to_front()
+	overlay.call_deferred("move_to_front")
+	card.call_deferred("move_to_front")
 
 	var lbl := Label.new()
 	lbl.text = tr("goal.climb_standings_match17").replace("{rank}", _bm_goal_ordinal_rank(_bm_goal_current_rank(save))).replace("<br>", "\n")
@@ -829,7 +833,7 @@ func _bm_show_auto_info_popup(title_key: String, body_key: String, overlay_name:
 	overlay.name = overlay_name
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	overlay.z_index = 30000
+	overlay.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
 	overlay.set_as_top_level(true)
 	overlay.z_as_relative = false
 	overlay.global_position = Vector2.ZERO
@@ -842,6 +846,13 @@ func _bm_show_auto_info_popup(title_key: String, body_key: String, overlay_name:
 		add_child(overlay)
 		overlay.move_to_front()
 
+	var dark := ColorRect.new()
+	dark.name = overlay_name + "Backdrop"
+	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dark.color = Color(0, 0, 0, 0.0)
+	dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(dark)
+
 	var card := Panel.new()
 	card.name = overlay_name + "Card"
 	var card_size := Vector2(780, 220)
@@ -852,7 +863,7 @@ func _bm_show_auto_info_popup(title_key: String, body_key: String, overlay_name:
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.025, 0.03, 0.055, 0.94)
+	sb.bg_color = Color(0.025, 0.03, 0.055, 1.0)
 	sb.border_width_left = 3
 	sb.border_width_top = 3
 	sb.border_width_right = 3
@@ -868,6 +879,9 @@ func _bm_show_auto_info_popup(title_key: String, body_key: String, overlay_name:
 	card.add_theme_stylebox_override("panel", sb)
 	card.z_index = 1
 	overlay.add_child(card)
+	card.move_to_front()
+	overlay.call_deferred("move_to_front")
+	card.call_deferred("move_to_front")
 
 	var lbl := Label.new()
 	lbl.text = tr(title_key).replace("\\n", "\n") + "\n" + tr(body_key).replace("\\n", "\n")
@@ -1166,8 +1180,8 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 	popup.add_child(dark)
 
 	var card := Panel.new()
-	card.custom_minimum_size = Vector2(360, 210)
-	card.size = Vector2(430, 320)
+	card.custom_minimum_size = Vector2(760, 320)
+	card.size = Vector2(760, 320)
 	card.position = (get_viewport_rect().size - card.size) * 0.5
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 
@@ -1199,7 +1213,7 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 	var lbl_mission := Label.new()
 	lbl_mission.text = mission_txt.strip_edges() + ". Congrats !"
 	lbl_mission.position = Vector2(20, 18)
-	lbl_mission.size = Vector2(320, 34)
+	lbl_mission.size = Vector2(720, 34)
 	lbl_mission.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl_mission.add_theme_font_size_override("font_size", 24)
 	card.add_child(lbl_mission)
@@ -1209,7 +1223,7 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 	var reward_fallback := "+{amount} Club Token earned!" if tokens_display == 1 else "+{amount} Club Tokens earned!"
 	lbl_line2.text = _bm_tr_or_fallback(reward_key, reward_fallback).replace("{amount}", str(tokens_display))
 	lbl_line2.position = Vector2(20, 155)
-	lbl_line2.size = Vector2(390, 30)
+	lbl_line2.size = Vector2(720, 30)
 	lbl_line2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl_line2.add_theme_font_size_override("font_size", 22)
 	card.add_child(lbl_line2)
@@ -1217,14 +1231,14 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 	var lbl_line3 := Label.new()
 	lbl_line3.text = _bm_tr_or_fallback("popup.tokens.first_reward.line3", "Tokens unlock premium upgrades and special content.")
 	lbl_line3.position = Vector2(20, 188)
-	lbl_line3.size = Vector2(390, 30)
+	lbl_line3.size = Vector2(720, 30)
 	lbl_line3.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl_line3.autowrap_mode = TextServer.AUTOWRAP_OFF
 	lbl_line3.add_theme_font_size_override("font_size", 22)
 	card.add_child(lbl_line3)
 
 	var tokens_row := HBoxContainer.new()
-	tokens_row.position = Vector2(15, 74)
+	tokens_row.position = Vector2(180, 74)
 	tokens_row.size = Vector2(400, 62)
 	tokens_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	tokens_row.add_theme_constant_override("separation", 8)
@@ -1251,7 +1265,7 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 	btn.text = "Close"
 	btn.custom_minimum_size = Vector2(160, 46)
 	btn.size = Vector2(160, 46)
-	btn.position = Vector2(120, 235)
+	btn.position = Vector2(300, 235)
 	btn.pressed.connect(func():
 		popup.queue_free()
 		call_deferred("_bm_show_pending_intro_after_token_reward_popup_close")
@@ -2500,7 +2514,7 @@ func _open_end_season_popup() -> void:
 
 	popup_fin_saison = Panel.new()
 	var popup_sb := StyleBoxFlat.new()
-	popup_sb.bg_color = Color(0.03, 0.03, 0.05, 0.96)
+	popup_sb.bg_color = Color(0.03, 0.03, 0.05, 1.0)
 	popup_sb.corner_radius_top_left = 18
 	popup_sb.corner_radius_top_right = 18
 	popup_sb.corner_radius_bottom_left = 18
@@ -2644,13 +2658,14 @@ func _open_end_season_popup() -> void:
 	end_overlay.name = "EndSeasonOverlay"
 	end_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	end_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	end_overlay.z_index = 30000
+	end_overlay.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
 	end_overlay.set_as_top_level(true)
 	end_overlay.z_as_relative = false
 	end_overlay.global_position = Vector2.ZERO
 	end_overlay.size = get_viewport_rect().size
 	get_node("Overlays").add_child(end_overlay)
 	end_overlay.move_to_front()
+	end_overlay.call_deferred("move_to_front")
 
 	var end_dark := ColorRect.new()
 	end_dark.name = "EndSeasonBackdrop"

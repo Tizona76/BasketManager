@@ -430,7 +430,7 @@ func _bm_refresh_preparing_club_initial_text() -> void:
 	_bm_set_preparing_club_text(tr("startup.preparing_club"), true)
 
 
-func _bm_set_preparing_club_text(text_value: String, show_ball: bool = false, align_left: bool = false) -> void:
+func _bm_set_preparing_club_text(text_value: String, show_ball: bool = false, align_left: bool = false, font_delta: int = 0) -> void:
 	var preparing_layer := get_node_or_null("PreparingClubLayer")
 	if preparing_layer == null:
 		return
@@ -458,15 +458,16 @@ func _bm_set_preparing_club_text(text_value: String, show_ball: bool = false, al
 		font_size = 20.0
 	elif char_count > 70:
 		font_size = 24.0
+	var display_font_size := font_size + float(font_delta)
 	preparing_label.scale = Vector2.ONE
-	preparing_label.add_theme_font_size_override("font_size", int(font_size))
+	preparing_label.add_theme_font_size_override("font_size", int(display_font_size))
 	var max_w := minf(1320.0, vp.x * 0.86)
 	var min_w := 520.0 if char_count > 70 else 430.0
-	var estimated_w := float(char_count) * font_size * 0.42 + 120.0
+	var estimated_w := float(char_count) * display_font_size * 0.42 + 120.0
 	var label_w := clampf(estimated_w, min_w, max_w)
-	var usable_chars_per_line := maxf(20.0, (label_w - 80.0) / (font_size * 0.44))
+	var usable_chars_per_line := maxf(20.0, (label_w - 80.0) / (display_font_size * 0.44))
 	var visual_lines := maxi(1, int(ceil(float(char_count) / usable_chars_per_line)))
-	var label_h := float(visual_lines) * font_size * 1.62 + 48.0
+	var label_h := float(visual_lines) * display_font_size * 1.62 + 48.0
 	label_h = clampf(label_h, 96.0, minf(vp.y * 0.72, 620.0))
 	var label_size := Vector2(label_w, label_h)
 	var label_pos := (vp - label_size) * 0.5
@@ -503,7 +504,7 @@ func _bm_update_preparing_club_label_after_delay() -> void:
 	preparing_layer = get_node_or_null("PreparingClubLayer")
 	if preparing_layer == null:
 		return
-	_bm_set_preparing_club_text(tr("startup.ready_to_manage_full_team"), false, true)
+	_bm_set_preparing_club_text(tr("startup.ready_to_manage_full_team"), false, true, 2)
 
 
 func _hide_preparing_club_label() -> void:

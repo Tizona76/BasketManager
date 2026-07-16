@@ -933,15 +933,15 @@ func _bm_update_finance_trend_text(income: int, expenses: int, tickets: int = -1
 	var income_base := maxi(income, 1)
 	var value := ""
 	if stadium_works > int(round(float(expense_base) * 0.25)):
-		value = _bm_pick_finance_comment(["finance.comment.stadium_cost.1", "finance.comment.stadium_cost.2", "finance.comment.stadium_cost.3"], seed + 1)
+		value = _bm_pick_finance_comment(["finance.comment.stadium_cost.1", "finance.comment.stadium_cost.2", "finance.comment.stadium_cost.3", "finance.comment.stadium_cost.4", "finance.comment.stadium_cost.5"], seed + 1)
 	elif salaries > int(round(float(expense_base) * 0.50)):
-		value = _bm_pick_finance_comment(["finance.comment.salaries_pressure.1", "finance.comment.salaries_pressure.2", "finance.comment.salaries_pressure.3"], seed + 2)
+		value = _bm_pick_finance_comment(["finance.comment.salaries_pressure.1", "finance.comment.salaries_pressure.2", "finance.comment.salaries_pressure.3", "finance.comment.salaries_pressure.4", "finance.comment.salaries_pressure.5"], seed + 2)
 	elif tickets > int(round(float(income_base) * 0.50)):
-		value = _bm_pick_finance_comment(["finance.comment.tickets_positive.1", "finance.comment.tickets_positive.2", "finance.comment.tickets_positive.3"], seed + 3)
+		value = _bm_pick_finance_comment(["finance.comment.tickets_positive.1", "finance.comment.tickets_positive.2", "finance.comment.tickets_positive.3", "finance.comment.tickets_positive.4", "finance.comment.tickets_positive.5"], seed + 3)
 	elif shop > int(round(float(income_base) * 0.25)):
-		value = _bm_pick_finance_comment(["finance.comment.shop_positive.1", "finance.comment.shop_positive.2", "finance.comment.shop_positive.3"], seed + 4)
+		value = _bm_pick_finance_comment(["finance.comment.shop_positive.1", "finance.comment.shop_positive.2", "finance.comment.shop_positive.3", "finance.comment.shop_positive.4", "finance.comment.shop_positive.5"], seed + 4)
 	else:
-		value = _bm_pick_finance_comment(["finance.comment.stable.1", "finance.comment.stable.2", "finance.comment.stable.3"], seed + 5)
+		value = _bm_pick_finance_comment(["finance.comment.stable.1", "finance.comment.stable.2", "finance.comment.stable.3", "finance.comment.stable.4", "finance.comment.stable.5"], seed + 5)
 
 	lbl.text = "“" + value + "”"
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

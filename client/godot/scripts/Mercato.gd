@@ -690,6 +690,28 @@ func _mercato_stars_text(p: Dictionary) -> String:
 	return str(stars) + "/5"
 
 
+func _mercato_avatar_texture_path(p: Dictionary) -> String:
+	var avatar_path := str(p.get("avatar_path", "")).strip_edges()
+	if avatar_path != "" and ResourceLoader.exists(avatar_path):
+		return avatar_path
+
+	var avatar_key := str(p.get("avatar_key", "")).strip_edges()
+	if avatar_key == "":
+		return ""
+
+	var roots := [
+		"res://assets/images/avatars",
+		"res://assets/images/avatars/avatars_dessin"
+	]
+	var extensions := [".png", ".webp", ".jpg", ".jpeg"]
+	for root in roots:
+		for ext in extensions:
+			var candidate := str(root) + "/" + avatar_key + str(ext)
+			if ResourceLoader.exists(candidate):
+				return candidate
+	return ""
+
+
 func _make_avatar_name_cell(p: Dictionary) -> Control:
 	var box := VBoxContainer.new()
 	box.custom_minimum_size = Vector2(88, 84)
@@ -701,8 +723,8 @@ func _make_avatar_name_cell(p: Dictionary) -> Control:
 	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	avatar.mouse_filter = Control.MOUSE_FILTER_STOP
 	avatar.pivot_offset = avatar.custom_minimum_size * 0.5
-	var avatar_path := str(p.get("avatar_path", ""))
-	if avatar_path != "" and ResourceLoader.exists(avatar_path):
+	var avatar_path := _mercato_avatar_texture_path(p)
+	if avatar_path != "":
 		avatar.texture = load(avatar_path) as Texture2D
 	avatar.mouse_entered.connect(func() -> void:
 		avatar.scale = Vector2(1.50, 1.50)
@@ -992,14 +1014,14 @@ func _bm_show_player_card_popup(data: Dictionary) -> void:
 	card.add_theme_stylebox_override("panel", sb)
 	popup.add_child(card)
 
-	var avatar_path := str(data.get("avatar_path", ""))
+	var avatar_path := _mercato_avatar_texture_path(data)
 	var avatar_big := TextureRect.new()
 	avatar_big.position = Vector2(34, 82)
 	avatar_big.size = Vector2(190, 190)
 	avatar_big.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	avatar_big.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	avatar_big.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if avatar_path != "" and ResourceLoader.exists(avatar_path):
+	if avatar_path != "":
 		avatar_big.texture = load(avatar_path) as Texture2D
 	card.add_child(avatar_big)
 	_bm_add_player_profile_graph(card, data)

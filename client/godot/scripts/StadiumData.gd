@@ -30,7 +30,7 @@ const COUT_NIVEAU_STADE: Dictionary = {
 }
 
 const DUREE_TRAVAUX_STADE: Dictionary = {
-	"1_1": 1,
+	"1_1": 2,
 	"1_2": 5,
 	"1_3": 7,
 	"2_1": 9,

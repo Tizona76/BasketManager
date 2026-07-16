@@ -96,7 +96,8 @@ static func load_savegame(path: String = "user://savegame.json") -> Dictionary:
 	var had_legacy_wallet: bool = save.has("wallet") and typeof(save["wallet"]) != TYPE_DICTIONARY
 	ensure_progression_wallet_schema(save)
 	_repair_corrupted_salaries_on_load(save)
-	if had_legacy_wallet:
+	var repaired_identity: bool = _repair_duplicate_player_identities_on_load(save)
+	if had_legacy_wallet or repaired_identity:
 		write_savegame(save, path)
 	return save
 
@@ -1166,6 +1167,178 @@ static func _mercato_load_avatar_meta() -> Dictionary:
 	return out
 
 
+static func _identity_player_name(p: Dictionary) -> String:
+	var n := str(p.get("nom", p.get("name", ""))).strip_edges()
+	if n == "":
+		n = str(p.get("name", p.get("nom", ""))).strip_edges()
+	return n
+
+
+static func _identity_extra_first_names() -> Array[String]:
+	return [
+		"Mason", "Isaac", "Aaron", "Adrian", "Blake", "Tyler", "Julian", "Dylan",
+		"Owen", "Caleb", "Evan", "Miles", "Carter", "Logan", "Wyatt", "Cole",
+		"Finn", "Axel", "Oscar", "Rayan", "Enzo", "Noe", "Robin", "Simon",
+		"Quentin", "Mathis", "Yanis", "Nicolas", "Samuel", "Diego", "Milo", "Eliott",
+		"Kylian", "Ilyes", "Nael", "Clement", "Paul", "Marceau", "Gabin",
+		"Amelie", "Manon", "Ambre", "Lucie", "Agathe", "Romane", "Lena", "Anais"
+	]
+
+
+static func _identity_unique_name(base_name: String, used_names: Dictionary, pid: int) -> String:
+	var clean := base_name.strip_edges()
+	if clean != "" and not used_names.has(clean.to_lower()):
+		return clean
+	for candidate in _identity_extra_first_names():
+		var c := str(candidate).strip_edges()
+		if c != "" and not used_names.has(c.to_lower()):
+			return c
+	return "Prospect " + str(pid)
+
+
+static func _identity_pair_key(name: String, avatar_key: String) -> String:
+	var n := name.strip_edges().to_lower()
+	var ak := avatar_key.strip_edges()
+	if n == "" or ak == "":
+		return ""
+	return n + "|" + ak
+
+
+static func _identity_unique_name_for_avatar(base_name: String, avatar_key: String, used_pairs: Dictionary, pid: int) -> String:
+	var clean := base_name.strip_edges()
+	if clean != "" and not used_pairs.has(_identity_pair_key(clean, avatar_key)):
+		return clean
+	for candidate in _identity_extra_first_names():
+		var c := str(candidate).strip_edges()
+		if c != "" and not used_pairs.has(_identity_pair_key(c, avatar_key)):
+			return c
+	return "Prospect " + str(pid)
+
+
+static func _identity_collect_used(save: Dictionary, skip_id: String = "") -> Dictionary:
+	var used := {"avatar_keys": {}, "names": {}, "identity_pairs": {}}
+	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
+		return used
+	var by_id: Dictionary = save["players_by_id"] as Dictionary
+	for k in by_id.keys():
+		var sid := str(k).strip_edges()
+		if skip_id != "" and sid == skip_id:
+			continue
+		var raw = by_id[k]
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var p: Dictionary = raw as Dictionary
+		var name := _identity_player_name(p)
+		var ak := str(p.get("avatar_key", "")).strip_edges()
+		if name != "":
+			(used["names"] as Dictionary)[name.to_lower()] = true
+		if ak != "":
+			(used["avatar_keys"] as Dictionary)[ak] = true
+		if name != "" and ak != "":
+			var pair_key := _identity_pair_key(name, ak)
+			if pair_key != "":
+				(used["identity_pairs"] as Dictionary)[pair_key] = true
+	return used
+
+
+static func _identity_pick_candidate(save: Dictionary, used: Dictionary) -> Dictionary:
+	var candidates: Array = _mercato_avatar_candidates()
+	var used_pairs: Dictionary = used.get("identity_pairs", {}) as Dictionary
+	for c_raw in candidates:
+		if typeof(c_raw) != TYPE_DICTIONARY:
+			continue
+		var c: Dictionary = c_raw as Dictionary
+		var ak := str(c.get("avatar_key", "")).strip_edges()
+		var name := str(c.get("name", "")).strip_edges()
+		if ak == "":
+			continue
+		if used_pairs.has(_identity_pair_key(name, ak)):
+			continue
+		return c
+	return {}
+
+
+static func _identity_apply_candidate(p: Dictionary, candidate: Dictionary, used: Dictionary, pid: int) -> void:
+	var base_name := str(candidate.get("name", p.get("name", p.get("nom", "")))).strip_edges()
+	var avatar_key := str(candidate.get("avatar_key", ""))
+	var used_pairs: Dictionary = used.get("identity_pairs", {}) as Dictionary
+	var display_name := _identity_unique_name_for_avatar(base_name, avatar_key, used_pairs, pid)
+	p["nom"] = display_name
+	p["name"] = display_name
+	p["avatar_key"] = avatar_key
+	p["avatar_path"] = str(candidate.get("avatar_path", ""))
+	p["gender"] = str(candidate.get("gender", p.get("gender", "U")))
+
+
+static func _identity_mark_used(used: Dictionary, p: Dictionary) -> void:
+	var name := _identity_player_name(p)
+	var ak := str(p.get("avatar_key", "")).strip_edges()
+	if name != "":
+		(used["names"] as Dictionary)[name.to_lower()] = true
+	if ak != "":
+		(used["avatar_keys"] as Dictionary)[ak] = true
+	if name != "" and ak != "":
+		var pair_key := _identity_pair_key(name, ak)
+		if pair_key != "":
+			(used["identity_pairs"] as Dictionary)[pair_key] = true
+
+
+static func _sync_player_identity_copies(save: Dictionary, by_id: Dictionary) -> void:
+	if save.has("players") and typeof(save["players"]) == TYPE_ARRAY:
+		var arr: Array = save["players"] as Array
+		for i in range(arr.size()):
+			var raw = arr[i]
+			if typeof(raw) != TYPE_DICTIONARY:
+				continue
+			var row: Dictionary = raw as Dictionary
+			var row_id := str(int(round(float(str(row.get("id", -1)).strip_edges()))))
+			if by_id.has(row_id) and typeof(by_id[row_id]) == TYPE_DICTIONARY:
+				var src: Dictionary = by_id[row_id] as Dictionary
+				row["nom"] = src.get("nom", row.get("nom", ""))
+				row["name"] = src.get("name", row.get("name", row.get("nom", "")))
+				row["avatar_key"] = src.get("avatar_key", row.get("avatar_key", ""))
+				row["avatar_path"] = src.get("avatar_path", row.get("avatar_path", ""))
+				row["gender"] = src.get("gender", row.get("gender", "U"))
+				arr[i] = row
+		save["players"] = arr
+
+
+static func _repair_duplicate_player_identities_on_load(save: Dictionary) -> bool:
+	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
+		return false
+	var by_id: Dictionary = save["players_by_id"] as Dictionary
+	var keys: Array = by_id.keys()
+	keys.sort_custom(func(a, b): return int(float(str(a))) < int(float(str(b))))
+	var used := {"avatar_keys": {}, "names": {}, "identity_pairs": {}}
+	var changed := false
+	for k in keys:
+		var raw = by_id[k]
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var p: Dictionary = raw as Dictionary
+		var pid := int(float(str(k)))
+		var name := _identity_player_name(p)
+		var ak := str(p.get("avatar_key", "")).strip_edges()
+		var pair_key := _identity_pair_key(name, ak)
+		var pair_collision := pair_key != "" and (used["identity_pairs"] as Dictionary).has(pair_key)
+		if pair_collision:
+			var candidate := _identity_pick_candidate(save, used)
+			if not candidate.is_empty():
+				_identity_apply_candidate(p, candidate, used, pid)
+			else:
+				var used_pairs: Dictionary = used.get("identity_pairs", {}) as Dictionary
+				var unique_name := _identity_unique_name_for_avatar(name, ak, used_pairs, pid)
+				p["nom"] = unique_name
+				p["name"] = unique_name
+			by_id[k] = p
+			changed = true
+		_identity_mark_used(used, p)
+	if changed:
+		save["players_by_id"] = by_id
+		_sync_player_identity_copies(save, by_id)
+	return changed
+
+
 static func _mercato_avatar_candidates() -> Array:
 	var base_root := "res://assets/images/avatars"
 	var base_used := base_root
@@ -1197,30 +1370,8 @@ static func _mercato_avatar_candidates() -> Array:
 
 
 static func _mercato_pick_unused_avatar(save: Dictionary) -> Dictionary:
-	var candidates: Array = _mercato_avatar_candidates()
-	if candidates.is_empty():
-		return {}
-	var used := {}
-	if save.has("players_by_id") and typeof(save["players_by_id"]) == TYPE_DICTIONARY:
-		var by_id: Dictionary = save["players_by_id"] as Dictionary
-		for k in by_id.keys():
-			var p_raw = by_id[k]
-			if typeof(p_raw) != TYPE_DICTIONARY:
-				continue
-			var p: Dictionary = p_raw as Dictionary
-			var ak := str(p.get("avatar_key", "")).strip_edges()
-			if ak != "":
-				used[ak] = true
-	for c_raw in candidates:
-		if typeof(c_raw) != TYPE_DICTIONARY:
-			continue
-		var c: Dictionary = c_raw as Dictionary
-		var ak2 := str(c.get("avatar_key", "")).strip_edges()
-		if ak2 == "":
-			continue
-		if not used.has(ak2):
-			return c
-	return candidates[0] as Dictionary
+	var used := _identity_collect_used(save)
+	return _identity_pick_candidate(save, used)
 
 
 static func _mercato_rng() -> RandomNumberGenerator:
@@ -1332,43 +1483,15 @@ static func _mercato_make_new_player(save: Dictionary) -> Dictionary:
 
 	var age: int = rng.randi_range(18, 35)
 	var avatar_pick: Dictionary = _mercato_pick_unused_avatar(save)
-	if not avatar_pick.is_empty() and str(avatar_pick.get("gender", "U")) != "M":
-		var used := {}
-		if save.has("players_by_id") and typeof(save["players_by_id"]) == TYPE_DICTIONARY:
-			var by_id: Dictionary = save["players_by_id"] as Dictionary
-			for k in by_id.keys():
-				var p_raw = by_id[k]
-				if typeof(p_raw) != TYPE_DICTIONARY:
-					continue
-				var p: Dictionary = p_raw as Dictionary
-				var ak := str(p.get("avatar_key", "")).strip_edges()
-				if ak != "":
-					used[ak] = true
-		var male_candidates: Array = []
-		var fallback_male_candidates: Array = []
-		var all_candidates: Array = _mercato_avatar_candidates()
-		for c_raw in all_candidates:
-			if typeof(c_raw) != TYPE_DICTIONARY:
-				continue
-			var c: Dictionary = c_raw as Dictionary
-			if str(c.get("gender", "U")) == "M":
-				fallback_male_candidates.append(c)
-				var ak2 := str(c.get("avatar_key", "")).strip_edges()
-				if ak2 != "" and not used.has(ak2):
-					male_candidates.append(c)
-		if not male_candidates.is_empty():
-			avatar_pick = male_candidates[rng.randi_range(0, male_candidates.size() - 1)] as Dictionary
-		elif not fallback_male_candidates.is_empty():
-			# All male avatars are already used: keep historical fallback to avoid blocking generation.
-			avatar_pick = fallback_male_candidates[rng.randi_range(0, fallback_male_candidates.size() - 1)] as Dictionary
 
 	var nom_affiche := "Prospect " + str(pid)
 	var avatar_key := ""
 	var avatar_path := ""
 	var gender := "U"
 	if not avatar_pick.is_empty():
-		nom_affiche = str(avatar_pick.get("name", nom_affiche))
+		var used_identity := _identity_collect_used(save)
 		avatar_key = str(avatar_pick.get("avatar_key", ""))
+		nom_affiche = _identity_unique_name_for_avatar(str(avatar_pick.get("name", nom_affiche)), avatar_key, used_identity.get("identity_pairs", {}) as Dictionary, pid)
 		avatar_path = str(avatar_pick.get("avatar_path", ""))
 		gender = str(avatar_pick.get("gender", "U"))
 
