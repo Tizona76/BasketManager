@@ -1333,16 +1333,34 @@ static func _mercato_make_new_player(save: Dictionary) -> Dictionary:
 	var age: int = rng.randi_range(18, 35)
 	var avatar_pick: Dictionary = _mercato_pick_unused_avatar(save)
 	if not avatar_pick.is_empty() and str(avatar_pick.get("gender", "U")) != "M":
+		var used := {}
+		if save.has("players_by_id") and typeof(save["players_by_id"]) == TYPE_DICTIONARY:
+			var by_id: Dictionary = save["players_by_id"] as Dictionary
+			for k in by_id.keys():
+				var p_raw = by_id[k]
+				if typeof(p_raw) != TYPE_DICTIONARY:
+					continue
+				var p: Dictionary = p_raw as Dictionary
+				var ak := str(p.get("avatar_key", "")).strip_edges()
+				if ak != "":
+					used[ak] = true
 		var male_candidates: Array = []
+		var fallback_male_candidates: Array = []
 		var all_candidates: Array = _mercato_avatar_candidates()
 		for c_raw in all_candidates:
 			if typeof(c_raw) != TYPE_DICTIONARY:
 				continue
 			var c: Dictionary = c_raw as Dictionary
 			if str(c.get("gender", "U")) == "M":
-				male_candidates.append(c)
+				fallback_male_candidates.append(c)
+				var ak2 := str(c.get("avatar_key", "")).strip_edges()
+				if ak2 != "" and not used.has(ak2):
+					male_candidates.append(c)
 		if not male_candidates.is_empty():
 			avatar_pick = male_candidates[rng.randi_range(0, male_candidates.size() - 1)] as Dictionary
+		elif not fallback_male_candidates.is_empty():
+			# All male avatars are already used: keep historical fallback to avoid blocking generation.
+			avatar_pick = fallback_male_candidates[rng.randi_range(0, fallback_male_candidates.size() - 1)] as Dictionary
 
 	var nom_affiche := "Prospect " + str(pid)
 	var avatar_key := ""

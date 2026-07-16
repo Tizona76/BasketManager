@@ -1958,6 +1958,7 @@ func _update_club_name_label_from_save() -> void:
 		tn = "BM Club"
 	if LblClubName != null:
 		LblClubName.text = tn
+		LblClubName.add_theme_font_size_override("font_size", 42)
 		_bm_update_club_crest_header_menu(d)
 
 	# --- wallet
@@ -2016,7 +2017,7 @@ func _update_club_name_label_from_save() -> void:
 
 	# --- Title (optionnel)
 	if Title != null:
-		Title.text = tr("menu.title_with_club").replace("{club}", tn)
+		Title.text = tr("menu.title")
 
 	print("[MENU] club=", tn, " euros=", euros, " tokens=", tokens, " j=", journee, " W-L=", wins, "-", losses)
 

@@ -381,11 +381,11 @@ func _bm_popup_fallback(key: String) -> String:
 			"pt": "Participe de torneios e complete missões para desenvolver seu clube."
 		},
 		"popup_stadium_title": {
-			"fr": "Avant votre prochain match",
-			"en": "Before your next game",
-			"es": "Antes de tu próximo partido",
-			"it": "Prima della tua prossima partita",
-			"pt": "Antes da sua próxima partida"
+			"fr": "Stadium",
+			"en": "Stadium",
+			"es": "Stadium",
+			"it": "Stadium",
+			"pt": "Stadium"
 		},
 		"popup_stadium_body": {
 			"fr": "Avant votre prochain match, il est important de gérer votre stade. Mettez un prix dans votre billetterie et votre boutique pour percevoir vos premiers revenus des visiteurs au stade.",
@@ -1478,7 +1478,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 
 	var dark := ColorRect.new()
 	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dark.color = Color(0, 0, 0, 0.55)
+	dark.color = Color(0, 0, 0, 0.70)
 	dark.mouse_filter = Control.MOUSE_FILTER_STOP
 	popup.add_child(dark)
 
@@ -1495,6 +1495,9 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 		(get_viewport_rect().size.y - card_h) * 0.5
 	)
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	var last_match_card_sb := StyleBoxFlat.new()
+	last_match_card_sb.bg_color = Color(0.015, 0.018, 0.030, 1.0)
+	card.add_theme_stylebox_override("panel", last_match_card_sb)
 	popup.add_child(card)
 
 	var title := Label.new()

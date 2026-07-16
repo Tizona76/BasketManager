@@ -3927,8 +3927,7 @@ func _shop_apply_restock_visibility_to_node(node: Node, unlocked: bool) -> void:
 		_shop_apply_restock_visibility_to_node(child, unlocked)
 
 
-func _get_shop_stock_for_level(level: int, pid: String) -> int:
-	# Utilise SHOP_STOCK_BY_LEVEL si présent, sinon fallback 0
+func _get_shop_restock_base_for_level(level: int, pid: String) -> int:
 	if not ("SHOP_STOCK_BY_LEVEL" in self):
 		return 0
 	var pack: Dictionary = SHOP_STOCK_BY_LEVEL.get(level, SHOP_STOCK_BY_LEVEL.get(1, {}))
@@ -3946,8 +3945,13 @@ func _get_shop_stock_for_level(level: int, pid: String) -> int:
 	var coef: float = 1.0
 	if StadiumDataRef != null:
 		coef = float(StadiumDataRef.get_shop_stock_mult(ng, ns))
+	return maxi(base_stock, int(round(float(base_stock) * coef)))
 
-	var computed_stock: int = maxi(base_stock, int(round(float(base_stock) * coef)))
+func _get_shop_stock_for_level(level: int, pid: String) -> int:
+	# Utilise SHOP_STOCK_BY_LEVEL si présent, sinon fallback 0
+	var computed_stock: int = _get_shop_restock_base_for_level(level, pid)
+	if computed_stock <= 0:
+		return 0
 
 	# BM_SHOP_CURRENT_STOCK_UI_V1
 	# À partir du match 14, l'affichage Shop montre le stock réel restant.
@@ -4651,8 +4655,8 @@ func _stadium_boost_ticketing_fonts() -> void:
 	sb_ticket_input.shadow_size = 5
 	sb_ticket_input.content_margin_left = 10
 	sb_ticket_input.content_margin_right = 10
-	sb_ticket_input.content_margin_top = 5
-	sb_ticket_input.content_margin_bottom = 5
+	sb_ticket_input.content_margin_top = 2
+	sb_ticket_input.content_margin_bottom = 2
 
 	var sb_ticket_input_focus := sb_ticket_input.duplicate() as StyleBoxFlat
 	sb_ticket_input_focus.border_color = Color(0.95, 0.58, 0.12, 0.86)
@@ -4672,8 +4676,8 @@ func _stadium_boost_ticketing_fonts() -> void:
 	sb_ticket_button.shadow_size = 4
 	sb_ticket_button.content_margin_left = 8
 	sb_ticket_button.content_margin_right = 8
-	sb_ticket_button.content_margin_top = 4
-	sb_ticket_button.content_margin_bottom = 4
+	sb_ticket_button.content_margin_top = 2
+	sb_ticket_button.content_margin_bottom = 2
 
 	var sb_ticket_button_hover := sb_ticket_button.duplicate() as StyleBoxFlat
 	sb_ticket_button_hover.bg_color = Color(0.16, 0.30, 0.50, 0.96)
@@ -4734,8 +4738,9 @@ func _stadium_boost_ticketing_fonts() -> void:
 		for pp: String in btn_paths:
 			var btn_mobile := get_node_or_null(pp) as Button
 			if btn_mobile != null:
-				btn_mobile.custom_minimum_size = Vector2(52, 38)
+				btn_mobile.custom_minimum_size = Vector2(46, 30)
 				btn_mobile.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+				btn_mobile.add_theme_font_size_override("font_size", maxi(24, btn_mobile.get_theme_font_size("font_size") - 4))
 		for pp_value: String in [
 			"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceA/PriceA",
 			"Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxPriceB/PriceB",
@@ -4746,9 +4751,9 @@ func _stadium_boost_ticketing_fonts() -> void:
 		]:
 			var value_ctrl := get_node_or_null(pp_value) as Control
 			if value_ctrl != null:
-				value_ctrl.custom_minimum_size = Vector2(maxf(value_ctrl.custom_minimum_size.x, 102.0), 38)
+				value_ctrl.custom_minimum_size = Vector2(maxf(value_ctrl.custom_minimum_size.x, 102.0), 30)
 				value_ctrl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-				value_ctrl.add_theme_font_size_override("font_size", value_ctrl.get_theme_font_size("font_size") + 2)
+				value_ctrl.add_theme_font_size_override("font_size", maxi(24, value_ctrl.get_theme_font_size("font_size") - 2))
 
 
 
@@ -5105,7 +5110,7 @@ func _apply_shop_restock_purchase(pid: String, units: int, total_cost: int) -> v
 # BM_SHOP_RESTOCK_POPUP_V4_DESIGN
 func _show_shop_restock_popup(pid: String) -> void:
 	var base_price: int = maxi(1, int(SHOP_DEFAULT_PRICES.get(pid, 10)))
-	var base_stock_for_restock := _get_shop_stock_for_level(_shop_level_cached, pid)
+	var base_stock_for_restock := _get_shop_restock_base_for_level(_shop_level_cached, pid)
 	var small_units := int(round(float(base_stock_for_restock) * 0.80))
 	var large_units := int(round(float(base_stock_for_restock) * 1.50))
 	var small_cost := small_units * maxi(1, int(round(float(base_price) * 0.60)))
@@ -5222,7 +5227,7 @@ func _show_shop_restock_popup(pid: String) -> void:
 	card.add_child(small_unit_cost_lbl)
 
 	var small_cost_lbl := Label.new()
-	small_cost_lbl.text = _format_int(small_cost) + " $"
+	small_cost_lbl.text = _format_int(small_cost).replace(" ", ".") + " $"
 	small_cost_lbl.position = Vector2(465, 122)
 	small_cost_lbl.size = Vector2(130, 38)
 	small_cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -5261,7 +5266,7 @@ func _show_shop_restock_popup(pid: String) -> void:
 	card.add_child(large_unit_cost_lbl)
 
 	var large_cost_lbl := Label.new()
-	large_cost_lbl.text = _format_int(large_cost) + " $"
+	large_cost_lbl.text = _format_int(large_cost).replace(" ", ".") + " $"
 	large_cost_lbl.position = Vector2(465, 182)
 	large_cost_lbl.size = Vector2(130, 38)
 	large_cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

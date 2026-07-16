@@ -348,14 +348,24 @@ func _bm_current_lineup_header(parent: Control, y: float, row_w: float) -> void:
 
 func _bm_current_lineup_players() -> Array[Dictionary]:
 	var save: Dictionary = PlayerLife.load_savegame()
-	var played_ids: Array = _bm_get_effective_played_ids(save)
+	var lineup_ids: Array = []
+	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
+		var roster: Dictionary = save["roster"] as Dictionary
+		if roster.has("match_selected_ids") and typeof(roster["match_selected_ids"]) == TYPE_ARRAY:
+			var official_ids: Array = (roster["match_selected_ids"] as Array).duplicate()
+			if official_ids.size() == 8:
+				lineup_ids = official_ids
+	if lineup_ids.is_empty():
+		lineup_ids = _bm_get_effective_played_ids(save)
+		if lineup_ids.size() > 8:
+			lineup_ids = lineup_ids.slice(0, 8)
 	var out: Array[Dictionary] = []
-	if played_ids.is_empty():
+	if lineup_ids.is_empty():
 		return out
 	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
 		return out
 	var by_id: Dictionary = save["players_by_id"] as Dictionary
-	for raw_id in played_ids:
+	for raw_id in lineup_ids:
 		var sid := str(raw_id).strip_edges()
 		if sid == "":
 			continue
