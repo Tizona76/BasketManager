@@ -277,13 +277,13 @@ func _get_displayed_tokens_cost(coach_id: String) -> int:
 	return maxi(0, int(data.get("tokens_cost", 0)))
 
 
-func _fmt_int_spaces(v: int) -> String:
+func _fmt_cost(v: int) -> String:
 	var s: String = str(maxi(0, int(v)))
 	var out: String = ""
 	while s.length() > 3:
-		out = " " + s.substr(s.length() - 3, 3) + out
+		out = "." + s.substr(s.length() - 3, 3) + out
 		s = s.substr(0, s.length() - 3)
-	return s + out
+	return s + out + " $"
 
 func _fill_inline_label(coach_id: String, lbl: Label) -> void:
 	if lbl == null:
@@ -305,7 +305,7 @@ func _fill_inline_label(coach_id: String, lbl: Label) -> void:
 	var tokens_cost: int = _get_displayed_tokens_cost(coach_id)
 	var status_txt: String = _coach_status_text(coach_id)
 	var owned: bool = (status_txt == "Owned")
-	lbl.text = contract_txt + "\nCost: " + _fmt_int_spaces(euros_cost) + " / season"
+	lbl.text = contract_txt + "\nCost: " + _fmt_cost(euros_cost) + " / season"
 
 	if owned:
 		lbl.add_theme_color_override("font_color", Color(0.42, 1.0, 0.42, 1))
@@ -379,7 +379,7 @@ func _coach_confirm_text(coach_id: String) -> String:
 	var tokens_cost: int = _get_displayed_tokens_cost(coach_id)
 
 	return contract_txt + "
-Cost: " + _fmt_int_spaces(euros_cost) + " / season"
+Cost: " + _fmt_cost(euros_cost) + " / season"
 
 
 func _open_unlock_confirm(coach_id: String) -> void:

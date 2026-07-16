@@ -186,6 +186,7 @@ static func _default_save_dict(profile_id: String) -> Dictionary:
 		"season_number": 1,
 		"season_round": 0,
 		"club": {"name": "BM Club", "level": 1, "xp": 0},
+		"club_xp_total_migrated": true,
 		"wallet": {"euros": 1200, "tokens": 0},
 		"total_billetterie": 0,
 		"total_boutique": 0,

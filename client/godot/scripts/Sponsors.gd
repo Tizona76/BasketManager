@@ -28,6 +28,84 @@ var _pending_sponsor_id: String = ""
 var _active_contract: Dictionary = {}
 
 
+func _get_progressive_offer_families(club_level: int) -> Array[String]:
+	match maxi(1, club_level):
+		1:
+			return [SponsorDataRef.FAMILY_LOCAL, SponsorDataRef.FAMILY_LOCAL, SponsorDataRef.FAMILY_LOCAL]
+		2:
+			return [SponsorDataRef.FAMILY_LOCAL, SponsorDataRef.FAMILY_LOCAL, SponsorDataRef.FAMILY_NATIONAL]
+		3:
+			return [SponsorDataRef.FAMILY_NATIONAL, SponsorDataRef.FAMILY_NATIONAL, SponsorDataRef.FAMILY_NATIONAL]
+		4:
+			return [SponsorDataRef.FAMILY_NATIONAL, SponsorDataRef.FAMILY_NATIONAL, SponsorDataRef.FAMILY_PREMIUM]
+		_:
+			return [SponsorDataRef.FAMILY_PREMIUM, SponsorDataRef.FAMILY_PREMIUM, SponsorDataRef.FAMILY_PREMIUM]
+
+
+func _remove_one_offer_family_slot(families: Array[String], family: String) -> void:
+	for i in range(families.size()):
+		if families[i] == family:
+			families.remove_at(i)
+			return
+
+
+func _add_sponsor_offer(offers: Array, used_ids: Array[String], sponsor: Dictionary) -> bool:
+	var sponsor_id := str(sponsor.get("id", ""))
+	if sponsor_id == "" or used_ids.has(sponsor_id):
+		return false
+	offers.append(sponsor.duplicate(true))
+	used_ids.append(sponsor_id)
+	return true
+
+
+func _add_offer_from_family(offers: Array, used_ids: Array[String], family: String, preferred_ids: Array[String], avoid_ids: Array[String]) -> bool:
+	for preferred_id in preferred_ids:
+		if avoid_ids.has(preferred_id):
+			continue
+		var preferred_sponsor := SponsorDataRef.get_sponsor_by_id(preferred_id)
+		if not preferred_sponsor.is_empty() and str(preferred_sponsor.get("family", "")) == family:
+			if _add_sponsor_offer(offers, used_ids, preferred_sponsor):
+				return true
+
+	for sponsor in SponsorDataRef.SPONSORS:
+		var sponsor_dict := sponsor as Dictionary
+		var sponsor_id := str(sponsor_dict.get("id", ""))
+		if avoid_ids.has(sponsor_id):
+			continue
+		if str(sponsor_dict.get("family", "")) == family:
+			if _add_sponsor_offer(offers, used_ids, sponsor_dict):
+				return true
+
+	return false
+
+
+func _get_progressive_sponsor_offers(club_level: int, active_sponsor_id_value: String, known_sponsor_ids: Array[String]) -> Array:
+	var offers: Array = []
+	var used_ids: Array[String] = []
+	var target_families := _get_progressive_offer_families(club_level)
+
+	if active_sponsor_id_value != "":
+		var active_sponsor := SponsorDataRef.get_sponsor_by_id(active_sponsor_id_value)
+		if not active_sponsor.is_empty():
+			_add_sponsor_offer(offers, used_ids, active_sponsor)
+			_remove_one_offer_family_slot(target_families, str(active_sponsor.get("family", "")))
+
+	var fresh_ids: Array[String] = []
+	for sponsor in SponsorDataRef.SPONSORS:
+		var sponsor_id := str((sponsor as Dictionary).get("id", ""))
+		if sponsor_id != "" and not known_sponsor_ids.has(sponsor_id):
+			fresh_ids.append(sponsor_id)
+
+	for family in target_families:
+		if offers.size() >= 3:
+			break
+		if _add_offer_from_family(offers, used_ids, family, fresh_ids, [active_sponsor_id_value]):
+			continue
+		_add_offer_from_family(offers, used_ids, family, known_sponsor_ids, [active_sponsor_id_value])
+
+	return offers.slice(0, 3)
+
+
 func _ready() -> void:
 	_apply_i18n()
 	if btn_retour != null and not btn_retour.pressed.is_connected(_on_btn_retour):
@@ -106,7 +184,6 @@ func _refresh_sponsor_ui() -> void:
 		var current_active_id := active_sponsor_id
 		if current_active_id == "" and not _active_contract.is_empty():
 			current_active_id = str(_active_contract.get("id", ""))
-		var last_signed_sponsor_id := SponsorDataRef.get_last_signed_sponsor_id(save)
 		vbox.add_theme_constant_override("separation", 34)
 		_offers_grid = GridContainer.new()
 		_offers_grid.name = "AvailableOffersGrid"
@@ -115,8 +192,7 @@ func _refresh_sponsor_ui() -> void:
 		_offers_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		vbox.add_child(_offers_grid)
 		vbox.move_child(_offers_grid, offers_title_label.get_index() + 1)
-		var market_anchor_id := current_active_id if current_active_id != "" else last_signed_sponsor_id
-		var offers: Array = SponsorDataRef.get_offers(SponsorDataRef.PROFILE_BEGINNER, club_level, market_anchor_id, known_sponsor_ids)
+		var offers: Array = _get_progressive_sponsor_offers(club_level, current_active_id, known_sponsor_ids)
 		var offered_ids: Array[String] = []
 		for sponsor in offers:
 			var sponsor_card_data: Dictionary = sponsor as Dictionary

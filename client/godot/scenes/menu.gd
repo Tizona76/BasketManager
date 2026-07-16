@@ -1777,6 +1777,7 @@ func _ensure_local_savegame_exists() -> void:
 		"season_id": "2026-01",
 		"team_name": "",
 		"club": {"name": "BM Club", "level": 1, "xp": 0},
+		"club_xp_total_migrated": true,
 		"wallet": {"euros": 1200, "tokens": 0},
 		"progress": {"journee": 1, "wins": 0, "losses": 0},
 		"meta": {"created_at_unix": Time.get_unix_time_from_system()}

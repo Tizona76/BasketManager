@@ -662,7 +662,7 @@ func _bm_maybe_show_shop_restock_notice_match14() -> void:
 	overlay.add_child(dark)
 
 	var notice_text: String = "Demand is growing.\nBefore the next game, check your Shop stocks and prices."
-	var notice_font_size: int = 43 if not mobile else 35
+	var notice_font_size: int = 41 if not mobile else 33
 	var notice_lines: int = maxi(1, notice_text.split("\n").size())
 	var notice_max_line_chars: int = 0
 	for notice_line in notice_text.split("\n"):

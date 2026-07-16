@@ -643,9 +643,13 @@ func _stadium_tr(key: String) -> String:
 		"stadium.tab.ticketing": {"fr":"Billetterie","en":"Ticketing","es":"Billetterie","it":"Biglietteria","pt":"Bilheteria"},
 		"stadium.tab.cafe": {"fr":"Cafétéria","en":"Cafeteria","es":"Cafetería","it":"Caffetteria","pt":"Cafetaria"},
 				"stadium.upgrade.works_in_progress_title": {"fr":"Travaux en cours","en":"Works in progress","es":"Obras en curso","it":"Lavori in corso","pt":"Obras em andamento"},
-		"stadium.upgrade.remaining_matches": {"fr":"{remaining} match(s) restant(s)","en":"{remaining} match(es) remaining","es":"{remaining} partido(s) restante(s)","it":"{remaining} partita/e rimanente/i","pt":"{remaining} partida(s) restante(s)"},
+		"stadium.upgrade.remaining_matches": {"fr":"{remaining} matchs restants","en":"{remaining} games remaining","es":"{remaining} partidos restantes","it":"{remaining} partite rimanenti","pt":"{remaining} partidas restantes"},
 		"stadium.upgrade.acceleration_available": {"fr":"Accélération possible après lancement : {tokens} tokens","en":"Acceleration available after launch: {tokens} tokens"},
 		"stadium.upgrade.accel_unavailable": {"fr":"Accélération indisponible pour cette amélioration.","en":"Acceleration unavailable for this upgrade.","es":"Aceleración no disponible para esta mejora.","it":"Accelerazione non disponibile per questo miglioramento.","pt":"Aceleração indisponível para esta melhoria."},
+		"stadium.upgrade.accel_title": {"fr":"Accélérer les travaux","en":"Accelerate works","es":"Acelerar obras","it":"Accelera i lavori","pt":"Acelerar obras"},
+		"stadium.upgrade.accelerate_now": {"fr":"Accélérer","en":"Accelerate","es":"Acelerar","it":"Accelera","pt":"Acelerar"},
+		"stadium.upgrade.completed_now": {"fr":"Travaux terminés.","en":"Upgrade completed.","es":"Mejora completada.","it":"Lavori completati.","pt":"Melhoria concluída."},
+		"stadium.upgrade.tokens_insufficient": {"fr":"Club Tokens insuffisants.\nDisponibles : {available}\nRequis : {required}","en":"Not enough Club Tokens.\nAvailable: {available}\nRequired: {required}","es":"Club Tokens insuficientes.\nDisponibles: {available}\nNecesarios: {required}","it":"Club Token insufficienti.\nDisponibili: {available}\nRichiesti: {required}","pt":"Club Tokens insuficientes.\nDisponíveis: {available}\nNecessários: {required}"},
 		"stadium.upgrade.accel_confirm": {"fr":"Travaux vers le niveau {level}\nCoût d'accélération : {tokens} tokens\nTemps restant actuel : {remaining} match(s)\nTemps restant après accélération : {after} match(s)\nTokens disponibles : {available}","en":"Works toward level {level}\nAcceleration cost: {tokens} tokens\nCurrent remaining time: {remaining} match(es)\nRemaining time after acceleration: {after} match(es)\nAvailable tokens: {available}","es":"Obras hacia el nivel {level}\nCoste de aceleración: {tokens} tokens\nTiempo restante actual: {remaining} partido(s)\nTiempo restante tras la aceleración: {after} partido(s)\nTokens disponibles: {available}","it":"Lavori verso il livello {level}\nCosto accelerazione: {tokens} token\nTempo rimanente attuale: {remaining} partita/e\nTempo rimanente dopo accelerazione: {after} partita/e\nToken disponibili: {available}","pt":"Obras para o nível {level}\nCusto da aceleração: {tokens} tokens\nTempo restante atual: {remaining} partida(s)\nTempo restante após aceleração: {after} partida(s)\nTokens disponíveis: {available}"},
 "stadium.tab.upgrade": {"fr":"Évolution Stade","en":"Stadium Upgrade","es":"Mejora del estadio","it":"Evoluzione stadio","pt":"Evolução do estádio"},
 
@@ -1724,6 +1728,99 @@ func _show_upgrade_notice_popup(message: String) -> void:
 	ok_wrap.add_child(ok_btn)
 
 
+func _show_upgrade_acceleration_popup(message: String) -> void:
+	var old_popup := get_node_or_null("UpgradeAccelerationPopup")
+	if old_popup != null:
+		old_popup.queue_free()
+
+	var popup := Control.new()
+	popup.name = "UpgradeAccelerationPopup"
+	popup.set_anchors_preset(Control.PRESET_FULL_RECT)
+	popup.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	add_child(popup)
+	popup.set_as_top_level(true)
+	popup.global_position = Vector2.ZERO
+	popup.size = get_viewport_rect().size
+
+	var card := PanelContainer.new()
+	card.name = "UpgradeAccelerationCard"
+	card.custom_minimum_size = Vector2(860, 420)
+	card.size = Vector2(860, 420)
+	card.position = (get_viewport_rect().size - card.size) * 0.5
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.add_child(card)
+	card.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+
+	var card_style := StyleBoxFlat.new()
+	card_style.bg_color = Color(0.055, 0.065, 0.095, 0.985)
+	card_style.border_width_left = 2
+	card_style.border_width_right = 2
+	card_style.border_width_top = 2
+	card_style.border_width_bottom = 2
+	card_style.border_color = Color(0.95, 0.56, 0.08, 0.94)
+	card_style.corner_radius_top_left = 10
+	card_style.corner_radius_top_right = 10
+	card_style.corner_radius_bottom_left = 10
+	card_style.corner_radius_bottom_right = 10
+	card_style.content_margin_left = 38
+	card_style.content_margin_right = 38
+	card_style.content_margin_top = 24
+	card_style.content_margin_bottom = 26
+	card.add_theme_stylebox_override("panel", card_style)
+
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 24)
+	card.add_child(box)
+
+	var title := Label.new()
+	title.name = "LblUpgradeAccelerationTitle"
+	title.text = _stadium_tr("stadium.upgrade.accel_title")
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 34)
+	title.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	box.add_child(title)
+
+	var body := Label.new()
+	body.name = "LblUpgradeAccelerationBody"
+	body.text = message.replace("[/color] $", " $[/color]").replace("[color=#F21F1F]", "").replace("[/color]", "")
+	body.custom_minimum_size = Vector2(760, 170)
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_theme_font_size_override("font_size", 26)
+	body.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	box.add_child(body)
+
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	buttons.add_theme_constant_override("separation", 28)
+	box.add_child(buttons)
+
+	var cancel_btn := Button.new()
+	cancel_btn.name = "BtnUpgradeAccelerationCancel"
+	cancel_btn.text = "Cancel"
+	_apply_upgrade_cancel_button_style(cancel_btn)
+	cancel_btn.pressed.connect(func() -> void:
+		_upgrade_accel_mode = false
+		popup.queue_free()
+	)
+	buttons.add_child(cancel_btn)
+
+	var confirm_btn := Button.new()
+	confirm_btn.name = "BtnUpgradeAccelerationConfirm"
+	confirm_btn.text = _stadium_tr("stadium.upgrade.accelerate_now")
+	confirm_btn.icon = load("res://assets/images/token.png") as Texture2D
+	_apply_upgrade_confirm_button_style(confirm_btn)
+	confirm_btn.pressed.connect(func() -> void:
+		popup.queue_free()
+		_on_upgrade_confirmed()
+	)
+	buttons.add_child(confirm_btn)
+
+
 func _show_upgrade_insufficient_funds_popup(message: String) -> void:
 	var old_popup := get_node_or_null("UpgradeInsufficientFundsPopup")
 	if old_popup != null:
@@ -2022,36 +2119,13 @@ func _prompt_upgrade_acceleration(rem: int, ng_cur: int, ns_cur: int) -> void:
 	_upgrade_accel_mode = true
 	_upgrade_target_ng = ng_cur
 	_upgrade_target_ns = ns_cur
-	_ensure_upgrade_dialogs()
-	if _upgrade_confirm_dialog != null:
-		_upgrade_confirm_dialog.dialog_text = _stadium_fmt("stadium.upgrade.accel_confirm", {
-			"level": str(ng_cur) + "." + str(ns_cur),
-			"remaining": rem,
-			"after": 0,
-			"tokens": accel_cost,
-			"available": tokens_now
-		})
-		var accel_text := "Accelerate"
-		var k := _stadium_tr("stadium.upgrade.accelerate_now")
-		if k != "stadium.upgrade.accelerate_now":
-			accel_text = k
-		else:
-			var loc := TranslationServer.get_locale().to_lower()
-			if loc.begins_with("fr"):
-				accel_text = "Accélérer"
-			elif loc.begins_with("es"):
-				accel_text = "Acelerar"
-			elif loc.begins_with("it"):
-				accel_text = "Accelera"
-			elif loc.begins_with("pt"):
-				accel_text = "Acelerar"
-		_upgrade_confirm_dialog.get_ok_button().text = accel_text
-		var _tok_icon := load("res://assets/images/token.png") as Texture2D
-		_upgrade_confirm_dialog.get_ok_button().icon = _tok_icon
-		print("[POPUP_ACCEL] btn=", _upgrade_confirm_dialog.get_ok_button(), " icon=", _tok_icon, " btn_icon=", _upgrade_confirm_dialog.get_ok_button().icon)
-
-		_upgrade_confirm_dialog.get_ok_button().icon = load("res://assets/images/token.png") as Texture2D
-		_upgrade_confirm_dialog.popup_centered()
+	_show_upgrade_acceleration_popup(_stadium_fmt("stadium.upgrade.accel_confirm", {
+		"level": str(ng_cur) + "." + str(ns_cur),
+		"remaining": rem,
+		"after": 0,
+		"tokens": accel_cost,
+		"available": tokens_now
+	}))
 
 
 func _on_upgrade_accelerate_pressed() -> void:
@@ -2555,7 +2629,7 @@ func _on_upgrade_confirmed() -> void:
 			return
 		var tokens_now: int = PlayerLife.get_tokens(save_cur)
 		if not PlayerLife.spend_tokens(save_cur, accel_cost, "stadium_upgrade_accelerate_" + key):
-			_show_upgrade_info(_stadium_fmt("stadium.upgrade.tokens_insufficient", {"available": tokens_now, "required": accel_cost}))
+			_show_upgrade_notice_popup(_stadium_fmt("stadium.upgrade.tokens_insufficient", {"available": tokens_now, "required": accel_cost}))
 			return
 		if not save_cur.has("stadium") or typeof(save_cur["stadium"]) != TYPE_DICTIONARY:
 			_show_upgrade_info(_stadium_tr("stadium.upgrade.impossible"))
@@ -2577,7 +2651,7 @@ func _on_upgrade_confirmed() -> void:
 		call_deferred("_ensure_capacity_label")
 		call_deferred("_stadium_apply_i18n")
 		call_deferred("_stadium_refresh_token_labels")
-		_show_upgrade_info(_stadium_tr("stadium.upgrade.completed_now"))
+		_show_upgrade_notice_popup(_stadium_tr("stadium.upgrade.completed_now"))
 		return
 
 	if save_node == null:

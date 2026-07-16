@@ -14,6 +14,7 @@ static func ensure_exists(profile_uuid: String = "") -> void:
 		"profile_uuid": profile_uuid,
 		"season_id": "2026-01",
 		"club": {"name": "BM Club", "level": 1, "xp": 0},
+		"club_xp_total_migrated": true,
 		"wallet": {"euros": 0, "tokens": 0},
 		"missions_progress": {
 			"completed": [],

@@ -754,7 +754,7 @@ func _show_finalist_popup() -> void:
 	title_icon.size = Vector2(40, 40)
 	title_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	title_icon.custom_minimum_size = Vector2(40, 40)
-	title_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	title_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
 	title_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(title_icon)
 
@@ -780,7 +780,7 @@ func _show_finalist_popup() -> void:
 	medal.size = Vector2(70, 70)
 	medal.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	medal.custom_minimum_size = Vector2(70, 70)
-	medal.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	medal.stretch_mode = TextureRect.STRETCH_SCALE
 	medal.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(medal)
 
@@ -874,7 +874,7 @@ func _show_victory_popup() -> void:
 	trophy.size = Vector2(70, 70)
 	trophy.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	trophy.custom_minimum_size = Vector2(70, 70)
-	trophy.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	trophy.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
 	trophy.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(trophy)
 
