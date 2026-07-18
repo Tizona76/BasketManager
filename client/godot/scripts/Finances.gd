@@ -291,7 +291,7 @@ func _show_finance_line_tooltip(label: Label, key: String) -> void:
 	_finance_line_tooltip_label.text = tr(key)
 	var label_rect := label.get_global_rect()
 	var tooltip_width := 430.0
-	var local_pos := to_local(label_rect.position)
+	var local_pos: Vector2 = label_rect.position - get_global_rect().position
 	var x := local_pos.x - tooltip_width - 12.0
 	var y := local_pos.y + label_rect.size.y * 0.5 - 34.0
 	_finance_line_tooltip.position = Vector2(maxf(12.0, x), maxf(12.0, y))
