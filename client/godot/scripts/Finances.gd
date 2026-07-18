@@ -222,6 +222,9 @@ var _expense_donut_salaries: RevenueDonutChart = null
 var _expense_donut_staff: RevenueDonutChart = null
 var _expense_donut_maintenance: RevenueDonutChart = null
 var _expense_donut_stadium_works: RevenueDonutChart = null
+var _finance_line_tooltip: PanelContainer = null
+var _finance_line_tooltip_label: Label = null
+
 func _apply_tr_to_named_node(node_name: String, key: String) -> void:
 	var n: Node = find_child(node_name, true, false)
 	if n == null:
@@ -236,6 +239,90 @@ func _apply_tr_to_named_node(node_name: String, key: String) -> void:
 # --- end i18n helpers ---
 
 
+
+func _ensure_finance_line_tooltip() -> void:
+	if _finance_line_tooltip != null and is_instance_valid(_finance_line_tooltip):
+		return
+
+	var panel := PanelContainer.new()
+	panel.name = "FinanceLineTooltip"
+	panel.visible = false
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.z_index = 80
+	panel.custom_minimum_size = Vector2(430.0, 0.0)
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.02, 0.025, 0.04, 0.96)
+	style.border_color = Color(1.0, 0.58, 0.08, 0.62)
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	style.content_margin_left = 14
+	style.content_margin_top = 10
+	style.content_margin_right = 14
+	style.content_margin_bottom = 10
+	style.shadow_color = Color(0.0, 0.0, 0.0, 0.35)
+	style.shadow_size = 8
+	style.shadow_offset = Vector2(0.0, 3.0)
+	panel.add_theme_stylebox_override("panel", style)
+
+	var label := Label.new()
+	label.name = "Text"
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_font_size_override("font_size", 15)
+	label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.92))
+	panel.add_child(label)
+	add_child(panel)
+
+	_finance_line_tooltip = panel
+	_finance_line_tooltip_label = label
+
+
+func _show_finance_line_tooltip(label: Label, key: String) -> void:
+	_ensure_finance_line_tooltip()
+	if _finance_line_tooltip == null or _finance_line_tooltip_label == null:
+		return
+
+	_finance_line_tooltip_label.text = tr(key)
+	var label_rect := label.get_global_rect()
+	var tooltip_width := 430.0
+	var local_pos := to_local(label_rect.position)
+	var x := local_pos.x - tooltip_width - 12.0
+	var y := local_pos.y + label_rect.size.y * 0.5 - 34.0
+	_finance_line_tooltip.position = Vector2(maxf(12.0, x), maxf(12.0, y))
+	_finance_line_tooltip.visible = true
+
+
+func _hide_finance_line_tooltip() -> void:
+	if _finance_line_tooltip != null and is_instance_valid(_finance_line_tooltip):
+		_finance_line_tooltip.visible = false
+
+
+func _bind_finance_line_tooltip(node_path: String, key: String) -> void:
+	var label := get_node_or_null(node_path) as Label
+	if label == null:
+		return
+	label.mouse_filter = Control.MOUSE_FILTER_PASS
+
+	var enter_call := Callable(self, "_show_finance_line_tooltip").bind(label, key)
+	if not label.mouse_entered.is_connected(enter_call):
+		label.mouse_entered.connect(enter_call)
+
+	var exit_call := Callable(self, "_hide_finance_line_tooltip")
+	if not label.mouse_exited.is_connected(exit_call):
+		label.mouse_exited.connect(exit_call)
+
+
+func _setup_finance_line_tooltips() -> void:
+	_ensure_finance_line_tooltip()
+	_bind_finance_line_tooltip("IncomePanel/IncomeTicketsLabel", "finance.tooltip.tickets")
+	_bind_finance_line_tooltip("IncomePanel/IncomeShopLabel", "finance.tooltip.shops")
+	_bind_finance_line_tooltip("ExpensesPanel/ExpensesSalariesLabel", "finance.tooltip.salaries")
 
 func _bm_make_back_button_style(bg: Color, glow: Color, bottom_w: int, shadow_size: int) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
@@ -399,6 +486,7 @@ func _ready() -> void:
 		btn_retour.pressed.connect(_on_retour_pressed)
 
 	_apply_i18n()
+	_setup_finance_line_tooltips()
 	_bm_finance_force_popularity_white()
 	_bm_finance_apply_text_plus2_runtime(self)
 	call_deferred("_bm_finance_apply_text_plus2_runtime")

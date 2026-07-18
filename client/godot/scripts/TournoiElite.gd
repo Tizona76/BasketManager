@@ -777,10 +777,11 @@ func _show_finalist_popup() -> void:
 	var medal := TextureRect.new()
 	medal.texture = load("res://assets/images/medaille_argent.png") as Texture2D
 	medal.position = Vector2(245, 132)
-	medal.size = Vector2(70, 70)
+	medal.size = Vector2(1024, 1024)
 	medal.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	medal.custom_minimum_size = Vector2(70, 70)
-	medal.stretch_mode = TextureRect.STRETCH_SCALE
+	medal.custom_minimum_size = Vector2(105, 105)
+	medal.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	medal.scale = Vector2(105.0 / 1024.0, 105.0 / 1024.0)
 	medal.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(medal)
 
@@ -871,10 +872,11 @@ func _show_victory_popup() -> void:
 	var trophy := TextureRect.new()
 	trophy.texture = load("res://assets/images/coupe.png") as Texture2D
 	trophy.position = Vector2(245, 132)
-	trophy.size = Vector2(70, 70)
+	trophy.size = Vector2(1024, 1024)
 	trophy.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	trophy.custom_minimum_size = Vector2(70, 70)
-	trophy.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+	trophy.custom_minimum_size = Vector2(105, 105)
+	trophy.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	trophy.scale = Vector2(105.0 / 1024.0, 105.0 / 1024.0)
 	trophy.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(trophy)
 

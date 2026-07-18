@@ -3340,9 +3340,8 @@ func _fin_match() -> void:
 		var rec_shop := int(round(float(prev_shop) * coef * shop_price_volume_coef))
 
 		# BM_SHOP_STOCK_SALES_V1
-		# Avant match 14 : on garde l'ancien système simple.
-		# À partir du match 14 : les ventes consomment le stock réel ligne par ligne.
-		if round_index_local >= 13 and save.has("shop") and typeof(save["shop"]) == TYPE_DICTIONARY:
+		# À partir du match 3 : les ventes consomment le stock réel ligne par ligne.
+		if round_index_local >= 2 and save.has("shop") and typeof(save["shop"]) == TYPE_DICTIONARY:
 			var shop_d: Dictionary = save["shop"] as Dictionary
 			if shop_d.has("items") and typeof(shop_d["items"]) == TYPE_DICTIONARY and shop_d.has("stock_state") and typeof(shop_d["stock_state"]) == TYPE_DICTIONARY:
 				var items_d: Dictionary = shop_d["items"] as Dictionary

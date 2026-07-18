@@ -416,7 +416,6 @@ func _ready() -> void:
 	_ensure_ticket_cat_c_icon()
 	_update_ticketing_capacity_labels()
 	_stadium_boost_ticketing_fonts()
-	_ensure_ticketing_close_button()
 	call_deferred("_ensure_capacity_label")
 	call_deferred("_stadium_hide_title_and_fix_popularity")
 	call_deferred("_stadium_fix_popularity_badges_visual")
@@ -767,7 +766,6 @@ func _stadium_make_panel_full_screen(panel: Control) -> void:
 @onready var SeatsA: LineEdit = get_node_or_null("Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsA/SeatsA") as LineEdit
 @onready var SeatsB: LineEdit = get_node_or_null("Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsB/SeatsB") as LineEdit
 @onready var SeatsC: LineEdit = get_node_or_null("Content/CenterTicketing/PanelTicketing/VBox/Grid/BoxSeatsC/SeatsC") as LineEdit
-var BtnCloseTicketing: Button = null
 var TicketingScreenBG: TextureRect = null
 const TICKETING_BG_PATH: String = "res://assets/images/backgrounds/billetterie.png"
 var _ticketing_inputs_bound: bool = false
@@ -947,58 +945,6 @@ func _ensure_ticketing_screen_bg() -> void:
 	# keep normal child order; z_index handles layering
 
 
-func _ensure_ticketing_close_button() -> void:
-	if PanelTicketing == null:
-		return
-
-	# Déjà créé
-	if BtnCloseTicketing != null:
-		_ticketing_place_close_button()
-		return
-
-	var b: Button = Button.new()
-	b.name = "BtnCloseTicketing"
-	b.text = "✕"
-	b.focus_mode = Control.FOCUS_NONE
-	b.mouse_filter = Control.MOUSE_FILTER_STOP
-	b.z_index = (RenderingServer.CANVAS_ITEM_Z_MAX - 1)
-	b.set_as_top_level(true) # ✅ hors layout des Containers
-	b.custom_minimum_size = Vector2(48, 48)
-	b.add_theme_font_size_override("font_size", 30)
-
-	add_child(b) # ✅ overlay sur Stadium (pas dans PanelContainer)
-	BtnCloseTicketing = b
-
-	var cb := Callable(self, "_on_ticketing_close_pressed")
-	if not b.pressed.is_connected(cb):
-		b.pressed.connect(cb)
-
-	# Reposition au resize du panel (si signal dispo)
-	if not PanelTicketing.resized.is_connected(Callable(self, "_ticketing_place_close_button")):
-		PanelTicketing.resized.connect(Callable(self, "_ticketing_place_close_button"))
-
-	_ticketing_place_close_button()
-
-func _ticketing_place_close_button() -> void:
-	if BtnCloseTicketing == null or PanelTicketing == null:
-		return
-	if not PanelTicketing.visible:
-		BtnCloseTicketing.visible = false
-		return
-
-	BtnCloseTicketing.visible = true
-
-	# Coin haut-droite du fond obscur (PanelTicketing) en global
-	# marge interne: 16px droite, 12px haut
-	var gp: Vector2 = PanelTicketing.global_position
-	var sz: Vector2 = PanelTicketing.size
-	var btn_sz: Vector2 = BtnCloseTicketing.size
-	if btn_sz.x <= 0.0: btn_sz.x = 48.0
-	if btn_sz.y <= 0.0: btn_sz.y = 48.0
-
-	BtnCloseTicketing.global_position = gp + Vector2(sz.x - btn_sz.x - 16.0, 16.0)
-
-
 
 func _on_ticketing_close_pressed() -> void:
 	if TicketingScreenBG != null:
@@ -1006,8 +952,6 @@ func _on_ticketing_close_pressed() -> void:
 
 	if PanelTicketing != null:
 		PanelTicketing.visible = false
-		if BtnCloseTicketing != null:
-			BtnCloseTicketing.visible = false
 		var btn_back_ticketing := find_child("BtnBackTicketing", true, false) as Button
 		if btn_back_ticketing != null:
 			btn_back_ticketing.visible = false
@@ -1728,6 +1672,107 @@ func _show_upgrade_notice_popup(message: String) -> void:
 	ok_wrap.add_child(ok_btn)
 
 
+func _show_shop_first_open_info_if_needed() -> void:
+	var d: Dictionary = PlayerLife.load_savegame()
+	if bool(d.get("stadium_shop_intro_seen", false)):
+		return
+	d["stadium_shop_intro_seen"] = true
+	PlayerLife.write_savegame(d)
+	_show_shop_first_open_info_popup(_stadium_tr("stadium.shop.first_open_info"))
+
+func _show_shop_first_open_info_popup(message: String) -> void:
+	var old_popup := get_node_or_null("ShopFirstOpenInfoPopup")
+	if old_popup != null:
+		old_popup.queue_free()
+
+	var popup := Control.new()
+	popup.name = "ShopFirstOpenInfoPopup"
+	popup.set_anchors_preset(Control.PRESET_FULL_RECT)
+	popup.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	add_child(popup)
+	popup.set_as_top_level(true)
+	popup.global_position = Vector2.ZERO
+	popup.size = get_viewport_rect().size
+
+	var card := PanelContainer.new()
+	card.name = "ShopFirstOpenInfoCard"
+	card.custom_minimum_size = Vector2(760, 260)
+	card.size = Vector2(760, 260)
+	card.position = (get_viewport_rect().size - card.size) * 0.5
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.add_child(card)
+	card.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+
+	var card_style := StyleBoxFlat.new()
+	card_style.bg_color = Color(0.055, 0.065, 0.095, 0.98)
+	card_style.border_width_left = 2
+	card_style.border_width_right = 2
+	card_style.border_width_top = 2
+	card_style.border_width_bottom = 2
+	card_style.border_color = Color(0.95, 0.56, 0.08, 0.92)
+	card_style.corner_radius_top_left = 10
+	card_style.corner_radius_top_right = 10
+	card_style.corner_radius_bottom_left = 10
+	card_style.corner_radius_bottom_right = 10
+	card_style.content_margin_left = 36
+	card_style.content_margin_right = 36
+	card_style.content_margin_top = 26
+	card_style.content_margin_bottom = 26
+	card.add_theme_stylebox_override("panel", card_style)
+
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 24)
+	card.add_child(box)
+
+	var body := Label.new()
+	body.name = "LblShopFirstOpenInfoBody"
+	body.text = message
+	body.custom_minimum_size = Vector2(688, 110)
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_theme_font_size_override("font_size", 26)
+	body.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	body.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.65))
+	box.add_child(body)
+
+	var close_wrap := CenterContainer.new()
+	close_wrap.custom_minimum_size = Vector2(0, 58)
+	box.add_child(close_wrap)
+
+	var close_btn := Button.new()
+	close_btn.name = "BtnShopFirstOpenInfoClose"
+	close_btn.text = _stadium_tr("common.close")
+	close_btn.custom_minimum_size = Vector2(190, 52)
+	close_btn.add_theme_font_size_override("font_size", 24)
+	var close_style := StyleBoxFlat.new()
+	close_style.bg_color = Color(0.045, 0.045, 0.045, 0.96)
+	close_style.corner_radius_top_left = 8
+	close_style.corner_radius_top_right = 8
+	close_style.corner_radius_bottom_left = 8
+	close_style.corner_radius_bottom_right = 8
+	close_style.content_margin_left = 18
+	close_style.content_margin_right = 18
+	close_style.content_margin_top = 8
+	close_style.content_margin_bottom = 8
+	var close_hover := close_style.duplicate() as StyleBoxFlat
+	close_hover.bg_color = Color(0.085, 0.085, 0.085, 1.0)
+	var close_pressed := close_style.duplicate() as StyleBoxFlat
+	close_pressed.bg_color = Color(0.025, 0.025, 0.025, 1.0)
+	close_btn.add_theme_stylebox_override("normal", close_style)
+	close_btn.add_theme_stylebox_override("hover", close_hover)
+	close_btn.add_theme_stylebox_override("pressed", close_pressed)
+	close_btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	close_btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
+	close_btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
+	close_btn.pressed.connect(func() -> void:
+		popup.queue_free()
+	)
+	close_wrap.add_child(close_btn)
+
+
 func _show_upgrade_acceleration_popup(message: String) -> void:
 	var old_popup := get_node_or_null("UpgradeAccelerationPopup")
 	if old_popup != null:
@@ -2188,8 +2233,6 @@ func _on_tab_upgrade() -> void:
 						PanelTicketing.visible = false
 						PanelTicketing.scale = Vector2(1, 1)
 
-					if BtnCloseTicketing != null:
-						BtnCloseTicketing.visible = false
 					if BtnCloseShop != null:
 						BtnCloseShop.visible = false
 
@@ -2237,8 +2280,6 @@ func _on_tab_upgrade() -> void:
 		PanelTicketing.visible = false
 		PanelTicketing.scale = Vector2(1, 1)
 
-	if BtnCloseTicketing != null:
-		BtnCloseTicketing.visible = false
 	if BtnCloseShop != null:
 		BtnCloseShop.visible = false
 
@@ -2830,7 +2871,6 @@ func _on_tab_ticketing() -> void:
 			_btn_shop.visible = false
 			_btn_shop.disabled = true
 			_btn_shop.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_ensure_ticketing_close_button()
 		_ensure_capacity_label()
 		_stadium_fix_popularity_badges_visual()
 		_stadium_apply_ticketing_limits(_stadium_current_capacity_value())
@@ -2839,7 +2879,6 @@ func _on_tab_ticketing() -> void:
 		_stadium_make_panel_full_screen(PanelTicketing)
 		_ensure_ticketing_confirm_button()
 		_ticketing_place_back_button()
-		call_deferred("_ticketing_place_close_button")
 		call_deferred("_ticketing_place_confirm_button")
 		_update_ticketing_total()
 
@@ -3523,7 +3562,7 @@ func _ensure_shop_panel() -> void:
 			if save.has("shop") and typeof(save["shop"]) == TYPE_DICTIONARY:
 				var shop_last_sales: Dictionary = save["shop"] as Dictionary
 				last_sales_coef = float(shop_last_sales.get("last_game_sales_coef", 0.0))
-				if int(save.get("season_round", 0)) >= 13 and shop_last_sales.has("stock_state") and typeof(shop_last_sales["stock_state"]) == TYPE_DICTIONARY:
+				if int(save.get("season_round", 0)) >= 2 and shop_last_sales.has("stock_state") and typeof(shop_last_sales["stock_state"]) == TYPE_DICTIONARY:
 					var stock_state_last_sales: Dictionary = shop_last_sales["stock_state"] as Dictionary
 					if stock_state_last_sales.has(pid2) and typeof(stock_state_last_sales[pid2]) == TYPE_DICTIONARY:
 						last_sales = maxi(0, int((stock_state_last_sales[pid2] as Dictionary).get("last_sold", 0)))
@@ -3989,6 +4028,7 @@ func _on_tab_shop() -> void:
 		_shop_place_back_button()
 		print("[STADIUM][SHOP] opened")
 		_ensure_shop_close_button()
+		_show_shop_first_open_info_if_needed()
 
 	call_deferred("_shop_force_confirm_button")
 
@@ -4058,7 +4098,7 @@ func _shop_restock_unlocked_now() -> bool:
 		var shop_d: Dictionary = d["shop"] as Dictionary
 		if bool(shop_d.get("restock_unlocked", false)):
 			return true
-	return int(d.get("season_round", 0)) >= 13
+	return int(d.get("season_round", 0)) >= 2
 
 
 func _shop_apply_restock_visibility(root: Node) -> void:
@@ -4115,8 +4155,8 @@ func _get_shop_stock_for_level(level: int, pid: String) -> int:
 		return 0
 
 	# BM_SHOP_CURRENT_STOCK_UI_V1
-	# À partir du match 14, l'affichage Shop montre le stock réel restant.
-	if typeof(save) == TYPE_DICTIONARY and int(save.get("season_round", 0)) >= 13:
+	# À partir du match 3, l'affichage Shop montre le stock réel restant.
+	if typeof(save) == TYPE_DICTIONARY and int(save.get("season_round", 0)) >= 2:
 		if save.has("shop") and typeof(save["shop"]) == TYPE_DICTIONARY:
 			var shop_d: Dictionary = save["shop"] as Dictionary
 			if shop_d.has("stock_state") and typeof(shop_d["stock_state"]) == TYPE_DICTIONARY:

@@ -1218,16 +1218,6 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 	lbl_mission.add_theme_font_size_override("font_size", 24)
 	card.add_child(lbl_mission)
 
-	var lbl_line2 := Label.new()
-	var reward_key := "club_tokens.reward_earned.one" if tokens_display == 1 else "club_tokens.reward_earned.many"
-	var reward_fallback := "+{amount} Club Token earned!" if tokens_display == 1 else "+{amount} Club Tokens earned!"
-	lbl_line2.text = _bm_tr_or_fallback(reward_key, reward_fallback).replace("{amount}", str(tokens_display))
-	lbl_line2.position = Vector2(20, 155)
-	lbl_line2.size = Vector2(720, 30)
-	lbl_line2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl_line2.add_theme_font_size_override("font_size", 22)
-	card.add_child(lbl_line2)
-
 	var lbl_line3 := Label.new()
 	lbl_line3.text = _bm_tr_or_fallback("popup.tokens.first_reward.line3", "Tokens unlock premium upgrades and special content.")
 	lbl_line3.position = Vector2(20, 188)
@@ -1847,7 +1837,6 @@ func _ready() -> void:
 	# BtnMatch micro hover (léger, HTML5)
 	if btn_match != null:
 		_btn_match_base_scale = btn_match.scale
-		_btn_match_base_pos = btn_match.position
 		if not btn_match.mouse_entered.is_connected(_on_btn_match_mouse_entered):
 			btn_match.mouse_entered.connect(_on_btn_match_mouse_entered)
 		if not btn_match.mouse_exited.is_connected(_on_btn_match_mouse_exited):
@@ -1867,6 +1856,7 @@ func _ready() -> void:
 	if btn_match != null:
 		btn_match.text = tr("season.btn_play_match")
 		_bm_style_btn_match_action()
+		_btn_match_base_pos = btn_match.position
 		var _save := PL.load_savegame()
 		if int(_save.get("matchs_joues", 0)) == 0:
 			call_deferred("_bm_add_play_match_halo")

@@ -791,8 +791,8 @@ func _bm_add_lineup_preview_player_row(parent: Control, player_data: Dictionary,
 
 	var player_name := str(player_data.get("name", player_data.get("nom", "Player"))).strip_edges()
 	var metrics := _bm_lineup_preview_player_metrics(player_data)
-	_bm_add_lineup_summary_label(row, player_name, Vector2(50, 4), Vector2(row_w - 370.0, 32), 18, Color(0.94, 0.96, 1.0, 1.0), false)
-	_bm_add_lineup_summary_label(row, _bm_player_card_position_text(str(player_data.get("poste", player_data.get("pos", "")))), Vector2(row_w - 320.0, 4), Vector2(70, 32), 17, Color(1, 1, 1, 0.94), true)
+	_bm_add_lineup_summary_label(row, player_name, Vector2(50, 4), Vector2(row_w - 388.0, 32), 18, Color(0.94, 0.96, 1.0, 1.0), false)
+	_bm_add_lineup_summary_label(row, _bm_player_card_position_text(str(player_data.get("poste", player_data.get("pos", "")))), Vector2(row_w - 338.0, 4), Vector2(70, 32), 17, Color(1, 1, 1, 0.94), true)
 	_bm_add_lineup_summary_label(row, str(int(metrics.get("attack", 0))), Vector2(row_w - 242.0, 4), Vector2(64, 32), 16, Color(1, 1, 1, 0.94), true)
 	_bm_add_lineup_summary_label(row, str(int(metrics.get("defense", 0))), Vector2(row_w - 170.0, 4), Vector2(70, 32), 16, Color(1, 1, 1, 0.94), true)
 	_bm_add_lineup_summary_label(row, str(int(metrics.get("energy", 0))), Vector2(row_w - 92.0, 4), Vector2(64, 32), 16, Color(1, 1, 1, 0.94), true)
@@ -800,7 +800,7 @@ func _bm_add_lineup_preview_player_row(parent: Control, player_data: Dictionary,
 
 func _bm_add_lineup_preview_header(parent: Control, y: float, row_w: float) -> void:
 	var header_color := Color(0.76, 0.84, 0.96, 0.82)
-	_bm_add_lineup_summary_label(parent, _bm_myteam_tr_or_fallback("mercato.col.position", "Position"), Vector2(row_w - 320.0, y), Vector2(70, 20), 13, header_color, true)
+	_bm_add_lineup_summary_label(parent, _bm_myteam_tr_or_fallback("mercato.col.position", "Position"), Vector2(row_w - 338.0, y), Vector2(70, 20), 13, header_color, true)
 	_bm_add_lineup_summary_label(parent, _bm_myteam_tr_or_fallback("player.card.graph.attack", "Attack"), Vector2(row_w - 242.0, y), Vector2(64, 20), 13, header_color, true)
 	_bm_add_lineup_summary_label(parent, _bm_myteam_tr_or_fallback("player.card.graph.defense", "Defense"), Vector2(row_w - 170.0, y), Vector2(70, 20), 13, header_color, true)
 	_bm_add_lineup_summary_label(parent, _bm_myteam_tr_or_fallback("matchsim.energy", "Energy"), Vector2(row_w - 92.0, y), Vector2(64, 20), 13, header_color, true)

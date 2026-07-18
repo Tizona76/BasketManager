@@ -12,6 +12,7 @@ const FATIGUE_RECOVER_REST := 10     # -fatigue si joueur n'a pas joué
 const MOTIV_WIN_GAIN := 4
 const MOTIV_LOSS_DROP := 4
 const MOTIV_REST_GAIN := 1
+const BM_MERCATO_ID_DEBUG := true
 
 # Blessure: probabilité augmente avec fatigue haute + endurance basse
 const INJURY_BASE_PCT := 1.0         # % mini
@@ -81,18 +82,101 @@ static func _bm_debug_dump_active_save_path() -> void:
 	var resolved := _resolve_save_path("user://savegame.json")
 	print("[DEBUG SAVE PATH] resolved=", resolved)
 
+static func _bm_save_debug_active_profile_id() -> String:
+	var tree := Engine.get_main_loop()
+	if tree != null and tree is SceneTree:
+		var root := (tree as SceneTree).root
+		if root != null:
+			var pm_node := root.get_node_or_null("/root/ProfileManager")
+			if pm_node != null:
+				if pm_node.has_method("get_active_profile_id"):
+					var pid := str(pm_node.call("get_active_profile_id")).strip_edges()
+					if pid != "":
+						return pid
+				if pm_node.has_method("get_current_profile_id"):
+					var pid2 := str(pm_node.call("get_current_profile_id")).strip_edges()
+					if pid2 != "":
+						return pid2
+
+	var profiles_path := "user://profiles.json"
+	if FileAccess.file_exists(profiles_path):
+		var f := FileAccess.open(profiles_path, FileAccess.READ)
+		if f != null:
+			var parsed = JSON.parse_string(f.get_as_text())
+			if typeof(parsed) == TYPE_DICTIONARY:
+				var d: Dictionary = parsed as Dictionary
+				return str(d.get("active_profile_id", "")).strip_edges()
+	return ""
+
+static func _bm_save_debug_caller() -> String:
+	var stack := get_stack()
+	for frame in stack:
+		if typeof(frame) != TYPE_DICTIONARY:
+			continue
+		var fn := str((frame as Dictionary).get("function", ""))
+		if fn == "" or fn.begins_with("_bm_save_debug") or fn == "load_savegame":
+			continue
+		var src := str((frame as Dictionary).get("source", ""))
+		var line := int((frame as Dictionary).get("line", 0))
+		return "%s:%d:%s" % [src, line, fn]
+	return "unknown"
+
+static func _bm_save_debug_player(save: Dictionary, wanted_id: int) -> void:
+	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
+		return
+	var by_id: Dictionary = save["players_by_id"] as Dictionary
+	var found: Dictionary = {}
+	for raw_key in by_id.keys():
+		var sid := str(raw_key).strip_edges()
+		if sid == "":
+			continue
+		if int(round(float(sid))) != wanted_id:
+			continue
+		var candidate = by_id[raw_key]
+		if typeof(candidate) == TYPE_DICTIONARY:
+			found = candidate as Dictionary
+		break
+	if found.is_empty():
+		return
+	print(
+		"[BM_SAVE_DEBUG] PLAYER_%d id=%s nom=%s name=%s avatar_key=%s avatar_path=%s mercato_generated=%s" %
+		[
+			wanted_id,
+			str(found.get("id", "")),
+			str(found.get("nom", "")),
+			str(found.get("name", "")),
+			str(found.get("avatar_key", "")),
+			str(found.get("avatar_path", "")),
+			str(found.get("mercato_generated", ""))
+		]
+	)
+
 static func load_savegame(path: String = "user://savegame.json") -> Dictionary:
 	path = _resolve_save_path(path)
+	print(
+		"[BM_SAVE_DEBUG] LOAD_SAVE path=%s global_path=%s profile=%s project=%s file=%s caller=%s" %
+		[
+			path,
+			ProjectSettings.globalize_path(path),
+			_bm_save_debug_active_profile_id(),
+			str(ProjectSettings.get_setting("application/config/name", "")),
+			path.get_file(),
+			_bm_save_debug_caller()
+		]
+	)
 	if not FileAccess.file_exists(path):
 		return {}
 	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
 		return {}
 	var txt := f.get_as_text()
+	print("[BM_SAVE_DEBUG] FILE_HASH hash=", txt.sha256_text())
 	var parsed = JSON.parse_string(txt)
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return {}
 	var save: Dictionary = parsed as Dictionary
+	_bm_save_debug_player(save, 1006)
+	_bm_save_debug_player(save, 1007)
 	var had_legacy_wallet: bool = save.has("wallet") and typeof(save["wallet"]) != TYPE_DICTIONARY
 	ensure_progression_wallet_schema(save)
 	_repair_corrupted_salaries_on_load(save)
@@ -1104,9 +1188,17 @@ static func apply_post_match_to_save(save: Dictionary, played_ids: Array, did_wi
 
 static func _mercato_scan_avatar_portraits(path: String) -> Array[String]:
 	var out: Array[String] = []
+	if BM_MERCATO_ID_DEBUG:
+		print("[BM_MERCATO_ID_DEBUG] SCAN_START path=", path, " platform_or_features=", OS.get_name(), "|web=", OS.has_feature("web"), "|ios=", OS.has_feature("ios"), "|android=", OS.has_feature("android"))
 	var dir := DirAccess.open(path)
 	if dir == null:
+		if BM_MERCATO_ID_DEBUG:
+			print("[BM_MERCATO_ID_DEBUG] SCAN_DIRACCESS_OPEN_OK=false")
+			print("[BM_MERCATO_ID_DEBUG] SCAN_DIRACCESS_ERROR=", DirAccess.get_open_error())
+			print("[BM_MERCATO_ID_DEBUG] SCAN_RESULT count=0 keys=[]")
 		return out
+	if BM_MERCATO_ID_DEBUG:
+		print("[BM_MERCATO_ID_DEBUG] SCAN_DIRACCESS_OPEN_OK=true")
 	dir.list_dir_begin()
 	while true:
 		var fn := dir.get_next()
@@ -1121,6 +1213,11 @@ static func _mercato_scan_avatar_portraits(path: String) -> Array[String]:
 			out.append(fn)
 	dir.list_dir_end()
 	out.sort()
+	if BM_MERCATO_ID_DEBUG:
+		var keys: Array[String] = []
+		for fn in out:
+			keys.append(String(fn).get_basename())
+		print("[BM_MERCATO_ID_DEBUG] SCAN_RESULT count=", out.size(), " keys=", keys)
 	return out
 
 
@@ -1215,19 +1312,127 @@ static func _identity_unique_name_for_avatar(base_name: String, avatar_key: Stri
 	return "Prospect " + str(pid)
 
 
+static func _identity_normalized_id(value: Variant) -> String:
+	var text := str(value).strip_edges()
+	if text == "":
+		return ""
+	if text.is_valid_int():
+		return str(int(text))
+	if text.is_valid_float():
+		return str(int(round(float(text))))
+	return text
+
+
+static func _identity_mark_active_id(active_ids: Dictionary, value: Variant) -> void:
+	var sid := _identity_normalized_id(value)
+	if sid != "":
+		active_ids[sid] = true
+
+
+static func _identity_collect_active_player_ids(save: Dictionary) -> Dictionary:
+	var active_ids := {}
+	if save.has("mercato") and typeof(save["mercato"]) == TYPE_DICTIONARY:
+		var md: Dictionary = save["mercato"] as Dictionary
+		if md.has("current_ids") and typeof(md["current_ids"]) == TYPE_ARRAY:
+			for id_value in (md["current_ids"] as Array):
+				_identity_mark_active_id(active_ids, id_value)
+		if md.has("purchased_ids") and typeof(md["purchased_ids"]) == TYPE_ARRAY:
+			for id_value in (md["purchased_ids"] as Array):
+				_identity_mark_active_id(active_ids, id_value)
+	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
+		var roster: Dictionary = save["roster"] as Dictionary
+		if roster.has("selected_ids") and typeof(roster["selected_ids"]) == TYPE_ARRAY:
+			for id_value in (roster["selected_ids"] as Array):
+				_identity_mark_active_id(active_ids, id_value)
+		if roster.has("match_selected_ids") and typeof(roster["match_selected_ids"]) == TYPE_ARRAY:
+			for id_value in (roster["match_selected_ids"] as Array):
+				_identity_mark_active_id(active_ids, id_value)
+		if roster.has("players") and typeof(roster["players"]) == TYPE_ARRAY:
+			for row_raw in (roster["players"] as Array):
+				if typeof(row_raw) != TYPE_DICTIONARY:
+					continue
+				var row: Dictionary = row_raw as Dictionary
+				_identity_mark_active_id(active_ids, row.get("id", ""))
+	if save.has("players") and typeof(save["players"]) == TYPE_ARRAY:
+		for row_raw in (save["players"] as Array):
+			if typeof(row_raw) != TYPE_DICTIONARY:
+				continue
+			var row: Dictionary = row_raw as Dictionary
+			_identity_mark_active_id(active_ids, row.get("id", ""))
+	return active_ids
+
+
+static func _identity_is_abandoned_mercato_player(p: Dictionary, sid: String, active_ids: Dictionary) -> bool:
+	if sid == "":
+		return false
+	if not bool(p.get("mercato_generated", false)):
+		return false
+	return not active_ids.has(sid)
+
+
+static func _identity_has_active_reference_schema(save: Dictionary) -> bool:
+	if not save.has("mercato") or typeof(save["mercato"]) != TYPE_DICTIONARY:
+		return false
+	var md: Dictionary = save["mercato"] as Dictionary
+	if not md.has("current_ids") or typeof(md["current_ids"]) != TYPE_ARRAY:
+		return false
+	if not md.has("purchased_ids") or typeof(md["purchased_ids"]) != TYPE_ARRAY:
+		return false
+	if not save.has("roster") or typeof(save["roster"]) != TYPE_DICTIONARY:
+		return false
+	var roster: Dictionary = save["roster"] as Dictionary
+	if not roster.has("selected_ids") or typeof(roster["selected_ids"]) != TYPE_ARRAY:
+		return false
+	if not save.has("players") or typeof(save["players"]) != TYPE_ARRAY:
+		return false
+	return true
+
+
 static func _identity_collect_used(save: Dictionary, skip_id: String = "") -> Dictionary:
 	var used := {"avatar_keys": {}, "names": {}, "identity_pairs": {}}
+	var current_ids_count := 0
+	var purchased_ids_count := 0
+	var roster_selected_count := 0
+	var roster_players_count := 0
+	var save_players_count := 0
+	if save.has("mercato") and typeof(save["mercato"]) == TYPE_DICTIONARY:
+		var md_debug: Dictionary = save["mercato"] as Dictionary
+		if md_debug.has("current_ids") and typeof(md_debug["current_ids"]) == TYPE_ARRAY:
+			current_ids_count = (md_debug["current_ids"] as Array).size()
+		if md_debug.has("purchased_ids") and typeof(md_debug["purchased_ids"]) == TYPE_ARRAY:
+			purchased_ids_count = (md_debug["purchased_ids"] as Array).size()
+	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
+		var roster_debug: Dictionary = save["roster"] as Dictionary
+		if roster_debug.has("selected_ids") and typeof(roster_debug["selected_ids"]) == TYPE_ARRAY:
+			roster_selected_count = (roster_debug["selected_ids"] as Array).size()
+		if roster_debug.has("players") and typeof(roster_debug["players"]) == TYPE_ARRAY:
+			roster_players_count = (roster_debug["players"] as Array).size()
+	if save.has("players") and typeof(save["players"]) == TYPE_ARRAY:
+		save_players_count = (save["players"] as Array).size()
 	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
+		if BM_MERCATO_ID_DEBUG:
+			print("[BM_MERCATO_ID_DEBUG] USED_IDENTITIES_RESULT used_pair_count=0 used_avatar_key_count=0 active_player_ids_count=0 players_by_id_missing=true selection_players_count=", save_players_count, " roster_selected_count=", roster_selected_count, " roster_players_count=", roster_players_count, " purchased_ids_count=", purchased_ids_count, " mercato_current_ids_count=", current_ids_count)
 		return used
 	var by_id: Dictionary = save["players_by_id"] as Dictionary
+	var active_ids := _identity_collect_active_player_ids(save)
+	var can_filter_abandoned_mercato := _identity_has_active_reference_schema(save)
+	var normalized_skip_id := _identity_normalized_id(skip_id)
+	var skipped_abandoned := 0
+	var skipped_id := 0
+	var scanned_players := 0
 	for k in by_id.keys():
-		var sid := str(k).strip_edges()
-		if skip_id != "" and sid == skip_id:
+		var sid := _identity_normalized_id(k)
+		if normalized_skip_id != "" and sid == normalized_skip_id:
+			skipped_id += 1
 			continue
 		var raw = by_id[k]
 		if typeof(raw) != TYPE_DICTIONARY:
 			continue
 		var p: Dictionary = raw as Dictionary
+		if can_filter_abandoned_mercato and _identity_is_abandoned_mercato_player(p, sid, active_ids):
+			skipped_abandoned += 1
+			continue
+		scanned_players += 1
 		var name := _identity_player_name(p)
 		var ak := str(p.get("avatar_key", "")).strip_edges()
 		if name != "":
@@ -1238,23 +1443,42 @@ static func _identity_collect_used(save: Dictionary, skip_id: String = "") -> Di
 			var pair_key := _identity_pair_key(name, ak)
 			if pair_key != "":
 				(used["identity_pairs"] as Dictionary)[pair_key] = true
+	if BM_MERCATO_ID_DEBUG:
+		var used_pairs: Array = (used["identity_pairs"] as Dictionary).keys()
+		var used_avatar_keys: Array = (used["avatar_keys"] as Dictionary).keys()
+		print("[BM_MERCATO_ID_DEBUG] USED_IDENTITIES_RESULT used_pair_count=", used_pairs.size(), " used_avatar_key_count=", used_avatar_keys.size(), " active_player_ids_count=", active_ids.size(), " selection_players_count=", save_players_count, " roster_selected_count=", roster_selected_count, " roster_players_count=", roster_players_count, " purchased_ids_count=", purchased_ids_count, " mercato_current_ids_count=", current_ids_count, " abandoned_mercato_ignored_count=", skipped_abandoned, " skipped_id_count=", skipped_id, " scanned_players=", scanned_players, " players_by_id_count=", by_id.size(), " used_pairs=", used_pairs, " used_avatar_keys=", used_avatar_keys)
 	return used
 
 
 static func _identity_pick_candidate(save: Dictionary, used: Dictionary) -> Dictionary:
 	var candidates: Array = _mercato_avatar_candidates()
 	var used_pairs: Dictionary = used.get("identity_pairs", {}) as Dictionary
+	var rejected_count := 0
 	for c_raw in candidates:
 		if typeof(c_raw) != TYPE_DICTIONARY:
+			rejected_count += 1
+			if BM_MERCATO_ID_DEBUG:
+				print("[BM_MERCATO_ID_DEBUG] CANDIDATE_REJECTED name= avatar_key= reason=not_dictionary")
 			continue
 		var c: Dictionary = c_raw as Dictionary
 		var ak := str(c.get("avatar_key", "")).strip_edges()
 		var name := str(c.get("name", "")).strip_edges()
+		var avatar_path := str(c.get("avatar_path", "")).strip_edges()
 		if ak == "":
+			rejected_count += 1
+			if BM_MERCATO_ID_DEBUG:
+				print("[BM_MERCATO_ID_DEBUG] CANDIDATE_REJECTED name=", name, " avatar_key=", ak, " reason=missing_avatar_key")
 			continue
 		if used_pairs.has(_identity_pair_key(name, ak)):
+			rejected_count += 1
+			if BM_MERCATO_ID_DEBUG:
+				print("[BM_MERCATO_ID_DEBUG] CANDIDATE_REJECTED name=", name, " avatar_key=", ak, " reason=pair_already_used")
 			continue
+		if BM_MERCATO_ID_DEBUG:
+			print("[BM_MERCATO_ID_DEBUG] CANDIDATE_SELECTED name=", name, " avatar_key=", ak, " avatar_path=", avatar_path, " gender=", str(c.get("gender", "")))
 		return c
+	if BM_MERCATO_ID_DEBUG:
+		print("[BM_MERCATO_ID_DEBUG] NO_CANDIDATE_SELECTED candidate_count=", candidates.size(), " rejected_count=", rejected_count)
 	return {}
 
 
@@ -1348,6 +1572,7 @@ static func _mercato_avatar_candidates() -> Array:
 		files = _mercato_scan_avatar_portraits(base_used)
 	var meta: Dictionary = _mercato_load_avatar_meta()
 	var out: Array = []
+	var meta_hits := 0
 	for i in range(files.size()):
 		var fname := files[i]
 		var avatar_key := fname.get_basename()
@@ -1358,6 +1583,7 @@ static func _mercato_avatar_candidates() -> Array:
 				var m: Dictionary = meta[k] as Dictionary
 				gender = str(m.get("gender", "U"))
 				first_name = str(m.get("first_name", first_name))
+				meta_hits += 1
 				break
 		out.append({
 			"id": i,
@@ -1366,12 +1592,22 @@ static func _mercato_avatar_candidates() -> Array:
 			"name": first_name,
 			"gender": gender
 		})
+	if BM_MERCATO_ID_DEBUG:
+		var candidate_keys: Array[String] = []
+		for c_raw in out:
+			if typeof(c_raw) == TYPE_DICTIONARY:
+				var c: Dictionary = c_raw as Dictionary
+				candidate_keys.append(str(c.get("name", "")) + "|" + str(c.get("avatar_key", "")) + "|" + str(c.get("avatar_path", "")) + "|" + str(c.get("gender", "")))
+		print("[BM_MERCATO_ID_DEBUG] CANDIDATES_RESULT portraits_count=", files.size(), " metadata_count=", meta.size(), " metadata_hits=", meta_hits, " candidate_count=", out.size(), " candidate_keys=", candidate_keys)
 	return out
 
 
 static func _mercato_pick_unused_avatar(save: Dictionary) -> Dictionary:
 	var used := _identity_collect_used(save)
-	return _identity_pick_candidate(save, used)
+	var picked := _identity_pick_candidate(save, used)
+	if BM_MERCATO_ID_DEBUG:
+		print("[BM_MERCATO_ID_DEBUG] PICK_RESULT is_empty=", picked.is_empty(), " name=", str(picked.get("name", "")), " avatar_key=", str(picked.get("avatar_key", "")), " avatar_path=", str(picked.get("avatar_path", "")), " gender=", str(picked.get("gender", "")))
+	return picked
 
 
 static func _mercato_rng() -> RandomNumberGenerator:
@@ -1549,6 +1785,10 @@ static func _mercato_make_new_player(save: Dictionary) -> Dictionary:
 		salaire_int = int(60000 + base * 400.0)
 	salaire_int = clamp(salaire_int, 60000, 250000)
 	j["salaire"] = salaire_int
+	if BM_MERCATO_ID_DEBUG:
+		var identity_complete := not str(j.get("nom", "")).begins_with("Prospect ") and str(j.get("avatar_key", "")).strip_edges() != "" and str(j.get("avatar_path", "")).strip_edges() != ""
+		print("[BM_MERCATO_ID_DEBUG] PLAYER_CREATED id=", pid, " nom=", str(j.get("nom", "")), " name=", str(j.get("name", "")), " avatar_key=", str(j.get("avatar_key", "")), " avatar_path=", str(j.get("avatar_path", "")), " gender=", str(j.get("gender", "")), " mercato_generated=", bool(j.get("mercato_generated", false)))
+		print("[BM_MERCATO_ID_DEBUG] PLAYER_IDENTITY_COMPLETE=", identity_complete)
 
 	return j
 
@@ -1591,10 +1831,17 @@ static func refresh_mercato_pool(save: Dictionary, phase: String = "manual") -> 
 	var season_now: int = int(save.get("season_number", 1))
 	var pool_size: int = 8
 	var next_ids: Array = []
+	if BM_MERCATO_ID_DEBUG:
+		var purchased_ids_debug: Array = []
+		if md.has("purchased_ids") and typeof(md["purchased_ids"]) == TYPE_ARRAY:
+			purchased_ids_debug = (md["purchased_ids"] as Array).duplicate()
+		print("[BM_MERCATO_ID_DEBUG] REFRESH_START season_round=", int(save.get("season_round", save.get("matchs_joues", 0))), " season_id=", season_now, " phase=", phase, " current_ids_before=", current_ids, " purchased_ids=", purchased_ids_debug, " players_by_id_count=", by_id.size())
 
 	# Même saison + pool déjà complet => on garde exactement les mêmes 8
 	if int(md.get("last_refresh_season", 0)) == season_now and current_ids.size() == pool_size:
 		next_ids = current_ids.duplicate()
+		if BM_MERCATO_ID_DEBUG:
+			print("[BM_MERCATO_ID_DEBUG] REFRESH_REUSE phase=", phase, " current_ids_after=", next_ids)
 	else:
 		while next_ids.size() < pool_size:
 			var player: Dictionary = _mercato_make_new_player(save)
@@ -1610,6 +1857,8 @@ static func refresh_mercato_pool(save: Dictionary, phase: String = "manual") -> 
 				seen_ids.append(pid)
 
 			md["last_generated_id"] = maxi(int(md.get("last_generated_id", 999)), pid)
+			if BM_MERCATO_ID_DEBUG:
+				print("[BM_MERCATO_ID_DEBUG] REFRESH_APPEND phase=", phase, " id=", pid, " slot=", next_ids.size(), " nom=", str(player.get("nom", "")), " avatar_key=", str(player.get("avatar_key", "")), " avatar_path=", str(player.get("avatar_path", "")))
 
 	md["current_ids"] = next_ids
 	md["seen_ids"] = seen_ids
@@ -1619,6 +1868,8 @@ static func refresh_mercato_pool(save: Dictionary, phase: String = "manual") -> 
 
 	save["players_by_id"] = by_id
 	save["mercato"] = md
+	if BM_MERCATO_ID_DEBUG:
+		print("[BM_MERCATO_ID_DEBUG] REFRESH_END current_ids_after=", next_ids, " generated_ids=", next_ids, " players_by_id_count_after=", by_id.size(), " seen_ids_count=", seen_ids.size(), " phase=", phase)
 
 # --- Reset Finance pour nouveau club (appelé depuis Main.gd) ---
 static func reset_finance_for_new_club(save: Dictionary) -> void:

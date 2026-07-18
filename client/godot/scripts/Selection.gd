@@ -531,6 +531,10 @@ func _scan_avatar_portraits(path: String) -> Array[String]:
 
 		res.sort()
 
+	var keys: Array[String] = []
+	for fn in res:
+		keys.append(String(fn).get_basename())
+	print("[BM_SELECTION_ID_DEBUG] SCAN_RESULT count=", res.size(), " keys=", keys)
 	return res
 
 
@@ -1612,6 +1616,7 @@ func _bm_init_player_from_avatar(p: Dictionary) -> Dictionary:
 	j["reussite_2pts"] = clamp(base2, 0.30, 0.65)
 	j["reussite_3pts"] = clamp(base3, 0.20, 0.45)
 
+	print("[BM_SELECTION_ID_DEBUG] FINAL_PLAYER id=", int(j.get("id", -1)), " nom=", str(j.get("nom", "")), " avatar_key=", str(j.get("avatar_key", "")), " avatar_path=", str(j.get("avatar_path", "")))
 	return j
 
 
