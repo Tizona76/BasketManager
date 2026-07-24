@@ -181,7 +181,8 @@ static func load_savegame(path: String = "user://savegame.json") -> Dictionary:
 	ensure_progression_wallet_schema(save)
 	_repair_corrupted_salaries_on_load(save)
 	var repaired_identity: bool = _repair_duplicate_player_identities_on_load(save)
-	if had_legacy_wallet or repaired_identity:
+	var repaired_incomplete_mercato_identity: bool = _repair_incomplete_mercato_identities_on_load(save)
+	if had_legacy_wallet or repaired_identity or repaired_incomplete_mercato_identity:
 		write_savegame(save, path)
 	return save
 
@@ -425,6 +426,8 @@ const CLUB_LEVEL_XP_FLOORS: Dictionary = {
 	5: 2000,
 	6: 2750,
 }
+const CLUB_STAFF_INTRO_SEEN_KEY := "club_staff_intro_seen"
+const CLUB_STAFF_INTRO_PENDING_KEY := "club_staff_intro_pending"
 
 
 static func _get_level_floor_xp(level: int) -> int:
@@ -722,9 +725,13 @@ static func add_club_xp(save: Dictionary, amount: int, reason: String = "") -> D
 	_migrate_club_xp_to_total_if_needed(save)
 
 	var club: Dictionary = save["club"] as Dictionary
+	var level_before := get_club_level_from_total_xp(maxi(0, int(club.get("xp", 0))))
 	var xp_add := maxi(0, int(amount))
 	club["xp"] = maxi(0, int(club.get("xp", 0))) + xp_add
 	club["level"] = get_club_level_from_total_xp(int(club["xp"]))
+	var level_after := int(club["level"])
+	if level_before < 2 and level_after >= 2 and not bool(save.get(CLUB_STAFF_INTRO_SEEN_KEY, false)):
+		save[CLUB_STAFF_INTRO_PENDING_KEY] = true
 	save["season_xp_earned"] = maxi(0, int(save.get("season_xp_earned", 0))) + xp_add
 
 	if reason != "":
@@ -1190,28 +1197,15 @@ static func _mercato_scan_avatar_portraits(path: String) -> Array[String]:
 	var out: Array[String] = []
 	if BM_MERCATO_ID_DEBUG:
 		print("[BM_MERCATO_ID_DEBUG] SCAN_START path=", path, " platform_or_features=", OS.get_name(), "|web=", OS.has_feature("web"), "|ios=", OS.has_feature("ios"), "|android=", OS.has_feature("android"))
-	var dir := DirAccess.open(path)
-	if dir == null:
-		if BM_MERCATO_ID_DEBUG:
-			print("[BM_MERCATO_ID_DEBUG] SCAN_DIRACCESS_OPEN_OK=false")
-			print("[BM_MERCATO_ID_DEBUG] SCAN_DIRACCESS_ERROR=", DirAccess.get_open_error())
-			print("[BM_MERCATO_ID_DEBUG] SCAN_RESULT count=0 keys=[]")
-		return out
-	if BM_MERCATO_ID_DEBUG:
-		print("[BM_MERCATO_ID_DEBUG] SCAN_DIRACCESS_OPEN_OK=true")
-	dir.list_dir_begin()
-	while true:
-		var fn := dir.get_next()
-		if fn == "":
-			break
-		if dir.current_is_dir():
+	var entries: PackedStringArray = ResourceLoader.list_directory(path)
+	for fn in entries:
+		if fn.ends_with("/"):
 			continue
 		var lf := fn.to_lower()
 		if not lf.begins_with("avatar_"):
 			continue
 		if lf.ends_with(".png") or lf.ends_with(".webp") or lf.ends_with(".jpg") or lf.ends_with(".jpeg"):
 			out.append(fn)
-	dir.list_dir_end()
 	out.sort()
 	if BM_MERCATO_ID_DEBUG:
 		var keys: Array[String] = []
@@ -1450,8 +1444,47 @@ static func _identity_collect_used(save: Dictionary, skip_id: String = "") -> Di
 	return used
 
 
-static func _identity_pick_candidate(save: Dictionary, used: Dictionary) -> Dictionary:
-	var candidates: Array = _mercato_avatar_candidates()
+static func _mercato_collect_used(save: Dictionary, skip_id: String = "") -> Dictionary:
+	var used := {"avatar_keys": {}, "names": {}, "identity_pairs": {}}
+	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
+		return used
+	if not save.has("mercato") or typeof(save["mercato"]) != TYPE_DICTIONARY:
+		return used
+	var by_id: Dictionary = save["players_by_id"] as Dictionary
+	var md: Dictionary = save["mercato"] as Dictionary
+	var active_mercato_ids := {}
+	if md.has("current_ids") and typeof(md["current_ids"]) == TYPE_ARRAY:
+		for id_value in (md["current_ids"] as Array):
+			_identity_mark_active_id(active_mercato_ids, id_value)
+	if md.has("purchased_ids") and typeof(md["purchased_ids"]) == TYPE_ARRAY:
+		for id_value in (md["purchased_ids"] as Array):
+			_identity_mark_active_id(active_mercato_ids, id_value)
+	var normalized_skip_id := _identity_normalized_id(skip_id)
+	for sid in active_mercato_ids.keys():
+		var clean_id := _identity_normalized_id(sid)
+		if clean_id == "" or clean_id == normalized_skip_id:
+			continue
+		if not by_id.has(clean_id) or typeof(by_id[clean_id]) != TYPE_DICTIONARY:
+			continue
+		_identity_mark_used(used, by_id[clean_id] as Dictionary)
+	return used
+
+
+static func _mercato_player_identity_complete(p: Dictionary) -> bool:
+	var name := str(p.get("nom", p.get("name", ""))).strip_edges()
+	var avatar_key := str(p.get("avatar_key", "")).strip_edges()
+	var avatar_path := str(p.get("avatar_path", "")).strip_edges()
+	if name == "" or name.begins_with("Prospect "):
+		return false
+	if avatar_key == "" or avatar_path == "":
+		return false
+	return ResourceLoader.exists(avatar_path)
+
+
+
+static func _identity_pick_candidate(save: Dictionary, used: Dictionary, candidates: Array = []) -> Dictionary:
+	if candidates.is_empty():
+		candidates = _mercato_avatar_candidates()
 	var used_pairs: Dictionary = used.get("identity_pairs", {}) as Dictionary
 	var rejected_count := 0
 	for c_raw in candidates:
@@ -1468,6 +1501,11 @@ static func _identity_pick_candidate(save: Dictionary, used: Dictionary) -> Dict
 			rejected_count += 1
 			if BM_MERCATO_ID_DEBUG:
 				print("[BM_MERCATO_ID_DEBUG] CANDIDATE_REJECTED name=", name, " avatar_key=", ak, " reason=missing_avatar_key")
+			continue
+		if avatar_path == "" or not ResourceLoader.exists(avatar_path):
+			rejected_count += 1
+			if BM_MERCATO_ID_DEBUG:
+				print("[BM_MERCATO_ID_DEBUG] CANDIDATE_REJECTED name=", name, " avatar_key=", ak, " reason=missing_avatar_path")
 			continue
 		if used_pairs.has(_identity_pair_key(name, ak)):
 			rejected_count += 1
@@ -1527,6 +1565,45 @@ static func _sync_player_identity_copies(save: Dictionary, by_id: Dictionary) ->
 		save["players"] = arr
 
 
+
+static func _repair_incomplete_mercato_identities_on_load(save: Dictionary) -> bool:
+	if not save.has("players_by_id") or typeof(save.get("players_by_id")) != TYPE_DICTIONARY:
+		return false
+	if not save.has("mercato") or typeof(save.get("mercato")) != TYPE_DICTIONARY:
+		return false
+	var by_id: Dictionary = save["players_by_id"] as Dictionary
+	var md: Dictionary = save["mercato"] as Dictionary
+	var target_ids := {}
+	if md.has("current_ids") and typeof(md["current_ids"]) == TYPE_ARRAY:
+		for id_value in (md["current_ids"] as Array):
+			_identity_mark_active_id(target_ids, id_value)
+	if md.has("purchased_ids") and typeof(md["purchased_ids"]) == TYPE_ARRAY:
+		for id_value in (md["purchased_ids"] as Array):
+			_identity_mark_active_id(target_ids, id_value)
+	var changed := false
+	for k in target_ids.keys():
+		var clean_id := _identity_normalized_id(k)
+		if clean_id == "" or not by_id.has(clean_id):
+			continue
+		var player = by_id.get(clean_id)
+		if typeof(player) != TYPE_DICTIONARY:
+			continue
+		var p: Dictionary = player as Dictionary
+		if not bool(p.get("mercato_generated", false)):
+			continue
+		if _mercato_player_identity_complete(p):
+			continue
+		var used := _mercato_collect_used(save, clean_id)
+		var pick := _identity_pick_candidate(save, used, _mercato_male_avatar_candidates())
+		if pick.is_empty():
+			continue
+		_identity_apply_candidate(p, pick, used, int(float(clean_id)))
+		by_id[clean_id] = p
+		changed = true
+	if changed:
+		save["players_by_id"] = by_id
+	return changed
+
 static func _repair_duplicate_player_identities_on_load(save: Dictionary) -> bool:
 	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
 		return false
@@ -1541,12 +1618,15 @@ static func _repair_duplicate_player_identities_on_load(save: Dictionary) -> boo
 			continue
 		var p: Dictionary = raw as Dictionary
 		var pid := int(float(str(k)))
+		if not bool(p.get("mercato_generated", false)):
+			_identity_mark_used(used, p)
+			continue
 		var name := _identity_player_name(p)
 		var ak := str(p.get("avatar_key", "")).strip_edges()
 		var pair_key := _identity_pair_key(name, ak)
 		var pair_collision := pair_key != "" and (used["identity_pairs"] as Dictionary).has(pair_key)
 		if pair_collision:
-			var candidate := _identity_pick_candidate(save, used)
+			var candidate := _identity_pick_candidate(save, used, _mercato_male_avatar_candidates())
 			if not candidate.is_empty():
 				_identity_apply_candidate(p, candidate, used, pid)
 			else:
@@ -1602,9 +1682,24 @@ static func _mercato_avatar_candidates() -> Array:
 	return out
 
 
+static func _mercato_male_avatar_candidates() -> Array:
+	var out: Array = []
+	for c_raw in _mercato_avatar_candidates():
+		if typeof(c_raw) != TYPE_DICTIONARY:
+			continue
+		var c: Dictionary = c_raw as Dictionary
+		var avatar_path := str(c.get("avatar_path", "")).strip_edges()
+		if str(c.get("gender", "U")) != "M":
+			continue
+		if avatar_path == "" or not ResourceLoader.exists(avatar_path):
+			continue
+		out.append(c)
+	return out
+
+
 static func _mercato_pick_unused_avatar(save: Dictionary) -> Dictionary:
-	var used := _identity_collect_used(save)
-	var picked := _identity_pick_candidate(save, used)
+	var used := _mercato_collect_used(save)
+	var picked := _identity_pick_candidate(save, used, _mercato_male_avatar_candidates())
 	if BM_MERCATO_ID_DEBUG:
 		print("[BM_MERCATO_ID_DEBUG] PICK_RESULT is_empty=", picked.is_empty(), " name=", str(picked.get("name", "")), " avatar_key=", str(picked.get("avatar_key", "")), " avatar_path=", str(picked.get("avatar_path", "")), " gender=", str(picked.get("gender", "")))
 	return picked
@@ -1719,13 +1814,15 @@ static func _mercato_make_new_player(save: Dictionary) -> Dictionary:
 
 	var age: int = rng.randi_range(18, 35)
 	var avatar_pick: Dictionary = _mercato_pick_unused_avatar(save)
+	if avatar_pick.is_empty():
+		return {}
 
 	var nom_affiche := "Prospect " + str(pid)
 	var avatar_key := ""
 	var avatar_path := ""
 	var gender := "U"
 	if not avatar_pick.is_empty():
-		var used_identity := _identity_collect_used(save)
+		var used_identity := _mercato_collect_used(save)
 		avatar_key = str(avatar_pick.get("avatar_key", ""))
 		nom_affiche = _identity_unique_name_for_avatar(str(avatar_pick.get("name", nom_affiche)), avatar_key, used_identity.get("identity_pairs", {}) as Dictionary, pid)
 		avatar_path = str(avatar_pick.get("avatar_path", ""))
@@ -1785,6 +1882,8 @@ static func _mercato_make_new_player(save: Dictionary) -> Dictionary:
 		salaire_int = int(60000 + base * 400.0)
 	salaire_int = clamp(salaire_int, 60000, 250000)
 	j["salaire"] = salaire_int
+	if not _mercato_player_identity_complete(j):
+		return {}
 	if BM_MERCATO_ID_DEBUG:
 		var identity_complete := not str(j.get("nom", "")).begins_with("Prospect ") and str(j.get("avatar_key", "")).strip_edges() != "" and str(j.get("avatar_path", "")).strip_edges() != ""
 		print("[BM_MERCATO_ID_DEBUG] PLAYER_CREATED id=", pid, " nom=", str(j.get("nom", "")), " name=", str(j.get("name", "")), " avatar_key=", str(j.get("avatar_key", "")), " avatar_path=", str(j.get("avatar_path", "")), " gender=", str(j.get("gender", "")), " mercato_generated=", bool(j.get("mercato_generated", false)))
@@ -1817,6 +1916,21 @@ static func ensure_mercato_schema(save: Dictionary) -> void:
 
 	save["mercato"] = md
 
+
+static func _mercato_current_pool_identity_complete(save: Dictionary, current_ids: Array) -> bool:
+	if not save.has("players_by_id") or typeof(save.get("players_by_id")) != TYPE_DICTIONARY:
+		return false
+	var by_id: Dictionary = save["players_by_id"] as Dictionary
+	for pid in current_ids:
+		var key := str(pid)
+		if not by_id.has(key) or typeof(by_id.get(key)) != TYPE_DICTIONARY:
+			return false
+		var player: Dictionary = by_id[key] as Dictionary
+		if not _mercato_player_identity_complete(player):
+			return false
+	return true
+
+
 static func refresh_mercato_pool(save: Dictionary, phase: String = "manual") -> void:
 	ensure_mercato_schema(save)
 
@@ -1827,6 +1941,9 @@ static func refresh_mercato_pool(save: Dictionary, phase: String = "manual") -> 
 	var md: Dictionary = save["mercato"] as Dictionary
 	var current_ids: Array = (md.get("current_ids", []) as Array).duplicate()
 	var seen_ids: Array = (md.get("seen_ids", []) as Array).duplicate()
+	var original_seen_ids: Array = seen_ids.duplicate()
+	var original_last_generated_id := int(md.get("last_generated_id", 999))
+	var original_by_id: Dictionary = by_id.duplicate(true)
 
 	var season_now: int = int(save.get("season_number", 1))
 	var pool_size: int = 8
@@ -1837,16 +1954,20 @@ static func refresh_mercato_pool(save: Dictionary, phase: String = "manual") -> 
 			purchased_ids_debug = (md["purchased_ids"] as Array).duplicate()
 		print("[BM_MERCATO_ID_DEBUG] REFRESH_START season_round=", int(save.get("season_round", save.get("matchs_joues", 0))), " season_id=", season_now, " phase=", phase, " current_ids_before=", current_ids, " purchased_ids=", purchased_ids_debug, " players_by_id_count=", by_id.size())
 
-	# Même saison + pool déjà complet => on garde exactement les mêmes 8
-	if int(md.get("last_refresh_season", 0)) == season_now and current_ids.size() == pool_size:
+	# Même saison + pool déjà complet et sain => on garde exactement les mêmes 8
+	if int(md.get("last_refresh_season", 0)) == season_now and current_ids.size() == pool_size and _mercato_current_pool_identity_complete(save, current_ids):
 		next_ids = current_ids.duplicate()
 		if BM_MERCATO_ID_DEBUG:
 			print("[BM_MERCATO_ID_DEBUG] REFRESH_REUSE phase=", phase, " current_ids_after=", next_ids)
 	else:
-		while next_ids.size() < pool_size:
+		var attempts := 0
+		while next_ids.size() < pool_size and attempts < pool_size * 8:
+			attempts += 1
+			md["current_ids"] = next_ids.duplicate()
+			save["mercato"] = md
 			var player: Dictionary = _mercato_make_new_player(save)
 			var pid: int = int(player.get("id", -1))
-			if pid < 0:
+			if pid < 0 or not _mercato_player_identity_complete(player):
 				continue
 
 			var key := str(pid)
@@ -1859,6 +1980,15 @@ static func refresh_mercato_pool(save: Dictionary, phase: String = "manual") -> 
 			md["last_generated_id"] = maxi(int(md.get("last_generated_id", 999)), pid)
 			if BM_MERCATO_ID_DEBUG:
 				print("[BM_MERCATO_ID_DEBUG] REFRESH_APPEND phase=", phase, " id=", pid, " slot=", next_ids.size(), " nom=", str(player.get("nom", "")), " avatar_key=", str(player.get("avatar_key", "")), " avatar_path=", str(player.get("avatar_path", "")))
+
+	if next_ids.size() < pool_size and not current_ids.is_empty():
+		var incomplete_generated_count := next_ids.size()
+		by_id = original_by_id
+		seen_ids = original_seen_ids
+		md["last_generated_id"] = original_last_generated_id
+		next_ids = current_ids.duplicate()
+		if BM_MERCATO_ID_DEBUG:
+			print("[BM_MERCATO_ID_DEBUG] REFRESH_KEEP_EXISTING_INCOMPLETE_GENERATION phase=", phase, " generated_count=", incomplete_generated_count, " required=", pool_size)
 
 	md["current_ids"] = next_ids
 	md["seen_ids"] = seen_ids
@@ -1901,6 +2031,8 @@ static func reset_finance_for_new_club(save: Dictionary) -> void:
 	save["goal_climb_standings_match17_seen"] = false
 	save["shop_restock_notice_match14_seen"] = false
 	save["stadium_intro_seen"] = false
+	save[CLUB_STAFF_INTRO_SEEN_KEY] = false
+	save[CLUB_STAFF_INTRO_PENDING_KEY] = false
 	save["last_match_finance_popup_pending"] = false
 	save.erase("season_unlock_glow_seen_s1_BtnTournois")
 	save.erase("season_unlock_glow_seen_s1_BtnMissions")

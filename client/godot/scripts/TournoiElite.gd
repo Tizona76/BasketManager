@@ -535,7 +535,8 @@ func _show_tournament_reward_popup(tournament_key: String, outcome: String) -> v
 	if euros_gain <= 0 and tokens_gain <= 0:
 		return
 
-	_bm_store_tournament_result("winner")
+	if outcome == "victory":
+		_bm_store_tournament_result("winner")
 	var popup := Control.new()
 	popup.name = "TournamentRewardPopup"
 	popup.set_anchors_preset(Control.PRESET_FULL_RECT)

@@ -553,7 +553,6 @@ func _is_player_bought(pid: String) -> bool:
 	return false
 
 func _toggle_player_bought(pid: String) -> bool:
-	print("[MERCATO][BUY_CLICK] pid=", pid)
 	var PL = load("res://scripts/PlayerLife.gd")
 	if PL == null:
 		return false
@@ -596,7 +595,6 @@ func _toggle_player_bought(pid: String) -> bool:
 		purchased.append(pid)
 		is_now_bought = true
 
-	print("[MERCATO][BUY_AFTER] purchased_ids=", purchased, " is_now_bought=", is_now_bought)
 	m["purchased_ids"] = purchased
 	save["mercato"] = m
 	_sync_mercato_owned_players_into_roster(save)

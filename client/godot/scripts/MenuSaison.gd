@@ -5,11 +5,13 @@ const PL = preload("res://scripts/PlayerLife.gd")
 const Selection := preload("res://scripts/Selection.gd")
 const TuningData := preload("res://scripts/TuningData.gd")
 const SponsorDataRef := preload("res://scripts/SponsorData.gd")
+const StadiumMinimal := preload("res://scenes/StadiumMinimal.gd")
 const TOKEN_ICON := preload("res://assets/images/token.png")
 
 
 var _close_x_lock_until_ms: int = 0
 var _last_match_finance_popup_shown_this_entry: bool = false
+var _shop_out_of_stock_popup_allowed_this_entry: bool = false
 @onready var standings_panel: Control = get_node_or_null("StandingsPanel") as Control
 @onready var lbl_standings: RichTextLabel = get_node_or_null("StandingsPanel/LblStandings") as RichTextLabel
 
@@ -883,18 +885,50 @@ func _bm_show_auto_info_popup(title_key: String, body_key: String, overlay_name:
 	overlay.call_deferred("move_to_front")
 	card.call_deferred("move_to_front")
 
-	var lbl := Label.new()
-	lbl.text = tr(title_key).replace("\\n", "\n") + "\n" + tr(body_key).replace("\\n", "\n")
-	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lbl.add_theme_font_size_override("font_size", 38 if not mobile else 32)
-	lbl.add_theme_color_override("font_color", Color(1.0, 0.86, 0.28, 1.0))
-	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 1.0))
-	lbl.add_theme_constant_override("outline_size", 8)
-	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(lbl)
+	if overlay_name == "SponsorsIntroOverlay":
+		var text_box := VBoxContainer.new()
+		text_box.set_anchors_preset(Control.PRESET_FULL_RECT)
+		text_box.alignment = BoxContainer.ALIGNMENT_CENTER
+		text_box.add_theme_constant_override("separation", 6)
+		text_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(text_box)
+
+		var title_lbl := Label.new()
+		title_lbl.text = tr(title_key).replace("\\n", "\n")
+		title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		title_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		title_lbl.add_theme_font_size_override("font_size", 38 if not mobile else 32)
+		title_lbl.add_theme_color_override("font_color", Color(1.0, 0.86, 0.28, 1.0))
+		title_lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 1.0))
+		title_lbl.add_theme_constant_override("outline_size", 8)
+		title_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		text_box.add_child(title_lbl)
+
+		var body_lbl := Label.new()
+		body_lbl.text = tr(body_key).replace("\\n", "\n")
+		body_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		body_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		body_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body_lbl.add_theme_font_size_override("font_size", (38 if not mobile else 32) - 1)
+		body_lbl.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+		body_lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 1.0))
+		body_lbl.add_theme_constant_override("outline_size", 8)
+		body_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		text_box.add_child(body_lbl)
+	else:
+		var lbl := Label.new()
+		lbl.text = tr(title_key).replace("\\n", "\n") + "\n" + tr(body_key).replace("\\n", "\n")
+		lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lbl.add_theme_font_size_override("font_size", 38 if not mobile else 32)
+		lbl.add_theme_color_override("font_color", Color(1.0, 0.86, 0.28, 1.0))
+		lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 1.0))
+		lbl.add_theme_constant_override("outline_size", 8)
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(lbl)
 
 	card.scale = Vector2(0.92, 0.92)
 	card.pivot_offset = card.size * 0.5
@@ -911,7 +945,139 @@ func _bm_show_auto_info_popup(title_key: String, body_key: String, overlay_name:
 	)
 
 
-func _bm_maybe_show_sponsors_intro_popup() -> bool:
+func _bm_maybe_show_shop_out_of_stock_popup() -> bool:
+	if not _shop_out_of_stock_popup_allowed_this_entry:
+		return false
+	_shop_out_of_stock_popup_allowed_this_entry = false
+	var save: Dictionary = PL.load_savegame()
+	if not StadiumMinimal.bm_shop_needs_restock_from_save(save):
+		return false
+	_show_shop_out_of_stock_popup()
+	return true
+
+
+func _show_shop_out_of_stock_popup() -> void:
+	await get_tree().process_frame
+	var guard := 0
+	while guard < 70 and (get_node_or_null("ShopRestockNoticeOverlay") != null or get_node_or_null("GoalClimbStandingsOverlay") != null):
+		guard += 1
+		await get_tree().create_timer(0.1).timeout
+
+	var old_popup := get_node_or_null("ShopOutOfStockPopup")
+	if old_popup != null:
+		return
+
+	var popup := Control.new()
+	popup.name = "ShopOutOfStockPopup"
+	popup.set_anchors_preset(Control.PRESET_FULL_RECT)
+	popup.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	popup.set_as_top_level(true)
+	popup.z_as_relative = false
+	popup.global_position = Vector2.ZERO
+	popup.size = get_viewport_rect().size
+
+	var overlays := get_node_or_null("Overlays") as Control
+	if overlays != null:
+		overlays.add_child(popup)
+	else:
+		add_child(popup)
+	popup.move_to_front()
+
+	var dark := ColorRect.new()
+	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dark.color = Color(0, 0, 0, 0.62)
+	dark.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.add_child(dark)
+
+	var card := PanelContainer.new()
+	card.name = "ShopOutOfStockCard"
+	card.custom_minimum_size = Vector2(760, 320)
+	card.size = Vector2(760, 320)
+	card.position = (get_viewport_rect().size - card.size) * 0.5
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.add_child(card)
+
+	var card_style := StyleBoxFlat.new()
+	card_style.bg_color = Color(0.055, 0.065, 0.095, 0.98)
+	card_style.border_width_left = 2
+	card_style.border_width_right = 2
+	card_style.border_width_top = 2
+	card_style.border_width_bottom = 2
+	card_style.border_color = Color(0.95, 0.56, 0.08, 0.92)
+	card_style.corner_radius_top_left = 10
+	card_style.corner_radius_top_right = 10
+	card_style.corner_radius_bottom_left = 10
+	card_style.corner_radius_bottom_right = 10
+	card_style.content_margin_left = 36
+	card_style.content_margin_right = 36
+	card_style.content_margin_top = 28
+	card_style.content_margin_bottom = 28
+	card.add_theme_stylebox_override("panel", card_style)
+
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 18)
+	card.add_child(box)
+
+	var title := Label.new()
+	title.name = "LblShopOutOfStockTitle"
+	title.text = tr("popup.shop_out_of_stock.title")
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 34)
+	title.add_theme_color_override("font_color", Color(1.0, 0.82, 0.22, 1.0))
+	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.65))
+	box.add_child(title)
+
+	var body := Label.new()
+	body.name = "LblShopOutOfStockBody"
+	body.text = tr("popup.shop_out_of_stock.body").replace("\\n", "\n")
+	body.custom_minimum_size = Vector2(688, 130)
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_theme_font_size_override("font_size", 26)
+	body.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	body.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.65))
+	box.add_child(body)
+
+	var close_wrap := CenterContainer.new()
+	close_wrap.custom_minimum_size = Vector2(0, 58)
+	box.add_child(close_wrap)
+
+	var close_btn := Button.new()
+	close_btn.name = "BtnShopOutOfStockClose"
+	close_btn.text = tr("common.close")
+	close_btn.custom_minimum_size = Vector2(190, 52)
+	close_btn.add_theme_font_size_override("font_size", 24)
+	var close_style := StyleBoxFlat.new()
+	close_style.bg_color = Color(0.045, 0.045, 0.045, 0.96)
+	close_style.corner_radius_top_left = 8
+	close_style.corner_radius_top_right = 8
+	close_style.corner_radius_bottom_left = 8
+	close_style.corner_radius_bottom_right = 8
+	close_style.content_margin_left = 18
+	close_style.content_margin_right = 18
+	close_style.content_margin_top = 8
+	close_style.content_margin_bottom = 8
+	var close_hover := close_style.duplicate() as StyleBoxFlat
+	close_hover.bg_color = Color(0.085, 0.085, 0.085, 1.0)
+	var close_pressed := close_style.duplicate() as StyleBoxFlat
+	close_pressed.bg_color = Color(0.025, 0.025, 0.025, 1.0)
+	close_btn.add_theme_stylebox_override("normal", close_style)
+	close_btn.add_theme_stylebox_override("hover", close_hover)
+	close_btn.add_theme_stylebox_override("pressed", close_pressed)
+	close_btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	close_btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
+	close_btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
+	close_btn.pressed.connect(func() -> void:
+		popup.queue_free()
+	)
+	close_wrap.add_child(close_btn)
+
+
+func _bm_maybe_show_sponsors_intro_popup(on_closed: Callable = Callable()) -> bool:
 	var save: Dictionary = PL.load_savegame()
 	if typeof(save) != TYPE_DICTIONARY:
 		return false
@@ -921,11 +1087,12 @@ func _bm_maybe_show_sponsors_intro_popup() -> bool:
 		return false
 	_bm_show_auto_info_popup("popup.sponsors.title", "popup.sponsors.body", "SponsorsIntroOverlay", func():
 		var save_close: Dictionary = PL.load_savegame()
-		if typeof(save_close) != TYPE_DICTIONARY:
-			return
-		save_close["intro_popup_sponsors_seen"] = true
-		save_close["sponsors_unlocked"] = true
-		PL.write_savegame(save_close)
+		if typeof(save_close) == TYPE_DICTIONARY:
+			save_close["intro_popup_sponsors_seen"] = true
+			save_close["sponsors_unlocked"] = true
+			PL.write_savegame(save_close)
+		if on_closed.is_valid():
+			on_closed.call()
 	)
 	return true
 
@@ -935,7 +1102,7 @@ func _bm_maybe_show_club_tokens_intro_popup() -> bool:
 	return false
 
 
-func _bm_maybe_show_sponsors_expired_popup() -> bool:
+func _bm_maybe_show_sponsors_expired_popup(on_closed: Callable = Callable()) -> bool:
 	var save: Dictionary = PL.load_savegame()
 	if typeof(save) != TYPE_DICTIONARY:
 		return false
@@ -945,16 +1112,19 @@ func _bm_maybe_show_sponsors_expired_popup() -> bool:
 	save["sponsors_unlocked"] = true
 	save["intro_popup_sponsors_seen"] = true
 	PL.write_savegame(save)
-	_bm_show_auto_info_popup("popup.sponsors_expired.title", "popup.sponsors_expired.body", "SponsorsExpiredOverlay")
+	_bm_show_auto_info_popup("popup.sponsors_expired.title", "popup.sponsors_expired.body", "SponsorsExpiredOverlay", on_closed)
 	return true
 
 
 func _bm_maybe_show_pending_sponsors_popup() -> void:
-	if _bm_maybe_show_sponsors_expired_popup():
+	var shop_tail := Callable(self, "_bm_maybe_show_shop_out_of_stock_popup")
+	if _bm_maybe_show_sponsors_expired_popup(shop_tail):
 		return
 	if _bm_maybe_show_club_tokens_intro_popup():
 		return
-	_bm_maybe_show_sponsors_intro_popup()
+	if _bm_maybe_show_sponsors_intro_popup(shop_tail):
+		return
+	_bm_maybe_show_shop_out_of_stock_popup()
 
 
 func _bm_show_pending_tokens_or_intro_popups() -> void:
@@ -1490,7 +1660,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	popup.add_child(dark)
 
 	var card := Panel.new()
-	var card_w: float = 700.0
+	var card_w: float = 980.0
 	var card_h: float = 360.0
 	if _bm_saison_is_mobile_layout():
 		card_w *= 1.15
@@ -1510,7 +1680,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	var title := Label.new()
 	title.text = _bm_tr_or_fallback("popup.last_match_finance.title", "Last match financial summary")
 	title.position = Vector2(40, 24)
-	title.size = Vector2(620, 40)
+	title.size = Vector2(card_w - 80.0, 40)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 28)
 	title.add_theme_color_override("font_color", Color(1, 1, 1, 1))
@@ -1519,7 +1689,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	var lbl_income_title := Label.new()
 	lbl_income_title.text = _bm_tr_or_fallback("popup.last_match_finance.income", "Income")
 	lbl_income_title.position = Vector2(70, 95)
-	lbl_income_title.size = Vector2(180, 32)
+	lbl_income_title.size = Vector2(260, 32)
 	lbl_income_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl_income_title.add_theme_font_size_override("font_size", 22)
 	lbl_income_title.add_theme_color_override("font_color", Color(1, 1, 1, 1))
@@ -1527,8 +1697,8 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 
 	var lbl_expenses_title := Label.new()
 	lbl_expenses_title.text = _bm_tr_or_fallback("popup.last_match_finance.expenses", "Expenses")
-	lbl_expenses_title.position = Vector2(260, 95)
-	lbl_expenses_title.size = Vector2(180, 32)
+	lbl_expenses_title.position = Vector2(370, 95)
+	lbl_expenses_title.size = Vector2(260, 32)
 	lbl_expenses_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl_expenses_title.add_theme_font_size_override("font_size", 22)
 	lbl_expenses_title.add_theme_color_override("font_color", Color(1, 1, 1, 1))
@@ -1536,8 +1706,8 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 
 	var lbl_xp_title := Label.new()
 	lbl_xp_title.text = _bm_tr_or_fallback("popup.last_match_finance.xp", "XP")
-	lbl_xp_title.position = Vector2(450, 95)
-	lbl_xp_title.size = Vector2(180, 32)
+	lbl_xp_title.position = Vector2(690, 95)
+	lbl_xp_title.size = Vector2(220, 32)
 	lbl_xp_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl_xp_title.add_theme_font_size_override("font_size", 22)
 	lbl_xp_title.add_theme_color_override("font_color", Color(1, 1, 1, 1))
@@ -1546,7 +1716,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	var income_lbl := Label.new()
 	income_lbl.text = _season_reward_menu_fmt_amount(0)
 	income_lbl.position = Vector2(70, 150)
-	income_lbl.size = Vector2(180, 52)
+	income_lbl.size = Vector2(260, 52)
 	income_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	income_lbl.add_theme_font_size_override("font_size", 38)
 	income_lbl.add_theme_color_override("font_color", Color(0.18, 0.72, 0.25, 1.0))
@@ -1554,8 +1724,8 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 
 	var expenses_lbl := Label.new()
 	expenses_lbl.text = "-0 $"
-	expenses_lbl.position = Vector2(260, 150)
-	expenses_lbl.size = Vector2(180, 52)
+	expenses_lbl.position = Vector2(370, 150)
+	expenses_lbl.size = Vector2(260, 52)
 	expenses_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	expenses_lbl.add_theme_font_size_override("font_size", 38)
 	expenses_lbl.add_theme_color_override("font_color", Color(0.86, 0.22, 0.22, 1.0))
@@ -1563,8 +1733,8 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 
 	var xp_lbl := Label.new()
 	xp_lbl.text = "+0 XP"
-	xp_lbl.position = Vector2(450, 150)
-	xp_lbl.size = Vector2(180, 52)
+	xp_lbl.position = Vector2(690, 150)
+	xp_lbl.size = Vector2(220, 52)
 	xp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	xp_lbl.add_theme_font_size_override("font_size", 38)
 	xp_lbl.add_theme_color_override("font_color", Color(0.20, 0.55, 0.95, 1.0))
@@ -1576,7 +1746,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	ball.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	ball.custom_minimum_size = Vector2(44, 44)
 	ball.size = Vector2(44, 44)
-	ball.position = Vector2(328, 214)
+	ball.position = Vector2(468, 214)
 	ball.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(ball)
 
@@ -1595,7 +1765,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	btn.text = (_bm_tr_or_fallback("popup.last_match_finance.cta_finances", "See club finances") if _open_finances_cta else "Close")
 	btn.custom_minimum_size = Vector2(320, 52)
 	btn.size = Vector2(320, 52)
-	btn.position = Vector2(190, 270)
+	btn.position = Vector2(330, 270)
 
 	var _sb_close := StyleBoxFlat.new()
 	_sb_close.bg_color = Color(0.20, 0.55, 0.95, 1.0)
@@ -1624,7 +1794,8 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 			if save_cta_now.has("progress") and typeof(save_cta_now["progress"]) == TYPE_DICTIONARY:
 				round_cta_now = maxi(round_cta_now, int((save_cta_now["progress"] as Dictionary).get("journee", round_cta_now + 1)) - 1)
 		if round_cta_now == 13:
-			call_deferred("_bm_maybe_show_shop_restock_notice_match14")
+			# Legacy match-14 Shop reminder hidden while stock-critical popup handles restock alerts.
+			pass
 
 		if round_cta_now == 18:
 			call_deferred("_bm_maybe_show_climb_standings_goal_match17")
@@ -1633,6 +1804,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 			call_deferred("_open_end_season_popup")
 			return
 
+		_shop_out_of_stock_popup_allowed_this_entry = true
 		call_deferred("_bm_show_pending_tokens_or_intro_popups")
 
 		if _open_finances_cta and tree != null and ResourceLoader.exists("res://scenes/Finances.tscn"):
@@ -1735,7 +1907,7 @@ func _bm_apply_early_tabs_visibility() -> void:
 
 	# Market visible seulement après le match 20 joué
 	if btn_market != null:
-		btn_market.visible = (int(d.get("season_number", 1)) >= 2)
+		btn_market.visible = BM_TEST_FORCE_MERCATO_OPEN or (int(d.get("season_number", 1)) >= 2)
 		btn_market.disabled = false
 
 	# Toujours cachés dans ce flow early

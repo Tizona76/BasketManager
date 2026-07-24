@@ -124,9 +124,14 @@ func _on_lang_pressed(code: String) -> void:
 
 var _web_guest_auth_pending: bool = false
 var _web_team_name_requested: bool = false
+var _bm_guest_auth_main_ready_ms: int = 0
+var _bm_guest_auth_request_start_ms: int = 0
+var _bm_guest_auth_last_outcome: String = "not_started"
 
 
 func _ready() -> void:
+	_bm_guest_auth_main_ready_ms = Time.get_ticks_msec()
+	print("[BM_GUEST_AUTH_TIMING] event=main_ready time_ms=", _bm_guest_auth_main_ready_ms)
 	TranslationServer.set_locale("en")
 
 	# BM_GUEST_AUTO_HOOK (web only, no UI impact)
@@ -142,6 +147,7 @@ func _ready() -> void:
 			ProfileManager.activate_profile(ProfileManager.get_active_profile_id())
 		if str(Session.access_token).strip_edges().length() < 20:
 			_web_guest_auth_pending = true
+			print("[BM_GUEST_AUTH_TIMING] event=pending_true time_ms=", Time.get_ticks_msec(), " access_token_length=", str(Session.access_token).strip_edges().length(), " refresh_token_present=", str(Session.refresh_token).strip_edges() != "", " profile_uuid=", str(Session.profile_uuid))
 			_try_guest_auth_silent()
 	else:
 		ProfileManager.ensure_exists()
@@ -323,6 +329,7 @@ func _apply_click_button_shop_green_style() -> void:
 
 
 func _on_click() -> void:
+	print("[BM_GUEST_AUTH_TIMING] event=click_to_start time_ms=", Time.get_ticks_msec(), " pending=", _web_guest_auth_pending)
 	print("[TRACE_FLOW] A CLICK")
 	print("[DBG] CLICK(btn)")
 
@@ -518,6 +525,7 @@ func _hide_preparing_club_label() -> void:
 
 
 func _on_intro_zoom_finished() -> void:
+	print("[BM_GUEST_AUTH_TIMING] event=zoom_finished time_ms=", Time.get_ticks_msec(), " pending=", _web_guest_auth_pending)
 	_show_preparing_club_label()
 	await get_tree().process_frame
 	_show_team_name()
@@ -769,6 +777,7 @@ func _show_team_name() -> void:
 	print("[TEAMNAME ENTRY] pending=", _web_guest_auth_pending, " requested=", _web_team_name_requested)
 	if OS.has_feature("web") and _web_guest_auth_pending:
 		_web_team_name_requested = true
+		print("[BM_GUEST_AUTH_TIMING] event=team_name_blocked time_ms=", Time.get_ticks_msec(), " pending=", _web_guest_auth_pending)
 		print("[TEAMNAME RETURN] auth pending")
 		return
 	_clear_screen()
@@ -784,6 +793,7 @@ func _show_team_name() -> void:
 		push_error("[MAIN] team_name_ps is null (missing in export?)")
 		return
 
+	print("[BM_GUEST_AUTH_TIMING] event=team_name_displayed time_ms=", Time.get_ticks_msec(), " pending=", _web_guest_auth_pending)
 	print("[TRACE_FLOW] G INSTANTIATE")
 	var t := team_name_ps.instantiate()
 	screen_root.add_child(t)
@@ -1160,6 +1170,8 @@ func _finish_web_guest_auth_silent() -> void:
 	print("[TRACE_FLOW] E AUTH_FINISHED")
 	print("[AUTH FINISHED]")
 	_web_guest_auth_pending = false
+	var _bm_now_ms := Time.get_ticks_msec()
+	print("[BM_GUEST_AUTH_TIMING] event=pending_false time_ms=", _bm_now_ms, " total_since_main_ready_ms=", (_bm_now_ms - _bm_guest_auth_main_ready_ms) if _bm_guest_auth_main_ready_ms > 0 else -1, " total_since_request_ms=", (_bm_now_ms - _bm_guest_auth_request_start_ms) if _bm_guest_auth_request_start_ms > 0 else -1, " success_or_failure=", _bm_guest_auth_last_outcome)
 	if _web_team_name_requested:
 		_web_team_name_requested = false
 		call_deferred("_show_team_name")
@@ -1174,6 +1186,9 @@ func _try_guest_auth_silent() -> void:
 	var headers := PackedStringArray(["Content-Type: application/json"])
 
 	http.request_completed.connect(func(result, code, _h, body):
+		var _bm_response_ms := Time.get_ticks_msec()
+		_bm_guest_auth_last_outcome = "failure"
+		print("[BM_GUEST_AUTH_TIMING] event=http_response time_ms=", _bm_response_ms, " elapsed_since_request_ms=", (_bm_response_ms - _bm_guest_auth_request_start_ms) if _bm_guest_auth_request_start_ms > 0 else -1, " result=", result, " response_code=", code, " body_size=", (body as PackedByteArray).size())
 		print("[TRACE_FLOW] D HTTP_RETURN code=", code)
 		if result == HTTPRequest.RESULT_SUCCESS and code >= 200 and code < 300:
 			var parsed: Variant = JSON.parse_string((body as PackedByteArray).get_string_from_utf8())
@@ -1183,6 +1198,7 @@ func _try_guest_auth_silent() -> void:
 				var rt := str(d.get("refresh_token", "")).strip_edges()
 				var tt := str(d.get("token_type", "Bearer")).strip_edges()
 				if at.length() >= 20:
+					_bm_guest_auth_last_outcome = "success"
 					Session.set_tokens(at, rt, tt)
 					Session.profile_uuid = str(d.get("profile_uuid", "")).strip_edges()
 					if Session.profile_uuid != "":
@@ -1193,9 +1209,12 @@ func _try_guest_auth_silent() -> void:
 		http.queue_free()
 	)
 
+	_bm_guest_auth_request_start_ms = Time.get_ticks_msec()
+	print("[BM_GUEST_AUTH_TIMING] event=http_request_start time_ms=", _bm_guest_auth_request_start_ms, " url=", url)
 	print("[TRACE_FLOW] C HTTP_SENT")
 	var request_error := http.request(url, headers, HTTPClient.METHOD_POST, "{}")
 	if request_error != OK:
+		_bm_guest_auth_last_outcome = "request_error"
 		_finish_web_guest_auth_silent()
 		http.queue_free()
 

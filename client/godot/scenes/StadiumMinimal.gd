@@ -615,7 +615,7 @@ func _shop_force_light_text(root: Node) -> void:
 				var stock_lbl := lbl.get_parent().get_node_or_null("LblStock") as Label
 				var last_sales := _safe_int(lbl.text)
 				var stock := _safe_int(stock_lbl.text if stock_lbl != null else "0")
-				var sales_color := Color(0.18, 0.95, 0.28, 1) if last_sales < stock else Color(1, 0.18, 0.18, 1)
+				var sales_color := Color(1, 0.18, 0.18, 1) if bm_shop_product_needs_restock(stock, last_sales) else Color(0.18, 0.95, 0.28, 1)
 				lbl.modulate = sales_color
 				lbl.add_theme_color_override("font_color", sales_color)
 			else:
@@ -3557,21 +3557,11 @@ func _ensure_shop_panel() -> void:
 
 			var lbl_last_sales := Label.new()
 			lbl_last_sales.name = "LblLastSales"
-			var last_sales_coef := 0.0
-			var last_sales := 0
-			if save.has("shop") and typeof(save["shop"]) == TYPE_DICTIONARY:
-				var shop_last_sales: Dictionary = save["shop"] as Dictionary
-				last_sales_coef = float(shop_last_sales.get("last_game_sales_coef", 0.0))
-				if int(save.get("season_round", 0)) >= 2 and shop_last_sales.has("stock_state") and typeof(shop_last_sales["stock_state"]) == TYPE_DICTIONARY:
-					var stock_state_last_sales: Dictionary = shop_last_sales["stock_state"] as Dictionary
-					if stock_state_last_sales.has(pid2) and typeof(stock_state_last_sales[pid2]) == TYPE_DICTIONARY:
-						last_sales = maxi(0, int((stock_state_last_sales[pid2] as Dictionary).get("last_sold", 0)))
-			if last_sales <= 0:
-				last_sales = int(round(float(stock) * last_sales_coef))
+			var last_sales := bm_shop_last_game_sales_for_display(save, pid2, stock)
 			lbl_last_sales.text = str(last_sales)
 			lbl_last_sales.custom_minimum_size.x = 190
 			lbl_last_sales.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			lbl_last_sales.modulate = Color(0.18, 0.95, 0.28, 1) if last_sales < stock else Color(1, 0.18, 0.18, 1)
+			lbl_last_sales.modulate = Color(1, 0.18, 0.18, 1) if bm_shop_product_needs_restock(stock, last_sales) else Color(0.18, 0.95, 0.28, 1)
 			lbl_last_sales.add_theme_font_size_override("font_size", 23)
 			line.add_child(lbl_last_sales)
 			line.add_child(price_box)
@@ -4165,6 +4155,54 @@ func _get_shop_stock_for_level(level: int, pid: String) -> int:
 					return maxi(0, int((stock_state[pid] as Dictionary).get("current", computed_stock)))
 
 	return computed_stock
+
+
+static func bm_shop_product_needs_restock(stock: int, last_sales: int) -> bool:
+	return int(last_sales) >= int(stock)
+
+
+static func bm_shop_last_game_sales_for_display(save_data: Dictionary, pid: String, stock: int) -> int:
+	var last_sales_coef := 0.0
+	var last_sales := 0
+	if typeof(save_data) == TYPE_DICTIONARY and save_data.has("shop") and typeof(save_data["shop"]) == TYPE_DICTIONARY:
+		var shop_last_sales: Dictionary = save_data["shop"] as Dictionary
+		last_sales_coef = float(shop_last_sales.get("last_game_sales_coef", 0.0))
+		if int(save_data.get("season_round", 0)) >= 2 and shop_last_sales.has("stock_state") and typeof(shop_last_sales["stock_state"]) == TYPE_DICTIONARY:
+			var stock_state_last_sales: Dictionary = shop_last_sales["stock_state"] as Dictionary
+			if stock_state_last_sales.has(pid) and typeof(stock_state_last_sales[pid]) == TYPE_DICTIONARY:
+				last_sales = maxi(0, int((stock_state_last_sales[pid] as Dictionary).get("last_sold", 0)))
+	if last_sales <= 0:
+		last_sales = int(round(float(stock) * last_sales_coef))
+	return last_sales
+
+
+static func bm_shop_needs_restock_from_save(save_data: Dictionary) -> bool:
+	if typeof(save_data) != TYPE_DICTIONARY:
+		return false
+	if not save_data.has("shop") or typeof(save_data["shop"]) != TYPE_DICTIONARY:
+		return false
+	var shop_d: Dictionary = save_data["shop"] as Dictionary
+	if not shop_d.has("items") or typeof(shop_d["items"]) != TYPE_DICTIONARY:
+		return false
+	var items_d: Dictionary = shop_d["items"] as Dictionary
+	var stock_state: Dictionary = {}
+	if shop_d.has("stock_state") and typeof(shop_d["stock_state"]) == TYPE_DICTIONARY:
+		stock_state = shop_d["stock_state"] as Dictionary
+	for pid_any in items_d.keys():
+		var item_any: Variant = items_d[pid_any]
+		if typeof(item_any) != TYPE_DICTIONARY:
+			continue
+		var item: Dictionary = item_any as Dictionary
+		if not bool(item.get("enabled", true)):
+			continue
+		var pid := str(pid_any)
+		var stock := maxi(0, int(item.get("qty", 0)))
+		if stock_state.has(pid) and typeof(stock_state[pid]) == TYPE_DICTIONARY:
+			stock = maxi(0, int((stock_state[pid] as Dictionary).get("current", stock)))
+		var last_sales := bm_shop_last_game_sales_for_display(save_data, pid, stock)
+		if bm_shop_product_needs_restock(stock, last_sales):
+			return true
+	return false
 
 func _get_shop_active_rows_for_level(level: int) -> int:
 	# pour l’instant : 4 fixes (comme demandé)
@@ -5312,8 +5350,8 @@ func _apply_shop_restock_purchase(pid: String, units: int, total_cost: int) -> v
 func _show_shop_restock_popup(pid: String) -> void:
 	var base_price: int = maxi(1, int(SHOP_DEFAULT_PRICES.get(pid, 10)))
 	var base_stock_for_restock := _get_shop_restock_base_for_level(_shop_level_cached, pid)
-	var small_units := int(round(float(base_stock_for_restock) * 0.80))
-	var large_units := int(round(float(base_stock_for_restock) * 1.50))
+	var small_units := int(round(float(base_stock_for_restock) * 1.20))
+	var large_units := int(round(float(base_stock_for_restock) * 1.90))
 	var small_cost := small_units * maxi(1, int(round(float(base_price) * 0.60)))
 	var large_cost := large_units * maxi(1, int(round(float(base_price) * 0.52)))
 

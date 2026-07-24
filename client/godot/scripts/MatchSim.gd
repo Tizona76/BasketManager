@@ -1916,8 +1916,12 @@ func _bm_clear_expired_live_match_comment() -> void:
 	if _live_comment_clear_minute > 0 and minute >= _live_comment_clear_minute:
 		_bm_clear_live_match_comment()
 
-func _bm_pick_live_match_comment_variant(key_a: String, key_b: String) -> String:
+func _bm_pick_live_match_comment_variant(key_a: String, key_b: String, key_c: String = "", key_d: String = "", key_e: String = "") -> String:
 	var keys := [key_a, key_b]
+	for extra_key in [key_c, key_d, key_e]:
+		var clean_key := str(extra_key).strip_edges()
+		if clean_key != "":
+			keys.append(clean_key)
 	return tr(str(keys[randi() % keys.size()]))
 
 func _bm_pick_live_match_comment(trigger_minute: int) -> String:
@@ -1952,21 +1956,21 @@ func _bm_pick_live_match_comment(trigger_minute: int) -> String:
 
 	if trigger_minute == 10:
 		if gap >= 1.5:
-			return _bm_pick_live_match_comment_variant("matchsim.live.minute10.lineup_positive", "matchsim.live.minute10.lineup_positive_2")
+			return _bm_pick_live_match_comment_variant("matchsim.live.minute10.lineup_positive", "matchsim.live.minute10.lineup_positive_2", "matchsim.live.minute10.lineup_positive_3", "matchsim.live.minute10.lineup_positive_4", "matchsim.live.minute10.lineup_positive_5")
 		if gap <= -1.5:
-			return _bm_pick_live_match_comment_variant("matchsim.live.minute10.lineup_negative", "matchsim.live.minute10.lineup_negative_2")
+			return _bm_pick_live_match_comment_variant("matchsim.live.minute10.lineup_negative", "matchsim.live.minute10.lineup_negative_2", "matchsim.live.minute10.lineup_negative_3", "matchsim.live.minute10.lineup_negative_4", "matchsim.live.minute10.lineup_negative_5")
 		if avg_motivation >= 78.0:
-			return _bm_pick_live_match_comment_variant("matchsim.live.minute10.motivation_positive", "matchsim.live.minute10.motivation_positive_2")
-		return _bm_pick_live_match_comment_variant("matchsim.live.minute10.neutral", "matchsim.live.minute10.neutral_2")
+			return _bm_pick_live_match_comment_variant("matchsim.live.minute10.motivation_positive", "matchsim.live.minute10.motivation_positive_2", "matchsim.live.minute10.motivation_positive_3", "matchsim.live.minute10.motivation_positive_4", "matchsim.live.minute10.motivation_positive_5")
+		return _bm_pick_live_match_comment_variant("matchsim.live.minute10.neutral", "matchsim.live.minute10.neutral_2", "matchsim.live.minute10.neutral_3", "matchsim.live.minute10.neutral_4", "matchsim.live.minute10.neutral_5")
 
 	if trigger_minute == 25:
 		if score_margin <= 5 and abs(gap) < 1.5:
-			return _bm_pick_live_match_comment_variant("matchsim.live.minute25.close", "matchsim.live.minute25.close_2")
+			return _bm_pick_live_match_comment_variant("matchsim.live.minute25.close", "matchsim.live.minute25.close_2", "matchsim.live.minute25.close_3", "matchsim.live.minute25.close_4", "matchsim.live.minute25.close_5")
 		if avg_fatigue >= 18.0:
-			return _bm_pick_live_match_comment_variant("matchsim.live.minute25.fatigue", "matchsim.live.minute25.fatigue_2")
+			return _bm_pick_live_match_comment_variant("matchsim.live.minute25.fatigue", "matchsim.live.minute25.fatigue_2", "matchsim.live.minute25.fatigue_3", "matchsim.live.minute25.fatigue_4", "matchsim.live.minute25.fatigue_5")
 		if avg_motivation <= 60.0:
-			return _bm_pick_live_match_comment_variant("matchsim.live.minute25.motivation_low", "matchsim.live.minute25.motivation_low_2")
-		return _bm_pick_live_match_comment_variant("matchsim.live.minute25.neutral", "matchsim.live.minute25.neutral_2")
+			return _bm_pick_live_match_comment_variant("matchsim.live.minute25.motivation_low", "matchsim.live.minute25.motivation_low_2", "matchsim.live.minute25.motivation_low_3", "matchsim.live.minute25.motivation_low_4", "matchsim.live.minute25.motivation_low_5")
+		return _bm_pick_live_match_comment_variant("matchsim.live.minute25.neutral", "matchsim.live.minute25.neutral_2", "matchsim.live.minute25.neutral_3", "matchsim.live.minute25.neutral_4", "matchsim.live.minute25.neutral_5")
 
 	return ""
 

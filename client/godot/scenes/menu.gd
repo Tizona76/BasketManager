@@ -39,6 +39,8 @@ const FILE_CLOUD_BLOB_TXT := "user://cloud_blob.txt"
 
 const FILE_CLOUD_LAST_APPLY_JSON := "user://cloud_last_apply.json"
 const FILE_NEW_CLUB_PENDING_CLOUD := "user://new_club_pending_cloud.txt"
+const CLUB_STAFF_INTRO_SEEN_KEY := "club_staff_intro_seen"
+const CLUB_STAFF_INTRO_PENDING_KEY := "club_staff_intro_pending"
 
 # ✅ BONUS: persister aussi tokens/refresh depuis Menu (offline-first)
 const SESSION_FILE := "user://session.json"
@@ -428,7 +430,7 @@ func _bm_apply_post_selection_hidden_buttons() -> void:
 	var sponsors_unlocked: bool = false
 	if typeof(d_any) == TYPE_DICTIONARY:
 		var d: Dictionary = d_any as Dictionary
-		mercato_unlocked = (int(d.get("season_number", 1)) >= 2)
+		mercato_unlocked = BM_TEST_FORCE_MERCATO_OPEN or (int(d.get("season_number", 1)) >= 2)
 		finances_unlocked = bool(d.get("early_flow_finances_unlocked", false))
 		stadium_unlocked = bool(d.get("early_flow_stadium_unlocked", false))
 		sponsors_unlocked = bool(d.get("sponsors_unlocked", false))
@@ -458,7 +460,7 @@ func _bm_apply_mercato_visibility_management(show_club: bool = true) -> void:
 	var mercato_unlocked: bool = false
 	if typeof(d_any) == TYPE_DICTIONARY:
 		var d: Dictionary = d_any as Dictionary
-		mercato_unlocked = (int(d.get("season_number", 1)) >= 2)
+		mercato_unlocked = BM_TEST_FORCE_MERCATO_OPEN or (int(d.get("season_number", 1)) >= 2)
 	BtnMercato.visible = show_club and mercato_unlocked
 
 func _bm_apply_stadium_unlock_from_save() -> void:
@@ -874,6 +876,7 @@ func _ready() -> void:
 	call_deferred("_bm_apply_stadium_unlock_from_save")
 	call_deferred("_bm_apply_finances_unlock_from_save")
 	call_deferred("_bm_refresh_coachs_button_visibility")
+	call_deferred("_bm_maybe_show_staff_intro_popup")
 	_try_cloud_load()
 
 
@@ -2124,6 +2127,125 @@ func _bm_refresh_coachs_button_visibility() -> void:
 		return
 	BtnCoachs.visible = _bm_can_show_coachs_button()
 
+func _bm_maybe_show_staff_intro_popup() -> void:
+	var save_any = PL.load_savegame()
+	if typeof(save_any) != TYPE_DICTIONARY:
+		return
+	var save: Dictionary = save_any as Dictionary
+	if bool(save.get(CLUB_STAFF_INTRO_SEEN_KEY, false)):
+		return
+	if not bool(save.get(CLUB_STAFF_INTRO_PENDING_KEY, false)):
+		return
+	if PL.get_club_level(save) < 2:
+		return
+
+	save[CLUB_STAFF_INTRO_SEEN_KEY] = true
+	save.erase(CLUB_STAFF_INTRO_PENDING_KEY)
+	PL.write_savegame(save)
+	_bm_show_staff_intro_popup()
+
+func _bm_show_staff_intro_popup() -> void:
+	var old_popup := get_node_or_null("StaffIntroPopup")
+	if old_popup != null:
+		old_popup.queue_free()
+
+	var popup := Control.new()
+	popup.name = "StaffIntroPopup"
+	popup.set_anchors_preset(Control.PRESET_FULL_RECT)
+	popup.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	add_child(popup)
+	popup.set_as_top_level(true)
+	popup.global_position = Vector2.ZERO
+	popup.size = get_viewport_rect().size
+
+	var card := PanelContainer.new()
+	card.name = "StaffIntroCard"
+	card.custom_minimum_size = Vector2(760, 320)
+	card.size = Vector2(760, 320)
+	card.position = (get_viewport_rect().size - card.size) * 0.5
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.add_child(card)
+	card.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+
+	var card_style := StyleBoxFlat.new()
+	card_style.bg_color = Color(0.055, 0.065, 0.095, 0.98)
+	card_style.border_width_left = 2
+	card_style.border_width_right = 2
+	card_style.border_width_top = 2
+	card_style.border_width_bottom = 2
+	card_style.border_color = Color(0.95, 0.56, 0.08, 0.92)
+	card_style.corner_radius_top_left = 10
+	card_style.corner_radius_top_right = 10
+	card_style.corner_radius_bottom_left = 10
+	card_style.corner_radius_bottom_right = 10
+	card_style.content_margin_left = 36
+	card_style.content_margin_right = 36
+	card_style.content_margin_top = 28
+	card_style.content_margin_bottom = 28
+	card.add_theme_stylebox_override("panel", card_style)
+
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 18)
+	card.add_child(box)
+
+	var title := Label.new()
+	title.name = "LblStaffIntroTitle"
+	title.text = tr("popup.staff_intro.title")
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 34)
+	title.add_theme_color_override("font_color", Color(1.0, 0.82, 0.22, 1.0))
+	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.65))
+	box.add_child(title)
+
+	var body := Label.new()
+	body.name = "LblStaffIntroBody"
+	body.text = tr("popup.staff_intro.body").replace("\\n", "\n")
+	body.custom_minimum_size = Vector2(688, 130)
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_theme_font_size_override("font_size", 26)
+	body.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	body.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.65))
+	box.add_child(body)
+
+	var close_wrap := CenterContainer.new()
+	close_wrap.custom_minimum_size = Vector2(0, 58)
+	box.add_child(close_wrap)
+
+	var close_btn := Button.new()
+	close_btn.name = "BtnStaffIntroClose"
+	close_btn.text = tr("common.close")
+	close_btn.custom_minimum_size = Vector2(190, 52)
+	close_btn.add_theme_font_size_override("font_size", 24)
+	var close_style := StyleBoxFlat.new()
+	close_style.bg_color = Color(0.045, 0.045, 0.045, 0.96)
+	close_style.corner_radius_top_left = 8
+	close_style.corner_radius_top_right = 8
+	close_style.corner_radius_bottom_left = 8
+	close_style.corner_radius_bottom_right = 8
+	close_style.content_margin_left = 18
+	close_style.content_margin_right = 18
+	close_style.content_margin_top = 8
+	close_style.content_margin_bottom = 8
+	var close_hover := close_style.duplicate() as StyleBoxFlat
+	close_hover.bg_color = Color(0.085, 0.085, 0.085, 1.0)
+	var close_pressed := close_style.duplicate() as StyleBoxFlat
+	close_pressed.bg_color = Color(0.025, 0.025, 0.025, 1.0)
+	close_btn.add_theme_stylebox_override("normal", close_style)
+	close_btn.add_theme_stylebox_override("hover", close_hover)
+	close_btn.add_theme_stylebox_override("pressed", close_pressed)
+	close_btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	close_btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
+	close_btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
+	close_btn.pressed.connect(func() -> void:
+		popup.queue_free()
+	)
+	close_wrap.add_child(close_btn)
+
 func _on_btn_coachs() -> void:
 	print("[MENU] Coachs clicked -> go Coachs")
 	call_deferred("_go_coachs")
@@ -2761,7 +2883,10 @@ func _bm_show_management_auto_info_popup(title_key: String, body_key: String, ov
 	overlay.add_child(card)
 
 	var lbl := Label.new()
-	lbl.text = tr(title_key).replace("\\n", "\n") + "\n" + tr(body_key).replace("\\n", "\n")
+	if overlay_name == "ClubTokensIntroOverlay":
+		lbl.text = tr(body_key).replace("\\n", "\n")
+	else:
+		lbl.text = tr(title_key).replace("\\n", "\n") + "\n" + tr(body_key).replace("\\n", "\n")
 	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

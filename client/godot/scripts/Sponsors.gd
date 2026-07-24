@@ -349,7 +349,14 @@ func _show_confirm_popup(sponsor: Dictionary) -> void:
 	var title := _make_label(_tr_key("sponsors.confirm_title"), 28, TEXT_PRIMARY, true)
 	box.add_child(title)
 	var sponsor_name := _tr_key(str(sponsor.get("name", "")))
-	var message := _make_label(_tr_key("sponsors.confirm_message") + "\n" + sponsor_name, 21, TEXT_SECONDARY, true)
+	var payment_line := _money(sponsor.get("payment_amount", 0)) + " / " + _format_payment_unit(str(sponsor.get("payment_type", "")))
+	var bonus_line := _tr_key("sponsors.field.bonus") + ": "
+	if int(sponsor.get("bonus_amount", 0)) > 0:
+		bonus_line += _tr_key(str(SponsorDataRef.BONUS_I18N.get(str(sponsor.get("bonus_type", "")), ""))) + " + " + _format_bonus_amount(sponsor.get("bonus_amount", 0)) + " $"
+	else:
+		bonus_line += _tr_key("sponsors.bonus.none")
+	var duration_line := _tr_key("sponsors.field.duration") + ": " + str(int(sponsor.get("duration_value", 0))) + " " + _format_duration_unit(str(sponsor.get("duration_type", "")), int(sponsor.get("duration_value", 0)))
+	var message := _make_label(sponsor_name + "\n" + payment_line + "\n" + bonus_line + "\n" + duration_line, 21, TEXT_SECONDARY, true)
 	box.add_child(message)
 
 	var buttons := HBoxContainer.new()
