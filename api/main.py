@@ -848,8 +848,15 @@ def auth_verify(p: AuthVerifyPayload, request: Request):
 
 @app.post("/v1/auth/guest")
 def auth_guest(request: Request):
+    auth_t0 = time.perf_counter()
+    def _auth_timing(event: str) -> None:
+        print(f"AUTH_TIMING event={event} elapsed_ms={int((time.perf_counter() - auth_t0) * 1000)}")
+
+    _auth_timing("auth_start")
+    _auth_timing("before_schema")
     if not _auth_init_schema():
         raise HTTPException(status_code=503, detail="AUTH_DB_NOT_READY")
+    _auth_timing("after_schema")
 
     eng = _lb_get_engine()
     if eng is None:
@@ -860,16 +867,21 @@ def auth_guest(request: Request):
     ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent", "")
 
+    _auth_timing("before_insert_user")
     with eng.begin() as conn:
         conn.execute(text("""
             INSERT INTO users (user_id, email, email_verified, status, is_tester, created_at, last_login_at)
             VALUES (:user_id, :email, FALSE, 'active', FALSE, NOW(), NOW());
         """), {"user_id": user_id, "email": email})
+    _auth_timing("after_insert_user")
 
     access_token = _jwt_make_access(user_id, email)
+    _auth_timing("after_access_token")
     refresh_token = _new_refresh_token()
+    _auth_timing("after_refresh_token")
 
     sess_id = uuid.uuid4().hex
+    _auth_timing("before_insert_session")
     with eng.begin() as conn:
         conn.execute(text("""
             INSERT INTO sessions (session_id, user_id, refresh_hash, created_at, expires_at, user_agent, ip)
@@ -882,8 +894,12 @@ def auth_guest(request: Request):
             "ua": ua[:256],
             "ip": ip,
         })
+    _auth_timing("after_insert_session")
 
+    _auth_timing("before_audit")
     _audit("/v1/auth/guest", 200, user_id=user_id, ip=ip)
+    _auth_timing("after_audit")
+    _auth_timing("before_return")
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
