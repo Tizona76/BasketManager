@@ -1708,6 +1708,158 @@ static func _mercato_pick_unused_avatar(save: Dictionary) -> Dictionary:
 	return picked
 
 
+static func _mercato_canonical_avatar_candidates() -> Array:
+	var candidates := _mercato_male_avatar_candidates(true)
+	candidates.sort_custom(func(a, b):
+		var da: Dictionary = a as Dictionary
+		var db: Dictionary = b as Dictionary
+		return str(da.get("avatar_key", "")) < str(db.get("avatar_key", ""))
+	)
+	return candidates
+
+
+static func _mercato_rotated_avatar_candidates(season_number: int) -> Array:
+	var candidates := _mercato_canonical_avatar_candidates()
+	if candidates.is_empty():
+		return []
+	var rotation_cycle: int = maxi(0, season_number - 2)
+	var start_index: int = (rotation_cycle * 8) % candidates.size()
+	var ordered: Array = []
+	for i in range(candidates.size()):
+		ordered.append(candidates[(start_index + i) % candidates.size()])
+	return ordered
+
+
+static func _mercato_rotated_unused_avatar_picks(save: Dictionary, pool_size: int, season_number: int) -> Array:
+	var used := _identity_collect_used(save)
+	var picks: Array = []
+	for c_raw in _mercato_rotated_avatar_candidates(season_number):
+		if typeof(c_raw) != TYPE_DICTIONARY:
+			continue
+		var c: Dictionary = c_raw as Dictionary
+		var avatar_key := str(c.get("avatar_key", "")).strip_edges()
+		var used_avatar_keys: Dictionary = used.get("avatar_keys", {}) as Dictionary
+		if avatar_key == "" or used_avatar_keys.has(avatar_key):
+			continue
+		var picked := _identity_pick_candidate(save, used, [c])
+		if picked.is_empty():
+			continue
+		var preview := {
+			"nom": str(picked.get("name", "")),
+			"name": str(picked.get("name", "")),
+			"avatar_key": str(picked.get("avatar_key", "")),
+			"avatar_path": str(picked.get("avatar_path", "")),
+			"gender": str(picked.get("gender", "U"))
+		}
+		_identity_mark_used(used, preview)
+		picks.append(picked)
+		if picks.size() >= pool_size:
+			break
+	return picks
+
+
+static func _mercato_pool_tier_plan() -> Array:
+	return ["elite", "bon", "bon", "standard", "standard", "standard", "bon", "standard"]
+
+
+static func _mercato_target_tier_counts() -> Dictionary:
+	return {"elite": 1, "bon": 3, "standard": 4}
+
+
+static func _mercato_normalized_tier(value: Variant) -> String:
+	var tier := str(value).strip_edges()
+	if tier == "elite" or tier == "bon" or tier == "standard":
+		return tier
+	return "standard"
+
+
+static func _mercato_used_avatar_keys_forever(save: Dictionary) -> Dictionary:
+	var used := {}
+	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
+		return used
+	var by_id: Dictionary = save["players_by_id"] as Dictionary
+	for k in by_id.keys():
+		var raw = by_id[k]
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var p: Dictionary = raw as Dictionary
+		var avatar_key := str(p.get("avatar_key", "")).strip_edges()
+		if avatar_key.begins_with("avatar_mercato_"):
+			used[avatar_key] = true
+	return used
+
+
+static func _mercato_unused_avatar_picks(save: Dictionary) -> Array:
+	var used_avatar_keys := _mercato_used_avatar_keys_forever(save)
+	var out: Array = []
+	for c_raw in _mercato_canonical_avatar_candidates():
+		if typeof(c_raw) != TYPE_DICTIONARY:
+			continue
+		var c: Dictionary = c_raw as Dictionary
+		var avatar_key := str(c.get("avatar_key", "")).strip_edges()
+		if avatar_key == "" or used_avatar_keys.has(avatar_key):
+			continue
+		out.append(c)
+	return out
+
+
+static func _mercato_purchased_id_set(md: Dictionary) -> Dictionary:
+	var purchased := {}
+	if md.has("purchased_ids") and typeof(md["purchased_ids"]) == TYPE_ARRAY:
+		for id_value in (md["purchased_ids"] as Array):
+			_identity_mark_active_id(purchased, id_value)
+	return purchased
+
+
+static func _mercato_select_retained_pool_ids(save: Dictionary, current_ids: Array, keep_count: int, target_counts: Dictionary) -> Array:
+	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
+		return []
+	if not save.has("mercato") or typeof(save["mercato"]) != TYPE_DICTIONARY:
+		return []
+	var by_id: Dictionary = save["players_by_id"] as Dictionary
+	var md: Dictionary = save["mercato"] as Dictionary
+	var purchased := _mercato_purchased_id_set(md)
+	var candidates: Array = []
+	var seen := {}
+	for id_value in current_ids:
+		var sid := _identity_normalized_id(id_value)
+		if sid == "" or seen.has(sid) or purchased.has(sid):
+			continue
+		seen[sid] = true
+		if not by_id.has(sid) or typeof(by_id[sid]) != TYPE_DICTIONARY:
+			continue
+		var p: Dictionary = by_id[sid] as Dictionary
+		if not _mercato_player_identity_complete(p):
+			continue
+		var tier := _mercato_normalized_tier(p.get("tier", "standard"))
+		if not target_counts.has(tier):
+			continue
+		candidates.append({"id": int(sid), "tier": tier})
+	return _mercato_select_retained_pool_ids_rec(candidates, keep_count, target_counts, 0, [], {"elite": 0, "bon": 0, "standard": 0})
+
+
+static func _mercato_select_retained_pool_ids_rec(candidates: Array, keep_count: int, target_counts: Dictionary, start_index: int, selected: Array, counts: Dictionary) -> Array:
+	if selected.size() == keep_count:
+		return selected.duplicate()
+	for i in range(start_index, candidates.size()):
+		var c: Dictionary = candidates[i] as Dictionary
+		var tier := str(c.get("tier", "standard"))
+		var next_count := int(counts.get(tier, 0)) + 1
+		if next_count > int(target_counts.get(tier, 0)):
+			continue
+		var remaining_candidates := candidates.size() - (i + 1)
+		if selected.size() + 1 + remaining_candidates < keep_count:
+			continue
+		var next_selected := selected.duplicate()
+		next_selected.append(int(c.get("id", -1)))
+		var next_counts := counts.duplicate()
+		next_counts[tier] = next_count
+		var result := _mercato_select_retained_pool_ids_rec(candidates, keep_count, target_counts, i + 1, next_selected, next_counts)
+		if not result.is_empty():
+			return result
+	return []
+
+
 static func _mercato_rng() -> RandomNumberGenerator:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
@@ -1802,7 +1954,7 @@ static func _mercato_next_generated_id(save: Dictionary) -> int:
 
 	return max_id + 1
 
-static func _mercato_make_new_player(save: Dictionary) -> Dictionary:
+static func _mercato_make_new_player(save: Dictionary, forced_tier: String = "", forced_avatar_pick: Dictionary = {}) -> Dictionary:
 	var rng := _mercato_rng()
 	var pid: int = _mercato_next_generated_id(save)
 	var poste: String = _mercato_random_poste(rng)
@@ -1810,13 +1962,23 @@ static func _mercato_make_new_player(save: Dictionary) -> Dictionary:
 	# 🎯 Niveau joueur (standard / bon / elite)
 	var roll: float = rng.randf()
 	var tier: String = "standard"
-	if roll > 0.95:
+	if forced_tier == "elite" or forced_tier == "bon" or forced_tier == "standard":
+		tier = forced_tier
+	elif roll > 0.95:
 		tier = "elite"
 	elif roll > 0.80:
 		tier = "bon"
 
 	var age: int = rng.randi_range(18, 35)
-	var avatar_pick: Dictionary = _mercato_pick_unused_avatar(save)
+	var avatar_pick: Dictionary = {}
+	if forced_avatar_pick.is_empty():
+		avatar_pick = _mercato_pick_unused_avatar(save)
+	else:
+		var forced_used := _identity_collect_used(save)
+		var forced_avatar_key := str(forced_avatar_pick.get("avatar_key", "")).strip_edges()
+		var forced_used_avatar_keys: Dictionary = forced_used.get("avatar_keys", {}) as Dictionary
+		if forced_avatar_key != "" and not forced_used_avatar_keys.has(forced_avatar_key):
+			avatar_pick = _identity_pick_candidate(save, forced_used, [forced_avatar_pick])
 	if avatar_pick.is_empty():
 		return {}
 
@@ -1962,36 +2124,95 @@ static func refresh_mercato_pool(save: Dictionary, phase: String = "manual") -> 
 		next_ids = current_ids.duplicate()
 		if BM_MERCATO_ID_DEBUG:
 			print("[BM_MERCATO_ID_DEBUG] REFRESH_REUSE phase=", phase, " current_ids_after=", next_ids)
-	else:
-		var attempts := 0
-		while next_ids.size() < pool_size and attempts < pool_size * 8:
-			attempts += 1
-			md["current_ids"] = next_ids.duplicate()
+		return
+
+	var current_pool_valid := current_ids.size() == pool_size and _mercato_current_pool_identity_complete(save, current_ids)
+	var tier_plan := _mercato_pool_tier_plan()
+	var target_counts := _mercato_target_tier_counts()
+	var unused_avatar_picks := _mercato_unused_avatar_picks(save)
+	var retained_ids: Array = []
+
+	if current_pool_valid:
+		if unused_avatar_picks.is_empty():
+			md["last_refresh_season"] = season_now
 			save["mercato"] = md
-			var player: Dictionary = _mercato_make_new_player(save)
-			var pid: int = int(player.get("id", -1))
-			if pid < 0 or not _mercato_player_identity_complete(player):
-				continue
-
-			var key := str(pid)
-			by_id[key] = player
-			next_ids.append(pid)
-
-			if not seen_ids.has(pid):
-				seen_ids.append(pid)
-
-			md["last_generated_id"] = maxi(int(md.get("last_generated_id", 999)), pid)
 			if BM_MERCATO_ID_DEBUG:
-				print("[BM_MERCATO_ID_DEBUG] REFRESH_APPEND phase=", phase, " id=", pid, " slot=", next_ids.size(), " nom=", str(player.get("nom", "")), " avatar_key=", str(player.get("avatar_key", "")), " avatar_path=", str(player.get("avatar_path", "")))
+				print("[BM_MERCATO_ID_DEBUG] REFRESH_FREEZE_NO_UNUSED_IDENTITIES phase=", phase, " current_ids_after=", current_ids)
+			return
+		if unused_avatar_picks.size() == 5:
+			retained_ids = _mercato_select_retained_pool_ids(save, current_ids, 3, target_counts)
+			if retained_ids.size() != 3:
+				md["last_refresh_season"] = season_now
+				save["mercato"] = md
+				if BM_MERCATO_ID_DEBUG:
+					print("[BM_MERCATO_ID_DEBUG] REFRESH_KEEP_EXISTING_NO_RETAINED_COMBINATION phase=", phase, " unused_identity_count=", unused_avatar_picks.size())
+				return
+		elif unused_avatar_picks.size() != pool_size:
+			md["last_refresh_season"] = season_now
+			save["mercato"] = md
+			if BM_MERCATO_ID_DEBUG:
+				print("[BM_MERCATO_ID_DEBUG] REFRESH_KEEP_EXISTING_UNSUPPORTED_UNUSED_COUNT phase=", phase, " unused_identity_count=", unused_avatar_picks.size())
+			return
+	elif unused_avatar_picks.size() < pool_size:
+		if BM_MERCATO_ID_DEBUG:
+			print("[BM_MERCATO_ID_DEBUG] REFRESH_KEEP_EXISTING_NOT_ENOUGH_IDENTITIES phase=", phase, " unused_identity_count=", unused_avatar_picks.size())
+		return
 
-	if next_ids.size() < pool_size and not current_ids.is_empty():
+	md["current_ids"] = []
+	save["mercato"] = md
+	var retained_remaining: Array = retained_ids.duplicate()
+	var new_pick_index := 0
+	for slot in range(pool_size):
+		var slot_tier := str(tier_plan[slot])
+		var retained_slot_index := -1
+		for i in range(retained_remaining.size()):
+			var retained_id := int(retained_remaining[i])
+			var retained_key := str(retained_id)
+			if by_id.has(retained_key) and typeof(by_id[retained_key]) == TYPE_DICTIONARY:
+				var retained_player: Dictionary = by_id[retained_key] as Dictionary
+				if _mercato_normalized_tier(retained_player.get("tier", "standard")) == slot_tier:
+					retained_slot_index = i
+					break
+		if retained_slot_index >= 0:
+			var placed_id := int(retained_remaining[retained_slot_index])
+			next_ids.append(placed_id)
+			retained_remaining.remove_at(retained_slot_index)
+			continue
+
+		if new_pick_index >= unused_avatar_picks.size():
+			break
+		md["current_ids"] = next_ids.duplicate()
+		save["mercato"] = md
+		var player: Dictionary = _mercato_make_new_player(save, slot_tier, unused_avatar_picks[new_pick_index])
+		new_pick_index += 1
+		var pid: int = int(player.get("id", -1))
+		if pid < 0 or not _mercato_player_identity_complete(player):
+			break
+
+		var key := str(pid)
+		by_id[key] = player
+		next_ids.append(pid)
+
+		if not seen_ids.has(pid):
+			seen_ids.append(pid)
+
+		md["last_generated_id"] = maxi(int(md.get("last_generated_id", 999)), pid)
+		if BM_MERCATO_ID_DEBUG:
+			print("[BM_MERCATO_ID_DEBUG] REFRESH_APPEND phase=", phase, " id=", pid, " slot=", next_ids.size(), " tier=", str(player.get("tier", "")), " nom=", str(player.get("nom", "")), " avatar_key=", str(player.get("avatar_key", "")), " avatar_path=", str(player.get("avatar_path", "")))
+
+	if next_ids.size() < pool_size or not retained_remaining.is_empty():
 		var incomplete_generated_count := next_ids.size()
 		by_id = original_by_id
 		seen_ids = original_seen_ids
 		md["last_generated_id"] = original_last_generated_id
 		next_ids = current_ids.duplicate()
+		md["current_ids"] = next_ids
+		md["seen_ids"] = seen_ids
+		save["players_by_id"] = by_id
+		save["mercato"] = md
 		if BM_MERCATO_ID_DEBUG:
 			print("[BM_MERCATO_ID_DEBUG] REFRESH_KEEP_EXISTING_INCOMPLETE_GENERATION phase=", phase, " generated_count=", incomplete_generated_count, " required=", pool_size)
+		return
 
 	md["current_ids"] = next_ids
 	md["seen_ids"] = seen_ids

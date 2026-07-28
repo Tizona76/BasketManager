@@ -242,14 +242,58 @@ func _fill_rows() -> void:
 		lbl_licensed_players.add_theme_color_override("font_color", Color(0.20, 0.55, 0.95, 1.0))
 
 	var pool: Array = _get_mercato_pool()
-	_sort_mercato_pool(pool)
-	print("[MERCATO] pool size=", pool.size(), " sort=", _mercato_sort_key, " asc=", _mercato_sort_ascending)
+	var visible_pool: Array = _bm_select_visible_mercato_players(pool)
+	_sort_mercato_pool(visible_pool)
+	print("[MERCATO] pool size=", pool.size(), " visible=", visible_pool.size(), " sort=", _mercato_sort_key, " asc=", _mercato_sort_ascending)
 	print("[MERCATO] purchased_ids=", _get_purchased_ids())
 
-	for p in pool:
+	var displayed_count := 0
+	for p in visible_pool:
 		if p is Dictionary:
 			print("[MERCATO] row=", str((p as Dictionary).get("id", "?")), " name=", str((p as Dictionary).get("nom", (p as Dictionary).get("name", "?"))))
 			rows.add_child(_make_row(p))
+			displayed_count += 1
+			if displayed_count >= 6:
+				break
+
+func _bm_select_visible_mercato_players(pool: Array) -> Array:
+	var selected: Array = []
+	var seen := {}
+	var limits := {"elite": 1, "bon": 2, "standard": 3}
+	var counts := {"elite": 0, "bon": 0, "standard": 0}
+
+	for raw in pool:
+		if not (raw is Dictionary):
+			continue
+		var p: Dictionary = raw as Dictionary
+		var pid := _player_id_text(p)
+		if seen.has(pid):
+			continue
+		var tier := str(p.get("tier", "standard")).strip_edges()
+		if not limits.has(tier):
+			tier = "standard"
+		if int(counts.get(tier, 0)) >= int(limits.get(tier, 0)):
+			continue
+		selected.append(p)
+		seen[pid] = true
+		counts[tier] = int(counts.get(tier, 0)) + 1
+		if selected.size() >= 6:
+			return selected
+
+	for raw in pool:
+		if not (raw is Dictionary):
+			continue
+		var p: Dictionary = raw as Dictionary
+		var pid := _player_id_text(p)
+		if seen.has(pid):
+			continue
+		selected.append(p)
+		seen[pid] = true
+		if selected.size() >= 6:
+			break
+
+	return selected
+
 
 func _connect_sort_header(lbl: Label, sort_key: String) -> void:
 	if lbl == null:
