@@ -346,12 +346,15 @@ finance.income.tournaments,Tournois,Tournaments,Torneos,Tornei,Torneios
 selection.avg_perf,Perf moyenne,Average performance,Rendimiento medio,Prestazione media,Performance média
 tournois.info.teams,Équipes,Teams,Equipos,Squadre,Equipes
 tournois.info.entry_fee,Adhésion,Entry fee,Inscripción,Iscrizione,Adesão
-tournois.info.registration,Inscription,Registration,Inscripción,Iscrizione,Inscrição
+tournois.info.registration,Jouer,Play,Jugar,Gioca,Jogar
 tournois.info.runner_up,Finaliste,Runner-up,Finalista,Finalista,Finalista
 tournois.info.champion,Champion,Winner,Campeón,Campione,Campeão
 tournois.info.tokens,tokens,tokens,tokens,tokens,tokens
+tournois.result.first_short,1er,1st,1.º,1°,1º
+tournois.result.second_short,2e,2nd,2.º,2°,2º
 finance.expenses.tournament_fees,Frais tournois,Tournament fees,Gastos torneos,Spese tornei,Taxas torneios
 finance.graph.title,Tendance du solde,Balance trend,Tendencia del saldo,Andamento del saldo,Tendência do saldo
+finance.message.first_visit_context,Un déficit initial est normal. Gagner augmente la Popularité et favorise les revenus futurs.,Early deficits are normal. Winning raises Popularity and supports future revenue.,Un déficit inicial es normal. Ganar aumenta la Popularidad y favorece los ingresos futuros.,Un deficit iniziale è normale. Vincere aumenta la Popolarità e favorisce le entrate future.,Um déficit inicial é normal. Vencer aumenta a Popularidade e favorece receitas futuras.
 tournois.victory_subtitle_intermediate,Victoire dans le tournoi Intermédiaire,Victory in the Intermediate tournament,Victoria en el torneo Intermedio,Vittoria nel torneo Intermedio,Vitória no torneio Intermediário
 tournois.victory_subtitle_elite,Victoire dans le tournoi Élite,Victory in the Elite tournament,Victoria en el torneo Élite,Vittoria nel torneo Élite,Vitória no torneio Elite
 stadium_intro_title,Stadium,Stadium,Stadium,Stadium,Stadium
@@ -677,6 +680,10 @@ matchsim.read_only,Lecture seule,Read only,Solo lectura,Sola lettura,Apenas leit
 matchsim.starting_five,CINQ MAJEUR,STARTING FIVE,CINCO INICIAL,QUINTETTO BASE,CINCO INICIAL
 matchsim.bench,BANC,BENCH,BANQUILLO,PANCHINA,BANCO
 matchsim.energy,Énergie,Energy,Energía,Energia,Energia
+matchsim.coach_name.junior,Coach Teddy,Coach Teddy,Coach Teddy,Coach Teddy,Coach Teddy
+matchsim.coach_name.confirme,Coach James,Coach James,Coach James,Coach James,Coach James
+matchsim.coach_name.elite,Coach Alan,Coach Alan,Coach Alan,Coach Alan,Coach Alan
+matchsim.game_lineup.coach_optimized,"Optimisée selon les critères de {coach} : niveau, forme et fraîcheur.","Optimized by {coach}'s staff criteria: quality, form and freshness.","Optimizada según los criterios de {coach}: nivel, forma y frescura.","Ottimizzata secondo i criteri di {coach}: livello, forma e freschezza.","Otimizada segundo os critérios de {coach}: nível, forma e frescura."
 finance.tooltip.tickets,"Revenus issus des ventes de billets pour ce match à domicile, influencés par vos prix et la popularité du club, qui attire plus de fans dans l'arène.","Income from ticket sales for this home game, influenced by your ticket prices and your club's popularity, which attracts more fans to the arena.","Ingresos de la venta de entradas para este partido en casa, influenciados por tus precios y la popularidad del club, que atrae a más aficionados al pabellón.","Entrate dalla vendita dei biglietti per questa partita in casa, influenzate dai prezzi e dalla popolarità del club, che attira più tifosi nell'arena.","Receita da venda de bilhetes para este jogo em casa, influenciada pelos preços e pela popularidade do clube, que atrai mais adeptos à arena."
 finance.tooltip.shops,"Revenus estimés de la nourriture, des boissons et des produits dérivés vendus pendant ce match à domicile. Un club plus populaire attire plus de fans et augmente les ventes de la boutique.","Estimated income from food, drinks and merchandise sold during this home game. A more popular club attracts more fans and increases shop sales.","Ingresos estimados por comida, bebidas y productos vendidos durante este partido en casa. Un club más popular atrae a más aficionados y aumenta las ventas de la tienda.","Entrate stimate da cibo, bevande e merchandising venduti durante questa partita in casa. Un club più popolare attira più tifosi e aumenta le vendite del negozio.","Receita estimada de comida, bebidas e merchandising vendidos durante este jogo em casa. Um clube mais popular atrai mais adeptos e aumenta as vendas da loja."
 finance.tooltip.salaries,"Les salaires annuels de tous les joueurs de votre effectif, répartis sur chaque match de la saison.","The annual salaries of all players in your club squad, spread across each game of the season.","Los salarios anuales de todos los jugadores de tu plantilla, repartidos entre cada partido de la temporada.","Gli stipendi annuali di tutti i giocatori della rosa del club, distribuiti su ogni partita della stagione.","Os salários anuais de todos os jogadores do plantel do clube, distribuídos por cada jogo da época."

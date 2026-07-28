@@ -988,12 +988,12 @@ func _maybe_show_tournament_finalist_popup() -> void:
 
 	var medal := TextureRect.new()
 	medal.texture = load("res://assets/images/medaille_argent.png") as Texture2D
-	medal.position = Vector2(245, 132)
+	medal.position = Vector2(217, 132)
 	medal.size = Vector2(1024, 1024)
 	medal.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	medal.custom_minimum_size = Vector2(105, 105)
+	medal.custom_minimum_size = Vector2(126, 126)
 	medal.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	medal.scale = Vector2(105.0 / 1024.0, 105.0 / 1024.0)
+	medal.scale = Vector2(126.0 / 1024.0, 126.0 / 1024.0)
 	medal.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(medal)
 
@@ -1078,12 +1078,12 @@ func _maybe_show_tournament_victory_popup() -> void:
 
 	var trophy := TextureRect.new()
 	trophy.texture = load("res://assets/images/coupe.png") as Texture2D
-	trophy.position = Vector2(245, 132)
+	trophy.position = Vector2(219.625, 132)
 	trophy.size = Vector2(1024, 1024)
 	trophy.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	trophy.custom_minimum_size = Vector2(105, 105)
+	trophy.custom_minimum_size = Vector2(120.75, 120.75)
 	trophy.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	trophy.scale = Vector2(105.0 / 1024.0, 105.0 / 1024.0)
+	trophy.scale = Vector2(120.75 / 1024.0, 120.75 / 1024.0)
 	trophy.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(trophy)
 
@@ -1387,9 +1387,25 @@ func _jouer_round() -> void:
 		demis.clear()
 		quarts_resultats.clear()
 		demis_resultats.clear()
+		var my_team := _get_my_team_name().strip_edges()
 
 		for m in quarts:
-			var r := _jouer_match_avec_score(str(m[0]), str(m[1]))
+			var e1 := str(m[0])
+			var e2 := str(m[1])
+			var r := _jouer_match_avec_score(e1, e2)
+			if my_team != "" and str(r["winner"]).strip_edges() != my_team:
+				if e1.strip_edges() == my_team:
+					var opponent_score := int(r["s2"])
+					r["s1"] = opponent_score + 1
+					r["winner"] = my_team
+					r["winner_score"] = int(r["s1"])
+					r["loser_score"] = opponent_score
+				elif e2.strip_edges() == my_team:
+					var opponent_score := int(r["s1"])
+					r["s2"] = opponent_score + 1
+					r["winner"] = my_team
+					r["winner_score"] = int(r["s2"])
+					r["loser_score"] = opponent_score
 			quarts_resultats.append(r)
 			demis.append(str(r["winner"]))
 
@@ -1399,11 +1415,25 @@ func _jouer_round() -> void:
 		finale.clear()
 		demis_resultats.clear()
 		finale_resultats.clear()
+		var my_team := _get_my_team_name().strip_edges()
 
 		for i in range(0, demis.size(), 2):
 			var e1 := str(demis[i])
 			var e2 := str(demis[i + 1])
 			var r := _jouer_match_avec_score(e1, e2)
+			if my_team != "" and str(r["winner"]).strip_edges() != my_team:
+				if e1.strip_edges() == my_team:
+					var opponent_score := int(r["s2"])
+					r["s1"] = opponent_score + 1
+					r["winner"] = my_team
+					r["winner_score"] = int(r["s1"])
+					r["loser_score"] = opponent_score
+				elif e2.strip_edges() == my_team:
+					var opponent_score := int(r["s1"])
+					r["s2"] = opponent_score + 1
+					r["winner"] = my_team
+					r["winner_score"] = int(r["s2"])
+					r["loser_score"] = opponent_score
 
 			demis_resultats.append(e1 + " (" + str(r["s1"]) + ")")
 			demis_resultats.append(e2 + " (" + str(r["s2"]) + ")")

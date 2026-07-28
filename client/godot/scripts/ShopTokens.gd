@@ -996,8 +996,6 @@ func _get_token_history_entries(save: Dictionary) -> Array[String]:
 			var reason := str(item.get("reason_key", item.get("reason", ""))).strip_edges()
 			if amount != 0:
 				lines.append(_token_history_reason_text(reason) + "  " + _token_history_amount_text(amount))
-			if lines.size() >= 6:
-				break
 
 	if lines.is_empty() and save.has("pending_season_reward_popup") and typeof(save["pending_season_reward_popup"]) == TYPE_DICTIONARY:
 		var pending: Dictionary = save["pending_season_reward_popup"] as Dictionary
@@ -1054,8 +1052,21 @@ func _show_token_history_popup() -> void:
 	box.add_theme_constant_override("separation", 10)
 	popup.add_child(box)
 	box.add_child(_make_info_label(_club_tokens_tr("club_tokens.history", "History"), 26, Color(1.0, 0.82, 0.28, 1.0), 5))
+
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(470, 205)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
+	scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	box.add_child(scroll)
+
+	var history_box := VBoxContainer.new()
+	history_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	history_box.add_theme_constant_override("separation", 8)
+	scroll.add_child(history_box)
+
 	for line in lines:
-		box.add_child(_make_info_label(line, 20, Color(0.96, 0.98, 1.0, 1.0), 3))
+		history_box.add_child(_make_info_label(line, 20, Color(0.96, 0.98, 1.0, 1.0), 3))
 
 	var close_btn := Button.new()
 	close_btn.text = _club_tokens_tr("club_tokens.history.close", "Close")

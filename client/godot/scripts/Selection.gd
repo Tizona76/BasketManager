@@ -566,6 +566,8 @@ func _avatar_players() -> Array:
 
 	for fname in files:
 		var avatar_key: String = fname.get_basename()
+		if avatar_key.begins_with("avatar_mercato_"):
+			continue
 		var gender: String = "U"
 
 		for k in _meta_key_candidates(avatar_key):

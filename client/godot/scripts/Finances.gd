@@ -28,6 +28,8 @@ func _bm_finance_apply_text_plus2_runtime(root: Node = null) -> void:
 
 const PL = preload("res://scripts/PlayerLife.gd")
 
+var _finance_first_context_preserve_current_frame := false
+
 
 func _i18n_lang2() -> String:
 	var loc := TranslationServer.get_locale()
@@ -1032,6 +1034,16 @@ func _bm_update_finance_trend_text(income: int, expenses: int, tickets: int = -1
 		value = _bm_pick_finance_comment(["finance.comment.stable.1", "finance.comment.stable.2", "finance.comment.stable.3", "finance.comment.stable.4", "finance.comment.stable.5"], seed + 5)
 
 	lbl.text = "“" + value + "”"
+	var save := PL.load_savegame()
+	if typeof(save) == TYPE_DICTIONARY:
+		if _finance_first_context_preserve_current_frame:
+			lbl.text = "“" + tr("finance.message.first_visit_context") + "”"
+		elif not bool(save.get("finance_first_context_seen_v1", false)):
+			lbl.text = "“" + tr("finance.message.first_visit_context") + "”"
+			save["finance_first_context_seen_v1"] = true
+			PL.write_savegame(save)
+			_finance_first_context_preserve_current_frame = true
+			call_deferred("_bm_release_finance_first_context_preserve")
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1052,3 +1064,6 @@ func _bm_update_finance_trend_text(income: int, expenses: int, tickets: int = -1
 	lbl.offset_right = 0
 	lbl.offset_top = 0
 	lbl.offset_bottom = 0
+
+func _bm_release_finance_first_context_preserve() -> void:
+	_finance_first_context_preserve_current_frame = false

@@ -252,8 +252,6 @@ func _bm_apply_i18n_btn_retour() -> void:
 @onready var missions_card: Panel = get_node_or_null("MissionsPanel/MissionsCard") as Panel
 @onready var lbl_missions_title: Label = get_node_or_null("MissionsPanel/MissionsCard/LblMissionsTitle") as Label
 @onready var lbl_missions_level: Label = get_node_or_null("MissionsPanel/MissionsCard/LblMissionsLevel") as Label
-@onready var lbl_missions_status: Label = get_node_or_null("MissionsPanel/MissionsCard/LblMissionsStatus") as Label
-@onready var lbl_missions_reward: Label = get_node_or_null("MissionsPanel/MissionsCard/LblMissionsReward") as Label
 @onready var metro_canvas: Control = get_node_or_null("MissionsPanel/MissionsCard/MetroCanvas") as Control
 @onready var btn_close_missions: Button = get_node_or_null("MissionsPanel/MissionsCard/BtnCloseMissions") as Button
 @onready var btn_claim_mission: Button = get_node_or_null("MissionsPanel/MissionsCard/BtnClaimMission") as Button
@@ -1279,7 +1277,7 @@ func _bm_format_int_spaces(v: int) -> String:
 	return out
 
 func _season_reward_menu_fmt_amount(v: int) -> String:
-	return "+" + _bm_format_int_spaces(int(v)) + " $"
+	return "+" + _bm_format_int_spaces(int(v)).replace(" ", ".") + " $"
 
 func _season_reward_menu_animate_amount(lbl: Label, euros_gain: int) -> void:
 	if lbl == null:
@@ -2459,7 +2457,7 @@ func _get_current_season_day_text() -> String:
 		txt = "Season {season} - Day {day}"
 
 	txt = txt.replace("{season}", str(season_number))
-	txt = txt.replace("{day}", "%02d" % journee)
+	txt = txt.replace("{day}", ("%02d / 22" % journee))
 	return txt.to_upper()
 
 func _ensure_season_day_label() -> void:
@@ -2732,7 +2730,7 @@ func _open_end_season_popup() -> void:
 		var img := TextureRect.new()
 		img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		img.custom_minimum_size = Vector2(200, 125)
+		img.custom_minimum_size = Vector2(230, 143.75)
 
 		var texture_path := ""
 		if rank == 1:
@@ -3591,19 +3589,41 @@ func _missions_update_tokens_counter(level_missions: Array, save: Dictionary) ->
 		token_icon.size = Vector2(41.4, 41.4)
 
 
+func _missions_stylebox(fill: Color, border: Color, border_w: int, radius: int) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = fill
+	sb.border_color = border
+	sb.border_width_left = border_w
+	sb.border_width_top = border_w
+	sb.border_width_right = border_w
+	sb.border_width_bottom = border_w
+	sb.corner_radius_top_left = radius
+	sb.corner_radius_top_right = radius
+	sb.corner_radius_bottom_right = radius
+	sb.corner_radius_bottom_left = radius
+	return sb
+
+
+func _missions_make_circle(parent: Control, pos: Vector2, size_px: float, fill: Color, border: Color, border_w: int) -> Panel:
+	var circle := Panel.new()
+	circle.position = pos - Vector2(size_px * 0.5, size_px * 0.5)
+	circle.size = Vector2(size_px, size_px)
+	circle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	circle.add_theme_stylebox_override("panel", _missions_stylebox(fill, border, border_w, int(size_px * 0.5)))
+	parent.add_child(circle)
+	return circle
+
+
 func _missions_make_station(parent: Control, pos: Vector2, mission: Dictionary, state: String, idx: int) -> void:
-	var halo := ColorRect.new()
-	halo.position = pos - Vector2(22, 22)
-	halo.size = Vector2(44, 44)
-	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	match state:
 		"done":
-			halo.color = Color(0.16, 0.78, 0.35, 0.22)
+			_missions_make_circle(parent, pos, 84.0, Color(1.00, 0.78, 0.16, 0.22), Color(0.42, 1.00, 0.38, 0.35), 2)
+			_missions_make_circle(parent, pos, 56.0, Color(0.98, 0.62, 0.08, 0.92), Color(1.00, 0.92, 0.32, 1.0), 4)
 		"active":
-			halo.color = Color(0.95, 0.62, 0.12, 0.28)
+			_missions_make_circle(parent, pos, 96.0, Color(0.42, 0.22, 1.00, 0.30), Color(0.28, 0.76, 1.00, 0.45), 3)
+			_missions_make_circle(parent, pos, 64.0, Color(0.16, 0.10, 0.42, 0.96), Color(0.52, 0.86, 1.00, 1.0), 4)
 		_:
-			halo.color = Color(0.55, 0.58, 0.62, 0.14)
-	parent.add_child(halo)
+			_missions_make_circle(parent, pos, 60.0, Color(0.07, 0.08, 0.11, 0.72), Color(0.25, 0.27, 0.32, 0.82), 3)
 
 	var tex := load("res://assets/images/ballon.png")
 	if tex != null:
@@ -3611,16 +3631,20 @@ func _missions_make_station(parent: Control, pos: Vector2, mission: Dictionary, 
 		ball.texture = tex
 		ball.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		ball.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		ball.position = pos - Vector2(28.57, 28.57)
-		ball.size = Vector2(57.13, 57.13)
 		ball.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		match state:
 			"done":
-				ball.modulate = Color(0.92, 1.00, 0.92, 1.0)
+				ball.position = pos - Vector2(25.0, 25.0)
+				ball.size = Vector2(50.0, 50.0)
+				ball.modulate = Color(0.95, 0.88, 0.58, 0.82)
 			"active":
-				ball.modulate = Color(1.0, 0.96, 0.88, 1.0)
+				ball.position = pos - Vector2(33.0, 33.0)
+				ball.size = Vector2(66.0, 66.0)
+				ball.modulate = Color(1.0, 0.97, 0.90, 1.0)
 			_:
-				ball.modulate = Color(0.72, 0.72, 0.72, 0.95)
+				ball.position = pos - Vector2(26.0, 26.0)
+				ball.size = Vector2(52.0, 52.0)
+				ball.modulate = Color(0.38, 0.40, 0.46, 0.58)
 		parent.add_child(ball)
 	else:
 		var dot := ColorRect.new()
@@ -3635,8 +3659,35 @@ func _missions_make_station(parent: Control, pos: Vector2, mission: Dictionary, 
 				dot.color = Color(0.48, 0.50, 0.55, 1.0)
 		parent.add_child(dot)
 
+	if state == "done":
+		var check := Label.new()
+		check.text = "✓"
+		check.position = pos + Vector2(11, -34)
+		check.size = Vector2(34, 34)
+		check.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		check.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		check.add_theme_font_size_override("font_size", 30)
+		check.add_theme_color_override("font_color", Color(0.40, 1.00, 0.38, 1.0))
+		check.add_theme_color_override("font_outline_color", Color(0.02, 0.18, 0.06, 1.0))
+		check.add_theme_constant_override("outline_size", 5)
+		check.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(check)
+	elif state == "locked":
+		var lock := Label.new()
+		lock.text = "🔒"
+		lock.position = pos + Vector2(-25, -16)
+		lock.size = Vector2(50, 32)
+		lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lock.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lock.add_theme_font_size_override("font_size", 24)
+		lock.add_theme_color_override("font_color", Color(0.88, 0.90, 0.96, 0.74))
+		lock.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 0.95))
+		lock.add_theme_constant_override("outline_size", 3)
+		lock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(lock)
+
 	var label := Label.new()
-	label.position = pos + Vector2(-10, -66)
+	label.position = pos + Vector2(-125, -116)
 	label.size = Vector2(250, 76)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -3645,14 +3696,14 @@ func _missions_make_station(parent: Control, pos: Vector2, mission: Dictionary, 
 	label.add_theme_font_size_override("font_size", 24)
 	match state:
 		"done":
-			label.add_theme_color_override("font_color", Color(0.92, 1.0, 0.92, 1))
-			label.add_theme_color_override("font_outline_color", Color(0.16, 0.78, 0.35, 0.98))
+			label.add_theme_color_override("font_color", Color(1.00, 0.96, 0.74, 1))
+			label.add_theme_color_override("font_outline_color", Color(0.42, 0.22, 0.02, 0.98))
 		"locked":
-			label.add_theme_color_override("font_color", Color(1.0, 0.97, 0.84, 1))
-			label.add_theme_color_override("font_outline_color", Color(1.00, 0.82, 0.18, 0.98))
+			label.add_theme_color_override("font_color", Color(0.58, 0.60, 0.68, 0.72))
+			label.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 0.92))
 		_:
 			label.add_theme_color_override("font_color", Color(0.98, 0.99, 1.0, 1))
-			label.add_theme_color_override("font_outline_color", Color(0.10, 0.18, 0.30, 0.95))
+			label.add_theme_color_override("font_outline_color", Color(0.22, 0.14, 0.64, 0.98))
 	label.add_theme_constant_override("outline_size", 6)
 	label.add_theme_color_override("font_shadow_color", Color(0.00, 0.00, 0.00, 0.45))
 	label.add_theme_constant_override("shadow_offset_x", 0)
@@ -3660,18 +3711,25 @@ func _missions_make_station(parent: Control, pos: Vector2, mission: Dictionary, 
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(label)
 
+	var capsule := Panel.new()
+	capsule.position = pos + Vector2(-52, 44)
+	capsule.size = Vector2(104, 42)
+	capsule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	capsule.add_theme_stylebox_override("panel", _missions_stylebox(Color(0.05, 0.06, 0.10, 0.88), Color(1.00, 0.78, 0.20, 0.98), 2, 18))
+	parent.add_child(capsule)
+
 	var reward_lbl := Label.new()
 	reward_lbl.text = "+" + str(int(mission.get("reward_tokens", 0)))
-	reward_lbl.position = pos + Vector2(-58, 30)
-	reward_lbl.size = Vector2(40, 24)
+	reward_lbl.position = Vector2(10, 0)
+	reward_lbl.size = Vector2(48, 42)
 	reward_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	reward_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	reward_lbl.add_theme_font_size_override("font_size", 28)
-	reward_lbl.add_theme_color_override("font_color", Color(0.98, 0.99, 1.0, 1))
-	reward_lbl.add_theme_color_override("font_outline_color", Color(0.10, 0.18, 0.30, 0.95))
-	reward_lbl.add_theme_constant_override("outline_size", 5)
+	reward_lbl.add_theme_font_size_override("font_size", 27)
+	reward_lbl.add_theme_color_override("font_color", Color(1.0, 0.94, 0.62, 1))
+	reward_lbl.add_theme_color_override("font_outline_color", Color(0.14, 0.08, 0.02, 1))
+	reward_lbl.add_theme_constant_override("outline_size", 4)
 	reward_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(reward_lbl)
+	capsule.add_child(reward_lbl)
 
 	var token_tex := load("res://assets/images/token.png")
 	if token_tex != null:
@@ -3679,29 +3737,34 @@ func _missions_make_station(parent: Control, pos: Vector2, mission: Dictionary, 
 		token_icon.texture = token_tex
 		token_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		token_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		token_icon.size = Vector2(40, 40)
-		token_icon.position = pos + Vector2(-15, 28)
+		token_icon.size = Vector2(34, 34)
+		token_icon.position = Vector2(62, 4)
 		token_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		parent.add_child(token_icon)
+		capsule.add_child(token_icon)
 
 func _missions_build_points(count: int) -> Array:
 	var pts: Array = []
-	var y := 70.0
+	var max_index := maxi(1, count - 1)
+	var start_y := minf(400.0, 118.0 + float(max_index) * 58.0)
 	for i in range(count):
-		var x := 140.0
-		if i % 6 == 1:
-			x = 330.0
-		elif i % 6 == 2:
-			x = 610.0
-		elif i % 6 == 3:
-			x = 800.0
-		elif i % 6 == 4:
-			x = 560.0
-		elif i % 6 == 5:
-			x = 250.0
+		var t := 0.0 if count <= 1 else float(i) / float(max_index)
+		var x: float = lerp(118.0, 858.0, t)
+		var y := start_y - (58.0 * float(i))
 		pts.append(Vector2(x, y))
-		y += 74.0
 	return pts
+
+
+func _missions_preview_missions(level: int, level_missions: Array, current_idx: int) -> Array:
+	var preview: Array = []
+	if current_idx + 1 < level_missions.size():
+		return preview
+	var next_level_missions: Array = _missions_get_level_data(level + 1)
+	for mission_any in next_level_missions:
+		if typeof(mission_any) == TYPE_DICTIONARY:
+			preview.append(mission_any)
+			return preview
+	return preview
+
 
 func _missions_build_curve_points(stations: Array) -> PackedVector2Array:
 	var out: PackedVector2Array = PackedVector2Array()
@@ -3719,6 +3782,45 @@ func _missions_build_curve_points(stations: Array) -> PackedVector2Array:
 		out.append(c2)
 		out.append(b)
 	return out
+
+
+func _missions_route_color(state: String) -> Color:
+	match state:
+		"done":
+			return Color(1.00, 0.72, 0.12, 1.0)
+		"active":
+			return Color(0.38, 0.48, 1.00, 1.0)
+		_:
+			return Color(0.16, 0.18, 0.24, 0.95)
+
+
+func _missions_add_route_segment(parent: Control, a: Vector2, b: Vector2, state: String) -> void:
+	var segment_pts := _missions_build_curve_points([a, b])
+	var glow_color := _missions_route_color(state)
+	glow_color.a = 0.24 if state != "locked" else 0.10
+	var glow := Line2D.new()
+	glow.width = 22.0
+	glow.default_color = glow_color
+	glow.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	glow.end_cap_mode = Line2D.LINE_CAP_ROUND
+	glow.joint_mode = Line2D.LINE_JOINT_ROUND
+	glow.antialiased = true
+	glow.round_precision = 12
+	for p in segment_pts:
+		glow.add_point(p)
+	parent.add_child(glow)
+
+	var line := Line2D.new()
+	line.width = 10.0
+	line.default_color = _missions_route_color(state)
+	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	line.joint_mode = Line2D.LINE_JOINT_ROUND
+	line.antialiased = true
+	line.round_precision = 12
+	for p in segment_pts:
+		line.add_point(p)
+	parent.add_child(line)
 
 
 func _missions_auto_claim_reached(save: Dictionary, level_missions: Array, counters: Dictionary) -> int:
@@ -3818,21 +3920,23 @@ func _refresh_missions_panel() -> void:
 	holder.anchors_preset = 15
 	metro_canvas.add_child(holder)
 
-	var pts: Array = _missions_build_points(level_missions.size())
-	var line := Line2D.new()
-	line.width = 10.0
-	line.default_color = Color(0.20, 0.75, 1.00, 0.96)
-	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	line.end_cap_mode = Line2D.LINE_CAP_ROUND
-	line.joint_mode = Line2D.LINE_JOINT_ROUND
-	line.antialiased = true
-	line.round_precision = 12
-	var curve_pts := _missions_build_curve_points(pts)
-	for p in curve_pts:
-		line.add_point(p)
-	holder.add_child(line)
+	var rendered_level_missions_count := level_missions.size()
+	if current_idx < level_missions.size():
+		rendered_level_missions_count = mini(level_missions.size(), current_idx + 2)
+	var preview_missions: Array = _missions_preview_missions(level, level_missions, current_idx)
+	var visual_missions_count := rendered_level_missions_count + preview_missions.size()
+	var pts: Array = _missions_build_points(visual_missions_count)
+	for i in range(maxi(0, pts.size() - 1)):
+		var segment_state := "locked"
+		if current_idx >= level_missions.size() and i < level_missions.size() - 1:
+			segment_state = "done"
+		elif i < current_idx - 1:
+			segment_state = "done"
+		elif current_idx > 0 and i == current_idx - 1:
+			segment_state = "active"
+		_missions_add_route_segment(holder, pts[i], pts[i + 1], segment_state)
 
-	for i in range(level_missions.size()):
+	for i in range(rendered_level_missions_count):
 		var mission: Dictionary = level_missions[i]
 		var state := "locked"
 		var mid := str(mission.get("id", ""))
@@ -3842,12 +3946,12 @@ func _refresh_missions_panel() -> void:
 		elif i == current_idx:
 			state = "active"
 		_missions_make_station(holder, pts[i], mission, state, i)
+	for i in range(preview_missions.size()):
+		var preview_mission: Dictionary = preview_missions[i]
+		var preview_idx := rendered_level_missions_count + i
+		_missions_make_station(holder, pts[preview_idx], preview_mission, "locked", preview_idx)
 
 	if current_idx >= level_missions.size():
-		if lbl_missions_status != null:
-			lbl_missions_status.text = _missions_tr("missions.ui.all_done", "Toutes les missions du niveau sont terminées.")
-		if lbl_missions_reward != null:
-			lbl_missions_reward.text = ""
 		if btn_claim_mission != null:
 			btn_claim_mission.visible = false
 			btn_claim_mission.disabled = true
@@ -3860,10 +3964,6 @@ func _refresh_missions_panel() -> void:
 	var cur_val := int(counters.get(cur_key, 0))
 	var done := _missions_is_done(cur, counters)
 
-	if lbl_missions_status != null:
-		lbl_missions_status.text = _missions_tr("missions.ui.active", "Mission active") + " : " + _missions_label_text(cur) + " | " + _missions_tr("missions.ui.progress", "Progression") + " : " + str(cur_val) + " / " + str(cur_target)
-	if lbl_missions_reward != null:
-		lbl_missions_reward.text = _missions_tr("missions.ui.reward", "Gain") + " : " + str(int(cur.get("reward_tokens", 0)))
 	if btn_claim_mission != null:
 		btn_claim_mission.visible = false
 		btn_claim_mission.disabled = true
@@ -4017,10 +4117,45 @@ func _bm_should_open_match_compo_popup_on_play() -> bool:
 
 	var roster: Dictionary = save["roster"] as Dictionary
 	if not roster.has("match_selected_ids") or typeof(roster["match_selected_ids"]) != TYPE_ARRAY:
-		return true
+		return not _bm_can_active_coach_autocompose_match(save)
 
 	var match_ids: Array = roster["match_selected_ids"] as Array
-	return match_ids.size() != 8
+	if match_ids.size() == 8:
+		return false
+	return not _bm_can_active_coach_autocompose_match(save)
+
+
+func _bm_can_active_coach_autocompose_match(save: Dictionary) -> bool:
+	if not save.has("coachs") or typeof(save["coachs"]) != TYPE_DICTIONARY:
+		return false
+	var coachs: Dictionary = save["coachs"] as Dictionary
+	var active_coach_id: String = str(coachs.get("active", "")).strip_edges()
+	if active_coach_id == "":
+		return false
+	if not save.has("roster") or typeof(save["roster"]) != TYPE_DICTIONARY:
+		return false
+	var roster: Dictionary = save["roster"] as Dictionary
+	if not roster.has("selected_ids") or typeof(roster["selected_ids"]) != TYPE_ARRAY:
+		return false
+	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
+		return false
+	var by_id: Dictionary = save["players_by_id"] as Dictionary
+	var selected_ids: Array = roster["selected_ids"] as Array
+	var seen: Dictionary = {}
+	var valid_count: int = 0
+	for raw_id in selected_ids:
+		var sid: String = str(raw_id).strip_edges()
+		if sid == "":
+			continue
+		var key: String = str(int(round(float(sid))))
+		if seen.has(key):
+			continue
+		seen[key] = true
+		if by_id.has(key) and typeof(by_id[key]) == TYPE_DICTIONARY:
+			valid_count += 1
+			if valid_count >= 8:
+				return true
+	return false
 
 
 func _bm_show_match_compo_popup_on_play() -> void:

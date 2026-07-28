@@ -460,37 +460,23 @@ theme_override_constants/outline_size = 8
 
 [node name="LblMissionsLevel" type="Label" parent="MissionsPanel/MissionsCard"]
 layout_mode = 0
-offset_left = 40.0
+offset_left = 470.0
 offset_top = 78.0
-offset_right = 240.0
+offset_right = 670.0
 offset_bottom = 118.0
 text = "Lv 1"
-theme_override_font_sizes/font_size = 24
-
-[node name="LblMissionsStatus" type="Label" parent="MissionsPanel/MissionsCard"]
-layout_mode = 0
-offset_left = 40.0
-offset_top = 520.0
-offset_right = 820.0
-offset_bottom = 560.0
-text = "Mission en cours"
-theme_override_font_sizes/font_size = 22
-
-[node name="LblMissionsReward" type="Label" parent="MissionsPanel/MissionsCard"]
-layout_mode = 0
-offset_left = 40.0
-offset_top = 560.0
-offset_right = 820.0
-offset_bottom = 600.0
-text = "Gain : 0 tokens"
-theme_override_font_sizes/font_size = 22
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(0.70, 0.86, 1, 1)
+theme_override_colors/font_outline_color = Color(0.12, 0.09, 0.38, 0.98)
+theme_override_constants/outline_size = 5
 
 [node name="MetroCanvas" type="Control" parent="MissionsPanel/MissionsCard"]
 layout_mode = 0
 offset_left = 40.0
-offset_top = 130.0
+offset_top = 118.0
 offset_right = 1080.0
-offset_bottom = 500.0
+offset_bottom = 590.0
 mouse_filter = 1
 
 [node name="BtnClaimMission" type="Button" parent="MissionsPanel/MissionsCard"]

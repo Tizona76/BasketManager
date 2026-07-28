@@ -284,7 +284,7 @@ func _bm_ensure_result_labels() -> void:
 
 	call_deferred("_bm_place_result_labels")
 
-func _bm_place_one_result_label(btn: Button, lbl: RichTextLabel) -> void:
+func _bm_place_one_result_label(btn: Button, lbl: RichTextLabel, result_y: float) -> void:
 	if btn == null or lbl == null:
 		return
 	var parent_ctrl := lbl.get_parent() as Control
@@ -292,13 +292,19 @@ func _bm_place_one_result_label(btn: Button, lbl: RichTextLabel) -> void:
 		return
 	var btn_global := btn.get_global_rect()
 	var parent_global := parent_ctrl.global_position
-	lbl.position = btn_global.position - parent_global + Vector2(0, btn.size.y + 8)
-	lbl.size = Vector2(btn.size.x, 24)
-	
+	lbl.position = Vector2(btn_global.position.x - parent_global.x, result_y - parent_global.y)
+	lbl.size = Vector2(btn.size.x, 170)
+
 func _bm_place_result_labels() -> void:
-	_bm_place_one_result_label(btn_tournoi_a, lbl_result_tournoi_a)
-	_bm_place_one_result_label(btn_intermediaire, lbl_result_intermediaire)
-	_bm_place_one_result_label(btn_elite, lbl_result_elite)
+	var result_y := INF
+	for btn in [btn_tournoi_a, btn_intermediaire, btn_elite]:
+		if btn != null:
+			result_y = minf(result_y, btn.get_global_rect().end.y + 8.0)
+	if result_y == INF:
+		return
+	_bm_place_one_result_label(btn_tournoi_a, lbl_result_tournoi_a, result_y)
+	_bm_place_one_result_label(btn_intermediaire, lbl_result_intermediaire, result_y)
+	_bm_place_one_result_label(btn_elite, lbl_result_elite, result_y)
 
 func _bm_apply_tournament_button_state(btn: Button, lbl: RichTextLabel, tournoi_id: String) -> void:
 	if btn == null or lbl == null:
@@ -319,9 +325,9 @@ func _bm_apply_tournament_button_state(btn: Button, lbl: RichTextLabel, tournoi_
 		btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
 		btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
 		if result == "winner":
-			lbl.text = "[center][img=81x81]res://assets/images/coupe.png[/img] 1er[/center]"
+			lbl.text = "[center][img=175x175]res://assets/images/coupe.png[/img] " + (tr("tournois.result.first_short") if tr("tournois.result.first_short") != "tournois.result.first_short" else "1er") + "[/center]"
 		elif result == "finalist":
-			lbl.text = "[center][img=63x63]res://assets/images/medaille_argent.png[/img] 2e[/center]"
+			lbl.text = "[center][img=135x135]res://assets/images/medaille_argent.png[/img] " + (tr("tournois.result.second_short") if tr("tournois.result.second_short") != "tournois.result.second_short" else "2e") + "[/center]"
 		elif result == "played":
 			lbl.text = ""
 		else:

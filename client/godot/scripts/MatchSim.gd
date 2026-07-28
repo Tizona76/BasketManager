@@ -25,6 +25,7 @@ var _match_progress_info_after_countdown: String = ""
 var _bm_lbl_info_base_position: Vector2 = Vector2.ZERO
 var _bm_lbl_info_base_size: Vector2 = Vector2.ZERO
 var _bm_lbl_info_base_font_size: int = 22
+var _bm_skip_final_result_clicked: bool = false
 static var _bm_last_coach_insight_family: String = ""
 static var _bm_last_coach_insight_player: String = ""
 
@@ -78,6 +79,8 @@ func _bm_style_btn_skip_final_result_active() -> void:
 	if btn_skip == null:
 		return
 	btn_skip.visible = true
+	btn_skip.disabled = false
+	_bm_skip_final_result_clicked = false
 	btn_skip.mouse_filter = Control.MOUSE_FILTER_STOP
 	var sb_final := StyleBoxFlat.new()
 	sb_final.bg_color = Color(1.00, 0.48, 0.02, 1.0)
@@ -148,6 +151,31 @@ func _bm_style_btn_skip_final_result_active() -> void:
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	capsule.add_child(icon)
+
+
+func _bm_style_btn_skip_final_result_clicked() -> void:
+	if btn_skip == null:
+		return
+	_bm_skip_final_result_clicked = true
+	btn_skip.disabled = true
+	btn_skip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb_clicked := StyleBoxFlat.new()
+	sb_clicked.bg_color = Color(0.22, 0.24, 0.30, 1.0)
+	sb_clicked.set_corner_radius_all(14)
+	sb_clicked.set_border_width_all(2)
+	sb_clicked.border_color = Color(0.56, 0.60, 0.68, 0.95)
+	sb_clicked.shadow_color = Color(0, 0, 0, 0.35)
+	sb_clicked.shadow_size = 6
+	sb_clicked.shadow_offset = Vector2(0, 3)
+	sb_clicked.content_margin_top = -2
+	sb_clicked.content_margin_bottom = 18
+	btn_skip.add_theme_stylebox_override("normal", sb_clicked)
+	btn_skip.add_theme_stylebox_override("hover", sb_clicked)
+	btn_skip.add_theme_stylebox_override("pressed", sb_clicked)
+	btn_skip.add_theme_stylebox_override("disabled", sb_clicked)
+	btn_skip.add_theme_color_override("font_color", Color(0.75, 0.78, 0.84, 1.0))
+	btn_skip.add_theme_color_override("font_disabled_color", Color(0.75, 0.78, 0.84, 1.0))
+
 
 func _bm_apply_i18n_btn_retour() -> void:
 	if btn_retour != null:
@@ -383,6 +411,36 @@ func _bm_current_lineup_players() -> Array[Dictionary]:
 	return out
 
 
+func _bm_current_lineup_active_coach_id() -> String:
+	var save: Dictionary = PlayerLife.load_savegame()
+	if typeof(save) != TYPE_DICTIONARY:
+		return ""
+	if not save.has("coachs") or typeof(save["coachs"]) != TYPE_DICTIONARY:
+		return ""
+	var coachs: Dictionary = save["coachs"] as Dictionary
+	return str(coachs.get("active", "")).strip_edges()
+
+
+func _bm_current_lineup_coach_name(active_coach_id: String) -> String:
+	match active_coach_id:
+		"coach_junior":
+			return _bm_matchsim_tr_fallback("matchsim.coach_name.junior", "Coach Teddy")
+		"coach_confirme":
+			return _bm_matchsim_tr_fallback("matchsim.coach_name.confirme", "Coach James")
+		"coach_elite":
+			return _bm_matchsim_tr_fallback("matchsim.coach_name.elite", "Coach Alan")
+		_:
+			return ""
+
+
+func _bm_current_lineup_coach_note_text(active_coach_id: String) -> String:
+	var coach_name := _bm_current_lineup_coach_name(active_coach_id)
+	if coach_name == "":
+		return ""
+	var template := _bm_matchsim_tr_fallback("matchsim.game_lineup.coach_optimized", "Optimized by {coach}'s staff criteria: quality, form and freshness.")
+	return template.replace("{coach}", coach_name)
+
+
 func _bm_current_lineup_summary(players: Array[Dictionary]) -> Dictionary:
 	var total_attack := 0.0
 	var total_defense := 0.0
@@ -438,6 +496,9 @@ func _bm_show_current_lineup_popup() -> void:
 	_bm_current_lineup_label(card, _bm_matchsim_tr_fallback("matchsim.game_lineup", "Game Lineup"), Vector2(0, 18), Vector2(card_w, 38), 30, Color(1, 1, 1, 1), HORIZONTAL_ALIGNMENT_CENTER)
 	_bm_current_lineup_label(card, _bm_matchsim_tr_fallback("matchsim.match_in_progress", "Match in progress") + "  |  " + _bm_matchsim_tr_fallback("matchsim.read_only", "Read only"), Vector2(0, 54), Vector2(card_w, 26), 16, Color(0.76, 0.84, 0.96, 0.88), HORIZONTAL_ALIGNMENT_CENTER)
 
+	var active_coach_id := _bm_current_lineup_active_coach_id()
+	var coach_note := _bm_current_lineup_coach_note_text(active_coach_id)
+
 	var summary := _bm_current_lineup_summary(players)
 	var summary_row := Control.new()
 	summary_row.position = Vector2((card_w - 510.0) * 0.5, 84.0)
@@ -450,7 +511,8 @@ func _bm_show_current_lineup_popup() -> void:
 
 	var content := VBoxContainer.new()
 	content.position = Vector2(34, 154)
-	content.size = Vector2(card_w - 68.0, card_h - 246.0)
+	var content_bottom_reserve := 300.0 if coach_note != "" else 246.0
+	content.size = Vector2(card_w - 68.0, card_h - content_bottom_reserve)
 	content.add_theme_constant_override("separation", 6)
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(content)
@@ -473,6 +535,17 @@ func _bm_show_current_lineup_popup() -> void:
 	_bm_current_lineup_label(bench_section, _bm_matchsim_tr_fallback("matchsim.bench", "BENCH"), Vector2(0, 0), Vector2(row_w, 22), 17, Color(1.0, 0.72, 0.20, 1.0))
 	for i in range(bench.size()):
 		_bm_current_lineup_player_row(bench_section, bench[i], 26.0 + float(i) * 46.0, row_w)
+
+	if coach_note != "":
+		var coach_note_panel := Panel.new()
+		coach_note_panel.position = Vector2(34, card_h - 122.0)
+		coach_note_panel.size = Vector2(card_w - 266.0, 56)
+		coach_note_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		coach_note_panel.add_theme_stylebox_override("panel", _bm_current_lineup_style_panel(Color(0.035, 0.045, 0.085, 0.90), Color(1.0, 0.72, 0.20, 0.62)))
+		card.add_child(coach_note_panel)
+		var coach_note_label := _bm_current_lineup_label(coach_note_panel, coach_note, Vector2(18, 0), Vector2(coach_note_panel.size.x - 36.0, 56), 18, Color(1.0, 0.90, 0.58, 1.0), HORIZONTAL_ALIGNMENT_CENTER)
+		coach_note_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		coach_note_label.clip_text = false
 
 	var btn := Button.new()
 	btn.text = _bm_matchsim_tr_fallback("common.close", "Close")
@@ -860,7 +933,7 @@ func _bm_format_int_spaces(value: int) -> String:
 	return out
 
 func _season_reward_fmt_amount(v: int) -> String:
-	return "+" + _bm_format_int_spaces(int(v)) + " $"
+	return "+" + _bm_format_int_spaces(int(v)).replace(" ", ".") + " $"
 
 func _season_reward_play_money_tick_once() -> void:
 	var click_path := "res://audio/sfx/click.mp3"
@@ -1570,33 +1643,42 @@ func _bm_get_effective_played_ids(save: Dictionary) -> Array:
 
 	if match_ids.size() == 8:
 		return match_ids
+
+	if active_coach_id != "":
+		if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
+			return []
+		var by_id: Dictionary = save["players_by_id"] as Dictionary
+		var ranked: Array = []
+		var seen: Dictionary = {}
+		for pid in selected_ids:
+			var sid: String = str(pid).strip_edges()
+			if sid == "":
+				continue
+			var key: String = str(int(round(float(sid))))
+			if seen.has(key):
+				continue
+			seen[key] = true
+			if not by_id.has(key) or typeof(by_id[key]) != TYPE_DICTIONARY:
+				continue
+			var pd: Dictionary = by_id[key] as Dictionary
+			ranked.append({
+				"id": int(key),
+				"score": _bm_get_coach_auto_score(pd, active_coach_id)
+			})
+		if ranked.size() >= 8:
+			ranked.sort_custom(func(a, b): return float((a as Dictionary).get("score", 0.0)) > float((b as Dictionary).get("score", 0.0)))
+			for row in ranked:
+				out.append((row as Dictionary).get("id"))
+				if out.size() >= 8:
+					break
+			print("[COACHS][AUTO_COMPO] coach=", active_coach_id, " selected_pool=", selected_ids.size(), " played_ids=", out)
+			return out
+
 	if match_selection_unlocked:
 		return []
 	if active_coach_id == "":
 		return selected_ids
-
-	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
-		return []
-	var by_id: Dictionary = save["players_by_id"] as Dictionary
-	var ranked: Array = []
-	for pid in selected_ids:
-		var key := str(pid)
-		if not by_id.has(key) or typeof(by_id[key]) != TYPE_DICTIONARY:
-			continue
-		var pd: Dictionary = by_id[key] as Dictionary
-		ranked.append({
-			"id": pid,
-			"score": _bm_get_coach_auto_score(pd, active_coach_id)
-		})
-	if ranked.is_empty():
-		return []
-	ranked.sort_custom(func(a, b): return float((a as Dictionary).get("score", 0.0)) > float((b as Dictionary).get("score", 0.0)))
-	for row in ranked:
-		out.append((row as Dictionary).get("id"))
-		if out.size() >= 8:
-			break
-	print("[COACHS][AUTO_COMPO] coach=", active_coach_id, " selected_pool=", selected_ids.size(), " played_ids=", out)
-	return out
+	return []
 
 func _get_selected_team_rating_average(save_override: Dictionary = {}) -> float:
 	var save: Dictionary = save_override if not save_override.is_empty() else PlayerLife.load_savegame()
@@ -3763,7 +3845,7 @@ func _fin_match() -> void:
 				var euros_gain := 0
 				var tokens_gain := 0
 				if final_rank == 1:
-					euros_gain = 120000
+					euros_gain = 280000
 					tokens_gain = 15
 				elif final_rank == 2:
 					euros_gain = 80000
@@ -3824,6 +3906,7 @@ func _fin_match() -> void:
 				ss.opponent_name = str(fx.get("opponent", "")).strip_edges()
 
 	if btn_retour != null:
+		_bm_style_btn_skip_final_result_clicked()
 		_bm_style_btn_retour()
 		btn_retour.disabled = false
 
@@ -3868,8 +3951,15 @@ func _bm_show_skip_final_result_not_enough_tokens() -> void:
 
 
 func _on_btn_skip_gate_pressed() -> void:
+	if _bm_skip_final_result_clicked:
+		return
+
 	if not BM_SKIP_FINAL_RESULT_TOKEN_MODE:
+		_bm_style_btn_skip_final_result_clicked()
 		_on_btn_skip_pressed()
+		return
+
+	if match_fini:
 		return
 
 	if not _bm_should_show_skip_final_result_button():
@@ -3887,6 +3977,8 @@ func _on_btn_skip_gate_pressed() -> void:
 	if tokens_now < BM_SKIP_FINAL_RESULT_TOKEN_COST:
 		_bm_show_skip_final_result_not_enough_tokens()
 		return
+
+	_bm_style_btn_skip_final_result_clicked()
 
 	wallet["tokens"] = tokens_now - BM_SKIP_FINAL_RESULT_TOKEN_COST
 	save["wallet"] = wallet

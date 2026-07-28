@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://fxn21inpmheg"]
+[gd_scene load_steps=8 format=3 uid="uid://fxn21inpmheg"]
 
 [ext_resource type="Texture2D" uid="uid://d0yeeoiusf744" path="res://assets/images/coachs/coach1.png" id="ext_coach1"]
 [ext_resource type="Texture2D" uid="uid://bw5vhsrri5qdw" path="res://assets/images/coachs/coach2.png" id="ext_coach2"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://ducftq7auporm" path="res://scenes/Coachs.gd" id="ext_script"]
 [ext_resource type="Texture2D" uid="uid://bhcorbec5ks2x" path="res://assets/images/token.png" id="ext_token"]
 [ext_resource type="PackedScene" path="res://scenes/ui/UnlockCapsule.tscn" id="ext_unlock_capsule"]
+[ext_resource type="Texture2D" path="res://assets/images/backgrounds/staff.png" id="ext_staff_bg"]
 
 [node name="Coachs" type="Control"]
 layout_mode = 3
@@ -23,6 +24,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+texture = ExtResource("ext_staff_bg")
 expand_mode = 1
 stretch_mode = 6
 

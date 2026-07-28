@@ -1682,12 +1682,15 @@ static func _mercato_avatar_candidates() -> Array:
 	return out
 
 
-static func _mercato_male_avatar_candidates() -> Array:
+static func _mercato_male_avatar_candidates(mercato_pool_only: bool = false) -> Array:
 	var out: Array = []
 	for c_raw in _mercato_avatar_candidates():
 		if typeof(c_raw) != TYPE_DICTIONARY:
 			continue
 		var c: Dictionary = c_raw as Dictionary
+		var avatar_key := str(c.get("avatar_key", "")).strip_edges()
+		if mercato_pool_only and not avatar_key.begins_with("avatar_mercato_"):
+			continue
 		var avatar_path := str(c.get("avatar_path", "")).strip_edges()
 		if str(c.get("gender", "U")) != "M":
 			continue
@@ -1699,7 +1702,7 @@ static func _mercato_male_avatar_candidates() -> Array:
 
 static func _mercato_pick_unused_avatar(save: Dictionary) -> Dictionary:
 	var used := _mercato_collect_used(save)
-	var picked := _identity_pick_candidate(save, used, _mercato_male_avatar_candidates())
+	var picked := _identity_pick_candidate(save, used, _mercato_male_avatar_candidates(true))
 	if BM_MERCATO_ID_DEBUG:
 		print("[BM_MERCATO_ID_DEBUG] PICK_RESULT is_empty=", picked.is_empty(), " name=", str(picked.get("name", "")), " avatar_key=", str(picked.get("avatar_key", "")), " avatar_path=", str(picked.get("avatar_path", "")), " gender=", str(picked.get("gender", "")))
 	return picked
