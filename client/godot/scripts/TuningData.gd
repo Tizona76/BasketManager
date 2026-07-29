@@ -199,12 +199,12 @@ const TOURNAMENT_TUNING: Dictionary = {
 		"label": "Tournoi Débutant",
 		"entry_fee_euros": 9000,
 		"finalist": {
-			"euros": 49500,
+			"euros": 65000,
 			"tokens": 0,
 			"xp": 30
 		},
 		"victory": {
-			"euros": 77000,
+			"euros": 90000,
 			"tokens": 8,
 			"xp": 60
 		}
@@ -214,12 +214,12 @@ const TOURNAMENT_TUNING: Dictionary = {
 		"label": "Tournoi Intermédiaire",
 		"entry_fee_euros": 22500,
 		"finalist": {
-			"euros": 88000,
+			"euros": 95000,
 			"tokens": 1,
 			"xp": 55
 		},
 		"victory": {
-			"euros": 143000,
+			"euros": 150000,
 			"tokens": 11,
 			"xp": 110
 		}
@@ -229,12 +229,12 @@ const TOURNAMENT_TUNING: Dictionary = {
 		"label": "Tournoi Élite",
 		"entry_fee_euros": 45000,
 		"finalist": {
-			"euros": 143000,
+			"euros": 190000,
 			"tokens": 3,
 			"xp": 90
 		},
 		"victory": {
-			"euros": 242000,
+			"euros": 310000,
 			"tokens": 15,
 			"xp": 180
 		}
