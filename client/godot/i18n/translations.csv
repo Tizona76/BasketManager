@@ -335,8 +335,8 @@ tournois.elite_selected_info,Élite sélectionné (écran bracket à brancher en
 tournois.victory_title,Victoire !,Victory!,¡Victoria!,Vittoria!,Vitória!
 tournois.victory_subtitle,Victoire dans le Tournoi A,Victory in Tournament A,Victoria en el Torneo A,Vittoria nel Torneo A,Vitória no Torneio A
 common.close,Fermer,Close,Cerrar,Chiudi,Fechar
-popup.staff_intro.title,Staff Unlocked!,Staff Unlocked!,Staff Unlocked!,Staff Unlocked!,Staff Unlocked!
-popup.staff_intro.body,"Votre club a atteint le niveau 2.\n\nVous pouvez maintenant recruter des coachs et du staff pour renforcer votre équipe.","Your club has reached Level 2.\n\nYou can now hire coaches and staff to strengthen your team.","Tu club ha alcanzado el nivel 2.\n\nAhora puedes contratar entrenadores y personal para reforzar tu equipo.","Il tuo club ha raggiunto il livello 2.\n\nOra puoi ingaggiare coach e staff per rafforzare la squadra.","Seu clube alcançou o nível 2.\n\nAgora você pode contratar técnicos e equipe para fortalecer seu time."
+popup.staff_intro.title,Level {level} atteint !,Level {level} reached!,¡Nivel {level} alcanzado!,Livello {level} raggiunto!,Nível {level} alcançado!
+popup.staff_intro.body,"Votre club franchit un nouveau cap.\n\nContinuez à développer votre projet pour ouvrir de nouvelles opportunités.","Your club has reached a new milestone.\n\nKeep developing your project to open up new opportunities.","Tu club ha alcanzado un nuevo hito.\n\nSigue desarrollando tu proyecto para abrir nuevas oportunidades.","Il tuo club ha raggiunto un nuovo traguardo.\n\nContinua a sviluppare il tuo progetto per aprire nuove opportunità.","Seu clube alcançou um novo marco.\n\nContinue desenvolvendo seu projeto para abrir novas oportunidades."
 tournois.reward_title,Récompense du tournoi,Tournament reward,Recompensa del torneo,Ricompensa del torneo,Recompensa do torneio
 tournois.reward_subtitle,Gain d'argent,Prize money,Premio en dinero,Premio in denaro,Prémio em dinheiro
 selection.avg_age,Âge moyen,Average age,Edad media,Età media,Idade média

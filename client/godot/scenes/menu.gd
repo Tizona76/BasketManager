@@ -2136,15 +2136,16 @@ func _bm_maybe_show_staff_intro_popup() -> void:
 		return
 	if not bool(save.get(CLUB_STAFF_INTRO_PENDING_KEY, false)):
 		return
-	if PL.get_club_level(save) < 2:
+	var club_level := PL.get_club_level(save)
+	if club_level < 2:
 		return
 
 	save[CLUB_STAFF_INTRO_SEEN_KEY] = true
 	save.erase(CLUB_STAFF_INTRO_PENDING_KEY)
 	PL.write_savegame(save)
-	_bm_show_staff_intro_popup()
+	_bm_show_staff_intro_popup(club_level)
 
-func _bm_show_staff_intro_popup() -> void:
+func _bm_show_staff_intro_popup(club_level: int) -> void:
 	var old_popup := get_node_or_null("StaffIntroPopup")
 	if old_popup != null:
 		old_popup.queue_free()
@@ -2192,7 +2193,7 @@ func _bm_show_staff_intro_popup() -> void:
 
 	var title := Label.new()
 	title.name = "LblStaffIntroTitle"
-	title.text = tr("popup.staff_intro.title")
+	title.text = tr("popup.staff_intro.title").replace("{level}", str(club_level))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 34)
