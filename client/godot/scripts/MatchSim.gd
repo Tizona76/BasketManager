@@ -3845,15 +3845,19 @@ func _fin_match() -> void:
 				var euros_gain := 0
 				var tokens_gain := 0
 				if final_rank == 1:
-					euros_gain = 280000
+					euros_gain = 425000
 					tokens_gain = 15
 				elif final_rank == 2:
-					euros_gain = 80000
+					euros_gain = 280000
 					tokens_gain = 8
 				elif final_rank == 3:
-					euros_gain = 50000
+					euros_gain = 120000
 				elif final_rank == 4:
-					euros_gain = 25000
+					euros_gain = 75000
+
+				var reward_season_number: int = maxi(1, int(save_sync.get("season_number", 1)))
+				var reward_season_multiplier: float = 1.2 if reward_season_number > 3 else 1.0
+				euros_gain = int(round(float(euros_gain) * reward_season_multiplier))
 
 				if euros_gain > 0 or tokens_gain > 0:
 					if not save_sync.has("wallet") or typeof(save_sync["wallet"]) != TYPE_DICTIONARY:
