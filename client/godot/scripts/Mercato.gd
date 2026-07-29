@@ -174,7 +174,7 @@ func _apply_i18n() -> void:
 	if hdr_nom != null:
 		hdr_nom.text = _tr_any(["mercato.col.name"], "Nom")
 	if hdr_stars != null:
-		hdr_stars.text = "⭐"
+		hdr_stars.text = "RANK"
 	if hdr_poste != null:
 		hdr_poste.text = "POS."
 	if hdr_age != null:
