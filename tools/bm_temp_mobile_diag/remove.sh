@@ -33,6 +33,9 @@ require_repo() {
 }
 
 verify_installed_hashes() {
+  if is_export_after_install; then
+    return 2
+  fi
   [ -f "$BM_DIAG_INDEX_HTML" ] || die "instrumented index.html missing"
   [ "$(sha256 "$BM_DIAG_INDEX_HTML")" = "$BM_DIAG_HTML_SHA_AFTER" ] || die "index.html changed after diagnostic installation; refusing to overwrite"
   [ -f "$BM_DIAG_JS_FILE" ] || die "diagnostic JS file missing"
@@ -46,6 +49,17 @@ verify_installed_hashes() {
     [ "$(sha256 "$BM_DIAG_INDEX_PCK")" = "$BM_DIAG_INDEX_PCK_SHA_BEFORE" ] || die "index.pck changed unexpectedly"
   fi
   [ "$(sha256 "$BM_DIAG_PRESET")" = "$BM_DIAG_PRESET_SHA_BEFORE" ] || die "export preset changed unexpectedly"
+}
+
+is_export_after_install() {
+  local current_html_sha markers_present
+  [ -f "$BM_DIAG_INDEX_HTML" ] || return 1
+  current_html_sha="$(sha256 "$BM_DIAG_INDEX_HTML")"
+  markers_present=no
+  if grep -q "BM_TEMP_MOBILE_DIAG_BEGIN" "$BM_DIAG_INDEX_HTML"; then
+    markers_present=yes
+  fi
+  [ "$markers_present" = no ] && [ "$current_html_sha" != "$BM_DIAG_HTML_SHA_AFTER" ]
 }
 
 check_marker_state() {
@@ -95,10 +109,45 @@ remove_state_and_tool_if_real() {
   rmdir "$TOOL_DIR" 2>/dev/null || true
 }
 
+clear_stale_export_state() {
+  if [ -f "$BM_DIAG_JS_FILE" ]; then
+    [ "$(sha256 "$BM_DIAG_JS_FILE")" = "$BM_DIAG_JS_ASSET_SHA" ] || die "stale diagnostic JS was modified; refusing automatic cleanup"
+    [ "$CHECK_ONLY" = "1" ] || rm -f "$BM_DIAG_JS_FILE"
+  fi
+  if [ -f "$BM_DIAG_CSS_FILE" ]; then
+    [ "$(sha256 "$BM_DIAG_CSS_FILE")" = "$BM_DIAG_CSS_ASSET_SHA" ] || die "stale diagnostic CSS was modified; refusing automatic cleanup"
+    [ "$CHECK_ONLY" = "1" ] || rm -f "$BM_DIAG_CSS_FILE"
+  fi
+  if [ "$CHECK_ONLY" = "1" ]; then
+    echo "BM diagnostic stale export state detected"
+    echo "Would remove stale manifest only; no previous index.html would be restored."
+    echo "Next install can run safely after this cleanup."
+    exit 0
+  fi
+  rm -f "$STATE_DIR/baseline/index.html"
+  rm -f "$STATE_DIR/baseline/index.js"
+  rm -f "$STATE_DIR/baseline/index.pck"
+  rm -f "$STATE_DIR/baseline/export_presets.cfg"
+  rm -f "$STATE_DIR/index.html.instrumented"
+  rm -f "$MANIFEST"
+  rmdir "$STATE_DIR/baseline" 2>/dev/null || true
+  rmdir "$STATE_DIR" 2>/dev/null || true
+  echo "BM temporary mobile diagnostic stale manifest removed after fresh export"
+  exit 0
+}
+
 main() {
   require_repo
   load_manifest
-  verify_installed_hashes
+  if verify_installed_hashes; then
+    :
+  else
+    local verify_rc="$?"
+    case "$verify_rc" in
+      2) clear_stale_export_state ;;
+      *) exit 1 ;;
+    esac
+  fi
   check_marker_state
   if [ "$CHECK_ONLY" = "1" ]; then
     echo "BM diagnostic removal check OK"

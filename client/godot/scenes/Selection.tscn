@@ -168,7 +168,7 @@ theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
 theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
 theme_override_colors/font_disabled_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 22
-text = "⭐"
+text = "RANK"
 
 [node name="HeaderPos" type="Button" parent="HeaderRow"]
 layout_mode = 2

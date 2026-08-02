@@ -9,8 +9,13 @@
   const MAX_TIMELINE = 900;
   const MAX_TOUCH_EVENTS = 220;
   const MAX_HISTORY = 260;
+  const CAUSAL_STORAGE_KEY = "bm_mobile_diag_causal_v1";
+  const MAX_CAUSAL_EVENTS = 80;
+  const MAX_CAUSAL_BOOTS = 8;
   const sessionId = makeSessionId();
+  const documentBootId = makeDocumentBootId();
   const startedAt = new Date();
+  const causalState = initCausalState();
   let seq = 0;
   let panelVisible = false;
   let paused = false;
@@ -34,9 +39,17 @@
   let lastFrameSample = 0;
   let slowFrames = 0;
   let lastFrameTime = performance.now();
-  let topTapTimes = [];
+  let secretLongPressTimer = null;
+  let secretLongPressStart = null;
+  let secretLongPressActive = false;
+  const SECRET_LONG_PRESS_ZONE_PX = 150;
+  const SECRET_LONG_PRESS_MS = 3000;
+  const SECRET_LONG_PRESS_MOVE_TOLERANCE_PX = 12;
   let currentTouchGesture = null;
   let currentPointer = null;
+  let webglListenersInstalled = false;
+  let godotStatusSeen = false;
+  let godotStatusWasHidden = false;
   const pendingCrossOriginLimitations = [];
   const observers = [];
   const timers = [];
@@ -46,10 +59,14 @@
     diagnostic_version: VERSION,
     session_metadata: {
       session_id: sessionId,
+      document_boot_id: documentBootId,
+      document_boot_count: causalState.boot_count,
+      previous_session_id: causalState.previous_session_id,
+      previous_boot: causalState.previous_boot,
       started_local: startedAt.toString(),
       started_iso_utc: startedAt.toISOString(),
       time_origin: performance.timeOrigin || null,
-      privacy: "No network transmission, no cookies, no localStorage, no IndexedDB, no game save reads.",
+      privacy: "No network transmission, no cookies, no localStorage, no IndexedDB, no game save reads. SessionStorage is used only for bounded causal boot markers.",
     },
     environment: collectEnvironment(),
     initial_snapshot: null,
@@ -82,28 +99,152 @@
     },
     manual_markers: [],
     final_snapshot: null,
+    causal_diagnostic: {
+      document_boot_id: documentBootId,
+      boot_count: causalState.boot_count,
+      previous_session_id: causalState.previous_session_id,
+      previous_boot: causalState.previous_boot,
+      current_signature: causalState.initial_signature,
+      session_storage_available: causalState.available,
+      storage_key: CAUSAL_STORAGE_KEY,
+      bounded_events: MAX_CAUSAL_EVENTS,
+    },
     privacy_statement: {
       no_network: true,
       no_cookies: true,
-      no_storage_reads: true,
+      no_localStorage: true,
+      no_indexedDB: true,
+      sessionStorage_only: true,
       no_save_reads: true,
-      local_memory_only: true,
+      local_memory_and_sessionStorage_only: true,
     },
   };
 
+  persistCausalEvent("script_boot", {
+    session_id: sessionId,
+    document_boot_id: documentBootId,
+    boot_count: causalState.boot_count,
+    previous_boot: causalState.previous_boot,
+    signature: causalState.initial_signature,
+  });
   installErrorHandlers();
   ensureSafeAreaProbe();
   snapshot("script-load", true);
   scheduleStartupSnapshots();
   installListeners();
   installCanvasObserversWhenReady();
-  createMiniButton();
+
   if (diagRequested()) showPanel("auto-url");
   logEvent("diagnostic-ready", { activation: activationState() });
 
   function makeSessionId() {
     const part = Math.random().toString(36).slice(2, 8);
     return "bm-diag-" + Date.now().toString(36) + "-" + part;
+  }
+
+  function makeDocumentBootId() {
+    const part = Math.random().toString(36).slice(2, 8);
+    return "doc-" + Date.now().toString(36) + "-" + part;
+  }
+
+  function initCausalState() {
+    const fallback = {
+      available: false,
+      boot_count: 1,
+      previous_session_id: null,
+      previous_boot: null,
+      initial_signature: "NO_RESTART_DETECTED",
+    };
+    try {
+      if (!window.sessionStorage) return fallback;
+      const raw = sessionStorage.getItem(CAUSAL_STORAGE_KEY);
+      const store = raw ? JSON.parse(raw) : {};
+      const boots = Array.isArray(store.boots) ? store.boots : [];
+      const previous = boots.length ? boots[boots.length - 1] : null;
+      const bootCount = Number(store.boot_count || 0) + 1;
+      const flightSessionId = store.flight_session_id || sessionId;
+      const current = {
+        document_boot_id: documentBootId,
+        session_id: sessionId,
+        flight_session_id: flightSessionId,
+        boot_count: bootCount,
+        started_iso_utc: startedAt.toISOString(),
+        started_perf_origin: performance.timeOrigin || null,
+        url: location.href.split("#")[0],
+        clean_exit: false,
+        last_exit_event: null,
+        last_event: "script_boot",
+        last_signature: "NO_RESTART_DETECTED",
+        webgl_context_lost_seen: false,
+        js_error_seen: false,
+        promise_rejection_seen: false,
+      };
+      const next = Object.assign({}, store, {
+        flight_session_id: flightSessionId,
+        boot_count: bootCount,
+        current_document_boot_id: documentBootId,
+        previous_session_id: previous ? previous.session_id : null,
+        boots: boots.concat([current]).slice(-MAX_CAUSAL_BOOTS),
+        events: (Array.isArray(store.events) ? store.events : []).slice(-MAX_CAUSAL_EVENTS),
+      });
+      sessionStorage.setItem(CAUSAL_STORAGE_KEY, JSON.stringify(next));
+      return {
+        available: true,
+        boot_count: bootCount,
+        previous_session_id: previous ? previous.session_id : null,
+        previous_boot: previous,
+        initial_signature: classifyBoot(previous),
+      };
+    } catch (e) {
+      return Object.assign({}, fallback, { error: e.name || "Error" });
+    }
+  }
+
+  function classifyBoot(previous) {
+    if (!previous) return "NO_RESTART_DETECTED";
+    if (previous.last_exit_event === "pageshow" && previous.pageshow_persisted === true) return "BFCache_RESTORE";
+    if (previous.webgl_context_lost_seen) return "WEBGL_CONTEXT_LOST_BEFORE_RESTART";
+    if (previous.clean_exit) return "NEW_DOCUMENT_AFTER_CLEAN_PAGEHIDE";
+    return "NEW_DOCUMENT_AFTER_ABRUPT_TERMINATION";
+  }
+
+  function persistCausalEvent(type, data) {
+    try {
+      if (!window.sessionStorage) return;
+      const raw = sessionStorage.getItem(CAUSAL_STORAGE_KEY);
+      const store = raw ? JSON.parse(raw) : {};
+      const events = Array.isArray(store.events) ? store.events : [];
+      const ev = {
+        type,
+        document_boot_id: documentBootId,
+        session_id: sessionId,
+        utc_time: new Date().toISOString(),
+        perf_now: round(performance.now()),
+        data: data || {},
+      };
+      events.push(ev);
+      store.events = events.slice(-MAX_CAUSAL_EVENTS);
+      store.current_document_boot_id = documentBootId;
+      if (Array.isArray(store.boots) && store.boots.length) {
+        const current = store.boots[store.boots.length - 1];
+        if (current && current.document_boot_id === documentBootId) {
+          current.last_event = type;
+          if (type === "pagehide" || type === "beforeunload") {
+            current.clean_exit = true;
+            current.last_exit_event = type;
+            if (data && data.persisted !== undefined) current.pagehide_persisted = data.persisted;
+          }
+          if (type === "pageshow" && data && data.persisted !== undefined) current.pageshow_persisted = data.persisted;
+          if (type === "webglcontextlost") current.webgl_context_lost_seen = true;
+          if (type === "js-error") current.js_error_seen = true;
+          if (type === "promise-rejection") current.promise_rejection_seen = true;
+          if (type === "same-document-godot-status-reappeared") current.last_signature = "SAME_DOCUMENT_GODOT_RESTART";
+        }
+      }
+      sessionStorage.setItem(CAUSAL_STORAGE_KEY, JSON.stringify(store));
+    } catch (e) {
+      // Diagnostic storage is best-effort only.
+    }
   }
 
   function nowEvent(type, data) {
@@ -126,6 +267,7 @@
       report.timeline.splice(0, report.timeline.length - MAX_TIMELINE);
       addFinding("INFORMATION", "timeline-limit", "Timeline limit reached; oldest non-critical events were dropped.");
     }
+    persistCausalEvent(type, data || {});
     refreshPanel();
     return ev;
   }
@@ -740,14 +882,16 @@
       window.addEventListener(type, (ev) => {
         const data = snapshot(type, type === "pageshow" || type === "pagehide");
         data.persisted = ev.persisted === undefined ? null : ev.persisted;
+        persistCausalEvent(type, { persisted: data.persisted, visibilityState: document.visibilityState });
         report.visibility_changes.push(nowEvent(type, data));
       }, { passive: true });
     });
+    window.addEventListener("beforeunload", () => persistCausalEvent("beforeunload", { visibilityState: document.visibilityState }), { passive: true });
     document.addEventListener("keydown", (ev) => {
       if (ev.ctrlKey && ev.shiftKey && String(ev.key).toLowerCase() === "d") showPanel("keyboard");
     }, { passive: true, capture: true });
     ["touchstart", "touchmove", "touchend", "touchcancel"].forEach((type) => document.addEventListener(type, handleTouch, { passive: true, capture: true }));
-    ["pointerdown", "pointermove", "pointerup", "pointercancel"].forEach((type) => document.addEventListener(type, handlePointer, { passive: true, capture: true }));
+    ["pointerdown", "pointermove", "pointerup", "pointercancel", "pointerleave"].forEach((type) => document.addEventListener(type, handlePointer, { passive: true, capture: true }));
     window.addEventListener("wheel", (ev) => logEvent("wheel", { target: targetKind(ev.target), deltaX: round(ev.deltaX), deltaY: round(ev.deltaY), cancelable: ev.cancelable, defaultPrevented: ev.defaultPrevented }), { passive: true, capture: true });
     window.addEventListener("scroll", () => logEvent("scroll", { scrollX, scrollY, seTop: document.scrollingElement ? document.scrollingElement.scrollTop : null }), { passive: true });
     monitorMedia("(orientation: portrait)");
@@ -784,8 +928,8 @@
     activeTouches = ev.touches ? ev.touches.length : 0;
     const kind = targetKind(ev.target);
     if (firstTouchAt === null) firstTouchAt = performance.now();
+    handleSecretLongPress(ev);
     if (ev.type === "touchstart") {
-      maybeSecretTap(ev);
       currentTouchGesture = {
         start_time: performance.now(),
         start_scrollY: scrollY,
@@ -838,19 +982,75 @@
     logEvent(ev.type, { touches: activeTouches, changedTouches: ev.changedTouches ? ev.changedTouches.length : 0, target: kind, cancelable: ev.cancelable, defaultPrevented: ev.defaultPrevented, eventPhase: ev.eventPhase });
   }
 
-  function maybeSecretTap(ev) {
-    const t = ev.touches && ev.touches[0];
-    if (!t || t.clientX > 60 || t.clientY > 60) return;
-    const now = performance.now();
-    topTapTimes = topTapTimes.filter((x) => now - x < 3000);
-    topTapTimes.push(now);
-    if (topTapTimes.length >= 5) {
-      topTapTimes = [];
-      showPanel("five-corner-taps");
+  function handleSecretLongPress(ev) {
+    if (ev.type === "touchstart") {
+      cancelSecretLongPress();
+      const t = ev.touches && ev.touches[0];
+      if (!t || ev.touches.length !== 1 || !isInSecretLongPressZone(t)) return;
+      secretLongPressActive = true;
+      secretLongPressStart = { x: t.clientX, y: t.clientY };
+      secretLongPressTimer = window.setTimeout(() => {
+        if (!secretLongPressActive) return;
+        cancelSecretLongPress();
+        showPanel("secret-long-press");
+      }, SECRET_LONG_PRESS_MS);
+      return;
+    }
+
+    if (!secretLongPressActive) return;
+    if (!ev.touches || ev.touches.length !== 1) {
+      cancelSecretLongPress();
+      return;
+    }
+
+    const t = ev.touches[0];
+    if (ev.type === "touchmove") {
+      const dx = Math.abs(t.clientX - secretLongPressStart.x);
+      const dy = Math.abs(t.clientY - secretLongPressStart.y);
+      if (!isInSecretLongPressZone(t) || dx > SECRET_LONG_PRESS_MOVE_TOLERANCE_PX || dy > SECRET_LONG_PRESS_MOVE_TOLERANCE_PX) cancelSecretLongPress();
+    } else if (ev.type === "touchend" || ev.type === "touchcancel") {
+      cancelSecretLongPress();
+    }
+  }
+
+  function isInSecretLongPressZone(t) {
+    return t.clientX >= 0 && t.clientY >= 0 && t.clientX <= SECRET_LONG_PRESS_ZONE_PX && t.clientY <= SECRET_LONG_PRESS_ZONE_PX;
+  }
+
+  function cancelSecretLongPress() {
+    if (secretLongPressTimer !== null) window.clearTimeout(secretLongPressTimer);
+    secretLongPressTimer = null;
+    secretLongPressStart = null;
+    secretLongPressActive = false;
+  }
+
+  function handleSecretLongPressPointer(ev) {
+    if (ev.pointerType && ev.pointerType !== "touch") return;
+    if (ev.type === "pointerdown") {
+      cancelSecretLongPress();
+      if (!isInSecretLongPressZone(ev)) return;
+      secretLongPressActive = true;
+      secretLongPressStart = { x: ev.clientX, y: ev.clientY };
+      secretLongPressTimer = window.setTimeout(() => {
+        if (!secretLongPressActive) return;
+        cancelSecretLongPress();
+        showPanel("secret-long-press");
+      }, SECRET_LONG_PRESS_MS);
+      return;
+    }
+
+    if (!secretLongPressActive) return;
+    if (ev.type === "pointermove") {
+      const dx = Math.abs(ev.clientX - secretLongPressStart.x);
+      const dy = Math.abs(ev.clientY - secretLongPressStart.y);
+      if (!isInSecretLongPressZone(ev) || dx > SECRET_LONG_PRESS_MOVE_TOLERANCE_PX || dy > SECRET_LONG_PRESS_MOVE_TOLERANCE_PX) cancelSecretLongPress();
+    } else if (ev.type === "pointerup" || ev.type === "pointercancel" || ev.type === "pointerleave") {
+      cancelSecretLongPress();
     }
   }
 
   function handlePointer(ev) {
+    handleSecretLongPressPointer(ev);
     if (ev.type === "pointerdown") currentPointer = { pointerType: ev.pointerType, startX: ev.clientX, startY: ev.clientY, target: targetKind(ev.target), start: performance.now() };
     if ((ev.type === "pointerup" || ev.type === "pointercancel") && currentPointer) {
       currentPointer.dx = round(ev.clientX - currentPointer.startX);
@@ -866,6 +1066,17 @@
     const tryInstall = () => {
       const c = findCanvas().primary;
       if (!c) return false;
+      if (!webglListenersInstalled) {
+        webglListenersInstalled = true;
+        c.addEventListener("webglcontextlost", (ev) => {
+          persistCausalEvent("webglcontextlost", { cancelable: ev.cancelable, defaultPrevented: ev.defaultPrevented });
+          logEvent("webglcontextlost", { cancelable: ev.cancelable, defaultPrevented: ev.defaultPrevented });
+        }, { passive: true });
+        c.addEventListener("webglcontextrestored", (ev) => {
+          persistCausalEvent("webglcontextrestored", { cancelable: ev.cancelable, defaultPrevented: ev.defaultPrevented });
+          logEvent("webglcontextrestored", { cancelable: ev.cancelable, defaultPrevented: ev.defaultPrevented });
+        }, { passive: true });
+      }
       if (window.ResizeObserver) {
         const ro = new ResizeObserver(() => snapshot("ResizeObserver-canvas", false));
         ro.observe(c);
@@ -903,10 +1114,12 @@
 
   function installErrorHandlers() {
     window.addEventListener("error", (ev) => {
+      persistCausalEvent("js-error", { message: ev.message, filename: safeName(ev.filename), lineno: ev.lineno, colno: ev.colno });
       report.errors.push(nowEvent("js-error", { message: ev.message, filename: safeName(ev.filename), lineno: ev.lineno, colno: ev.colno }));
       refreshPanel();
     }, { passive: true });
     window.addEventListener("unhandledrejection", (ev) => {
+      persistCausalEvent("promise-rejection", { reason: String(ev.reason && ev.reason.message ? ev.reason.message : ev.reason).slice(0, 240) });
       report.errors.push(nowEvent("promise-rejection", { reason: String(ev.reason && ev.reason.message ? ev.reason.message : ev.reason).slice(0, 240) }));
       refreshPanel();
     }, { passive: true });
@@ -926,18 +1139,7 @@
   }
 
   function activationState() {
-    return { url: diagRequested(), keyboard: "Ctrl+Shift+D", mobile: "five taps top-left" };
-  }
-
-  function createMiniButton() {
-    const btn = document.createElement("button");
-    btn.id = "bm-mobile-diag-mini";
-    btn.className = "bm-diag-mini";
-    btn.type = "button";
-    btn.textContent = "diag";
-    btn.title = "Basket Manager mobile diagnostic";
-    btn.addEventListener("click", () => showPanel("mini-button"));
-    document.documentElement.appendChild(btn);
+    return { url: diagRequested(), keyboard: "Ctrl+Shift+D", mobile: "3s long press top-left 150x150" };
   }
 
   function showPanel(reason) {
@@ -951,8 +1153,6 @@
       wirePanel(root);
     }
     root.classList.remove("bm-diag-hidden");
-    const mini = document.getElementById("bm-mobile-diag-mini");
-    if (mini) mini.classList.add("bm-diag-hidden");
     logEvent("panel-open", { reason });
     snapshot("panel-open", true);
     refreshPanel();
@@ -962,8 +1162,6 @@
     panelVisible = false;
     const root = document.getElementById("bm-mobile-diag-root");
     if (root) root.classList.add("bm-diag-hidden");
-    const mini = document.getElementById("bm-mobile-diag-mini");
-    if (mini) mini.classList.remove("bm-diag-hidden");
     logEvent("panel-hide", {});
   }
 
@@ -1057,8 +1255,11 @@
     const snap = report.final_snapshot || snapshot("panel-refresh", false);
     const c = snap.canvas || {};
     const vv = snap.visualViewport || {};
+    updateCausalSignature();
     const standardRows = [
       kv("Session", sessionId),
+      kv("Causal", report.causal_diagnostic.current_signature),
+      kv("Document boot", documentBootId + " #" + causalState.boot_count),
       kv("Browser", report.environment.browser_family),
       kv("Iframe", window === window.top ? "top-level" : "iframe"),
       kv("Orientation", JSON.stringify(snap.orientation)),
@@ -1078,6 +1279,7 @@
       kv("Godot viewport", JSON.stringify(c.godot_viewport_observation || "missing")),
       kv("History sizes", Object.keys(report.histories).map((k) => k + ":" + report.histories[k].length).join(", ")),
       kv("Technical fingerprint", report.environment.technical_fingerprint),
+      kv("Previous boot", JSON.stringify(report.causal_diagnostic.previous_boot || "none")),
     ];
     s.innerHTML = (expertMode ? standardRows.concat(expertRows) : standardRows).join("");
     const health = document.getElementById("bm-diag-health-strip");
@@ -1146,7 +1348,9 @@
       navigation: safe(() => performance.getEntriesByType("navigation").map((e) => ({ type: e.type, domContentLoadedEventEnd: round(e.domContentLoadedEventEnd), loadEventEnd: round(e.loadEventEnd), duration: round(e.duration) })), []),
       resources_failed_note: "Resource payloads are not inspected; browser console remains authoritative for failed loads.",
     };
+    updateCausalSignature();
     report.flight_recorder_milestones = flightMilestones();
+    report.causal_diagnostic.storage_tail = readCausalTail();
     report.analysis_model = {
       levels: ["PROUVÉ PAR MESURE DE CETTE SESSION", "INDICE FORT", "HYPOTHÈSE", "NON MESURABLE DANS CE CONTEXTE", "INFORMATION"],
       rule: "Findings are limited to local measurements; cross-browser causality requires comparing multiple reports.",
@@ -1171,6 +1375,7 @@
       health_scores: full.health_scores,
       synthesis: full.synthesis,
       automatic_findings: full.automatic_findings,
+      causal_diagnostic: full.causal_diagnostic,
       flight_recorder_milestones: full.flight_recorder_milestones,
       comparison: full.comparison,
       privacy_statement: full.privacy_statement,
@@ -1191,12 +1396,64 @@
       "canvas=" + JSON.stringify(snap.canvas && snap.canvas.rect),
       "canvasVisiblePercent=" + (snap.canvas ? snap.canvas.visible_percent : "n/a"),
       "scrollY=" + scrollY,
+      "causal=" + report.causal_diagnostic.current_signature,
+      "documentBoot=" + documentBootId + " #" + causalState.boot_count,
+      "previousBoot=" + JSON.stringify(report.causal_diagnostic.previous_boot || null),
       "findings=" + report.automatic_findings.map((f) => f.level + ":" + f.code).join(", "),
       "health=" + JSON.stringify(report.health_scores),
       "synthesis=" + report.synthesis,
-      "privacy=no network/no cookies/no storage/no saves",
+      "privacy=no network/no cookies/no localStorage/no IndexedDB/no saves/sessionStorage causal markers only",
     ].join("\n");
   }
+
+  function updateCausalSignature() {
+    if (godotStatusWasHidden && document.getElementById("status")) {
+      report.causal_diagnostic.current_signature = "SAME_DOCUMENT_GODOT_RESTART";
+      persistCausalEvent("same-document-godot-status-reappeared", {});
+    } else if (report.causal_diagnostic.current_signature !== "SAME_DOCUMENT_GODOT_RESTART") {
+      report.causal_diagnostic.current_signature = causalState.initial_signature;
+    }
+    return report.causal_diagnostic.current_signature;
+  }
+
+  function readCausalTail() {
+    try {
+      if (!window.sessionStorage) return [];
+      const raw = sessionStorage.getItem(CAUSAL_STORAGE_KEY);
+      const store = raw ? JSON.parse(raw) : {};
+      return {
+        boot_count: store.boot_count || 0,
+        current_document_boot_id: store.current_document_boot_id || null,
+        previous_session_id: store.previous_session_id || null,
+        boots: (Array.isArray(store.boots) ? store.boots : []).slice(-3),
+        events: (Array.isArray(store.events) ? store.events : []).slice(-12),
+      };
+    } catch (e) {
+      return { error: e.name || "Error" };
+    }
+  }
+
+  function observeGodotStatus() {
+    if (!window.MutationObserver) return;
+    const scan = () => {
+      const present = !!document.getElementById("status");
+      if (present && godotStatusWasHidden) {
+        persistCausalEvent("same-document-godot-status-reappeared", {});
+        report.causal_diagnostic.current_signature = "SAME_DOCUMENT_GODOT_RESTART";
+      }
+      if (present) godotStatusSeen = true;
+      if (!present && godotStatusSeen && !godotStatusWasHidden) {
+        godotStatusWasHidden = true;
+        persistCausalEvent("godot_status_removed", {});
+      }
+    };
+    scan();
+    const mo = new MutationObserver(scan);
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+    observers.push(mo);
+  }
+
+  observeGodotStatus();
 
   function comparePastedReports() {
     const input = document.getElementById("bm-diag-compare-input");

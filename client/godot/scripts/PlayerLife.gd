@@ -1594,7 +1594,7 @@ static func _repair_incomplete_mercato_identities_on_load(save: Dictionary) -> b
 		if _mercato_player_identity_complete(p):
 			continue
 		var used := _mercato_collect_used(save, clean_id)
-		var pick := _identity_pick_candidate(save, used, _mercato_male_avatar_candidates())
+		var pick := _identity_pick_candidate(save, used, _mercato_male_avatar_candidates(true))
 		if pick.is_empty():
 			continue
 		_identity_apply_candidate(p, pick, used, int(float(clean_id)))
@@ -1602,6 +1602,7 @@ static func _repair_incomplete_mercato_identities_on_load(save: Dictionary) -> b
 		changed = true
 	if changed:
 		save["players_by_id"] = by_id
+		_sync_player_identity_copies(save, by_id)
 	return changed
 
 static func _repair_duplicate_player_identities_on_load(save: Dictionary) -> bool:
@@ -1611,7 +1612,25 @@ static func _repair_duplicate_player_identities_on_load(save: Dictionary) -> boo
 	var keys: Array = by_id.keys()
 	keys.sort_custom(func(a, b): return int(float(str(a))) < int(float(str(b))))
 	var used := {"avatar_keys": {}, "names": {}, "identity_pairs": {}}
+	var reserved_mercato_avatar_owner := {}
+	var reserved_mercato_pair_owner := {}
 	var changed := false
+	for k in keys:
+		var raw = by_id[k]
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var p: Dictionary = raw as Dictionary
+		if not bool(p.get("mercato_generated", false)):
+			_identity_mark_used(used, p)
+			continue
+		if _mercato_player_identity_complete(p):
+			var ak := str(p.get("avatar_key", "")).strip_edges()
+			if ak.begins_with("avatar_mercato_") and not reserved_mercato_avatar_owner.has(ak):
+				var pair_key := _identity_pair_key(_identity_player_name(p), ak)
+				reserved_mercato_avatar_owner[ak] = int(float(str(k)))
+				if pair_key != "":
+					reserved_mercato_pair_owner[pair_key] = int(float(str(k)))
+				_identity_mark_used(used, p)
 	for k in keys:
 		var raw = by_id[k]
 		if typeof(raw) != TYPE_DICTIONARY:
@@ -1624,9 +1643,11 @@ static func _repair_duplicate_player_identities_on_load(save: Dictionary) -> boo
 		var name := _identity_player_name(p)
 		var ak := str(p.get("avatar_key", "")).strip_edges()
 		var pair_key := _identity_pair_key(name, ak)
-		var pair_collision := pair_key != "" and (used["identity_pairs"] as Dictionary).has(pair_key)
-		if pair_collision:
-			var candidate := _identity_pick_candidate(save, used, _mercato_male_avatar_candidates())
+		var avatar_collision := ak != "" and (used["avatar_keys"] as Dictionary).has(ak) and int(reserved_mercato_avatar_owner.get(ak, -1)) != pid
+		var pair_collision := pair_key != "" and (used["identity_pairs"] as Dictionary).has(pair_key) and int(reserved_mercato_pair_owner.get(pair_key, -1)) != pid
+		var invalid_mercato_identity := ak == "" or not ak.begins_with("avatar_mercato_") or not _mercato_player_identity_complete(p)
+		if invalid_mercato_identity or avatar_collision or pair_collision:
+			var candidate := _identity_pick_candidate(save, used, _mercato_male_avatar_candidates(true))
 			if not candidate.is_empty():
 				_identity_apply_candidate(p, candidate, used, pid)
 			else:

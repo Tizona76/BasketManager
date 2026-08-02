@@ -51,7 +51,7 @@ func _play_tournois_music() -> void:
 	if am == null:
 		return
 	if am.has_method("play_music"):
-		am.call("play_music", "res://assets/audio_mp3/tournois.mp3", true, false)
+		am.call("play_music", "res://audio/music/tournois.mp3", true, false)
 
 func _stop_tournois_music() -> void:
 	var am := get_node_or_null("/root/AudioManager")

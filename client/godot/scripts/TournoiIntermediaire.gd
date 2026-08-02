@@ -4,6 +4,10 @@ const Save := preload("res://scripts/Save.gd")
 const PlayerLife := preload("res://scripts/PlayerLife.gd")
 const TuningData := preload("res://scripts/TuningData.gd")
 
+const BM_GENERIC_FUNNEL_URL := "https://api.basketmanager-game.com/v1/funnel/event"
+const BM_GENERIC_FUNNEL_MAX_RETRIES := 2
+
+
 var equipes := ["Bulls", "Panthères", "Toros", "Hawks", "Wolves", "Sharks", "Lions", "Kings"]
 var round_actuel := 0
 var quarts := []
@@ -847,6 +851,74 @@ func _schedule_tournament_victory_popup() -> void:
 	)
 
 
+
+func _bm_funnel_profile_uuid() -> String:
+	var profile_uuid: String = str(Session.profile_uuid).strip_edges()
+	if profile_uuid == "":
+		var active_profile_id: String = str(ProfileManager.get_active_profile_id()).strip_edges()
+		if active_profile_id != "" and active_profile_id != "default":
+			profile_uuid = active_profile_id
+	return profile_uuid
+
+
+func _bm_schedule_generic_funnel_retry(event_name: String, flag_name: String, meta: Dictionary, attempt: int) -> void:
+	var retry_timer := get_tree().create_timer(1.0)
+	retry_timer.timeout.connect(func() -> void:
+		_bm_send_generic_funnel_event(event_name, flag_name, meta, attempt + 1)
+	, CONNECT_ONE_SHOT)
+
+
+func _bm_send_generic_funnel_event(event_name: String, flag_name: String, meta: Dictionary, attempt: int = 0) -> void:
+	var save: Dictionary = PlayerLife.load_savegame()
+	if bool(save.get(flag_name, false)):
+		return
+
+	var profile_uuid := _bm_funnel_profile_uuid()
+	if profile_uuid == "":
+		if attempt < BM_GENERIC_FUNNEL_MAX_RETRIES:
+			_bm_schedule_generic_funnel_retry(event_name, flag_name, meta, attempt)
+		return
+
+	var request := HTTPRequest.new()
+	request.timeout = 8.0
+	get_tree().root.add_child(request)
+	var request_url := BM_GENERIC_FUNNEL_URL
+	var payload_data := {
+		"profile_uuid": profile_uuid,
+		"event_name": event_name,
+		"team_name": str(save.get("team_name", save.get("club_name", ""))),
+		"meta": meta,
+	}
+	if event_name == "first-match-started":
+		request_url = "https://api.basketmanager-game.com/v1/funnel/first-match-started"
+		payload_data = {"profile_uuid": profile_uuid}
+	elif event_name == "first-match-finished":
+		request_url = "https://api.basketmanager-game.com/v1/funnel/first-match-finished"
+		payload_data = {"profile_uuid": profile_uuid}
+	var payload := JSON.stringify(payload_data)
+
+	request.request_completed.connect(func(result: int, response_code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
+		var sent_ok := result == HTTPRequest.RESULT_SUCCESS and response_code >= 200 and response_code < 300
+		request.queue_free()
+		if sent_ok:
+			var fresh_save: Dictionary = PlayerLife.load_savegame()
+			fresh_save[flag_name] = true
+			PlayerLife.write_savegame(fresh_save)
+		elif attempt < BM_GENERIC_FUNNEL_MAX_RETRIES:
+			_bm_schedule_generic_funnel_retry(event_name, flag_name, meta, attempt)
+	, CONNECT_ONE_SHOT)
+
+	var request_error := request.request(
+		request_url,
+		["Content-Type: application/json"],
+		HTTPClient.METHOD_POST,
+		payload
+	)
+	if request_error != OK:
+		request.queue_free()
+		if attempt < BM_GENERIC_FUNNEL_MAX_RETRIES:
+			_bm_schedule_generic_funnel_retry(event_name, flag_name, meta, attempt)
+
 func _bm_load_tournament_save_dict() -> Dictionary:
 	var d := PlayerLife.load_savegame()
 	return d if d is Dictionary else {}
@@ -1128,7 +1200,7 @@ func _play_tournois_music() -> void:
 	if am == null:
 		return
 	if am.has_method("play_music"):
-		am.call("play_music", "res://assets/audio_mp3/tournois.mp3", true, false)
+		am.call("play_music", "res://audio/music/tournois.mp3", true, false)
 
 func _stop_tournois_music() -> void:
 	var am := get_node_or_null("/root/AudioManager")
@@ -1412,6 +1484,7 @@ func _jouer_round() -> void:
 		vainqueur = str(r["winner"])
 		vainqueur_resultat = str(r["winner"]) + " (" + str(r["winner_score"]) + ")"
 		_bm_store_tournament_result("played")
+		_bm_send_generic_funnel_event("tournament-intermediate-played", "funnel_tournament_intermediate_played_sent", {"tournament_id": "intermediaire"})
 		round_actuel = 3
 		await _bm_show_tournament_final_cinematic(e1, e2, int(r["s1"]), int(r["s2"]), vainqueur)
 		_maybe_show_tournament_victory_popup()

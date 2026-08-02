@@ -7,6 +7,24 @@ signal back_requested()
 const BM_GENERIC_FUNNEL_URL := "https://api.basketmanager-game.com/v1/funnel/event"
 const BM_GENERIC_FUNNEL_MAX_RETRIES := 2
 const MAX_SEL := 12
+const BM_SELECTION_CANONICAL_AVATARS := [
+	{"name": "Liam", "avatar_key": "avatar_02"},
+	{"name": "Noah", "avatar_key": "avatar_03"},
+	{"name": "Lucas", "avatar_key": "avatar_05"},
+	{"name": "Leo", "avatar_key": "avatar_07"},
+	{"name": "Ethan", "avatar_key": "avatar_10"},
+	{"name": "Alex", "avatar_key": "avatar_10B"},
+	{"name": "Nathan", "avatar_key": "avatar_11"},
+	{"name": "Hugo", "avatar_key": "avatar_14"},
+	{"name": "Jules", "avatar_key": "avatar_16"},
+	{"name": "Adam", "avatar_key": "avatar_17"},
+	{"name": "Arthur", "avatar_key": "avatar_20"},
+	{"name": "Louis", "avatar_key": "avatar_22"},
+	{"name": "Mael", "avatar_key": "avatar_23"},
+	{"name": "Gabriel", "avatar_key": "avatar_26"},
+	{"name": "Tom", "avatar_key": "avatar_27"},
+	{"name": "Theo", "avatar_key": "avatar_29"},
+]
 
 var selected_ids: Array[int] = []
 var selected_crest_id: String = ""
@@ -541,75 +559,21 @@ func _scan_avatar_portraits(path: String) -> Array[String]:
 
 func _avatar_players() -> Array:
 	var base_root: String = "res://assets/images/avatars"
-	var base_used: String = base_root
-	var files: Array[String] = []
-
-	# 1) Essai: racine (compat si tu y mets des avatar_01.png un jour)
-	files = _scan_avatar_portraits(base_root)
-
-	# 2) Fallback: avatars_dessin (TON cas actuel)
-	if files.size() == 0:
-		base_used = base_root + "/avatars_dessin"
-		files = _scan_avatar_portraits(base_used)
-
-	# 3) Si toujours rien -> dummy (évite liste vide)
-	if files.size() == 0:
-		push_error("[SELECTION] no avatar portraits found in " + base_root + " or avatars_dessin -> fallback dummy")
-		return _dummy_players()
-
 	var out: Array = []
-	var n: int = mini(16, files.size())
-
-	# 1) hommes d'abord
-	var males: Array = []
-	var females: Array = []
-
-	for fname in files:
-		var avatar_key: String = fname.get_basename()
-		if avatar_key.begins_with("avatar_mercato_"):
-			continue
-		var gender: String = "U"
-
-		for k in _meta_key_candidates(avatar_key):
-			if avatar_meta.has(k):
-				gender = str(avatar_meta[k].get("gender", "U"))
-				break
-
-		if gender == "M":
-			males.append(fname)
-		else:
-			females.append(fname)
-
-	var ordered := males + females
-
-	for i: int in range(mini(n, ordered.size())):
-		var fname: String = ordered[i]
-		var avatar_key: String = fname.get_basename()
-
-		# Par défaut : nom lisible depuis filename
-		var gender: String = "U"
-		var first_name: String = avatar_key.replace("_", " ")
-
-		# CSV override (robuste: avatar_10 / avatar_010 / avatar_10B / avatar_010B / etc.)
-		var cands: Array[String] = _meta_key_candidates(avatar_key)
-		for k: String in cands:
-			if avatar_meta.has(k):
-				var m: Dictionary = avatar_meta[k] as Dictionary
-				gender = str(m.get("gender", "U"))
-				first_name = str(m.get("first_name", first_name))
-				break
-
+	for i: int in range(BM_SELECTION_CANONICAL_AVATARS.size()):
+		var entry: Dictionary = BM_SELECTION_CANONICAL_AVATARS[i] as Dictionary
+		var avatar_key: String = str(entry.get("avatar_key", ""))
 		out.append({
 			"id": i,
 			"avatar_key": avatar_key,
-			"gender": gender,
-			"name": first_name,
-			"avatar_path": base_used + "/" + fname,
+			"gender": "M",
+			"name": str(entry.get("name", "")),
+			"avatar_path": base_root + "/" + avatar_key + ".png",
 			"pos": "",
 			"rating": ""
 		})
 
-	print("[SELECTION] avatar_players=", n, " from ", base_used)
+	print("[SELECTION] avatar_players=", out.size(), " from canonical selection")
 	return out
 
 
@@ -942,7 +906,7 @@ func _sort_players_in_place(players: Array, sort_key: String, ascending: bool) -
 
 func _update_sort_header_titles() -> void:
 	var labels := {
-		"HeaderStars": "⭐",
+		"HeaderStars": "RANK",
 		"HeaderPos": "POS.",
 		"HeaderAge": "AGE",
 		"HeaderGender": tr("player.attr.tir"),
@@ -959,8 +923,6 @@ func _update_sort_header_titles() -> void:
 		if b == null:
 			continue
 		var txt := str(labels[node_name])
-		if node_name == "HeaderStars" and _selection_is_mobile_layout():
-			txt = "RAT."
 		var key := ""
 		match node_name:
 			"HeaderStars":

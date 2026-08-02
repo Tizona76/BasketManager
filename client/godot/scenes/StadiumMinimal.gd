@@ -295,7 +295,15 @@ func _stadium_apply_i18n_action_buttons() -> void:
 				(_n as Button).text = tr(_key)
 				break
 
+func _bm_play_stadium_music() -> void:
+	var am := get_node_or_null("/root/AudioManager")
+	if am == null:
+		return
+	if am.has_method("play_music"):
+		am.call("play_music", "res://audio/music/stade.mp3", true, false)
+
 func _ready() -> void:
+	_bm_play_stadium_music()
 	var d_unlock_enter: Dictionary = PlayerLife.load_savegame()
 	if typeof(d_unlock_enter) == TYPE_DICTIONARY and not bool(d_unlock_enter.get("early_flow_stadium_unlocked", false)):
 		d_unlock_enter["early_flow_stadium_unlocked"] = true
@@ -4176,6 +4184,22 @@ static func bm_shop_last_game_sales_for_display(save_data: Dictionary, pid: Stri
 	return last_sales
 
 
+func _get_shop_last_sales_for_restock(save_data: Dictionary, pid: String) -> int:
+	var reference_stock := _get_shop_restock_base_for_level(_shop_level_cached, pid)
+	var last_sales_coef := 0.0
+	var last_sales := 0
+	if typeof(save_data) == TYPE_DICTIONARY and save_data.has("shop") and typeof(save_data["shop"]) == TYPE_DICTIONARY:
+		var shop_d: Dictionary = save_data["shop"] as Dictionary
+		last_sales_coef = float(shop_d.get("last_game_sales_coef", 0.0))
+		if shop_d.has("stock_state") and typeof(shop_d["stock_state"]) == TYPE_DICTIONARY:
+			var stock_state: Dictionary = shop_d["stock_state"] as Dictionary
+			if stock_state.has(pid) and typeof(stock_state[pid]) == TYPE_DICTIONARY:
+				last_sales = maxi(0, int((stock_state[pid] as Dictionary).get("last_sold", 0)))
+	if last_sales <= 0:
+		last_sales = int(round(float(reference_stock) * last_sales_coef))
+	return last_sales
+
+
 static func bm_shop_needs_restock_from_save(save_data: Dictionary) -> bool:
 	if typeof(save_data) != TYPE_DICTIONARY:
 		return false
@@ -5349,9 +5373,17 @@ func _apply_shop_restock_purchase(pid: String, units: int, total_cost: int) -> v
 # BM_SHOP_RESTOCK_POPUP_V4_DESIGN
 func _show_shop_restock_popup(pid: String) -> void:
 	var base_price: int = maxi(1, int(SHOP_DEFAULT_PRICES.get(pid, 10)))
-	var base_stock_for_restock := _get_shop_restock_base_for_level(_shop_level_cached, pid)
-	var small_units := int(round(float(base_stock_for_restock) * 1.20))
-	var large_units := int(round(float(base_stock_for_restock) * 1.90))
+	var current_stock := _get_shop_stock_for_level(_shop_level_cached, pid)
+	var save_popup: Dictionary = PlayerLife.load_savegame()
+	if typeof(save_popup) == TYPE_DICTIONARY and save_popup.has("shop") and typeof(save_popup["shop"]) == TYPE_DICTIONARY:
+		var shop_popup: Dictionary = save_popup["shop"] as Dictionary
+		if shop_popup.has("stock_state") and typeof(shop_popup["stock_state"]) == TYPE_DICTIONARY:
+			var stock_state_popup: Dictionary = shop_popup["stock_state"] as Dictionary
+			if stock_state_popup.has(pid) and typeof(stock_state_popup[pid]) == TYPE_DICTIONARY:
+				current_stock = int((stock_state_popup[pid] as Dictionary).get("current", current_stock))
+	var last_game_sales_for_restock := _get_shop_last_sales_for_restock(save_popup, pid)
+	var small_units := int(round(float(last_game_sales_for_restock) * 1.80))
+	var large_units := int(round(float(last_game_sales_for_restock) * 3.20))
 	var small_cost := small_units * maxi(1, int(round(float(base_price) * 0.60)))
 	var large_cost := large_units * maxi(1, int(round(float(base_price) * 0.52)))
 
@@ -5416,15 +5448,6 @@ func _show_shop_restock_popup(pid: String) -> void:
 	card.add_child(product_img)
 
 	# BM_RESTOCK_POPUP_MINI_TABLE_V1
-	var current_stock := _get_shop_stock_for_level(_shop_level_cached, pid)
-	var save_popup: Dictionary = PlayerLife.load_savegame()
-	if typeof(save_popup) == TYPE_DICTIONARY and save_popup.has("shop") and typeof(save_popup["shop"]) == TYPE_DICTIONARY:
-		var shop_popup: Dictionary = save_popup["shop"] as Dictionary
-		if shop_popup.has("stock_state") and typeof(shop_popup["stock_state"]) == TYPE_DICTIONARY:
-			var stock_state_popup: Dictionary = shop_popup["stock_state"] as Dictionary
-			if stock_state_popup.has(pid) and typeof(stock_state_popup[pid]) == TYPE_DICTIONARY:
-				current_stock = int((stock_state_popup[pid] as Dictionary).get("current", current_stock))
-
 	var headers := [
 		{"text": "Order", "x": 42.0, "w": 170.0},
 		{"text": "Units", "x": 225.0, "w": 90.0},

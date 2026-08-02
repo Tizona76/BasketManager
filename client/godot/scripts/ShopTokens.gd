@@ -68,7 +68,15 @@ var _club_tokens_active_section: String = "overview"
 var _club_tokens_cards_scroll: ScrollContainer = null
 var _home_arena_show_congratulations: bool = false
 
+func _bm_play_club_tokens_music() -> void:
+	var am := get_node_or_null("/root/AudioManager")
+	if am == null:
+		return
+	if am.has_method("play_music"):
+		am.call("play_music", "res://audio/music/club-tokens.mp3", true, false)
+
 func _ready() -> void:
+	_bm_play_club_tokens_music()
 	if BtnBack != null and not BtnBack.pressed.is_connected(_on_back):
 		BtnBack.pressed.connect(_on_back)
 		BtnBack.text = tr("menu.back")
@@ -1357,7 +1365,7 @@ func _apply_club_identity_selection(root: Control) -> void:
 		var selected := badge_id == _club_identity_preview_badge_id
 		card.scale = Vector2(1.5, 1.5) if selected else Vector2.ONE
 		card.z_index = 20 if selected else 0
-		card.mouse_filter = Control.MOUSE_FILTER_IGNORE if selected else Control.MOUSE_FILTER_STOP
+		card.mouse_filter = Control.MOUSE_FILTER_STOP
 		var current_style := card.get_theme_stylebox("panel")
 		if current_style is StyleBoxFlat:
 			var sb := (current_style as StyleBoxFlat).duplicate() as StyleBoxFlat
@@ -1375,12 +1383,11 @@ func _make_club_identity_badge_card(root: Control, save: Dictionary, badge_id: S
 	if is_selected:
 		card.scale = Vector2(1.5, 1.5)
 		card.z_index = 20
-		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton:
 			var mb := event as InputEventMouseButton
 			if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
-				_club_identity_preview_badge_id = badge_id
+				_club_identity_preview_badge_id = "" if _club_identity_preview_badge_id == badge_id else badge_id
 				_apply_club_identity_selection(root)
 	)
 	var sb := StyleBoxFlat.new()
@@ -1639,6 +1646,13 @@ func _show_club_identity_zoom_overlay(root: Control, source_card: Control, save:
 	box.add_child(_make_info_label(_club_identity_badge_name(badge_id), 31, Color(1, 1, 1, 1), 4))
 	if is_selected:
 		box.add_child(_make_info_label(_club_tokens_tr("club_identity.selected", "Selected"), 31, Color(0.25, 1.0, 0.48, 1.0), 4))
+		box.mouse_filter = Control.MOUSE_FILTER_STOP
+		box.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton:
+				var mb := event as InputEventMouseButton
+				if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
+					_clear_club_identity_zoom_overlay(root)
+		)
 		return
 	if not enabled:
 		box.add_child(_make_info_label(_club_tokens_tr("club_identity.unavailable", "Next step"), 27, Color(0.70, 0.76, 0.86, 0.70), 3))

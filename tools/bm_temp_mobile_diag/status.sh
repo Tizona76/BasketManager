@@ -54,6 +54,11 @@ if grep -q "BM_TEMP_MOBILE_DIAG_BEGIN" "$BM_DIAG_INDEX_HTML" && grep -q "bm_mobi
   markers=present
 fi
 
+export_after_install=no
+if [ "$markers" = missing ] && [ "$html_ok" = no ]; then
+  export_after_install=yes
+fi
+
 echo "index_html_hash_ok=$html_ok"
 echo "diagnostic_js_hash_ok=$js_ok"
 echo "diagnostic_css_hash_ok=$css_ok"
@@ -61,10 +66,17 @@ echo "index_js_unchanged=$index_js_ok"
 echo "index_pck_unchanged=$pck_ok"
 echo "preset_unchanged=$preset_ok"
 echo "markers=$markers"
+echo "export_after_install=$export_after_install"
 
 if [ "$html_ok" = yes ] && [ "$js_ok" = yes ] && [ "$css_ok" = yes ] && [ "$index_js_ok" = yes ] && [ "$pck_ok" != no ] && [ "$preset_ok" = yes ] && [ "$markers" = present ]; then
   echo "safe_to_remove=yes"
+elif [ "$export_after_install" = yes ]; then
+  echo "safe_to_remove=no"
+  echo "safe_to_reinstall=yes"
+  echo "next_step=bash tools/bm_temp_mobile_diag/install.sh"
+  exit 4
 else
   echo "safe_to_remove=no"
+  echo "safe_to_reinstall=no"
   exit 3
 fi

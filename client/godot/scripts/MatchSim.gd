@@ -10,6 +10,7 @@ const BM_SKIP_FINAL_RESULT_TOKEN_COST := 1
 const BM_GENERIC_FUNNEL_URL := "https://api.basketmanager-game.com/v1/funnel/event"
 const BM_GENERIC_FUNNEL_MAX_RETRIES := 2
 const HOME_ARENA_MATCH_BACKGROUND_PATH := "res://assets/images/backgrounds/home_arena.png"
+const AWAY_MATCH_BACKGROUND_PATH := "res://assets/images/backgrounds/match_visiteur.png"
 const BM_COACH_INSIGHTS_DEBUG := true
 
 @onready var lbl_temps: Label = $LabelTemps
@@ -1161,6 +1162,13 @@ func _is_home_arena_selected_for_match(save: Dictionary) -> bool:
 
 func _apply_home_arena_background_if_needed() -> void:
 	if not _user_is_home:
+		var away_bg := get_node_or_null("BG") as TextureRect
+		if away_bg == null:
+			return
+		if not ResourceLoader.exists(AWAY_MATCH_BACKGROUND_PATH):
+			return
+		away_bg.texture = load(AWAY_MATCH_BACKGROUND_PATH) as Texture2D
+		_bm_apply_away_match_identity_overlays()
 		return
 
 	var save := PlayerLife.load_savegame()
@@ -1174,6 +1182,133 @@ func _apply_home_arena_background_if_needed() -> void:
 		return
 
 	bg.texture = load(HOME_ARENA_MATCH_BACKGROUND_PATH) as Texture2D
+
+
+func _bm_away_identity_font_size(text: String, max_size: int, min_size: int, compact_after: int) -> int:
+	var extra := maxi(0, text.strip_edges().length() - compact_after)
+	return maxi(min_size, max_size - extra)
+
+
+func _bm_make_away_road_sign_identity(rect: Rect2, crest_path: String, team_name: String, crest_size: float, font_size: int) -> Control:
+	var zone := Control.new()
+	zone.name = "OpponentRoadSignIdentity"
+	zone.position = rect.position
+	zone.size = rect.size
+	zone.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var sign := Polygon2D.new()
+	sign.name = "MatteBlackRoadSign"
+	sign.color = Color(0.004, 0.005, 0.006, 0.98)
+	sign.polygon = PackedVector2Array([
+		Vector2(0.0, 0.0),
+		Vector2(rect.size.x, 4.0),
+		Vector2(rect.size.x - 8.0, rect.size.y),
+		Vector2(8.0, rect.size.y - 4.0)
+	])
+	zone.add_child(sign)
+
+	var top_label := Label.new()
+	top_label.name = "OpponentName"
+	top_label.position = Vector2(22.0, 18.0)
+	top_label.size = Vector2(maxf(0.0, rect.size.x - 44.0), rect.size.y * 0.30)
+	top_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	top_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	top_label.text = team_name.to_upper()
+	top_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	top_label.add_theme_font_size_override("font_size", font_size)
+	top_label.add_theme_color_override("font_color", Color(0.96, 0.98, 1.0, 1.0))
+	top_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.75))
+	top_label.add_theme_constant_override("outline_size", 2)
+	top_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	zone.add_child(top_label)
+
+	if crest_path != "" and ResourceLoader.exists(crest_path):
+		var crest := TextureRect.new()
+		crest.name = "OpponentCrest"
+		crest.position = Vector2((rect.size.x - crest_size) * 0.5, rect.size.y * 0.37)
+		crest.size = Vector2(crest_size, crest_size)
+		crest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		crest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		crest.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		crest.texture = load(crest_path) as Texture2D
+		zone.add_child(crest)
+
+	var divider := Line2D.new()
+	divider.name = "RoadSignDivider"
+	divider.default_color = Color(0.92, 0.94, 0.96, 0.82)
+	divider.width = 2.0
+	divider.points = PackedVector2Array([
+		Vector2(18.0, rect.size.y * 0.70),
+		Vector2(rect.size.x - 18.0, rect.size.y * 0.70)
+	])
+	zone.add_child(divider)
+
+	var exit_label := Label.new()
+	exit_label.name = "NextExit"
+	exit_label.position = Vector2(18.0, rect.size.y * 0.72)
+	exit_label.size = Vector2(rect.size.x - 36.0, rect.size.y * 0.22)
+	exit_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	exit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	exit_label.text = "NEXT EXIT"
+	exit_label.add_theme_font_size_override("font_size", maxi(13, int(font_size * 0.62)))
+	exit_label.add_theme_color_override("font_color", Color(0.96, 0.98, 1.0, 1.0))
+	exit_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.65))
+	exit_label.add_theme_constant_override("outline_size", 2)
+	exit_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	zone.add_child(exit_label)
+
+	var arrow_start := Vector2(rect.size.x * 0.70, rect.size.y * 0.84)
+	var arrow_end := Vector2(rect.size.x * 0.80, rect.size.y * 0.78)
+	var arrow := Line2D.new()
+	arrow.name = "NextExitArrowShaft"
+	arrow.default_color = Color(0.96, 0.98, 1.0, 1.0)
+	arrow.width = 3.0
+	arrow.points = PackedVector2Array([arrow_start, arrow_end])
+	zone.add_child(arrow)
+
+	var arrow_head := Polygon2D.new()
+	arrow_head.name = "NextExitArrowHead"
+	arrow_head.color = Color(0.96, 0.98, 1.0, 1.0)
+	arrow_head.polygon = PackedVector2Array([
+		arrow_end,
+		arrow_end + Vector2(-15.0, -1.0),
+		arrow_end + Vector2(-7.0, 12.0)
+	])
+	zone.add_child(arrow_head)
+
+	return zone
+
+
+func _bm_apply_away_match_identity_overlays() -> void:
+	if _user_is_home:
+		return
+
+	var old := get_node_or_null("AwayMatchIdentityOverlay")
+	if old != null:
+		old.queue_free()
+
+	var save := PlayerLife.load_savegame()
+	var opponent_crest_path := PlayerLife.get_display_crest_path(save, _opp_team_name)
+	var vp := get_viewport_rect().size
+	if vp.x <= 0.0 or vp.y <= 0.0:
+		vp = Vector2(1600.0, 900.0)
+	var sx := vp.x / 1600.0
+	var sy := vp.y / 900.0
+	var s := minf(sx, sy)
+
+	var overlay := Control.new()
+	overlay.name = "AwayMatchIdentityOverlay"
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.z_index = -7
+	add_child(overlay)
+	overlay.add_child(_bm_make_away_road_sign_identity(
+		Rect2(Vector2(975.0 * sx, 192.0 * sy), Vector2(300.0 * sx, 226.0 * sy)),
+		opponent_crest_path,
+		_opp_team_name,
+		58.0 * s,
+		_bm_away_identity_font_size(_opp_team_name, maxi(18, int(27.0 * s)), maxi(12, int(16.0 * s)), 11)
+	))
 
 
 func _ensure_translations_loaded() -> void:
@@ -1203,6 +1338,14 @@ func _bm_funnel_profile_uuid() -> String:
 		if active_profile_id != "" and active_profile_id != "default":
 			profile_uuid = active_profile_id
 	return profile_uuid
+
+
+func _bm_print_funnel_profile_compare(event_name: String) -> void:
+	var session_uuid: String = str(Session.profile_uuid).strip_edges()
+	var active_profile_id: String = str(ProfileManager.get_active_profile_id()).strip_edges()
+	var resolved_uuid: String = _bm_funnel_profile_uuid()
+	var active_profile_kind := "default" if active_profile_id == "" or active_profile_id == "default" else "non_default"
+	print("[BM_FUNNEL_PROFILE_COMPARE] event=", event_name, " session_present=", session_uuid != "", " session_length=", session_uuid.length(), " active_profile_present=", active_profile_id != "", " active_profile_length=", active_profile_id.length(), " active_profile_kind=", active_profile_kind, " resolved_present=", resolved_uuid != "", " resolved_length=", resolved_uuid.length())
 
 
 func _bm_schedule_generic_funnel_retry(event_name: String, flag_name: String, meta: Dictionary, attempt: int) -> void:
@@ -1272,6 +1415,7 @@ func _bm_track_match_start_milestones() -> void:
 	var meta := {"season_number": season_number, "match_number": match_number}
 
 	if season_number == 1 and completed_matches == 1:
+		_bm_print_funnel_profile_compare("second-match-started")
 		_bm_send_generic_funnel_event("second-match-started", "funnel_second_match_started_sent", meta)
 	elif season_number == 1 and completed_matches == 10:
 		_bm_send_generic_funnel_event("eleventh-match-started", "funnel_eleventh_match_started_sent", meta)
@@ -1292,7 +1436,15 @@ func _bm_track_first_match_started() -> void:
 		_bm_send_generic_funnel_event("first-match-started", "funnel_first_match_started_sent", meta)
 
 
+func _bm_play_match_music() -> void:
+	var am := get_node_or_null("/root/AudioManager")
+	if am == null:
+		return
+	if am.has_method("play_music"):
+		am.call("play_music", "res://audio/music/match.mp3", true, false)
+
 func _ready() -> void:
+	_bm_play_match_music()
 	if timer != null:
 		timer.stop()
 		timer.autostart = false
@@ -3787,6 +3939,16 @@ func _fin_match() -> void:
 				}
 			)
 
+		if int(save_sync.get("season_number", 1)) == 1 and int(save_sync.get("season_round", 0)) == 5:
+			_bm_send_generic_funnel_event(
+				"fifth-match-finished",
+				"funnel_fifth_match_finished_sent",
+				{
+					"season_number": 1,
+					"match_number": 5
+				}
+			)
+
 		if not save_sync.has("progress") or typeof(save_sync["progress"]) != TYPE_DICTIONARY:
 			save_sync["progress"] = {}
 		var next_journee_sync: int = int(ss.matchs_joues) + 1
@@ -3901,6 +4063,14 @@ func _fin_match() -> void:
 				var sync_result: Dictionary = sync_any as Dictionary
 				if bool(sync_result.get("finished", false)):
 					print("[STADIUM] travaux terminés -> niveau ", sync_result.get("new_ng"), ".", sync_result.get("new_ns"))
+					_bm_send_generic_funnel_event(
+						"stadium-upgraded",
+						"funnel_stadium_upgraded_sent",
+						{
+							"season_number": int(save_sync.get("season_number", 1)),
+							"match_number": int(save_sync.get("season_round", 0))
+						}
+					)
 		# ----------------------------------------------------------------------
 
 		# 4) préparer l'adversaire suivant (optionnel)

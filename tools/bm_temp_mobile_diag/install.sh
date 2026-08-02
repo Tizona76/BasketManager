@@ -48,13 +48,59 @@ require_files() {
 }
 
 require_no_active_install() {
-  [ ! -e "$STATE_DIR" ] || die "diagnostic already installed or state directory exists: $STATE_DIR"
+  if [ -e "$STATE_DIR" ]; then
+    handle_existing_state
+  fi
   if grep -q "BM_TEMP_MOBILE_DIAG" "$INDEX_HTML"; then
     die "diagnostic markers already present in index.html without this installer state"
   fi
   if grep -q "$JS_NAME\|$CSS_NAME" "$INDEX_HTML"; then
     die "diagnostic references already present in index.html"
   fi
+}
+
+handle_existing_state() {
+  [ -f "$MANIFEST" ] || die "state directory exists without manifest: $STATE_DIR"
+  # shellcheck disable=SC1090
+  . "$MANIFEST"
+  local current_html_sha markers_present
+  current_html_sha="$([ -f "$BM_DIAG_INDEX_HTML" ] && sha256 "$BM_DIAG_INDEX_HTML" || echo "missing")"
+  markers_present=no
+  if [ -f "$BM_DIAG_INDEX_HTML" ] && grep -q "BM_TEMP_MOBILE_DIAG_BEGIN" "$BM_DIAG_INDEX_HTML"; then
+    markers_present=yes
+  fi
+
+  if [ "$current_html_sha" = "$BM_DIAG_HTML_SHA_AFTER" ] && [ "$markers_present" = yes ]; then
+    die "diagnostic already installed: $STATE_DIR"
+  fi
+
+  if [ "$markers_present" = no ] && [ "$current_html_sha" != "$BM_DIAG_HTML_SHA_AFTER" ]; then
+    clear_stale_export_state
+    return
+  fi
+
+  die "diagnostic state is not safely refreshable; run status.sh for details"
+}
+
+clear_stale_export_state() {
+  if [ -f "$BM_DIAG_JS_FILE" ]; then
+    [ "$(sha256 "$BM_DIAG_JS_FILE")" = "$BM_DIAG_JS_ASSET_SHA" ] || die "stale diagnostic JS was modified; refusing automatic cleanup"
+    rm -f "$BM_DIAG_JS_FILE"
+  fi
+  if [ -f "$BM_DIAG_CSS_FILE" ]; then
+    [ "$(sha256 "$BM_DIAG_CSS_FILE")" = "$BM_DIAG_CSS_ASSET_SHA" ] || die "stale diagnostic CSS was modified; refusing automatic cleanup"
+    rm -f "$BM_DIAG_CSS_FILE"
+  fi
+  rm -f "$STATE_DIR/baseline/index.html"
+  rm -f "$STATE_DIR/baseline/index.js"
+  rm -f "$STATE_DIR/baseline/index.pck"
+  rm -f "$STATE_DIR/baseline/export_presets.cfg"
+  rm -f "$STATE_DIR/index.html.instrumented"
+  rm -f "$MANIFEST"
+  rmdir "$STATE_DIR/baseline" 2>/dev/null || true
+  rmdir "$STATE_DIR" 2>/dev/null || true
+  echo "Detected a fresh export after previous diagnostic installation."
+  echo "Cleared stale diagnostic manifest; installing on current web_release."
 }
 
 inject_html() {

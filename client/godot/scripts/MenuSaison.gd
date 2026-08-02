@@ -1384,6 +1384,7 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 	lbl_mission.size = Vector2(720, 34)
 	lbl_mission.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl_mission.add_theme_font_size_override("font_size", 24)
+	lbl_mission.add_theme_color_override("font_color", Color(1.00, 0.72, 0.18, 1.0))
 	card.add_child(lbl_mission)
 
 	var lbl_line3 := Label.new()
@@ -1393,6 +1394,7 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 	lbl_line3.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl_line3.autowrap_mode = TextServer.AUTOWRAP_OFF
 	lbl_line3.add_theme_font_size_override("font_size", 22)
+	lbl_line3.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	card.add_child(lbl_line3)
 
 	var tokens_row := HBoxContainer.new()
@@ -1933,7 +1935,15 @@ func _bm_ensure_season_start_progress_baseline() -> void:
 	if changed:
 		PL.write_savegame(save)
 
+func _bm_play_management_music() -> void:
+	var am := get_node_or_null("/root/AudioManager")
+	if am == null:
+		return
+	if am.has_method("play_music"):
+		am.call("play_music", "res://audio/music/menu.mp3", true, false)
+
 func _ready() -> void:
+	_bm_play_management_music()
 	PL._bm_debug_dump_active_save_path()
 	call_deferred("_bm_update_management_crest_header")
 	_bm_ensure_season_start_progress_baseline()
@@ -3614,6 +3624,52 @@ func _missions_make_circle(parent: Control, pos: Vector2, size_px: float, fill: 
 	return circle
 
 
+func _missions_make_done_mark(parent: Control, pos: Vector2) -> void:
+	var outline := Line2D.new()
+	outline.points = PackedVector2Array([
+		pos + Vector2(14.0, -17.0),
+		pos + Vector2(24.0, -7.0),
+		pos + Vector2(42.0, -30.0)
+	])
+	outline.width = 10.0
+	outline.default_color = Color(0.02, 0.18, 0.06, 1.0)
+	parent.add_child(outline)
+
+	var mark := Line2D.new()
+	mark.points = outline.points
+	mark.width = 5.0
+	mark.default_color = Color(0.40, 1.00, 0.38, 1.0)
+	parent.add_child(mark)
+
+
+func _missions_make_locked_mark(parent: Control, pos: Vector2) -> void:
+	var shackle := Line2D.new()
+	shackle.points = PackedVector2Array([
+		pos + Vector2(-12.0, -4.0),
+		pos + Vector2(-12.0, -15.0),
+		pos + Vector2(0.0, -25.0),
+		pos + Vector2(12.0, -15.0),
+		pos + Vector2(12.0, -4.0)
+	])
+	shackle.width = 5.0
+	shackle.default_color = Color(0.88, 0.90, 0.96, 0.74)
+	parent.add_child(shackle)
+
+	var body := Panel.new()
+	body.position = pos + Vector2(-19.0, -4.0)
+	body.size = Vector2(38.0, 25.0)
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_theme_stylebox_override("panel", _missions_stylebox(Color(0.88, 0.90, 0.96, 0.74), Color(0.02, 0.03, 0.06, 0.95), 3, 6))
+	parent.add_child(body)
+
+	var keyhole := ColorRect.new()
+	keyhole.position = pos + Vector2(-3.0, 6.0)
+	keyhole.size = Vector2(6.0, 8.0)
+	keyhole.color = Color(0.02, 0.03, 0.06, 0.95)
+	keyhole.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(keyhole)
+
+
 func _missions_make_station(parent: Control, pos: Vector2, mission: Dictionary, state: String, idx: int) -> void:
 	match state:
 		"done":
@@ -3660,31 +3716,9 @@ func _missions_make_station(parent: Control, pos: Vector2, mission: Dictionary, 
 		parent.add_child(dot)
 
 	if state == "done":
-		var check := Label.new()
-		check.text = "✓"
-		check.position = pos + Vector2(11, -34)
-		check.size = Vector2(34, 34)
-		check.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		check.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		check.add_theme_font_size_override("font_size", 30)
-		check.add_theme_color_override("font_color", Color(0.40, 1.00, 0.38, 1.0))
-		check.add_theme_color_override("font_outline_color", Color(0.02, 0.18, 0.06, 1.0))
-		check.add_theme_constant_override("outline_size", 5)
-		check.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		parent.add_child(check)
+		_missions_make_done_mark(parent, pos)
 	elif state == "locked":
-		var lock := Label.new()
-		lock.text = "🔒"
-		lock.position = pos + Vector2(-25, -16)
-		lock.size = Vector2(50, 32)
-		lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		lock.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		lock.add_theme_font_size_override("font_size", 24)
-		lock.add_theme_color_override("font_color", Color(0.88, 0.90, 0.96, 0.74))
-		lock.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 0.95))
-		lock.add_theme_constant_override("outline_size", 3)
-		lock.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		parent.add_child(lock)
+		_missions_make_locked_mark(parent, pos)
 
 	var label := Label.new()
 	label.position = pos + Vector2(-125, -116)

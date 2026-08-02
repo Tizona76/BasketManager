@@ -6,6 +6,15 @@ It does not modify Godot scenes, gameplay scripts, saves, assets, `index.js`,
 
 ## 1. Installation locale
 
+Recommended workflow:
+
+1. Export Godot to `client/web_release`.
+2. Install the diagnostic.
+3. Check status.
+4. Publish only if explicitly requested.
+5. Test.
+6. Remove.
+
 ```bash
 cd /Users/isidroetannebosch/Dev/BasketManager_GIT && \
 bash tools/bm_temp_mobile_diag/install.sh
@@ -18,6 +27,11 @@ Expected result:
 - `client/web_release/bm_mobile_web_diag.css` is created.
 - Exact backups and hashes are stored in the tool state folder.
 
+If Godot exported a fresh `client/web_release` after a previous diagnostic
+installation, the manifest may still exist while the markers are gone. In that
+case, run the same install command again. The installer detects the fresh export,
+clears only its stale diagnostic state, and installs on the current export.
+
 ## 2. Vérification du statut
 
 ```bash
@@ -26,6 +40,13 @@ bash tools/bm_temp_mobile_diag/status.sh
 ```
 
 The status must show `installed=yes` and `safe_to_remove=yes`.
+
+If it shows `export_after_install=yes` and `safe_to_reinstall=yes`, run:
+
+```bash
+cd /Users/isidroetannebosch/Dev/BasketManager_GIT && \
+bash tools/bm_temp_mobile_diag/install.sh
+```
 
 ## 3. Publication éventuelle uniquement sur instruction séparée
 
