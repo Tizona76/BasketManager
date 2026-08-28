@@ -6,6 +6,7 @@ const Selection := preload("res://scripts/Selection.gd")
 const TuningData := preload("res://scripts/TuningData.gd")
 const SponsorDataRef := preload("res://scripts/SponsorData.gd")
 const StadiumMinimal := preload("res://scenes/StadiumMinimal.gd")
+const LeagueDataScript := preload("res://scripts/LeagueData.gd")
 const TOKEN_ICON := preload("res://assets/images/token.png")
 
 
@@ -72,6 +73,7 @@ var _btn_match_vs_label: Label = null
 var _btn_match_opponent_line: HBoxContainer = null
 var _btn_match_opponent_crest: TextureRect = null
 var _btn_match_opponent_label: Label = null
+var lbl_league_badge: Label = null
 @onready var btn_retour: Button = get_node("UI/BtnRetour") as Button
 
 var _unlock_glow_tweens: Dictionary = {}
@@ -1982,6 +1984,8 @@ func _ready() -> void:
 		PL.write_savegame(save)
 
 	_ensure_season_day_label()
+	_bm_ensure_league_badge()
+	_bm_refresh_league_badge()
 	_bm_ensure_match_button_opponent_line()
 	_bm_refresh_match_button_opponent_line()
 	var save_after := PL.load_savegame()
@@ -2060,6 +2064,7 @@ func _ready() -> void:
 	call_deferred("_bm_saison_apply_mobile_top_left_buttons_plus20_text_plus2")
 	call_deferred("_bm_saison_apply_mobile_play_button_plus20_text_plus2")
 	call_deferred("_bm_refresh_match_button_opponent_line")
+	call_deferred("_bm_refresh_league_badge")
 	call_deferred("_bm_saison_apply_mobile_day_and_popularity_texts")
 	call_deferred("_bm_saison_align_mobile_play_and_day")
 
@@ -2516,6 +2521,62 @@ func _ensure_season_day_label() -> void:
 		btn_match.position.x + (btn_match.size.x - lbl_season_day.size.x) * 0.5 + 24.0,
 		btn_match.position.y - 88
 	)
+
+
+func _bm_current_league_name() -> String:
+	var save: Dictionary = PL.load_savegame()
+	if typeof(save) != TYPE_DICTIONARY:
+		return LeagueDataScript.get_league_name(LeagueDataScript.get_default_league_id())
+	var league_id := str(save.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+	if league_id == "":
+		league_id = LeagueDataScript.get_default_league_id()
+	return LeagueDataScript.get_league_name(league_id)
+
+
+func _bm_ensure_league_badge() -> void:
+	if btn_match == null:
+		return
+	if lbl_league_badge != null and is_instance_valid(lbl_league_badge):
+		return
+
+	lbl_league_badge = Label.new()
+	lbl_league_badge.name = "LblLeagueBadge"
+	lbl_league_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl_league_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl_league_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lbl_league_badge.add_theme_font_size_override("font_size", 16)
+	lbl_league_badge.add_theme_color_override("font_color", Color(1.0, 0.86, 0.42, 1.0))
+	lbl_league_badge.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.85))
+	lbl_league_badge.add_theme_constant_override("shadow_offset_x", 1)
+	lbl_league_badge.add_theme_constant_override("shadow_offset_y", 2)
+
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.02, 0.06, 0.14, 0.86)
+	sb.border_color = Color(1.0, 0.72, 0.24, 0.72)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(16)
+	sb.content_margin_left = 16
+	sb.content_margin_right = 16
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
+	lbl_league_badge.add_theme_stylebox_override("normal", sb)
+
+	add_child(lbl_league_badge)
+	move_child(lbl_league_badge, get_node("Overlays").get_index())
+
+
+func _bm_refresh_league_badge() -> void:
+	_bm_ensure_league_badge()
+	if btn_match == null or lbl_league_badge == null or not is_instance_valid(lbl_league_badge):
+		return
+	lbl_league_badge.text = _bm_current_league_name().to_upper()
+	lbl_league_badge.visible = btn_match.visible
+	lbl_league_badge.size = Vector2(250, 34)
+	lbl_league_badge.position = Vector2(
+		btn_match.position.x + (btn_match.size.x - lbl_league_badge.size.x) * 0.5,
+		btn_match.position.y + btn_match.size.y + 12.0
+	)
+	lbl_league_badge.pivot_offset = lbl_league_badge.size * 0.5
 
 
 
@@ -4011,6 +4072,8 @@ func _show_missions_panel() -> void:
 			btn_match.visible = false
 		if lbl_season_day != null and is_instance_valid(lbl_season_day):
 			lbl_season_day.visible = false
+		if lbl_league_badge != null and is_instance_valid(lbl_league_badge):
+			lbl_league_badge.visible = false
 		if _btn_match_halo != null and is_instance_valid(_btn_match_halo):
 			_btn_match_halo.visible = false
 
@@ -4029,6 +4092,8 @@ func _hide_missions_panel() -> void:
 		btn_match.visible = true
 	if lbl_season_day != null and is_instance_valid(lbl_season_day):
 		lbl_season_day.visible = true
+	if lbl_league_badge != null and is_instance_valid(lbl_league_badge):
+		lbl_league_badge.visible = true
 	if _btn_match_halo != null and is_instance_valid(_btn_match_halo):
 		_btn_match_halo.visible = true
 
@@ -4336,6 +4401,10 @@ func _bm_show_mercato_closed_popup() -> void:
 	if btn_match != null:
 		restore_btn_match_visible = btn_match.visible
 		btn_match.visible = false
+	var restore_badge_visible := false
+	if lbl_league_badge != null and is_instance_valid(lbl_league_badge):
+		restore_badge_visible = lbl_league_badge.visible
+		lbl_league_badge.visible = false
 	var restore_halo_visible := false
 	if _btn_match_halo != null and is_instance_valid(_btn_match_halo):
 		restore_halo_visible = _btn_match_halo.visible
@@ -4397,6 +4466,8 @@ func _bm_show_mercato_closed_popup() -> void:
 	btn.pressed.connect(func():
 		if btn_match != null:
 			btn_match.visible = restore_btn_match_visible
+		if lbl_league_badge != null and is_instance_valid(lbl_league_badge):
+			lbl_league_badge.visible = restore_badge_visible
 		if _btn_match_halo != null and is_instance_valid(_btn_match_halo):
 			_btn_match_halo.visible = restore_halo_visible
 		popup.queue_free()
@@ -4565,4 +4636,5 @@ func _bm_saison_align_mobile_play_and_day() -> void:
 		btn_match.position.y - lbl_season_day.size.y - 36.0
 	)
 	lbl_season_day.pivot_offset = lbl_season_day.size * 0.5
+	_bm_refresh_league_badge()
 	btn_match.pivot_offset = btn_match.size * 0.5

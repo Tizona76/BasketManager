@@ -33,6 +33,7 @@ var _audio_unlocked := false
 var team_name_ps: PackedScene = null
 var login_ps: PackedScene = null
 var _pending_team_name: String = ""
+var _pending_league_id: String = "classic"
 var _pending_locale: String = ""
 
 var _teamname_submitted: bool = false
@@ -804,7 +805,9 @@ func _show_team_name() -> void:
 
 
 	I18nSvc.apply_all()
-	if t.has_signal("submit_team_name"):
+	if t.has_signal("submit_team_setup"):
+		t.connect("submit_team_setup", Callable(self, "_on_submit_team_setup"))
+	elif t.has_signal("submit_team_name"):
 		t.connect("submit_team_name", Callable(self, "_on_submit_team_name"))
 	if t.has_signal("back_requested"):
 		t.connect("back_requested", Callable(self, "_goto_stadium"))
@@ -812,7 +815,14 @@ func _show_team_name() -> void:
 		t.connect("action_requested", Callable(self, "_on_stadium_action"))
 
 
+func _on_submit_team_setup(team_name: String, league_id: String) -> void:
+	_pending_league_id = league_id.strip_edges() if league_id.strip_edges() != "" else "classic"
+	_on_submit_team_name(team_name)
+
+
 func _on_submit_team_name(team_name: String) -> void:
+	if _pending_league_id.strip_edges() == "":
+		_pending_league_id = "classic"
 	print("[MAIN] RECEIVED submit_team_name =", team_name)
 	if _teamname_submitted:
 		print("[MAIN] submit_team_name ignored (already submitted) arg=", team_name)
@@ -962,6 +972,7 @@ func _apply_pending_team_name() -> void:
 		save_cur["popup_bienvenue_club_deja_vu"] = false
 		save_cur["club_name"] = new_name
 		save_cur["team_name"] = new_name
+		save_cur["league_id"] = _pending_league_id
 		PlayerLife.write_savegame(save_cur)
 		print("[MAIN][RESET] new club -> finance reset prev=", prev_name, " new=", new_name)
 # ----------------------------------------------------------------------
@@ -1027,6 +1038,7 @@ func _apply_pending_team_name() -> void:
 
 	save_post["club_name"] = new_name
 	save_post["team_name"] = new_name
+	save_post["league_id"] = _pending_league_id
 	print("[WRITE TEAM] ", new_name)
 	PlayerLife.write_savegame(save_post)
 	if SaveSvc != null:
@@ -1067,6 +1079,7 @@ func _apply_pending_team_name() -> void:
 		_menu_inst.call("_update_club_name_label_from_save")
 
 	_pending_team_name = ""
+	_pending_league_id = "classic"
 
 	# ✅ après création du nom : rester sur Menu, le popup pilotera ensuite l'ouverture de Selection
 	if has_method("_ensure_shop_confirm_button"):

@@ -38,6 +38,16 @@ const OPPONENT_NAMES: Array[String] = [
 	"Storm"
 ]
 
+const LeagueDataScript = preload("res://scripts/LeagueData.gd")
+
+func _league_opponent_names() -> Array[String]:
+	var names: Array[String] = []
+	for value in LeagueDataScript.CLASSIC_OPPONENT_NAMES:
+		names.append(str(value))
+	if names.size() == OPPONENT_NAMES.size():
+		return names
+	return OPPONENT_NAMES.duplicate()
+
 var opponent_name: String = ""
 
 const SEASON_TOTAL_ROUNDS: int = 22
@@ -45,7 +55,7 @@ const SEASON_TOTAL_ROUNDS: int = 22
 func compute_next_opponent_name(my_team_name: String) -> String:
 	# Déterministe : dépend de matchs_joues (donc stable)
 	var names: Array[String] = []
-	for n in OPPONENT_NAMES:
+	for n in _league_opponent_names():
 		if n != my_team_name:
 			names.append(n)
 	if names.is_empty():

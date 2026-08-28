@@ -1,6 +1,7 @@
 extends Control
 
 const PlayerLife := preload("res://scripts/PlayerLife.gd")
+const LeagueDataScript := preload("res://scripts/LeagueData.gd")
 
 const _TEAMNAME_BG_NODE := "__BG_JOUEURS__"
 const _TEAMNAME_BG_PATH := "res://assets/images/backgrounds/joueurs.png"
@@ -41,6 +42,7 @@ func _ensure_bg_joueurs() -> void:
 
 
 signal submit_team_name(team_name: String)
+signal submit_team_setup(team_name: String, league_id: String)
 signal back_requested()
 signal action_requested(action: String)
 
@@ -66,6 +68,15 @@ var _teamname_caret_blink_timer: Timer = null
 var _teamname_caret_blink_visible := true
 var _teamname_popup_caret_blink_timer: Timer = null
 var _teamname_popup_caret_blink_visible := true
+var _league_choices: Array[Dictionary] = []
+var _league_index: int = 2
+var _pending_league_team_name: String = ""
+var _league_choice_overlay: Control = null
+var _league_card_panel: PanelContainer = null
+var _league_image: TextureRect = null
+var _league_title: Label = null
+var _league_confirm_popup: ConfirmationDialog = null
+
 
 const FLAG_SIZE := Vector2(58, 44)
 const FLAG_TO_LOCALE := {
@@ -164,24 +175,27 @@ func _bm_make_back_button_style(bg: Color, glow: Color, bottom_w: int, shadow_si
 func _bm_style_back_button() -> void:
 	if btn_back == null:
 		return
+	_bm_apply_back_button_style(btn_back)
 
+
+func _bm_apply_back_button_style(btn: Button) -> void:
 	var normal := _bm_make_back_button_style(Color(0.9, 0.05, 0.05, 1.0), Color(0,0,0,0.35), 3, 6)
 	var hover := _bm_make_back_button_style(Color(1.0, 0.1, 0.1, 1.0), Color(0,0,0,0.45), 4, 8)
 	var pressed := _bm_make_back_button_style(Color(0.7, 0.02, 0.02, 1.0), Color(0,0,0,0.25), 2, 4)
 	var disabled := _bm_make_back_button_style(Color(0.4, 0.1, 0.1, 0.6), Color(0,0,0,0.2), 2, 2)
 
-	btn_back.add_theme_stylebox_override("normal", normal)
-	btn_back.add_theme_stylebox_override("hover", hover)
-	btn_back.add_theme_stylebox_override("pressed", pressed)
-	btn_back.add_theme_stylebox_override("disabled", disabled)
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_stylebox_override("disabled", disabled)
 
-	btn_back.add_theme_color_override("font_color", Color(1,1,1,1))
-	btn_back.add_theme_color_override("font_hover_color", Color(1,1,1,1))
-	btn_back.add_theme_color_override("font_pressed_color", Color(1,1,1,1))
-	btn_back.add_theme_color_override("font_disabled_color", Color(1,1,1,0.5))
+	btn.add_theme_color_override("font_color", Color(1,1,1,1))
+	btn.add_theme_color_override("font_hover_color", Color(1,1,1,1))
+	btn.add_theme_color_override("font_pressed_color", Color(1,1,1,1))
+	btn.add_theme_color_override("font_disabled_color", Color(1,1,1,0.5))
 
-	btn_back.add_theme_font_size_override("font_size", 22)
-	btn_back.custom_minimum_size = Vector2(260, 56)
+	btn.add_theme_font_size_override("font_size", 22)
+	btn.custom_minimum_size = Vector2(260, 56)
 
 
 func _bm_is_mobile_layout() -> bool:
@@ -387,6 +401,337 @@ func _bm_single_play_pressed() -> void:
 			input_team.grab_focus()
 		return
 	_on_confirm()
+
+
+func _bm_league_card_style(selected: bool) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.025, 0.035, 0.055, 0.96)
+	sb.border_width_left = 3
+	sb.border_width_top = 3
+	sb.border_width_right = 3
+	sb.border_width_bottom = 3
+	sb.border_color = Color(0.10, 0.56, 1.0, 0.96) if selected else Color(0.35, 0.42, 0.55, 0.62)
+	sb.shadow_color = Color(0.10, 0.56, 1.0, 0.36) if selected else Color(0, 0, 0, 0.30)
+	sb.shadow_size = 16 if selected else 7
+	sb.shadow_offset = Vector2(0, 5)
+	sb.corner_radius_top_left = 12
+	sb.corner_radius_top_right = 12
+	sb.corner_radius_bottom_left = 12
+	sb.corner_radius_bottom_right = 12
+	sb.content_margin_left = 14
+	sb.content_margin_top = 14
+	sb.content_margin_right = 14
+	sb.content_margin_bottom = 14
+	return sb
+
+
+func _bm_make_league_nav_button(text_value: String) -> Button:
+	var btn := Button.new()
+	btn.text = text_value
+	btn.custom_minimum_size = Vector2(44, 56)
+	btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	btn.add_theme_font_size_override("font_size", 26)
+	btn.add_theme_color_override("font_color", Color(1.0, 0.82, 0.24, 1.0))
+	btn.add_theme_color_override("font_hover_color", Color(1.0, 0.92, 0.50, 1.0))
+	btn.add_theme_color_override("font_pressed_color", Color(1.0, 0.70, 0.18, 1.0))
+	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.85))
+	btn.add_theme_constant_override("outline_size", 3)
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color(0.025, 0.03, 0.055, 0.86)
+	normal.border_color = Color(1.0, 0.74, 0.22, 0.74)
+	normal.set_border_width_all(2)
+	normal.border_width_bottom = 3
+	normal.set_corner_radius_all(10)
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(0.05, 0.16, 0.36, 0.95)
+	hover.border_color = Color(1.0, 0.82, 0.28, 0.95)
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color(0.02, 0.10, 0.24, 1.0)
+	pressed.border_color = Color(1.0, 0.64, 0.16, 1.0)
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_stylebox_override("focus", hover)
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	return btn
+
+
+func _bm_make_league_confirm_dialog_style() -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.012, 0.025, 0.055, 0.99)
+	sb.border_color = Color(1.0, 0.72, 0.24, 0.94)
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(18)
+	sb.content_margin_left = 32
+	sb.content_margin_right = 32
+	sb.content_margin_top = 26
+	sb.content_margin_bottom = 24
+	sb.shadow_color = Color(0.02, 0.10, 0.26, 0.44)
+	sb.shadow_size = 22
+	sb.shadow_offset = Vector2(0, 5)
+	return sb
+
+
+func _bm_make_league_confirm_button_style(bg: Color) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.border_color = bg.lightened(0.25)
+	sb.border_width_left = 2
+	sb.border_width_top = 2
+	sb.border_width_right = 2
+	sb.border_width_bottom = 3
+	sb.corner_radius_top_left = 10
+	sb.corner_radius_top_right = 10
+	sb.corner_radius_bottom_left = 10
+	sb.corner_radius_bottom_right = 10
+	sb.content_margin_left = 18
+	sb.content_margin_right = 18
+	sb.content_margin_top = 9
+	sb.content_margin_bottom = 9
+	return sb
+
+
+func _bm_style_league_confirm_button(btn: Button, bg: Color) -> void:
+	var normal := _bm_make_league_confirm_button_style(bg)
+	var hover := _bm_make_league_confirm_button_style(bg.lightened(0.10))
+	var pressed := _bm_make_league_confirm_button_style(bg.darkened(0.16))
+	btn.custom_minimum_size = Vector2(150, 44)
+	btn.add_theme_font_size_override("font_size", 17)
+	btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
+	btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", pressed)
+
+
+func _bm_style_league_confirm_popup() -> void:
+	if _league_confirm_popup == null:
+		return
+	var panel_style := _bm_make_league_confirm_dialog_style()
+	_league_confirm_popup.add_theme_stylebox_override("embedded_border", panel_style)
+	_league_confirm_popup.add_theme_stylebox_override("embedded_unfocused_border", panel_style)
+	_league_confirm_popup.add_theme_color_override("title_color", Color(1.0, 0.90, 0.52, 1.0))
+	_league_confirm_popup.add_theme_color_override("title_outline_modulate", Color(0.02, 0.02, 0.04, 0.95))
+	_league_confirm_popup.add_theme_constant_override("title_outline_size", 5)
+	_league_confirm_popup.add_theme_font_size_override("title_font_size", 28)
+	var body := _league_confirm_popup.get_label()
+	if body != null:
+		body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		body.add_theme_font_size_override("font_size", 23)
+		body.add_theme_color_override("font_color", Color(1.0, 0.92, 0.70, 1.0))
+		body.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.95))
+		body.add_theme_constant_override("outline_size", 4)
+		body.add_theme_color_override("font_shadow_color", Color(1.0, 0.62, 0.12, 0.30))
+		body.add_theme_constant_override("shadow_offset_x", 0)
+		body.add_theme_constant_override("shadow_offset_y", 0)
+		body.add_theme_constant_override("shadow_outline_size", 5)
+		body.add_theme_constant_override("line_spacing", 7)
+	var ok_btn := _league_confirm_popup.get_ok_button()
+	if ok_btn != null:
+		_bm_style_league_confirm_button(ok_btn, Color(0.08, 0.62, 0.22, 1.0))
+		var footer := ok_btn.get_parent() as BoxContainer
+		if footer != null:
+			footer.alignment = BoxContainer.ALIGNMENT_CENTER
+			footer.add_theme_constant_override("separation", 24)
+	var cancel_btn := _league_confirm_popup.get_cancel_button()
+	if cancel_btn != null:
+		_bm_style_league_confirm_button(cancel_btn, Color(0.74, 0.10, 0.16, 1.0))
+
+
+func _bm_league_current() -> Dictionary:
+	if _league_choices.is_empty():
+		_league_choices = LeagueDataScript.get_league_choices()
+	if _league_choices.is_empty():
+		return {"id": "classic", "name": "Classic League", "image": "res://assets/images/backgrounds/league_classic.png"}
+	_league_index = clampi(_league_index, 0, _league_choices.size() - 1)
+	return _league_choices[_league_index]
+
+
+func _bm_update_league_card() -> void:
+	var league := _bm_league_current()
+	if _league_image != null:
+		var image_path := str(league.get("image", ""))
+		_league_image.texture = load(image_path) as Texture2D if image_path != "" and ResourceLoader.exists(image_path) else null
+	if _league_card_panel != null:
+		_league_card_panel.add_theme_stylebox_override("panel", _bm_league_card_style(false))
+
+
+func _bm_shift_league(delta: int) -> void:
+	if _league_choices.is_empty():
+		_league_choices = LeagueDataScript.get_league_choices()
+	if _league_choices.is_empty():
+		return
+	_league_index = wrapi(_league_index + delta, 0, _league_choices.size())
+	_bm_update_league_card()
+
+
+func _bm_on_league_card_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_on_league_card_pressed()
+
+
+func _bm_set_teamname_entry_visible_for_league(v: bool) -> void:
+	for n in [get_node_or_null("Center"), menu_entry, lang_bar_entry]:
+		if n != null and n is CanvasItem:
+			(n as CanvasItem).visible = v
+
+
+func _bm_show_league_choice(team_name: String) -> void:
+	_pending_league_team_name = team_name.strip_edges()
+	if _pending_league_team_name == "":
+		return
+	_bm_set_teamname_entry_visible_for_league(false)
+	_league_choices = LeagueDataScript.get_league_choices()
+	_league_index = 0
+	for i in range(_league_choices.size()):
+		if str(_league_choices[i].get("id", "")) == LeagueDataScript.get_default_league_id():
+			_league_index = i
+			break
+	if _league_choice_overlay != null and is_instance_valid(_league_choice_overlay):
+		_league_choice_overlay.queue_free()
+
+	_league_choice_overlay = Control.new()
+	_league_choice_overlay.name = "ChooseLeagueOverlay"
+	_league_choice_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_league_choice_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_league_choice_overlay.z_index = 120
+	add_child(_league_choice_overlay)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_league_choice_overlay.add_child(center)
+
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 16)
+	center.add_child(box)
+
+
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 18)
+	box.add_child(row)
+
+	var prev_btn := _bm_make_league_nav_button("‹")
+	prev_btn.pressed.connect(func(): _bm_shift_league(-1))
+	row.add_child(prev_btn)
+
+	_league_card_panel = PanelContainer.new()
+	_league_card_panel.custom_minimum_size = Vector2(363, 424) if _bm_is_mobile_layout() else Vector2(871, 629)
+	_league_card_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_league_card_panel.gui_input.connect(_bm_on_league_card_gui_input)
+	_league_card_panel.add_theme_stylebox_override("panel", _bm_league_card_style(false))
+	row.add_child(_league_card_panel)
+
+	var card_box := VBoxContainer.new()
+	card_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	card_box.mouse_filter = Control.MOUSE_FILTER_STOP
+	card_box.gui_input.connect(_bm_on_league_card_gui_input)
+	card_box.add_theme_constant_override("separation", 12)
+	_league_card_panel.add_child(card_box)
+
+	var title := Label.new()
+	title.text = "Choose Your League"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 42)
+	title.add_theme_color_override("font_color", Color(1.0, 0.86, 0.34, 1.0))
+	title.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.95))
+	title.add_theme_constant_override("outline_size", 5)
+	title.add_theme_color_override("font_shadow_color", Color(1.0, 0.62, 0.12, 0.85))
+	title.add_theme_constant_override("shadow_offset_x", 0)
+	title.add_theme_constant_override("shadow_offset_y", 0)
+	title.add_theme_constant_override("shadow_outline_size", 10)
+	card_box.add_child(title)
+
+	_league_image = TextureRect.new()
+	_league_image.custom_minimum_size = Vector2(327, 266) if _bm_is_mobile_layout() else Vector2(811, 508)
+	_league_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_league_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_league_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_box.add_child(_league_image)
+
+	var next_btn := _bm_make_league_nav_button("›")
+	next_btn.pressed.connect(func(): _bm_shift_league(1))
+	row.add_child(next_btn)
+
+	var back_btn := Button.new()
+	back_btn.text = "Back"
+	_bm_apply_back_button_style(back_btn)
+	back_btn.custom_minimum_size = Vector2(180, 56)
+	back_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	back_btn.pressed.connect(_on_league_back_pressed)
+	box.add_child(back_btn)
+
+	_bm_update_league_card()
+
+
+func _on_league_back_pressed() -> void:
+	if _league_choice_overlay != null and is_instance_valid(_league_choice_overlay):
+		_league_choice_overlay.queue_free()
+	_league_choice_overlay = null
+	_bm_set_teamname_entry_visible_for_league(true)
+	if input_team != null:
+		input_team.text = _pending_league_team_name
+		input_team.editable = true
+		input_team.grab_focus()
+	if btn_confirm != null:
+		btn_confirm.disabled = false
+	if btn_back != null:
+		btn_back.disabled = false
+
+
+func _on_league_card_pressed() -> void:
+	if _league_card_panel != null:
+		_league_card_panel.add_theme_stylebox_override("panel", _bm_league_card_style(true))
+	var league := _bm_league_current()
+	if _league_confirm_popup == null or not is_instance_valid(_league_confirm_popup):
+		_league_confirm_popup = ConfirmationDialog.new()
+		_league_confirm_popup.name = "ConfirmLeagueDialog"
+		_league_confirm_popup.confirmed.connect(_on_league_confirmed)
+		add_child(_league_confirm_popup)
+	var league_name := str(league.get("name", "Classic League"))
+	var league_id := str(league.get("id", "classic")).strip_edges()
+	var motivation_key := "teamname.league_confirm.motivation.classic"
+	var title_key := "teamname.league_confirm.title.classic"
+	match league_id:
+		"challenger":
+			motivation_key = "teamname.league_confirm.motivation.challenger"
+			title_key = "teamname.league_confirm.title.challenger"
+		"growth":
+			motivation_key = "teamname.league_confirm.motivation.growth"
+			title_key = "teamname.league_confirm.title.growth"
+		"premium":
+			motivation_key = "teamname.league_confirm.motivation.premium"
+			title_key = "teamname.league_confirm.title.premium"
+		"stars":
+			motivation_key = "teamname.league_confirm.motivation.stars"
+			title_key = "teamname.league_confirm.title.stars"
+		_:
+			motivation_key = "teamname.league_confirm.motivation.classic"
+			title_key = "teamname.league_confirm.title.classic"
+	_league_confirm_popup.title = ""
+	_league_confirm_popup.dialog_text = "%s\n\n%s\n%s" % [tr(title_key), tr("teamname.league_confirm.permanent"), tr(motivation_key)]
+	var ok_btn := _league_confirm_popup.get_ok_button()
+	if ok_btn != null:
+		ok_btn.text = tr("common.confirm")
+	var cancel_btn := _league_confirm_popup.get_cancel_button()
+	if cancel_btn != null:
+		cancel_btn.text = tr("club_identity.cancel")
+	_bm_style_league_confirm_popup()
+	_league_confirm_popup.popup_centered(Vector2i(560, 205))
+
+
+func _on_league_confirmed() -> void:
+	var league := _bm_league_current()
+	var league_id := str(league.get("id", LeagueDataScript.get_default_league_id())).strip_edges()
+	if league_id == "":
+		league_id = LeagueDataScript.get_default_league_id()
+	if _league_choice_overlay != null and is_instance_valid(_league_choice_overlay):
+		_league_choice_overlay.queue_free()
+	print("[TEAMNAME] EMIT submit_team_setup =", _pending_league_team_name, " league=", league_id)
+	emit_signal("submit_team_setup", _pending_league_team_name, league_id)
 
 
 func _ready() -> void:
@@ -1024,9 +1369,7 @@ func _on_confirm() -> void:
 		btn_back.disabled = true
 	input_team.editable = false
 
-	print("[TEAMNAME] EMIT submit_team_name =", team_name)
-	emit_signal("submit_team_name", team_name)
-	print("[TEAMNAME] EMIT done")
+	_bm_show_league_choice(team_name)
 
 
 func _open_fallback_dialog() -> void:
@@ -1084,7 +1427,7 @@ func _on_fallback_confirmed() -> void:
 	if input_team != null:
 		input_team.text = team_name
 
-	emit_signal("submit_team_name", team_name)
+	_bm_show_league_choice(team_name)
 
 
 # --- BM MOBILE HTML INPUT BRIDGE ---
