@@ -1,6 +1,7 @@
 extends Control
 
 const SponsorDataRef := preload("res://scripts/SponsorData.gd")
+const LeagueDataScript := preload("res://scripts/LeagueData.gd")
 const PlayerLife := preload("res://scripts/PlayerLife.gd")
 
 const TEXT_PRIMARY := Color(0.96, 0.99, 1.0, 1.0)
@@ -106,6 +107,21 @@ func _get_progressive_sponsor_offers(club_level: int, active_sponsor_id_value: S
 	return offers.slice(0, 3)
 
 
+func _get_active_league_id(save: Dictionary) -> String:
+	var league_id: String = str(save.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+	if league_id == "":
+		return LeagueDataScript.get_default_league_id()
+	return league_id
+
+
+func _apply_sponsor_league_coef(sponsor: Dictionary, save: Dictionary) -> Dictionary:
+	var adjusted_sponsor: Dictionary = sponsor.duplicate(true)
+	var base_amount: int = int(adjusted_sponsor.get("payment_amount", 0))
+	var sponsor_coef: float = LeagueDataScript.get_coef(_get_active_league_id(save), "sponsor")
+	adjusted_sponsor["payment_amount"] = int(round(float(base_amount) * sponsor_coef))
+	return adjusted_sponsor
+
+
 func _ready() -> void:
 	_apply_i18n()
 	if btn_retour != null and not btn_retour.pressed.is_connected(_on_btn_retour):
@@ -195,7 +211,7 @@ func _refresh_sponsor_ui() -> void:
 		var offers: Array = _get_progressive_sponsor_offers(club_level, current_active_id, known_sponsor_ids)
 		var offered_ids: Array[String] = []
 		for sponsor in offers:
-			var sponsor_card_data: Dictionary = sponsor as Dictionary
+			var sponsor_card_data: Dictionary = _apply_sponsor_league_coef(sponsor as Dictionary, save)
 			var offered_id := str(sponsor_card_data.get("id", ""))
 			if offered_id != "" and not offered_ids.has(offered_id):
 				offered_ids.append(offered_id)
@@ -310,6 +326,8 @@ func _show_confirm_popup(sponsor: Dictionary) -> void:
 	var ui := get_node_or_null("UI") as Control
 	if ui == null:
 		return
+	var save: Dictionary = PlayerLife.load_savegame()
+	var adjusted_sponsor: Dictionary = _apply_sponsor_league_coef(sponsor, save)
 
 	_confirm_popup = PanelContainer.new()
 	_confirm_popup.name = "SponsorConfirmPopup"
@@ -348,14 +366,14 @@ func _show_confirm_popup(sponsor: Dictionary) -> void:
 
 	var title := _make_label(_tr_key("sponsors.confirm_title"), 28, TEXT_PRIMARY, true)
 	box.add_child(title)
-	var sponsor_name := _tr_key(str(sponsor.get("name", "")))
-	var payment_line := _money(sponsor.get("payment_amount", 0)) + " / " + _format_payment_unit(str(sponsor.get("payment_type", "")))
+	var sponsor_name := _tr_key(str(adjusted_sponsor.get("name", "")))
+	var payment_line := _money(adjusted_sponsor.get("payment_amount", 0)) + " / " + _format_payment_unit(str(adjusted_sponsor.get("payment_type", "")))
 	var bonus_line := _tr_key("sponsors.field.bonus") + ": "
-	if int(sponsor.get("bonus_amount", 0)) > 0:
-		bonus_line += _tr_key(str(SponsorDataRef.BONUS_I18N.get(str(sponsor.get("bonus_type", "")), ""))) + " + " + _format_bonus_amount(sponsor.get("bonus_amount", 0)) + " $"
+	if int(adjusted_sponsor.get("bonus_amount", 0)) > 0:
+		bonus_line += _tr_key(str(SponsorDataRef.BONUS_I18N.get(str(adjusted_sponsor.get("bonus_type", "")), ""))) + " + " + _format_bonus_amount(adjusted_sponsor.get("bonus_amount", 0)) + " $"
 	else:
 		bonus_line += _tr_key("sponsors.bonus.none")
-	var duration_line := _tr_key("sponsors.field.duration") + ": " + str(int(sponsor.get("duration_value", 0))) + " " + _format_duration_unit(str(sponsor.get("duration_type", "")), int(sponsor.get("duration_value", 0)))
+	var duration_line := _tr_key("sponsors.field.duration") + ": " + str(int(adjusted_sponsor.get("duration_value", 0))) + " " + _format_duration_unit(str(adjusted_sponsor.get("duration_type", "")), int(adjusted_sponsor.get("duration_value", 0)))
 	var message := _make_label(sponsor_name + "\n" + payment_line + "\n" + bonus_line + "\n" + duration_line, 21, TEXT_SECONDARY, true)
 	box.add_child(message)
 
@@ -402,8 +420,9 @@ func _activate_sponsor_contract(sponsor_id: String) -> void:
 		return
 	var save: Dictionary = PlayerLife.load_savegame()
 	PlayerLife.ensure_finance_schema(save)
+	var adjusted_sponsor: Dictionary = _apply_sponsor_league_coef(sponsor, save)
 
-	var contract: Dictionary = SponsorDataRef.make_contract_copy(sponsor)
+	var contract: Dictionary = SponsorDataRef.make_contract_copy(adjusted_sponsor)
 	if str(contract.get("payment_type", "")) == SponsorDataRef.PAYMENT_PER_SEASON and not bool(contract.get("season_payment_paid", false)):
 		SponsorDataRef.apply_sponsor_revenue_to_save(save, int(contract.get("payment_amount", 0)))
 		contract["season_payment_paid"] = true

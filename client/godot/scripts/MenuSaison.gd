@@ -2346,7 +2346,12 @@ func _prepare_new_season() -> void:
 				print("[COACHS][EXPIRE] coach=", active_coach_id, " current_season=", current_season, " hired=", hired_season, " duration=", duration)
 			else:
 				var coach_price: Dictionary = PL.get_coach_price_data(active_coach_id)
-				var coach_season_cost: int = int(coach_price.get("euros_cost", 0))
+				var historical_coach_season_cost: int = int(coach_price.get("euros_cost", 0))
+				var active_league_id: String = str(save.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+				if active_league_id == "":
+					active_league_id = LeagueDataScript.get_default_league_id()
+				var staff_league_coef: float = LeagueDataScript.get_coef(active_league_id, "staff")
+				var coach_season_cost: int = int(round(float(historical_coach_season_cost) * staff_league_coef))
 				if coach_season_cost > 0:
 					if not save.has("wallet") or typeof(save["wallet"]) != TYPE_DICTIONARY:
 						save["wallet"] = {}

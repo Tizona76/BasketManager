@@ -1,6 +1,7 @@
 extends Control
 const PlayerLife := preload("res://scripts/PlayerLife.gd")
 const SponsorDataRef := preload("res://scripts/SponsorData.gd")
+const LeagueDataScript := preload("res://scripts/LeagueData.gd")
 
 # BM_SKIP_FINAL_RESULT_TOKEN_MODE_V1
 # false = mode test actuel inchangé.
@@ -915,7 +916,8 @@ func _compute_total_salary_per_match(save: Dictionary) -> int:
 
 	print("[SALARY MATCH][TOTAL SEASON] ", total_season)
 	var matches_total := 22
-	var per_match := int(round(float(total_season) / float(matches_total)))
+	var salary_league_coef := _get_salary_league_coef(save)
+	var per_match := int(round(float(total_season) * salary_league_coef / float(matches_total)))
 	print("[SALARY MATCH][PER MATCH] ", per_match)
 	return maxi(0, per_match)
 
@@ -1736,9 +1738,14 @@ func _prepare_match_like_py() -> void:
 
 	var strength_gap: float = clampf(mean_dom - mean_ext, -12.0, 12.0)
 	var boost_points: int = int(round(strength_gap * 1.20))
+	var league_id: String = str(save.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+	if league_id == "":
+		league_id = LeagueDataScript.get_default_league_id()
+	var variance_coef: float = LeagueDataScript.get_coef(league_id, "ai_variance")
+	var variance_range: int = maxi(0, int(round(5.0 * variance_coef)))
 
-	_score_final_dom = clampi(base_score + boost_points + randi_range(-5, 5), 50, 120)
-	_score_final_ext = clampi(base_score - boost_points + randi_range(-5, 5), 50, 120)
+	_score_final_dom = clampi(base_score + boost_points + randi_range(-variance_range, variance_range), 50, 120)
+	_score_final_ext = clampi(base_score - boost_points + randi_range(-variance_range, variance_range), 50, 120)
 
 	if _score_final_dom == _score_final_ext:
 		if boost_points >= 0:
@@ -1881,7 +1888,12 @@ func _get_opponent_team_rating_estimate(save_override: Dictionary = {}) -> float
 	else:
 		opp_rating = my_rating + 1.5
 
-	return clampf(opp_rating, 68.0, 82.0)
+	var opponent_league_id: String = str(save.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+	if opponent_league_id == "":
+		opponent_league_id = LeagueDataScript.get_default_league_id()
+	var ai_strength_coef: float = LeagueDataScript.get_coef(opponent_league_id, "ai_strength")
+	var league_rating_pressure: float = clampf((ai_strength_coef - 1.0) * 7.0, -1.5, 1.6)
+	return clampf(opp_rating + league_rating_pressure, 68.0, 82.0)
 
 func _estimate_strength_dom(save_override: Dictionary = {}) -> float:
 	return _get_selected_team_rating_average(save_override) if _user_is_home else _get_opponent_team_rating_estimate(save_override)
@@ -3328,6 +3340,18 @@ func _compute_ticketing_prevision(save: Dictionary) -> int:
 			total += price * seats
 	return total
 
+func _get_ticketing_league_coef(save: Dictionary) -> float:
+	var league_id: String = str(save.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+	if league_id == "":
+		league_id = LeagueDataScript.get_default_league_id()
+	return LeagueDataScript.get_coef(league_id, "ticketing")
+
+func _get_salary_league_coef(save: Dictionary) -> float:
+	var league_id: String = str(save.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+	if league_id == "":
+		league_id = LeagueDataScript.get_default_league_id()
+	return LeagueDataScript.get_coef(league_id, "salary")
+
 func _compute_shop_prevision(save: Dictionary) -> int:
 	# 1) shop.items = [{price, qty}...] ou shop.items_by_id = {id:{price,qty}}
 	var total := 0
@@ -3573,7 +3597,8 @@ func _fin_match() -> void:
 		var coef := PlayerLife.popularity_coef(save)
 		var prev_ticket := _compute_ticketing_prevision(save)
 		var prev_shop := _compute_shop_prevision(save)
-		var rec_ticket := int(round(float(prev_ticket) * coef))
+		var ticketing_league_coef := _get_ticketing_league_coef(save)
+		var rec_ticket := int(round(float(prev_ticket) * coef * ticketing_league_coef))
 		var shop_price_volume_coef := _bm_shop_price_volume_coef_from_save(save)
 		var rec_shop := int(round(float(prev_shop) * coef * shop_price_volume_coef))
 
@@ -4020,6 +4045,19 @@ func _fin_match() -> void:
 				var reward_season_number: int = maxi(1, int(save_sync.get("season_number", 1)))
 				var reward_season_multiplier: float = 1.2 if reward_season_number > 3 else 1.0
 				euros_gain = int(round(float(euros_gain) * reward_season_multiplier))
+
+				if final_rank == 1:
+					var reward_title_league_id: String = str(save_sync.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+					if reward_title_league_id == "":
+						reward_title_league_id = LeagueDataScript.get_default_league_id()
+					var title_reward_coef: float = LeagueDataScript.get_coef(reward_title_league_id, "title_reward")
+					euros_gain = int(round(float(euros_gain) * title_reward_coef))
+				elif final_rank >= 2 and final_rank <= 4:
+					var reward_top4_league_id: String = str(save_sync.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+					if reward_top4_league_id == "":
+						reward_top4_league_id = LeagueDataScript.get_default_league_id()
+					var top4_reward_coef: float = LeagueDataScript.get_coef(reward_top4_league_id, "top4_reward")
+					euros_gain = int(round(float(euros_gain) * top4_reward_coef))
 
 				if euros_gain > 0 or tokens_gain > 0:
 					if not save_sync.has("wallet") or typeof(save_sync["wallet"]) != TYPE_DICTIONARY:

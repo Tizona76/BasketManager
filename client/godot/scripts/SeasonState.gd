@@ -221,6 +221,16 @@ func simulate_other_games_for_round(dom_team: String, ext_team: String, round_in
 
 	var r := int(round_index) % SEASON_TOTAL_ROUNDS
 	var games := _rr_games_for_round(user_team_name, r)
+	var league_id: String = LeagueDataScript.get_default_league_id()
+	var PL = load("res://scripts/PlayerLife.gd")
+	if PL != null and PL.has_method("load_savegame"):
+		var save: Dictionary = PL.load_savegame()
+		if typeof(save) == TYPE_DICTIONARY:
+			league_id = str(save.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+	if league_id == "":
+		league_id = LeagueDataScript.get_default_league_id()
+	var ai_variance_coef: float = LeagueDataScript.get_coef(league_id, "ai_variance")
+	var variance_range: int = maxi(0, int(round(10.0 * ai_variance_coef)))
 
 	# On ne simule PAS le match déjà joué (dom_team/ext_team tel qu’affiché)
 	for g in games:
@@ -234,8 +244,8 @@ func simulate_other_games_for_round(dom_team: String, ext_team: String, round_in
 
 		# Score cohérent (simple). On raffinera plus tard avec pondérations.
 		var base_score: int = randi_range(70, 90)
-		var score_dom_sim := clampi(base_score + randi_range(-10, 10), 55, 125)
-		var score_ext_sim := clampi(base_score + randi_range(-10, 10), 55, 125)
+		var score_dom_sim := clampi(base_score + randi_range(-variance_range, variance_range), 55, 125)
+		var score_ext_sim := clampi(base_score + randi_range(-variance_range, variance_range), 55, 125)
 
 		register_match_result(d, e, score_dom_sim, score_ext_sim, user_team_name)
 

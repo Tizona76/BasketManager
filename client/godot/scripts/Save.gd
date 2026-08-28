@@ -1,6 +1,7 @@
 extends Node
 
 const PlayerLife := preload("res://scripts/PlayerLife.gd")
+const LeagueDataScript := preload("res://scripts/LeagueData.gd")
 
 const FILE_SAVEGAME: String = "user://savegame.json"
 const StadiumDataRef = preload("res://scripts/StadiumData.gd")
@@ -185,8 +186,15 @@ static func stadium_next_level() -> Variant:
 		int(s.get("niveau_stade", 1))
 	)
 
+static func _get_stadium_league_coef(d: Dictionary) -> float:
+	var league_id: String = str(d.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+	if league_id == "":
+		league_id = LeagueDataScript.get_default_league_id()
+	return LeagueDataScript.get_coef(league_id, "stadium")
+
 static func stadium_cost_for(ng: int, ns: int) -> int:
-	return int(StadiumDataRef.get_cost(ng, ns))
+	var d: Dictionary = read_dict()
+	return int(round(float(StadiumDataRef.get_cost(ng, ns)) * _get_stadium_league_coef(d)))
 
 static func stadium_duration_for(ng: int, ns: int) -> int:
 	return int(StadiumDataRef.get_duration(ng, ns))
@@ -207,7 +215,7 @@ static func stadium_launch_upgrade(target_ng: int, target_ns: int, current_match
 	var finance: Dictionary = d["finance"] as Dictionary
 
 	var wallet_disponible: int = maxi(0, int(d.get("total_recettes", 0)) - int(d.get("total_depenses", 0)))
-	var cost: int = int(StadiumDataRef.get_cost(target_ng, target_ns))
+	var cost: int = int(round(float(StadiumDataRef.get_cost(target_ng, target_ns)) * _get_stadium_league_coef(d)))
 	var duration: int = int(StadiumDataRef.get_duration(target_ng, target_ns))
 	var capacity: int = int(StadiumDataRef.get_capacity(target_ng, target_ns))
 	var is_basic_improvements := int(stadium.get("niveau_global_jeu", 1)) == 1 and int(stadium.get("niveau_stade", 1)) == 0 and target_ng == 1 and target_ns == 1
