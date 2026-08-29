@@ -48,6 +48,7 @@ var _shop_total_label: Label = null
 
 const PlayerLife := preload("res://scripts/PlayerLife.gd")
 const StadiumDataRef := preload("res://scripts/StadiumData.gd")
+const LeagueDataScript := preload("res://scripts/LeagueData.gd")
 ### STADIUM_TICKETING_MINIMAL
 const STADIUM_FONT_BOOST_FACTOR: float = 2.3
 const STADIUM_CAPACITY_DEFAULT := 5500
@@ -4449,17 +4450,25 @@ func _update_ticketing_total() -> void:
 	var sa := _safe_int(SeatsA.text)
 	var sb := _safe_int(SeatsB.text)
 	var sc := _safe_int(SeatsC.text)
-	var total := pa*sa + pb*sb + pc*sc
+	var ticketing_display_coef := PlayerLife.popularity_coef(save) * _get_ticketing_league_coef()
+	var total := int(round(float(pa*sa + pb*sb + pc*sc) * ticketing_display_coef))
 	LblTicketingTotal.text = _stadium_tr("stadium.shop.total_estimate") + " : " + _format_int(total) + " $"
 	var est_a := get_node_or_null("Content/CenterTicketing/PanelTicketing/VBox/Grid/SpacerA") as Label
 	var est_b := get_node_or_null("Content/CenterTicketing/PanelTicketing/VBox/Grid/SpacerB") as Label
 	var est_c := get_node_or_null("Content/CenterTicketing/PanelTicketing/VBox/Grid/SpacerC") as Label
 	if est_a != null:
-		est_a.text = _format_int(pa * sa) + " $"
+		est_a.text = _format_int(int(round(float(pa * sa) * ticketing_display_coef))) + " $"
 	if est_b != null:
-		est_b.text = _format_int(pb * sb) + " $"
+		est_b.text = _format_int(int(round(float(pb * sb) * ticketing_display_coef))) + " $"
 	if est_c != null:
-		est_c.text = _format_int(pc * sc) + " $"
+		est_c.text = _format_int(int(round(float(pc * sc) * ticketing_display_coef))) + " $"
+
+
+func _get_ticketing_league_coef() -> float:
+	var league_id: String = str(save.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+	if league_id == "":
+		league_id = LeagueDataScript.get_default_league_id()
+	return LeagueDataScript.get_coef(league_id, "ticketing")
 
 
 # --- Ticketing hold-repeat helpers ---

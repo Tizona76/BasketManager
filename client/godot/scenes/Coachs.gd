@@ -10,6 +10,7 @@ extends Control
 
 const PL = preload("res://scripts/PlayerLife.gd")
 const SaveRef = preload("res://scripts/Save.gd")
+const LeagueDataScript := preload("res://scripts/LeagueData.gd")
 
 const COACH_UI_CONFIG := {
 	"coach_junior": {
@@ -285,6 +286,16 @@ func _fmt_cost(v: int) -> String:
 		s = s.substr(0, s.length() - 3)
 	return s + out + " $"
 
+func _get_staff_display_league_coef() -> float:
+	var d: Dictionary = SaveRef.read_dict()
+	var league_id: String = str(d.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+	if league_id == "":
+		league_id = LeagueDataScript.get_default_league_id()
+	return LeagueDataScript.get_coef(league_id, "staff")
+
+func _get_displayed_staff_season_cost(historical_euros_cost: int) -> int:
+	return int(round(float(maxi(0, historical_euros_cost)) * _get_staff_display_league_coef()))
+
 func _fill_inline_label(coach_id: String, lbl: Label) -> void:
 	if lbl == null:
 		return
@@ -301,7 +312,8 @@ func _fill_inline_label(coach_id: String, lbl: Label) -> void:
 	var contract_txt: String = str(coach_cfg.get("contract_text", "Contract: -"))
 	var payment_txt: String = str(coach_cfg.get("payment_text", "Payment: -"))
 
-	var euros_cost: int = int(data.get("euros_cost", 0))
+	var historical_euros_cost: int = int(data.get("euros_cost", 0))
+	var euros_cost: int = _get_displayed_staff_season_cost(historical_euros_cost)
 	var tokens_cost: int = _get_displayed_tokens_cost(coach_id)
 	var status_txt: String = _coach_status_text(coach_id)
 	var owned: bool = (status_txt == "Owned")
@@ -375,7 +387,8 @@ func _coach_confirm_text(coach_id: String) -> String:
 	}) as Dictionary
 
 	var contract_txt: String = str(coach_cfg.get("contract_text", "Contract: -"))
-	var euros_cost: int = int(data.get("euros_cost", 0))
+	var historical_euros_cost: int = int(data.get("euros_cost", 0))
+	var euros_cost: int = _get_displayed_staff_season_cost(historical_euros_cost)
 	var tokens_cost: int = _get_displayed_tokens_cost(coach_id)
 
 	return contract_txt + "
