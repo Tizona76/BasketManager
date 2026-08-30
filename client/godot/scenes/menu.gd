@@ -508,6 +508,7 @@ func _find_first_texture_rect(n: Node) -> TextureRect:
 
 var _did_auto_save: bool = false
 var _inflight: String = ""   # "", "load", "save"
+var _cloud_request_career_id: String = ""
 
 # ------------------------------------------------------------
 # AUTH REFRESH (menu-level, dédié)
@@ -1209,6 +1210,55 @@ func _on_auth_completed(result: int, response_code: int, _headers: PackedStringA
 	_maybe_flush_dirty_local("auth_reconnect")
 
 
+
+func _cloud_active_career_id() -> String:
+	if ProfileManager == null or not ProfileManager.has_method("get_active_career_id"):
+		return ""
+	return str(ProfileManager.get_active_career_id()).strip_edges()
+
+
+func _cloud_should_attach_legacy(career_id: String) -> bool:
+	var cid := str(career_id).strip_edges()
+	if cid == "" or ProfileManager == null or not ProfileManager.has_method("list_careers"):
+		return false
+	var careers: Array = ProfileManager.list_careers()
+	if careers.size() != 1:
+		return false
+	var first: Variant = careers[0]
+	if typeof(first) != TYPE_DICTIONARY:
+		return false
+	return str((first as Dictionary).get("career_id", "")).strip_edges() == cid
+
+
+func _cloud_rev_for_career(career_id: String) -> int:
+	if Session != null and Session.has_method("get_cloud_rev_for_career"):
+		return int(Session.get_cloud_rev_for_career(career_id))
+	return 0
+
+
+func _cloud_checksum_for_career(career_id: String) -> String:
+	if Session != null and Session.has_method("get_cloud_checksum_for_career"):
+		return str(Session.get_cloud_checksum_for_career(career_id))
+	return ""
+
+
+func _cloud_set_meta_for_career(career_id: String, rev: Variant, checksum: Variant) -> void:
+	if Session != null and Session.has_method("set_cloud_meta_for_career"):
+		Session.set_cloud_meta_for_career(career_id, rev, checksum)
+
+
+func _cloud_response_matches_request(response: Dictionary, requested_career_id: String) -> bool:
+	var requested := str(requested_career_id).strip_edges()
+	var current := _cloud_active_career_id()
+	var returned := str(response.get("career_id", "")).strip_edges()
+	if requested == "" or current != requested:
+		print("[CLOUD][CAREER_GUARD] ignored response requested=", requested, " current=", current)
+		return false
+	if returned != "" and returned != requested:
+		print("[CLOUD][CAREER_GUARD] ignored response requested=", requested, " returned=", returned)
+		return false
+	return true
+
 # ------------------------------------------------------------
 # CLOUD LOAD
 # ------------------------------------------------------------
@@ -1234,10 +1284,19 @@ func _try_cloud_load() -> void:
 		_set_status("Status: Pas de profile_uuid")
 		return
 
+	var career_id: String = _cloud_active_career_id()
+	if career_id == "":
+		_set_status("Status: Pas de career_id")
+		print("[CLOUD_LOAD_SKIP] missing active career_id")
+		return
+
 	_set_status("Status: Chargement cloud…")
 	_inflight = "load"
+	_cloud_request_career_id = career_id
 
-	var url := API_BASE + PATH_CLOUD_LOAD + "?profile_uuid=%s" % puuid
+	var url := API_BASE + PATH_CLOUD_LOAD + "?profile_uuid=%s&career_id=%s" % [puuid.uri_encode(), career_id.uri_encode()]
+	if _cloud_should_attach_legacy(career_id):
+		url += "&attach_legacy=true"
 
 	var headers := PackedStringArray()
 	headers.append("Authorization: Bearer %s" % access)
@@ -1246,6 +1305,7 @@ func _try_cloud_load() -> void:
 	var err := Http.request(url, headers, HTTPClient.METHOD_GET)
 	if err != OK:
 		_inflight = ""
+		_cloud_request_career_id = ""
 		_set_status("Status: HTTP request() error %s" % str(err))
 
 
@@ -1269,6 +1329,12 @@ func _try_cloud_save_from_local() -> void:
 		_set_status("Status: Pas de profile_uuid (save)")
 		return
 
+	var career_id: String = _cloud_active_career_id()
+	if career_id == "":
+		_set_status("Status: Pas de career_id (save)")
+		print("[CLOUD_SAVE_SKIP] missing active career_id")
+		return
+
 	_ensure_local_savegame_exists()
 
 	var active_save_path: String = PL._resolve_save_path(FILE_SAVEGAME)
@@ -1288,12 +1354,15 @@ func _try_cloud_save_from_local() -> void:
 
 	_set_status("Status: Upload cloud…")
 	_inflight = "save"
+	_cloud_request_career_id = career_id
 
 	var payload := {
 		"profile_uuid": puuid,
+		"career_id": career_id,
 		"blob": blob_to_send,
 		"checksum": checksum,
-		"rev": int(Session.cloud_rev)
+		"client_rev": _cloud_rev_for_career(career_id),
+		"attach_legacy": _cloud_should_attach_legacy(career_id)
 	}
 
 	var headers := PackedStringArray()
@@ -1307,6 +1376,7 @@ func _try_cloud_save_from_local() -> void:
 	var err := Http.request(url, headers, HTTPClient.METHOD_POST, body_txt)
 	if err != OK:
 		_inflight = ""
+		_cloud_request_career_id = ""
 		_set_status("Status: HTTP save request() error %s" % str(err))
 
 
@@ -1402,17 +1472,20 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		else:
 			_save_text_file(FILE_CLOUD_LAST_LOAD_TXT, txt)
 
+		var requested_career_id_load := _cloud_request_career_id
 		_inflight = ""
-		_maybe_flush_dirty_local("load_ok")
 
 		var is_empty_load: bool = false
 		if typeof(parsed) == TYPE_DICTIONARY:
 			var dload: Dictionary = parsed as Dictionary
+			if not _cloud_response_matches_request(dload, requested_career_id_load):
+				_cloud_request_career_id = ""
+				return
 			is_empty_load = (bool(dload.get("found", true)) == false)
 			if FileAccess.file_exists(FILE_NEW_CLUB_PENDING_CLOUD):
 				print("[CLOUD_GUARD][HARD] skip cloud load apply because new club is pending")
 			else:
-				Session.set_cloud_meta(dload.get("rev", 0), dload.get("checksum", ""))
+				_cloud_set_meta_for_career(requested_career_id_load, dload.get("rev", 0), dload.get("checksum", ""))
 				var cloud_ck_load: String = str(dload.get("checksum", ""))
 				var active_save_path_load: String = PL._resolve_save_path(FILE_SAVEGAME)
 				var local_ck_before_load: String = _sha256_canonical_from_file(active_save_path_load)
@@ -1466,12 +1539,16 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 				var local_ck_after_load: String = _sha256_canonical_from_file(active_save_path_load)
 				_save_text_file(FILE_CLOUD_LAST_APPLY_JSON, JSON.stringify({
 					"applied_at_unix": Time.get_unix_time_from_system(),
-					"cloud_rev": int(Session.cloud_rev),
-					"cloud_checksum": str(Session.get("cloud_checksum")),
+					"career_id": requested_career_id_load,
+					"cloud_rev": _cloud_rev_for_career(requested_career_id_load),
+					"cloud_checksum": _cloud_checksum_for_career(requested_career_id_load),
 					"local_checksum_before": local_ck_before_load,
 					"local_checksum_after": local_ck_after_load,
 					"should_apply": should_apply_load
 				}, "\t"))
+
+		_cloud_request_career_id = ""
+		_maybe_flush_dirty_local("load_ok")
 
 		if is_empty_load and (not _did_auto_save):
 			var local_ck_load: String = _sha256_canonical_from_file(PL._resolve_save_path(FILE_SAVEGAME))
@@ -1489,16 +1566,22 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		_set_status("Status: Cloud OK ✅")
 		_toast_status("Cloud synced ✅", 1.6)
 
+		var requested_career_id_save := _cloud_request_career_id
 		var is_empty: bool = false
 
 		if typeof(parsed) == TYPE_DICTIONARY:
 			var d: Dictionary = parsed as Dictionary
+			if not _cloud_response_matches_request(d, requested_career_id_save):
+				_cloud_set_meta_for_career(requested_career_id_save, d.get("rev", 0), d.get("checksum", ""))
+				_inflight = ""
+				_cloud_request_career_id = ""
+				return
 
 			if FileAccess.file_exists(FILE_NEW_CLUB_PENDING_CLOUD):
 				DirAccess.remove_absolute(ProjectSettings.globalize_path(FILE_NEW_CLUB_PENDING_CLOUD))
 				print("[CLOUD_GUARD][HARD] cleared after cloud save")
 
-			Session.set_cloud_meta(d.get("rev", 0), d.get("checksum", ""))
+			_cloud_set_meta_for_career(requested_career_id_save, d.get("rev", 0), d.get("checksum", ""))
 
 			is_empty = (bool(d.get("found", true)) == false)
 
@@ -1591,18 +1674,19 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 						print("[APPLY] skipped (same checksum)")
 
 			var local_ck_after: String = _sha256_canonical_from_file(active_save_path_apply)
-			var chk: String = str(Session.get("cloud_checksum"))
+			var chk: String = _cloud_checksum_for_career(requested_career_id_save)
 
 			_save_text_file(FILE_CLOUD_LAST_APPLY_JSON, JSON.stringify({
 				"applied_at_unix": Time.get_unix_time_from_system(),
-				"cloud_rev": int(Session.cloud_rev),
+				"career_id": requested_career_id_save,
+				"cloud_rev": _cloud_rev_for_career(requested_career_id_save),
 				"cloud_checksum": chk,
 				"local_checksum_before": local_ck_before,
 				"local_checksum_after": local_ck_after,
 				"should_apply": should_apply
 			}, "\t"))
 
-			print("[APPLY_META] rev=", int(Session.cloud_rev), " local_ck_after=", local_ck_after)
+			print("[APPLY_META] career_id=", requested_career_id_save, " rev=", _cloud_rev_for_career(requested_career_id_save), " local_ck_after=", local_ck_after)
 			print("[CHK] api_checksum=", str(d.get("checksum", "")), " local_after=", local_ck_after)
 
 			if _rt_last_local_checksum != "":
@@ -1611,6 +1695,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 				_rt_last_local_checksum = ""
 
 		_inflight = ""
+		_cloud_request_career_id = ""
 		_maybe_flush_dirty_local("load_ok")
 
 		if is_empty and (not _did_auto_save):
@@ -1633,12 +1718,13 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		var parsed2: Variant = JSON.parse_string(txt)
 		if typeof(parsed2) == TYPE_DICTIONARY:
 			var d2: Dictionary = parsed2 as Dictionary
-			Session.set_cloud_meta(d2.get("rev", 0), d2.get("checksum", ""))
+			_cloud_set_meta_for_career(_cloud_request_career_id, d2.get("rev", 0), d2.get("checksum", ""))
 			_save_text_file(FILE_CLOUD_LAST_SAVE_JSON, JSON.stringify(d2, "\t"))
 		else:
 			_save_text_file(FILE_CLOUD_LAST_SAVE_TXT, txt)
 
 		_inflight = ""
+		_cloud_request_career_id = ""
 
 		_bm_lb_submit_from_save()
 
@@ -1680,12 +1766,13 @@ func _roundtrip_start() -> void:
 		d["meta"] = {}
 	(d["meta"] as Dictionary)["rt_bump_unix"] = Time.get_unix_time_from_system()
 
-	_save_text_file(FILE_SAVEGAME, JSON.stringify(d, "\t"))
+	var active_save_path_rt: String = PL._resolve_save_path(FILE_SAVEGAME)
+	_save_text_file(active_save_path_rt, JSON.stringify(d, "\t"))
 
 	_dirty_local = true
 	print("[OFFLINE] local changed -> dirty_local=true")
 
-	_rt_last_local_checksum = _sha256_canonical_from_file(FILE_SAVEGAME)
+	_rt_last_local_checksum = _sha256_canonical_from_file(active_save_path_rt)
 	print("[DBG][RT] local edited -> checksum_canon=", _rt_last_local_checksum)
 
 	_rt_pending_reload = true
@@ -1693,7 +1780,8 @@ func _roundtrip_start() -> void:
 
 
 func _roundtrip_validate_against_cloud_blob() -> bool:
-	var local_ck: String = _sha256_canonical_from_file(FILE_SAVEGAME)
+	var active_save_path_rt: String = PL._resolve_save_path(FILE_SAVEGAME)
+	var local_ck: String = _sha256_canonical_from_file(active_save_path_rt)
 
 	var cloud_ck: String = ""
 	if FileAccess.file_exists(FILE_CLOUD_BLOB_JSON):
@@ -1701,7 +1789,8 @@ func _roundtrip_validate_against_cloud_blob() -> bool:
 	elif FileAccess.file_exists(FILE_CLOUD_BLOB_TXT):
 		cloud_ck = _sha256_file_hex(FILE_CLOUD_BLOB_TXT)
 
-	print("[DBG][RT] validate local_ck_canon=", local_ck, " cloud_ck_canon=", cloud_ck, " rev=", int(Session.cloud_rev))
+	var career_id_rt: String = _cloud_active_career_id()
+	print("[DBG][RT] validate local_ck_canon=", local_ck, " cloud_ck_canon=", cloud_ck, " career_id=", career_id_rt, " rev=", _cloud_rev_for_career(career_id_rt))
 	return (local_ck != "" and cloud_ck != "" and local_ck == cloud_ck)
 
 
@@ -1746,9 +1835,10 @@ func _read_json_file(path: String) -> Variant:
 # ✅ LOCAL SAVE INIT / MIGRATION (team_name)
 # ------------------------------------------------------------
 func _ensure_local_savegame_exists() -> void:
+	var active_save_path: String = PL._resolve_save_path(FILE_SAVEGAME)
 	# 1) fichier existe -> migration soft (ajoute team_name si absent)
-	if FileAccess.file_exists(FILE_SAVEGAME):
-		var parsed: Variant = _read_json_file(FILE_SAVEGAME)
+	if FileAccess.file_exists(active_save_path):
+		var parsed: Variant = _read_json_file(active_save_path)
 		if parsed != null and typeof(parsed) == TYPE_DICTIONARY:
 			var d: Dictionary = parsed as Dictionary
 			var changed: bool = false
@@ -1775,8 +1865,8 @@ func _ensure_local_savegame_exists() -> void:
 				if tn_guard == "":
 					print("[LOCAL_SKIP] empty team_name -> no patch")
 				else:
-					_save_text_file(FILE_SAVEGAME, JSON.stringify(d, "\t"))
-					print("[LOCAL] patched savegame.json (team_name)")
+					_save_text_file(active_save_path, JSON.stringify(d, "\t"))
+					print("[LOCAL] patched active career save (team_name)")
 		return
 
 	# 2) fichier absent -> création (inclut team_name)
@@ -1791,8 +1881,8 @@ func _ensure_local_savegame_exists() -> void:
 		"progress": {"journee": 1, "wins": 0, "losses": 0},
 		"meta": {"created_at_unix": Time.get_unix_time_from_system()}
 	}
-	_save_text_file(FILE_SAVEGAME, JSON.stringify(save, "\t"))
-	print("[LOCAL] created REAL savegame.json")
+	_save_text_file(active_save_path, JSON.stringify(save, "\t"))
+	print("[LOCAL] created active career save")
 
 
 # ------------------------------------------------------------

@@ -607,8 +607,30 @@ def _auth_init_schema() -> bool:
             );
             """,
             """
+            ALTER TABLE cloud_saves_v2
+              ADD COLUMN IF NOT EXISTS career_id TEXT NULL;
+            """,
+            """
+            ALTER TABLE cloud_saves_v2
+              DROP CONSTRAINT IF EXISTS cloud_saves_v2_uq;
+            """,
+            """
             CREATE INDEX IF NOT EXISTS cloud_saves_v2_user_profile_idx
               ON cloud_saves_v2 (user_id, profile_uuid);
+            """,
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS cloud_saves_v2_user_profile_career_uq
+              ON cloud_saves_v2 (user_id, profile_uuid, career_id)
+              WHERE career_id IS NOT NULL;
+            """,
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS cloud_saves_v2_user_profile_legacy_uq
+              ON cloud_saves_v2 (user_id, profile_uuid)
+              WHERE career_id IS NULL;
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS cloud_saves_v2_user_profile_career_idx
+              ON cloud_saves_v2 (user_id, profile_uuid, career_id);
             """,
             """
             CREATE TABLE IF NOT EXISTS club_token_wallets (
@@ -689,9 +711,11 @@ class AuthRefreshPayload(BaseModel):
 
 class CloudSavePayloadV2(BaseModel):
     profile_uuid: str
+    career_id: str = ""
     blob: Dict[str, Any]
     client_rev: Optional[int] = None
     checksum: Optional[str] = ""
+    attach_legacy: Optional[bool] = False
 
 
 class CreateCheckoutSessionPayload(BaseModel):
@@ -1237,12 +1261,53 @@ def _cloud_blob_with_server_tokens(blob: Dict[str, Any], server_tokens: int) -> 
     clean_blob["wallet"]["tokens"] = max(0, int(server_tokens))
     return clean_blob
 
-def _cloud_v2_save(user_id: str, profile_uuid: str, blob: Dict[str, Any], client_rev: Optional[int], checksum: str) -> Dict[str, Any]:
+
+def _clean_career_id(career_id: str) -> str:
+    cid = str(career_id or "").strip()
+    if not cid or len(cid) > 128:
+        raise HTTPException(status_code=400, detail="BAD_CAREER_ID")
+    return cid
+
+
+def _cloud_v2_attach_legacy_once(conn, user_id: str, profile_uuid: str, career_id: str, attach_legacy: bool) -> None:
+    if not attach_legacy:
+        return
+
+    existing = conn.execute(text("""
+        SELECT save_id
+        FROM cloud_saves_v2
+        WHERE user_id = :uid AND profile_uuid = :p AND career_id = :c
+        LIMIT 1;
+    """), {"uid": user_id, "p": profile_uuid, "c": career_id}).fetchone()
+    if existing:
+        return
+
+    legacy_rows = conn.execute(text("""
+        SELECT save_id
+        FROM cloud_saves_v2
+        WHERE user_id = :uid AND profile_uuid = :p AND career_id IS NULL
+        LIMIT 2;
+    """), {"uid": user_id, "p": profile_uuid}).fetchall()
+
+    if len(legacy_rows) > 1:
+        raise HTTPException(status_code=409, detail="LEGACY_CLOUD_AMBIGUOUS")
+    if len(legacy_rows) == 0:
+        return
+
+    conn.execute(text("""
+        UPDATE cloud_saves_v2
+        SET career_id = :c, updated_at = NOW()
+        WHERE save_id = :sid AND user_id = :uid AND profile_uuid = :p AND career_id IS NULL;
+    """), {"sid": legacy_rows[0][0], "uid": user_id, "p": profile_uuid, "c": career_id})
+
+
+def _cloud_v2_save(user_id: str, profile_uuid: str, career_id: str, blob: Dict[str, Any], client_rev: Optional[int], checksum: str, attach_legacy: bool = False) -> Dict[str, Any]:
     if not _auth_init_schema():
         raise HTTPException(status_code=503, detail="CLOUD_DB_NOT_READY")
 
     if not profile_uuid or len(profile_uuid) < 16:
         raise HTTPException(status_code=400, detail="BAD_PROFILE_UUID")
+    cid = _clean_career_id(career_id)
     if not isinstance(blob, dict):
         raise HTTPException(status_code=400, detail="BAD_BLOB")
 
@@ -1250,13 +1315,13 @@ def _cloud_v2_save(user_id: str, profile_uuid: str, blob: Dict[str, Any], client
     if eng is None:
         raise HTTPException(status_code=503, detail="CLOUD_DB_NOT_READY")
 
-    # conflict / rev
     with eng.begin() as conn:
+        _cloud_v2_attach_legacy_once(conn, user_id, profile_uuid, cid, bool(attach_legacy))
         r = conn.execute(text("""
             SELECT rev FROM cloud_saves_v2
-            WHERE user_id = :uid AND profile_uuid = :p
+            WHERE user_id = :uid AND profile_uuid = :p AND career_id = :c
             LIMIT 1;
-        """), {"uid": user_id, "p": profile_uuid}).fetchone()
+        """), {"uid": user_id, "p": profile_uuid, "c": cid}).fetchone()
         server_rev = int(r[0]) if r else 0
         server_tokens = _club_token_wallet_get_or_create(conn, user_id, profile_uuid)
 
@@ -1272,9 +1337,9 @@ def _cloud_v2_save(user_id: str, profile_uuid: str, blob: Dict[str, Any], client
             raise HTTPException(status_code=413, detail="BLOB_TOO_LARGE")
 
         q = text("""
-            INSERT INTO cloud_saves_v2 (save_id, user_id, profile_uuid, rev, checksum, blob_json, blob_size, updated_at)
-            VALUES (:sid, :uid, :p, :rev, :chk, CAST(:blob_json AS jsonb), :sz, NOW())
-            ON CONFLICT (user_id, profile_uuid)
+            INSERT INTO cloud_saves_v2 (save_id, user_id, profile_uuid, career_id, rev, checksum, blob_json, blob_size, updated_at)
+            VALUES (:sid, :uid, :p, :c, :rev, :chk, CAST(:blob_json AS jsonb), :sz, NOW())
+            ON CONFLICT (user_id, profile_uuid, career_id) WHERE career_id IS NOT NULL
             DO UPDATE SET
               rev = EXCLUDED.rev,
               checksum = EXCLUDED.checksum,
@@ -1287,43 +1352,54 @@ def _cloud_v2_save(user_id: str, profile_uuid: str, blob: Dict[str, Any], client
             "sid": save_id,
             "uid": user_id,
             "p": profile_uuid,
+            "c": cid,
             "rev": int(new_rev),
             "chk": (checksum or "")[:128],
             "blob_json": blob_json,
             "sz": int(len(blob_bytes)),
         }).fetchone()
 
-    return {"ok": True, "profile_uuid": profile_uuid, "rev": int(row[0]) if row else new_rev, "updated_at": str(row[1]) if row else None}
+    return {
+        "ok": True,
+        "profile_uuid": profile_uuid,
+        "career_id": cid,
+        "rev": int(row[0]) if row else new_rev,
+        "checksum": (checksum or "")[:128],
+        "updated_at": str(row[1]) if row else None,
+    }
 
 
-def _cloud_v2_load(user_id: str, profile_uuid: str) -> Dict[str, Any]:
+def _cloud_v2_load(user_id: str, profile_uuid: str, career_id: str, attach_legacy: bool = False) -> Dict[str, Any]:
     if not _auth_init_schema():
         raise HTTPException(status_code=503, detail="CLOUD_DB_NOT_READY")
 
     if not profile_uuid or len(profile_uuid) < 16:
         raise HTTPException(status_code=400, detail="BAD_PROFILE_UUID")
+    cid = _clean_career_id(career_id)
 
     eng = _lb_get_engine()
     if eng is None:
         raise HTTPException(status_code=503, detail="CLOUD_DB_NOT_READY")
 
     with eng.begin() as conn:
+        _cloud_v2_attach_legacy_once(conn, user_id, profile_uuid, cid, bool(attach_legacy))
         server_tokens = _club_token_wallet_get_or_create(conn, user_id, profile_uuid)
         r = conn.execute(text("""
             SELECT blob_json, rev, checksum, updated_at
             FROM cloud_saves_v2
-            WHERE user_id = :uid AND profile_uuid = :p
+            WHERE user_id = :uid AND profile_uuid = :p AND career_id = :c
             LIMIT 1;
-        """), {"uid": user_id, "p": profile_uuid}).fetchone()
+        """), {"uid": user_id, "p": profile_uuid, "c": cid}).fetchone()
 
     if not r:
-        return {"ok": True, "profile_uuid": profile_uuid, "found": False, "blob": None}
+        return {"ok": True, "profile_uuid": profile_uuid, "career_id": cid, "found": False, "blob": None}
 
     safe_blob = _cloud_blob_with_server_tokens(r[0] if isinstance(r[0], dict) else {}, server_tokens)
 
     return {
         "ok": True,
         "profile_uuid": profile_uuid,
+        "career_id": cid,
         "found": True,
         "blob": safe_blob,
         "rev": int(r[1]),
@@ -1422,7 +1498,7 @@ def cloud_save_v2(p: CloudSavePayloadV2, request: Request, authorization: str = 
     ip = request.client.host if request.client else None
 
     try:
-        out = _cloud_v2_save(user_id, p.profile_uuid, p.blob, p.client_rev, p.checksum or "")
+        out = _cloud_v2_save(user_id, p.profile_uuid, p.career_id, p.blob, p.client_rev, p.checksum or "", bool(p.attach_legacy))
         _audit("/v1/cloud/save", 200, user_id=user_id, size=None, ip=ip)
         return out
     except HTTPException as he:
@@ -1431,7 +1507,7 @@ def cloud_save_v2(p: CloudSavePayloadV2, request: Request, authorization: str = 
 
 
 @app.get("/v1/cloud/load")
-def cloud_load_v2(profile_uuid: str, request: Request, authorization: str = Header(default="")):
+def cloud_load_v2(profile_uuid: str, request: Request, career_id: str = "", attach_legacy: bool = False, authorization: str = Header(default="")):
     claims = _require_bearer_claims(authorization)
     user_id = str(claims.get("sub") or "")
 
@@ -1439,7 +1515,7 @@ def cloud_load_v2(profile_uuid: str, request: Request, authorization: str = Head
 
     ip = request.client.host if request.client else None
     try:
-        out = _cloud_v2_load(user_id, profile_uuid)
+        out = _cloud_v2_load(user_id, profile_uuid, career_id, bool(attach_legacy))
         _audit("/v1/cloud/load", 200, user_id=user_id, ip=ip)
         return out
     except HTTPException as he:
