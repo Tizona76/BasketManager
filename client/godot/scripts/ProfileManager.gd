@@ -79,13 +79,18 @@ static func _read_careers_index(profile_id: String) -> Variant:
 		return null
 	return d
 
-static func _career_exists_in_index(index: Dictionary, career_id: String) -> bool:
+static func _career_entry_index(index: Dictionary, career_id: String) -> int:
 	if typeof(index.get("careers")) != TYPE_ARRAY:
-		return false
-	for raw_entry in index["careers"]:
-		if typeof(raw_entry) == TYPE_DICTIONARY and str((raw_entry as Dictionary).get("career_id", "")).strip_edges() == career_id:
-			return true
-	return false
+		return -1
+	var cid: String = _sanitize_path_id(career_id)
+	for i in range((index["careers"] as Array).size()):
+		var raw_entry: Variant = (index["careers"] as Array)[i]
+		if typeof(raw_entry) == TYPE_DICTIONARY and str((raw_entry as Dictionary).get("career_id", "")).strip_edges() == cid:
+			return i
+	return -1
+
+static func _career_exists_in_index(index: Dictionary, career_id: String) -> bool:
+	return _career_entry_index(index, career_id) >= 0
 
 static func _find_first_existing_career_id(profile_id: String, index: Dictionary) -> String:
 	if typeof(index.get("careers")) != TYPE_ARRAY:
@@ -123,7 +128,7 @@ static func _generate_career_id(_profile_id: String) -> String:
 	var random_part: int = randi() % 1000000
 	return _sanitize_path_id("career_%d_%06d" % [unix_part, random_part])
 
-static func _career_entry_from_save(save: Dictionary, career_id: String) -> Dictionary:
+static func _career_entry_from_save(save: Dictionary, career_id: String, last_played: int = 0) -> Dictionary:
 	var team_name: String = str(save.get("team_name", save.get("club_name", ""))).strip_edges()
 	if team_name == "" and save.has("club") and typeof(save["club"]) == TYPE_DICTIONARY:
 		team_name = str((save["club"] as Dictionary).get("name", "")).strip_edges()
@@ -133,13 +138,36 @@ static func _career_entry_from_save(save: Dictionary, career_id: String) -> Dict
 	var club_level: int = maxi(1, int(save.get("club_level", 1)))
 	if save.has("club") and typeof(save["club"]) == TYPE_DICTIONARY:
 		club_level = maxi(1, int((save["club"] as Dictionary).get("level", club_level)))
+	var season: int = maxi(1, int(save.get("season_number", 1)))
+	if save.has("progress") and typeof(save["progress"]) == TYPE_DICTIONARY:
+		season = maxi(1, int((save["progress"] as Dictionary).get("season_number", season)))
+	if last_played <= 0:
+		last_played = int(save.get("last_played", 0))
+	if last_played <= 0 and save.has("meta") and typeof(save["meta"]) == TYPE_DICTIONARY:
+		last_played = int((save["meta"] as Dictionary).get("last_played", 0))
+	if last_played <= 0:
+		last_played = int(Time.get_unix_time_from_system())
 	return {
-		"career_id": career_id,
+		"career_id": _sanitize_path_id(career_id),
 		"team_name": team_name,
 		"league_id": league_id,
-		"season": maxi(1, int(save.get("season_number", 1))),
+		"season": season,
 		"club_level": club_level,
-		"last_played": int(Time.get_unix_time_from_system())
+		"last_played": last_played
+	}
+
+static func _career_entry_from_index_entry(entry: Dictionary) -> Dictionary:
+	var career_id: String = _sanitize_path_id(str(entry.get("career_id", "")))
+	var league_id: String = str(entry.get("league_id", FALLBACK_LEAGUE_ID)).strip_edges()
+	if league_id == "":
+		league_id = FALLBACK_LEAGUE_ID
+	return {
+		"career_id": career_id,
+		"team_name": str(entry.get("team_name", "")).strip_edges(),
+		"league_id": league_id,
+		"season": maxi(1, int(entry.get("season", 1))),
+		"club_level": maxi(1, int(entry.get("club_level", 1))),
+		"last_played": int(entry.get("last_played", 0))
 	}
 
 static func _write_career_save(profile_id: String, career_id: String, save: Dictionary) -> void:
@@ -214,6 +242,109 @@ static func get_active_career_id() -> String:
 	if active_id != "" and FileAccess.file_exists(_career_save_path(pid, active_id)):
 		return active_id
 	return ""
+
+static func list_careers() -> Array:
+	var pid: String = get_active_profile_id()
+	_ensure_careers_for_profile(pid)
+	var index_any: Variant = _read_careers_index(pid)
+	if typeof(index_any) != TYPE_DICTIONARY:
+		return []
+	var index: Dictionary = index_any as Dictionary
+	if typeof(index.get("careers")) != TYPE_ARRAY:
+		return []
+	var result: Array = []
+	for raw_entry in index["careers"]:
+		if typeof(raw_entry) == TYPE_DICTIONARY:
+			var entry: Dictionary = _career_entry_from_index_entry(raw_entry as Dictionary)
+			if entry.get("career_id", "") != "":
+				result.append(entry)
+	return result
+
+static func set_active_career_id(career_id: String) -> bool:
+	var pid: String = get_active_profile_id()
+	_ensure_careers_for_profile(pid)
+	var cid: String = _sanitize_path_id(career_id)
+	if cid == "":
+		return false
+	var index_any: Variant = _read_careers_index(pid)
+	if typeof(index_any) != TYPE_DICTIONARY:
+		return false
+	var index: Dictionary = index_any as Dictionary
+	var idx: int = _career_entry_index(index, cid)
+	if idx < 0:
+		return false
+	if not FileAccess.file_exists(_career_save_path(pid, cid)):
+		return false
+	index["active_career_id"] = cid
+	var careers: Array = index["careers"] as Array
+	var entry: Dictionary = _career_entry_from_index_entry(careers[idx] as Dictionary)
+	entry["last_played"] = int(Time.get_unix_time_from_system())
+	careers[idx] = entry
+	index["careers"] = careers
+	_write_json(_careers_index_path(pid), index)
+	_hydrate_season_state_from_active_save()
+	return true
+
+static func create_career(initial_save: Dictionary) -> String:
+	var pid: String = get_active_profile_id()
+	_ensure_careers_for_profile(pid)
+	var index_any: Variant = _read_careers_index(pid)
+	var index: Dictionary = _empty_careers_index() if typeof(index_any) != TYPE_DICTIONARY else (index_any as Dictionary)
+	if typeof(index.get("careers")) != TYPE_ARRAY:
+		index["careers"] = []
+	var career_id: String = _generate_career_id(pid)
+	while _career_exists_in_index(index, career_id) or FileAccess.file_exists(_career_save_path(pid, career_id)):
+		career_id = _generate_career_id(pid)
+	var save: Dictionary = initial_save.duplicate(true)
+	save["profile_id"] = pid
+	save["career_id"] = career_id
+	if not save.has("league_id") or str(save.get("league_id", "")).strip_edges() == "":
+		save["league_id"] = FALLBACK_LEAGUE_ID
+	_write_career_save(pid, career_id, save)
+	var careers: Array = index["careers"] as Array
+	careers.append(_career_entry_from_save(save, career_id, int(Time.get_unix_time_from_system())))
+	index["careers"] = careers
+	index["active_career_id"] = career_id
+	_write_json(_careers_index_path(pid), index)
+	_hydrate_season_state_from_active_save()
+	return career_id
+
+static func get_career_metadata(career_id: String) -> Dictionary:
+	var pid: String = get_active_profile_id()
+	_ensure_careers_for_profile(pid)
+	var cid: String = _sanitize_path_id(career_id)
+	var index_any: Variant = _read_careers_index(pid)
+	if typeof(index_any) != TYPE_DICTIONARY:
+		return {}
+	var index: Dictionary = index_any as Dictionary
+	var idx: int = _career_entry_index(index, cid)
+	if idx < 0:
+		return {}
+	if not FileAccess.file_exists(_career_save_path(pid, cid)):
+		return {}
+	return _career_entry_from_index_entry((index["careers"] as Array)[idx] as Dictionary)
+
+static func refresh_career_metadata(career_id: String) -> bool:
+	var pid: String = get_active_profile_id()
+	_ensure_careers_for_profile(pid)
+	var cid: String = _sanitize_path_id(career_id)
+	var index_any: Variant = _read_careers_index(pid)
+	if typeof(index_any) != TYPE_DICTIONARY:
+		return false
+	var index: Dictionary = index_any as Dictionary
+	var idx: int = _career_entry_index(index, cid)
+	if idx < 0:
+		return false
+	var save_any: Variant = _read_json(_career_save_path(pid, cid))
+	if typeof(save_any) != TYPE_DICTIONARY:
+		return false
+	var current_entry: Dictionary = _career_entry_from_index_entry((index["careers"] as Array)[idx] as Dictionary)
+	var refreshed: Dictionary = _career_entry_from_save(save_any as Dictionary, cid, int(current_entry.get("last_played", 0)))
+	var careers: Array = index["careers"] as Array
+	careers[idx] = refreshed
+	index["careers"] = careers
+	_write_json(_careers_index_path(pid), index)
+	return true
 
 static func get_active_career_save_path() -> String:
 	var pid: String = get_active_profile_id()
