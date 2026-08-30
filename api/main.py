@@ -642,6 +642,28 @@ def _auth_init_schema() -> bool:
             );
             """,
             """
+            ALTER TABLE club_token_wallets
+              ADD COLUMN IF NOT EXISTS career_id TEXT NULL;
+            """,
+            """
+            ALTER TABLE club_token_wallets
+              DROP CONSTRAINT IF EXISTS club_token_wallets_uq;
+            """,
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS club_token_wallets_user_profile_career_uq
+              ON club_token_wallets (user_id, profile_uuid, career_id)
+              WHERE career_id IS NOT NULL;
+            """,
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS club_token_wallets_user_profile_legacy_uq
+              ON club_token_wallets (user_id, profile_uuid)
+              WHERE career_id IS NULL;
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS club_token_wallets_user_profile_career_idx
+              ON club_token_wallets (user_id, profile_uuid, career_id);
+            """,
+            """
             CREATE TABLE IF NOT EXISTS payments (
               payment_id               TEXT PRIMARY KEY,
               user_id                  TEXT NOT NULL REFERENCES users(user_id),
@@ -1235,19 +1257,54 @@ def lb_season_me(season_id: str, profile_uuid: str, metric: str = "score_final")
 # CLOUD SAVE — V2 (Bearer) + Legacy V1 (HMAC) migration
 # ============================================================
 
-def _club_token_wallet_get_or_create(conn, user_id: str, profile_uuid: str) -> int:
+def _club_token_wallet_attach_legacy_once(conn, user_id: str, profile_uuid: str, career_id: str, attach_legacy: bool) -> None:
+    if not attach_legacy:
+        return
+
+    existing = conn.execute(text("""
+        SELECT 1
+        FROM club_token_wallets
+        WHERE user_id = :uid AND profile_uuid = :p AND career_id = :c
+        LIMIT 1;
+    """), {"uid": user_id, "p": profile_uuid, "c": career_id}).fetchone()
+    if existing:
+        return
+
+    legacy_rows = conn.execute(text("""
+        SELECT user_id, profile_uuid
+        FROM club_token_wallets
+        WHERE user_id = :uid AND profile_uuid = :p AND career_id IS NULL
+        LIMIT 2;
+    """), {"uid": user_id, "p": profile_uuid}).fetchall()
+
+    if len(legacy_rows) > 1:
+        raise HTTPException(status_code=409, detail="LEGACY_WALLET_AMBIGUOUS")
+    if len(legacy_rows) == 0:
+        return
+
     conn.execute(text("""
-        INSERT INTO club_token_wallets (user_id, profile_uuid, tokens, updated_at)
-        VALUES (:uid, :p, 0, NOW())
-        ON CONFLICT (user_id, profile_uuid) DO NOTHING;
-    """), {"uid": user_id, "p": profile_uuid})
+        UPDATE club_token_wallets
+        SET career_id = :c, updated_at = NOW()
+        WHERE user_id = :uid AND profile_uuid = :p AND career_id IS NULL;
+    """), {"uid": user_id, "p": profile_uuid, "c": career_id})
+
+
+def _club_token_wallet_get_or_create(conn, user_id: str, profile_uuid: str, career_id: str, attach_legacy: bool = False) -> int:
+    cid = _clean_career_id(career_id)
+    _club_token_wallet_attach_legacy_once(conn, user_id, profile_uuid, cid, bool(attach_legacy))
+
+    conn.execute(text("""
+        INSERT INTO club_token_wallets (user_id, profile_uuid, career_id, tokens, updated_at)
+        VALUES (:uid, :p, :c, 0, NOW())
+        ON CONFLICT (user_id, profile_uuid, career_id) WHERE career_id IS NOT NULL DO NOTHING;
+    """), {"uid": user_id, "p": profile_uuid, "c": cid})
 
     row = conn.execute(text("""
         SELECT tokens
         FROM club_token_wallets
-        WHERE user_id = :uid AND profile_uuid = :p
+        WHERE user_id = :uid AND profile_uuid = :p AND career_id = :c
         LIMIT 1;
-    """), {"uid": user_id, "p": profile_uuid}).fetchone()
+    """), {"uid": user_id, "p": profile_uuid, "c": cid}).fetchone()
 
     return max(0, int(row[0])) if row else 0
 
@@ -1323,7 +1380,7 @@ def _cloud_v2_save(user_id: str, profile_uuid: str, career_id: str, blob: Dict[s
             LIMIT 1;
         """), {"uid": user_id, "p": profile_uuid, "c": cid}).fetchone()
         server_rev = int(r[0]) if r else 0
-        server_tokens = _club_token_wallet_get_or_create(conn, user_id, profile_uuid)
+        server_tokens = _club_token_wallet_get_or_create(conn, user_id, profile_uuid, cid, bool(attach_legacy))
 
         if client_rev is not None and server_rev and int(client_rev) < server_rev:
             raise HTTPException(status_code=409, detail="REV_CONFLICT")
@@ -1383,7 +1440,7 @@ def _cloud_v2_load(user_id: str, profile_uuid: str, career_id: str, attach_legac
 
     with eng.begin() as conn:
         _cloud_v2_attach_legacy_once(conn, user_id, profile_uuid, cid, bool(attach_legacy))
-        server_tokens = _club_token_wallet_get_or_create(conn, user_id, profile_uuid)
+        server_tokens = _club_token_wallet_get_or_create(conn, user_id, profile_uuid, cid, bool(attach_legacy))
         r = conn.execute(text("""
             SELECT blob_json, rev, checksum, updated_at
             FROM cloud_saves_v2
