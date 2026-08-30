@@ -170,6 +170,36 @@ static func _career_entry_from_index_entry(entry: Dictionary) -> Dictionary:
 		"last_played": int(entry.get("last_played", 0))
 	}
 
+static func _normalize_careers_index(index: Dictionary) -> Dictionary:
+	var normalized: Dictionary = _empty_careers_index()
+	normalized["active_career_id"] = _sanitize_path_id(str(index.get("active_career_id", "")))
+	if typeof(index.get("careers")) != TYPE_ARRAY:
+		return normalized
+
+	var careers: Array = []
+	var positions: Dictionary = {}
+	for raw_entry in index["careers"]:
+		if typeof(raw_entry) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = _career_entry_from_index_entry(raw_entry as Dictionary)
+		var cid: String = str(entry.get("career_id", "")).strip_edges()
+		if cid == "":
+			continue
+		if not positions.has(cid):
+			positions[cid] = careers.size()
+			careers.append(entry)
+			continue
+		var idx: int = int(positions[cid])
+		var existing: Dictionary = careers[idx] as Dictionary
+		if int(entry.get("last_played", 0)) > int(existing.get("last_played", 0)):
+			careers[idx] = entry
+	normalized["careers"] = careers
+	return normalized
+
+
+static func _write_careers_index(profile_id: String, index: Dictionary) -> void:
+	_write_json(_careers_index_path(profile_id), _normalize_careers_index(index))
+
 static func _write_career_save(profile_id: String, career_id: String, save: Dictionary) -> void:
 	var career_save: Dictionary = save.duplicate(true)
 	career_save["profile_id"] = _sanitize_path_id(profile_id)
@@ -191,14 +221,15 @@ static func _ensure_careers_for_profile(profile_id: String) -> void:
 	var index_path: String = _careers_index_path(pid)
 	var existing_index: Variant = _read_careers_index(pid)
 	if typeof(existing_index) == TYPE_DICTIONARY:
-		var index: Dictionary = existing_index as Dictionary
+		var index: Dictionary = _normalize_careers_index(existing_index as Dictionary)
+		_write_careers_index(pid, index)
 		var active_id: String = str(index.get("active_career_id", "")).strip_edges()
 		if active_id != "" and _career_exists_in_index(index, active_id) and FileAccess.file_exists(_career_save_path(pid, active_id)):
 			return
 		var first_existing: String = _find_first_existing_career_id(pid, index)
 		if first_existing != "":
 			index["active_career_id"] = first_existing
-			_write_json(index_path, index)
+			_write_careers_index(pid, index)
 			return
 	elif FileAccess.file_exists(index_path):
 		return
@@ -210,7 +241,7 @@ static func _ensure_careers_for_profile(profile_id: String) -> void:
 			var rebuilt: Dictionary = _empty_careers_index()
 			rebuilt["active_career_id"] = scanned_ids[0]
 			rebuilt["careers"] = [_career_entry_from_save(scanned_save as Dictionary, scanned_ids[0])]
-			_write_json(index_path, rebuilt)
+			_write_careers_index(pid, rebuilt)
 			return
 	elif scanned_ids.size() > 1:
 		return
@@ -230,7 +261,7 @@ static func _ensure_careers_for_profile(profile_id: String) -> void:
 	var new_index: Dictionary = _empty_careers_index()
 	new_index["active_career_id"] = career_id
 	new_index["careers"] = [_career_entry_from_save(source_save, career_id)]
-	_write_json(_careers_index_path(pid), new_index)
+	_write_careers_index(pid, new_index)
 
 static func get_active_career_id() -> String:
 	var pid: String = get_active_profile_id()
@@ -249,7 +280,8 @@ static func list_careers() -> Array:
 	var index_any: Variant = _read_careers_index(pid)
 	if typeof(index_any) != TYPE_DICTIONARY:
 		return []
-	var index: Dictionary = index_any as Dictionary
+	var index: Dictionary = _normalize_careers_index(index_any as Dictionary)
+	_write_careers_index(pid, index)
 	if typeof(index.get("careers")) != TYPE_ARRAY:
 		return []
 	var result: Array = []
@@ -269,7 +301,7 @@ static func set_active_career_id(career_id: String) -> bool:
 	var index_any: Variant = _read_careers_index(pid)
 	if typeof(index_any) != TYPE_DICTIONARY:
 		return false
-	var index: Dictionary = index_any as Dictionary
+	var index: Dictionary = _normalize_careers_index(index_any as Dictionary)
 	var idx: int = _career_entry_index(index, cid)
 	if idx < 0:
 		return false
@@ -281,7 +313,7 @@ static func set_active_career_id(career_id: String) -> bool:
 	entry["last_played"] = int(Time.get_unix_time_from_system())
 	careers[idx] = entry
 	index["careers"] = careers
-	_write_json(_careers_index_path(pid), index)
+	_write_careers_index(pid, index)
 	_hydrate_season_state_from_active_save()
 	return true
 
@@ -289,7 +321,7 @@ static func create_career(initial_save: Dictionary) -> String:
 	var pid: String = get_active_profile_id()
 	_ensure_careers_for_profile(pid)
 	var index_any: Variant = _read_careers_index(pid)
-	var index: Dictionary = _empty_careers_index() if typeof(index_any) != TYPE_DICTIONARY else (index_any as Dictionary)
+	var index: Dictionary = _empty_careers_index() if typeof(index_any) != TYPE_DICTIONARY else _normalize_careers_index(index_any as Dictionary)
 	if typeof(index.get("careers")) != TYPE_ARRAY:
 		index["careers"] = []
 	var career_id: String = _generate_career_id(pid)
@@ -305,7 +337,7 @@ static func create_career(initial_save: Dictionary) -> String:
 	careers.append(_career_entry_from_save(save, career_id, int(Time.get_unix_time_from_system())))
 	index["careers"] = careers
 	index["active_career_id"] = career_id
-	_write_json(_careers_index_path(pid), index)
+	_write_careers_index(pid, index)
 	_hydrate_season_state_from_active_save()
 	return career_id
 
@@ -316,7 +348,7 @@ static func get_career_metadata(career_id: String) -> Dictionary:
 	var index_any: Variant = _read_careers_index(pid)
 	if typeof(index_any) != TYPE_DICTIONARY:
 		return {}
-	var index: Dictionary = index_any as Dictionary
+	var index: Dictionary = _normalize_careers_index(index_any as Dictionary)
 	var idx: int = _career_entry_index(index, cid)
 	if idx < 0:
 		return {}
@@ -331,7 +363,7 @@ static func refresh_career_metadata(career_id: String) -> bool:
 	var index_any: Variant = _read_careers_index(pid)
 	if typeof(index_any) != TYPE_DICTIONARY:
 		return false
-	var index: Dictionary = index_any as Dictionary
+	var index: Dictionary = _normalize_careers_index(index_any as Dictionary)
 	var idx: int = _career_entry_index(index, cid)
 	if idx < 0:
 		return false
@@ -343,7 +375,7 @@ static func refresh_career_metadata(career_id: String) -> bool:
 	var careers: Array = index["careers"] as Array
 	careers[idx] = refreshed
 	index["careers"] = careers
-	_write_json(_careers_index_path(pid), index)
+	_write_careers_index(pid, index)
 	return true
 
 static func get_active_career_save_path() -> String:
@@ -355,14 +387,15 @@ static func get_active_career_save_path() -> String:
 		if scanned_ids.size() == 1:
 			return _career_save_path(pid, scanned_ids[0])
 		return _profile_path(pid)
-	var index: Dictionary = index_any as Dictionary
+	var index: Dictionary = _normalize_careers_index(index_any as Dictionary)
+	_write_careers_index(pid, index)
 	var active_id: String = str(index.get("active_career_id", "")).strip_edges()
 	if active_id != "" and _career_exists_in_index(index, active_id) and FileAccess.file_exists(_career_save_path(pid, active_id)):
 		return _career_save_path(pid, active_id)
 	var first_existing: String = _find_first_existing_career_id(pid, index)
 	if first_existing != "":
 		index["active_career_id"] = first_existing
-		_write_json(_careers_index_path(pid), index)
+		_write_careers_index(pid, index)
 		return _career_save_path(pid, first_existing)
 	return _profile_path(pid)
 

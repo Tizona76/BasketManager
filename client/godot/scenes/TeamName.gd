@@ -1,6 +1,7 @@
 extends Control
 
 const PlayerLife := preload("res://scripts/PlayerLife.gd")
+const ProfileManager := preload("res://scripts/ProfileManager.gd")
 const LeagueDataScript := preload("res://scripts/LeagueData.gd")
 
 const _TEAMNAME_BG_NODE := "__BG_JOUEURS__"
@@ -45,6 +46,7 @@ signal submit_team_name(team_name: String)
 signal submit_team_setup(team_name: String, league_id: String)
 signal back_requested()
 signal action_requested(action: String)
+signal career_selected(career_id: String)
 
 @onready var input_team: LineEdit = $Center/Box/WrapInput/InputTeam
 @onready var btn_confirm: Button = $Center/Box/BtnConfirmer
@@ -80,6 +82,8 @@ var _selected_league_id: String = LeagueDataScript.get_default_league_id()
 var _league_inline_row: HBoxContainer = null
 var _league_inline_value: Label = null
 var _league_inline_change_btn: Button = null
+var _career_picker: Control = null
+var _create_new_career_dialog: ConfirmationDialog = null
 
 
 const FLAG_SIZE := Vector2(58, 44)
@@ -200,6 +204,126 @@ func _bm_apply_back_button_style(btn: Button) -> void:
 
 	btn.add_theme_font_size_override("font_size", 22)
 	btn.custom_minimum_size = Vector2(260, 56)
+
+
+func _bm_career_team_name(entry: Dictionary) -> String:
+	var team_name := str(entry.get("team_name", "")).strip_edges()
+	if team_name == "":
+		team_name = "BM Club"
+	return team_name
+
+
+func _bm_career_summary(entry: Dictionary) -> String:
+	var league_id := str(entry.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+	if league_id == "":
+		league_id = LeagueDataScript.get_default_league_id()
+	var league_name := LeagueDataScript.get_league_name(league_id)
+	var season := maxi(1, int(entry.get("season", 1)))
+	var club_level := maxi(1, int(entry.get("club_level", 1)))
+	return "%s • Season %d • Club Lv. %d" % [league_name, season, club_level]
+
+
+func _bm_list_unique_careers() -> Array:
+	var out: Array = []
+	var seen := {}
+	var careers: Array = ProfileManager.list_careers()
+	for raw in careers:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = raw as Dictionary
+		var cid := str(entry.get("career_id", "")).strip_edges()
+		if cid == "" or seen.has(cid):
+			continue
+		seen[cid] = true
+		out.append(entry.duplicate(true))
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a.get("last_played", 0)) > int(b.get("last_played", 0))
+	)
+	return out
+
+
+func _bm_has_career_picker_data() -> bool:
+	for entry in _bm_list_unique_careers():
+		if _bm_career_team_name(entry) != "BM Club":
+			return true
+	return false
+
+
+func _bm_clear_career_picker() -> void:
+	if _career_picker != null and is_instance_valid(_career_picker):
+		_career_picker.queue_free()
+	_career_picker = null
+
+
+func _bm_make_career_button(entry: Dictionary) -> Button:
+	var btn := Button.new()
+	btn.text = "%s\n%s" % [_bm_career_team_name(entry), _bm_career_summary(entry)]
+	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	btn.custom_minimum_size = Vector2(560, 86) if not _bm_is_mobile_layout() else Vector2(430, 96)
+	btn.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else 26)
+	_bm_style_entry_duplicate_button(btn, true)
+	var cid := str(entry.get("career_id", "")).strip_edges()
+	btn.pressed.connect(func() -> void:
+		if cid == "":
+			return
+		emit_signal("career_selected", cid)
+	)
+	return btn
+
+
+func _bm_ensure_create_new_career_dialog() -> void:
+	if _create_new_career_dialog != null and is_instance_valid(_create_new_career_dialog):
+		return
+	_create_new_career_dialog = ConfirmationDialog.new()
+	_create_new_career_dialog.name = "CreateNewCareerDialog"
+	_create_new_career_dialog.title = "Create a new club?"
+	_create_new_career_dialog.dialog_text = "Your existing clubs and progress will be preserved.\nYou can return to them at any time."
+	_create_new_career_dialog.ok_button_text = "Create New Team"
+	_create_new_career_dialog.cancel_button_text = "Cancel"
+	_create_new_career_dialog.exclusive = true
+	add_child(_create_new_career_dialog)
+	_create_new_career_dialog.confirmed.connect(_on_create_new_team_confirmed)
+
+
+func _bm_show_create_new_career_confirm() -> void:
+	_bm_ensure_create_new_career_dialog()
+	if _create_new_career_dialog != null:
+		_create_new_career_dialog.popup_centered()
+
+
+func _bm_build_career_picker() -> void:
+	_bm_clear_career_picker()
+	var careers := _bm_list_unique_careers()
+	if careers.is_empty():
+		return
+	_career_picker = CenterContainer.new()
+	_career_picker.name = "YourTeamsPicker"
+	_career_picker.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_career_picker)
+
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 14)
+	(_career_picker as CenterContainer).add_child(box)
+
+	var title := Label.new()
+	title.text = "YOUR TEAMS"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 38 if not _bm_is_mobile_layout() else 34)
+	title.add_theme_color_override("font_color", Color(1.0, 0.86, 0.34, 1.0))
+	box.add_child(title)
+
+	for entry in careers:
+		box.add_child(_bm_make_career_button(entry as Dictionary))
+
+	var create_btn := Button.new()
+	create_btn.text = "+ Create New Team"
+	create_btn.custom_minimum_size = Vector2(560, 68) if not _bm_is_mobile_layout() else Vector2(430, 76)
+	create_btn.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else 26)
+	_bm_style_entry_duplicate_button(create_btn, false)
+	create_btn.pressed.connect(_on_create_new_team_pressed)
+	box.add_child(create_btn)
+	move_child(_career_picker, get_child_count() - 1)
 
 
 func _bm_is_mobile_layout() -> bool:
@@ -363,6 +487,9 @@ func _bm_set_teamname_form_visible(v: bool) -> void:
 	var tn := _bm_entry_real_team_name()
 
 	if btn_confirm != null:
+		btn_confirm.visible = v
+		btn_confirm.disabled = not v
+		btn_confirm.mouse_filter = Control.MOUSE_FILTER_STOP if v else Control.MOUSE_FILTER_IGNORE
 		if v:
 			var c := tr("teamname.create")
 			if c == "teamname.create":
@@ -839,10 +966,11 @@ func _ready() -> void:
 	_bm_style_create_team_button()
 	_bm_ensure_inline_league_row()
 	_bm_setup_entry_duplicates()
-	if _bm_entry_real_team_name() == "":
-		_bm_set_teamname_form_visible(true)
-	else:
+	if _bm_has_career_picker_data():
 		_bm_set_teamname_form_visible(false)
+		_bm_build_career_picker()
+	else:
+		_bm_set_teamname_form_visible(true)
 
 
 func _notification(what: int) -> void:
@@ -1014,7 +1142,15 @@ func _on_entry_signup_pressed() -> void:
 
 
 func _on_create_new_team_pressed() -> void:
+	_bm_show_create_new_career_confirm()
+
+
+func _on_create_new_team_confirmed() -> void:
+	emit_signal("action_requested", "create_new_career")
+	_bm_clear_career_picker()
+	_selected_league_id = LeagueDataScript.get_default_league_id()
 	_bm_set_teamname_form_visible(true)
+	_bm_update_inline_league()
 	if input_team != null:
 		input_team.text = ""
 		input_team.grab_focus()

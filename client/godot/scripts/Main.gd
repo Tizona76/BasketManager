@@ -34,6 +34,7 @@ var team_name_ps: PackedScene = null
 var login_ps: PackedScene = null
 var _pending_team_name: String = ""
 var _pending_league_id: String = "classic"
+var _pending_create_new_career: bool = false
 var _pending_locale: String = ""
 
 var _teamname_submitted: bool = false
@@ -628,6 +629,10 @@ func _on_stadium_action(action: String) -> void:
 		_show_menu()
 		return
 
+	if action == "create_new_career":
+		_pending_create_new_career = true
+		return
+
 
 var _menu_inst: Node = null
 
@@ -811,6 +816,8 @@ func _show_team_name() -> void:
 		t.connect("submit_team_name", Callable(self, "_on_submit_team_name"))
 	if t.has_signal("back_requested"):
 		t.connect("back_requested", Callable(self, "_goto_stadium"))
+	if t.has_signal("career_selected"):
+		t.connect("career_selected", Callable(self, "_on_teamname_career_selected"))
 	if t.has_signal("action_requested"):
 		t.connect("action_requested", Callable(self, "_on_stadium_action"))
 
@@ -840,7 +847,12 @@ func _on_submit_team_name(team_name: String) -> void:
 	_pending_team_name = team_name
 
 	SeasonState.early_flow_post_selection_hide_menu_buttons = true
-	_apply_pending_team_name()
+	if _pending_create_new_career:
+		if not _create_new_career_from_pending_team_name():
+			_teamname_submitted = false
+			return
+	else:
+		_apply_pending_team_name()
 	_show_menu()
 
 
@@ -1086,6 +1098,84 @@ func _apply_pending_team_name() -> void:
 		call_deferred("_ensure_shop_confirm_button")
 	if has_method("_load_shop_from_save"):
 		call_deferred("_load_shop_from_save")
+
+
+func _on_teamname_career_selected(career_id: String) -> void:
+	var cid := str(career_id).strip_edges()
+	if cid == "":
+		push_warning("[MAIN][CAREER] empty career selection ignored")
+		return
+	if not ProfileManager.set_active_career_id(cid):
+		push_warning("[MAIN][CAREER] invalid career selection ignored: " + cid)
+		return
+	_pending_create_new_career = false
+	_load_session_local_for_resume()
+	print("[MAIN][CAREER] selected=", cid, " active=", ProfileManager.get_active_career_id())
+	_show_menu()
+
+
+func _create_new_career_from_pending_team_name() -> bool:
+	var new_name := str(_pending_team_name).strip_edges()
+	if new_name == "":
+		return false
+	var league_id := str(_pending_league_id).strip_edges()
+	if league_id == "":
+		league_id = "classic"
+	var profile_id := str(ProfileManager.get_active_profile_id()).strip_edges()
+	var fresh_save: Dictionary = ProfileManager._default_save_dict(profile_id)
+	PlayerLife.reset_finance_for_new_club(fresh_save)
+	if not fresh_save.has("club") or typeof(fresh_save["club"]) != TYPE_DICTIONARY:
+		fresh_save["club"] = {}
+	var club: Dictionary = fresh_save["club"] as Dictionary
+	club["name"] = new_name
+	club["level"] = 1
+	club["xp"] = 0
+	fresh_save["club"] = club
+	fresh_save["club_name"] = new_name
+	fresh_save["team_name"] = new_name
+	fresh_save["league_id"] = league_id
+	fresh_save["season_number"] = 1
+	fresh_save["season_id"] = "season_1"
+	fresh_save["early_flow_stadium_unlocked"] = false
+	fresh_save["early_flow_finances_unlocked"] = false
+	fresh_save["popup_bienvenue_club_deja_vu"] = false
+	fresh_save["tournament_results_by_season"] = {}
+	fresh_save["total_tournois"] = 0
+	fresh_save["missions_progress"] = {"completed": [], "in_progress": [], "selected": [], "rewards_awarded": []}
+	fresh_save["missions_state"] = {
+		"counters": {
+			"wins_total": 0,
+			"win_streak": 0,
+			"pts_75_plus": 0,
+			"pts_90_plus": 0,
+			"pts_100_plus": 0,
+			"price_adjust_done": 0,
+			"stadium_upgraded": 0,
+			"mercato_achats": 0,
+			"tournois_participations": 0,
+			"coach_signed": 0,
+			"sponsors_signes": 0,
+			"youth_ok_matches": 0
+		},
+		"current": "",
+		"last_screen": "",
+		"last_stadium_level": "",
+		"stadium_upgraded_flag": 0
+	}
+	var active_before := ProfileManager.get_active_career_id()
+	var created_id := ProfileManager.create_career(fresh_save)
+	if str(created_id).strip_edges() == "":
+		push_warning("[MAIN][CAREER] create_career failed")
+		return false
+	var created_save: Dictionary = PlayerLife.load_savegame()
+	var created_tokens := -1
+	if created_save.has("wallet") and typeof(created_save["wallet"]) == TYPE_DICTIONARY:
+		created_tokens = int((created_save["wallet"] as Dictionary).get("tokens", -1))
+	print("[MAIN][CAREER] created=", created_id, " before=", active_before, " league=", league_id, " tokens=", created_tokens)
+	_pending_create_new_career = false
+	_pending_team_name = ""
+	_pending_league_id = "classic"
+	return true
 
 
 func _on_menu_go_match() -> void:
