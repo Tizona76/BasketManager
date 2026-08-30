@@ -52,6 +52,7 @@ const TOKEN_PROGRESS_MESSAGES := [
 
 var _pending_tokens_amount: int = 0
 var _pending_checkout_url: String = ""
+var _pending_checkout_career_id: String = ""
 var _checkout_session_request_in_flight: bool = false
 var _checkout_auth_retry_done: bool = false
 var _checkout_auth_request_in_flight: bool = false
@@ -67,6 +68,24 @@ var _club_identity_preview_badge_id: String = ""
 var _club_tokens_active_section: String = "overview"
 var _club_tokens_cards_scroll: ScrollContainer = null
 var _home_arena_show_congratulations: bool = false
+
+func _active_career_id() -> String:
+	if ProfileManager == null or not ProfileManager.has_method("get_active_career_id"):
+		return ""
+	return str(ProfileManager.get_active_career_id()).strip_edges()
+
+
+func _payment_response_matches_pending_career(data: Dictionary) -> bool:
+	var expected := str(_pending_checkout_career_id).strip_edges()
+	var current := _active_career_id()
+	var returned := str(data.get("career_id", "")).strip_edges()
+	if expected == "" or current != expected:
+		print("[STRIPE_UX][CAREER_GUARD] ignored refresh expected=", expected, " current=", current)
+		return false
+	if returned != "" and returned != expected:
+		print("[STRIPE_UX][CAREER_GUARD] ignored refresh expected=", expected, " returned=", returned)
+		return false
+	return true
 
 func _bm_play_club_tokens_music() -> void:
 	var am := get_node_or_null("/root/AudioManager")
@@ -2312,14 +2331,27 @@ func _on_confirm_purchase() -> void:
 		_set_status(_club_tokens_tr("club_tokens.stripe.unknown_pack", "Unknown token package"))
 		return
 
+	var career_id := _active_career_id()
+	if career_id == "":
+		_set_status(_club_tokens_tr("club_tokens.stripe.session_failed", "Payment request failed. Please try again."))
+		print("[STRIPE_UX] CHECKOUT_SKIP missing active career_id")
+		return
+
+	var puuid := str(Session.profile_uuid).strip_edges()
+	if puuid == "":
+		_set_status(_club_tokens_tr("club_tokens.stripe.session_failed", "Payment request failed. Please try again."))
+		print("[STRIPE_UX] CHECKOUT_SKIP missing profile_uuid")
+		return
+
 	var access := str(Session.access_token).strip_edges()
-	print("[STRIPE_UX] BUY_CLICK pack_id=", pack_id)
+	print("[STRIPE_UX] BUY_CLICK pack_id=", pack_id, " career_id=", career_id)
 	print("[STRIPE_UX] AUTH_PRESENT=", str(access.length() >= 20).to_lower())
 	if access.length() < 20:
 		_set_status(_club_tokens_tr("club_tokens.stripe.login_required", "Login required"))
 		return
 
 	_expected_payment_tokens = _pending_tokens_amount
+	_pending_checkout_career_id = career_id
 	_tokens_before_payment = _get_current_token_balance()
 	_checkout_session_request_in_flight = true
 	if BtnConfirm != null:
@@ -2337,12 +2369,17 @@ func _on_confirm_purchase() -> void:
 		"Accept: application/json",
 		"Content-Type: application/json"
 	])
-	var body_txt := JSON.stringify({"pack_id": pack_id})
+	var body_txt := JSON.stringify({
+		"profile_uuid": puuid,
+		"career_id": career_id,
+		"pack_id": pack_id
+	})
 	print("[STRIPE_UX] REQUEST_START endpoint=", API_BASE + CHECKOUT_SESSION_PATH)
 	var err := http.request(API_BASE + CHECKOUT_SESSION_PATH, headers, HTTPClient.METHOD_POST, body_txt)
 	print("[STRIPE_UX] REQUEST_CALL_RESULT=", err)
 	if err != OK:
 		_checkout_session_request_in_flight = false
+		_pending_checkout_career_id = ""
 		if BtnConfirm != null:
 			BtnConfirm.disabled = false
 		http.queue_free()
@@ -2446,6 +2483,7 @@ func _on_checkout_session_completed(http: HTTPRequest, result: int, response_cod
 		return
 
 	if result != HTTPRequest.RESULT_SUCCESS or response_code < 200 or response_code >= 300:
+		_pending_checkout_career_id = ""
 		if BtnConfirm != null:
 			BtnConfirm.text = _format_buy_payment_button_text(_pending_tokens_amount)
 			_restore_confirm_button_layout()
@@ -2457,6 +2495,7 @@ func _on_checkout_session_completed(http: HTTPRequest, result: int, response_cod
 	print("[STRIPE_UX] JSON_PARSE_OK=", str(json_parse_ok).to_lower())
 	print("[STRIPE_UX] JSON_TYPE=", type_string(typeof(parsed)))
 	if not json_parse_ok:
+		_pending_checkout_career_id = ""
 		_set_status(_club_tokens_tr("club_tokens.stripe.response_invalid", "Payment response invalid. Please try again."))
 		return
 
@@ -2467,6 +2506,7 @@ func _on_checkout_session_completed(http: HTTPRequest, result: int, response_cod
 	print("[STRIPE_UX] URL_LENGTH=", checkout_url.length())
 	print("[STRIPE_UX] URL_PREFIX=", checkout_url.substr(0, 32))
 	if checkout_url == "":
+		_pending_checkout_career_id = ""
 		_set_status(_club_tokens_tr("club_tokens.stripe.url_missing", "Payment URL missing. Please try again."))
 		return
 
@@ -2507,6 +2547,14 @@ func _request_payment_cloud_load() -> void:
 	if puuid == "":
 		_set_status(_club_tokens_tr("club_tokens.stripe.refresh_failed", "Payment refresh failed. Please try again."))
 		return
+	var career_id := str(_pending_checkout_career_id).strip_edges()
+	if career_id == "":
+		career_id = _active_career_id()
+	if career_id == "":
+		print("[STRIPE_UX] PAYMENT_REFRESH_SKIP missing active career_id")
+		_set_status(_club_tokens_tr("club_tokens.stripe.refresh_failed", "Payment refresh failed. Please try again."))
+		return
+	_pending_checkout_career_id = career_id
 
 	_payment_refresh_request_in_flight = true
 	if BtnConfirm != null:
@@ -2522,7 +2570,7 @@ func _request_payment_cloud_load() -> void:
 		"Authorization: Bearer " + access,
 		"Accept: application/json"
 	])
-	var url := API_BASE + CLOUD_LOAD_PATH + "?profile_uuid=" + puuid
+	var url := API_BASE + CLOUD_LOAD_PATH + "?profile_uuid=%s&career_id=%s" % [puuid.uri_encode(), career_id.uri_encode()]
 	var err := http.request(url, headers, HTTPClient.METHOD_GET)
 	if err != OK:
 		_payment_refresh_request_in_flight = false
@@ -2550,6 +2598,10 @@ func _on_payment_cloud_load_completed(http: HTTPRequest, result: int, response_c
 		_set_status(_club_tokens_tr("club_tokens.stripe.still_confirming", "Payment is still being confirmed. This usually takes only a few seconds."))
 		return
 	var data: Dictionary = parsed as Dictionary
+	if not _payment_response_matches_pending_career(data):
+		_set_refresh_payment_button()
+		_set_status(_club_tokens_tr("club_tokens.stripe.still_confirming", "Payment is still being confirmed. This usually takes only a few seconds."))
+		return
 	if bool(data.get("found", true)) == false or not data.has("blob") or typeof(data.get("blob")) != TYPE_DICTIONARY:
 		_set_refresh_payment_button()
 		_set_status(_club_tokens_tr("club_tokens.stripe.still_confirming", "Payment is still being confirmed. This usually takes only a few seconds."))
@@ -2592,6 +2644,7 @@ func _on_payment_cloud_load_completed(http: HTTPRequest, result: int, response_c
 		added = _expected_payment_tokens
 	if added > 0:
 		_payment_confirmation_shown = true
+		_pending_checkout_career_id = ""
 		_payment_waiting_for_refresh = false
 		_return_refresh_done = true
 		_set_payment_confirmed_content(added, after_tokens)
@@ -2610,6 +2663,7 @@ func _on_payment_cloud_load_completed(http: HTTPRequest, result: int, response_c
 
 func _on_cancel_purchase() -> void:
 	_pending_tokens_amount = 0
+	_pending_checkout_career_id = ""
 	_reset_payment_attempt_state()
 	_restore_purchase_popup_layout()
 	if BtnConfirm != null:

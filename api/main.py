@@ -680,8 +680,20 @@ def _auth_init_schema() -> bool:
             );
             """,
             """
+            ALTER TABLE payments
+              ADD COLUMN IF NOT EXISTS career_id TEXT NULL;
+            """,
+            """
+            ALTER TABLE payments
+              ADD COLUMN IF NOT EXISTS credited_at TIMESTAMPTZ NULL;
+            """,
+            """
             CREATE INDEX IF NOT EXISTS payments_user_profile_idx
               ON payments (user_id, profile_uuid, created_at DESC);
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS payments_user_profile_career_idx
+              ON payments (user_id, profile_uuid, career_id, created_at DESC);
             """,
             """
             CREATE TABLE IF NOT EXISTS api_audit (
@@ -741,6 +753,8 @@ class CloudSavePayloadV2(BaseModel):
 
 
 class CreateCheckoutSessionPayload(BaseModel):
+    profile_uuid: str = ""
+    career_id: str = ""
     pack_id: str
 
 
@@ -1604,30 +1618,31 @@ def _stripe_get_pack(pack_id: str) -> Dict[str, Any]:
 
 
 def _payment_profile_uuid_from_claims(claims: Dict[str, Any]) -> str:
-    # SAFE 1: the client sends only pack_id. Guest auth already uses user_id as profile_uuid.
     return str(claims.get("sub") or "")
 
 
-def _payment_upsert_checkout_session(conn, *, payment_id: str, user_id: str, profile_uuid: str,
+def _payment_upsert_checkout_session(conn, *, payment_id: str, user_id: str, profile_uuid: str, career_id: str,
                                      session_id: str, payment_intent_id: str, pack: Dict[str, Any],
                                      status: str) -> None:
     conn.execute(text("""
         INSERT INTO payments (
-          payment_id, user_id, profile_uuid, provider, stripe_session_id, stripe_payment_intent_id,
+          payment_id, user_id, profile_uuid, career_id, provider, stripe_session_id, stripe_payment_intent_id,
           pack_id, amount, currency, status, created_at, updated_at
         ) VALUES (
-          :payment_id, :user_id, :profile_uuid, 'stripe', :stripe_session_id, :stripe_payment_intent_id,
+          :payment_id, :user_id, :profile_uuid, :career_id, 'stripe', :stripe_session_id, :stripe_payment_intent_id,
           :pack_id, :amount, :currency, :status, NOW(), NOW()
         )
         ON CONFLICT (stripe_session_id)
         DO UPDATE SET
           stripe_payment_intent_id = COALESCE(EXCLUDED.stripe_payment_intent_id, payments.stripe_payment_intent_id),
+          career_id = COALESCE(payments.career_id, EXCLUDED.career_id),
           status = EXCLUDED.status,
           updated_at = NOW();
     """), {
         "payment_id": payment_id,
         "user_id": user_id,
         "profile_uuid": profile_uuid,
+        "career_id": career_id or None,
         "stripe_session_id": session_id,
         "stripe_payment_intent_id": payment_intent_id or None,
         "pack_id": str(pack.get("pack_id", "")),
@@ -1637,11 +1652,40 @@ def _payment_upsert_checkout_session(conn, *, payment_id: str, user_id: str, pro
     })
 
 
+def _payment_mark_credited_once(conn, session_id: str) -> bool:
+    row = conn.execute(text("""
+        UPDATE payments
+        SET credited_at = NOW(), updated_at = NOW()
+        WHERE stripe_session_id = :stripe_session_id AND credited_at IS NULL
+        RETURNING payment_id;
+    """), {"stripe_session_id": session_id}).fetchone()
+    return row is not None
+
+
+def _payment_credit_wallet(conn, user_id: str, profile_uuid: str, career_id: str, tokens: int) -> int:
+    cid = _clean_career_id(career_id)
+    credit = max(0, int(tokens))
+    if credit <= 0:
+        return _club_token_wallet_get_or_create(conn, user_id, profile_uuid, cid, False)
+
+    _club_token_wallet_get_or_create(conn, user_id, profile_uuid, cid, False)
+    row = conn.execute(text("""
+        UPDATE club_token_wallets
+        SET tokens = tokens + :tokens, updated_at = NOW()
+        WHERE user_id = :uid AND profile_uuid = :p AND career_id = :c
+        RETURNING tokens;
+    """), {"uid": user_id, "p": profile_uuid, "c": cid, "tokens": credit}).fetchone()
+    return max(0, int(row[0])) if row else 0
+
+
 @app.post("/v1/payments/create_checkout_session")
 def create_checkout_session(p: CreateCheckoutSessionPayload, request: Request, authorization: str = Header(default="")):
     claims = _require_bearer_claims(authorization)
     user_id = str(claims.get("sub") or "")
-    profile_uuid = _payment_profile_uuid_from_claims(claims)
+    profile_uuid = str(p.profile_uuid or "").strip()
+    if not profile_uuid or len(profile_uuid) < 16:
+        raise HTTPException(status_code=400, detail="BAD_PROFILE_UUID")
+    career_id = _clean_career_id(p.career_id)
 
     _rl_global(user_id)
     _stripe_require_config()
@@ -1663,6 +1707,7 @@ def create_checkout_session(p: CreateCheckoutSessionPayload, request: Request, a
             metadata={
                 "user_id": user_id,
                 "profile_uuid": profile_uuid,
+                "career_id": career_id,
                 "pack_id": str(pack["pack_id"]),
                 "tokens": str(int(pack["tokens"])),
             },
@@ -1681,6 +1726,7 @@ def create_checkout_session(p: CreateCheckoutSessionPayload, request: Request, a
             payment_id=uuid.uuid4().hex,
             user_id=user_id,
             profile_uuid=profile_uuid,
+            career_id=career_id,
             session_id=session_id,
             payment_intent_id="",
             pack=pack,
@@ -1729,8 +1775,10 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(defaul
 
     user_id = str(metadata.get("user_id", "") or session.get("client_reference_id", "")).strip()
     profile_uuid = str(metadata.get("profile_uuid", "") or user_id).strip()
+    career_id = str(metadata.get("career_id", "")).strip()
     if not user_id or not profile_uuid:
         raise HTTPException(status_code=400, detail="MISSING_PAYMENT_OWNER")
+    has_career_id = career_id != ""
 
     payment_status = str(session.get("payment_status", "") or "")
     status = "webhook_received"
@@ -1749,19 +1797,28 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(defaul
     if not _auth_init_schema():
         raise HTTPException(status_code=503, detail="PAYMENTS_DB_NOT_READY")
 
+    credited = False
+    wallet_tokens = None
     with eng.begin() as conn:
         _payment_upsert_checkout_session(
             conn,
             payment_id=uuid.uuid4().hex,
             user_id=user_id,
             profile_uuid=profile_uuid,
+            career_id=career_id if has_career_id else "",
             session_id=session_id,
             payment_intent_id=payment_intent_id,
             pack=pack,
             status=status,
         )
+        if status == "paid":
+            if not has_career_id:
+                return {"ok": True, "event": event_type, "status": status, "credited": False, "reason": "MISSING_CAREER_ID"}
+            if _payment_mark_credited_once(conn, session_id):
+                wallet_tokens = _payment_credit_wallet(conn, user_id, profile_uuid, career_id, int(pack.get("tokens", 0)))
+                credited = True
 
-    return {"ok": True, "event": event_type, "status": status}
+    return {"ok": True, "event": event_type, "status": status, "career_id": career_id if has_career_id else None, "credited": credited, "wallet_tokens": wallet_tokens}
 
 # -------- Legacy endpoints (V1 HMAC) — migration only --------
 @app.post("/v1/cloud/save_v1")
