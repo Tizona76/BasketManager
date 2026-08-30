@@ -158,19 +158,12 @@ func _bm_get_tournament_tuning_id() -> String:
 			return "tournoi_a"
 
 func _bm_get_current_season_number() -> int:
-	var path := "user://savegame.json"
-	if not FileAccess.file_exists(path):
-		return 1
-	var f := FileAccess.open(path, FileAccess.READ)
-	if f == null:
-		return 1
-	var parsed = JSON.parse_string(f.get_as_text())
-	if parsed is Dictionary:
-		if parsed.has("season_number"):
-			return max(1, int(parsed.get("season_number", 1)))
-		var progress = parsed.get("progress", {})
-		if progress is Dictionary and progress.has("season_number"):
-			return max(1, int(progress.get("season_number", 1)))
+	var parsed: Dictionary = PlayerLife.load_savegame()
+	if parsed.has("season_number"):
+		return max(1, int(parsed.get("season_number", 1)))
+	var progress = parsed.get("progress", {})
+	if progress is Dictionary and progress.has("season_number"):
+		return max(1, int(progress.get("season_number", 1)))
 	return 1
 
 func _bm_get_current_team_rank_value() -> int:
@@ -181,14 +174,8 @@ func _bm_get_current_team_rank_value() -> int:
 	return 8
 
 func _bm_get_current_team_rating_value() -> float:
-	var path := "user://savegame.json"
-	if not FileAccess.file_exists(path):
-		return 60.0
-	var f := FileAccess.open(path, FileAccess.READ)
-	if f == null:
-		return 60.0
-	var parsed = JSON.parse_string(f.get_as_text())
-	if not (parsed is Dictionary):
+	var parsed: Dictionary = PlayerLife.load_savegame()
+	if parsed.is_empty():
 		return 60.0
 
 	var players_by_id = parsed.get("players_by_id", {})

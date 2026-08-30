@@ -1032,7 +1032,7 @@ func _maybe_flush_dirty_local(reason: String) -> void:
 		print("[DIRTY] flush delayed by cooldown, left=", left, "s reason=", reason)
 		return
 
-	var local_ck: String = _sha256_canonical_from_file(FILE_SAVEGAME)
+	var local_ck: String = _sha256_canonical_from_file(PL._resolve_save_path(FILE_SAVEGAME))
 	if local_ck == "":
 		print("[DIRTY] flush skipped: local checksum empty reason=", reason)
 		return
@@ -1250,7 +1250,7 @@ func _try_cloud_load() -> void:
 
 
 # ------------------------------------------------------------
-# CLOUD SAVE (depuis user://savegame.json)
+# CLOUD SAVE (depuis la carriere active)
 # ------------------------------------------------------------
 func _try_cloud_save_from_local() -> void:
 	if _inflight != "":
@@ -1271,7 +1271,8 @@ func _try_cloud_save_from_local() -> void:
 
 	_ensure_local_savegame_exists()
 
-	var local_parsed: Variant = _read_json_file(FILE_SAVEGAME)
+	var active_save_path: String = PL._resolve_save_path(FILE_SAVEGAME)
+	var local_parsed: Variant = _read_json_file(active_save_path)
 	var blob_to_send: Dictionary = {}
 
 	if typeof(local_parsed) == TYPE_DICTIONARY:
@@ -1279,9 +1280,9 @@ func _try_cloud_save_from_local() -> void:
 	else:
 		blob_to_send = {}
 
-	var checksum: String = _sha256_canonical_from_file(FILE_SAVEGAME)
+	var checksum: String = _sha256_canonical_from_file(active_save_path)
 	if checksum == "":
-		var raw_txt2: String = _read_text_file(FILE_SAVEGAME)
+		var raw_txt2: String = _read_text_file(active_save_path)
 		if raw_txt2.strip_edges() != "":
 			checksum = _sha256_hex(raw_txt2)
 
@@ -1413,9 +1414,10 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 			else:
 				Session.set_cloud_meta(dload.get("rev", 0), dload.get("checksum", ""))
 				var cloud_ck_load: String = str(dload.get("checksum", ""))
-				var local_ck_before_load: String = _sha256_canonical_from_file(FILE_SAVEGAME)
+				var active_save_path_load: String = PL._resolve_save_path(FILE_SAVEGAME)
+				var local_ck_before_load: String = _sha256_canonical_from_file(active_save_path_load)
 				var should_apply_load: bool = true
-				var local_exists_load: bool = FileAccess.file_exists(FILE_SAVEGAME)
+				var local_exists_load: bool = FileAccess.file_exists(active_save_path_load)
 				if local_exists_load:
 					print("[APPLY_SKIP][LOCAL_PRIORITY] local save exists -> skip cloud overwrite")
 					should_apply_load = false
@@ -1435,7 +1437,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 					if typeof(blobv_load) == TYPE_DICTIONARY:
 						var blobd_load: Dictionary = blobv_load as Dictionary
 						var cloud_tn_load: String = str(blobd_load.get("team_name", "")).strip_edges()
-						var local_now_load: Variant = _read_json_file(FILE_SAVEGAME)
+						var local_now_load: Variant = PL.load_savegame()
 						var local_tn_load: String = ""
 						if typeof(local_now_load) == TYPE_DICTIONARY:
 							local_tn_load = str((local_now_load as Dictionary).get("team_name", "")).strip_edges()
@@ -1444,8 +1446,8 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 							should_apply_load = false
 						_save_text_file(FILE_CLOUD_BLOB_JSON, JSON.stringify(blobv_load, "\t"))
 						if should_apply_load:
-							_save_text_file(FILE_SAVEGAME, JSON.stringify(blobv_load, "\t"))
-							print("[CLOUD][LOAD] blob applied")
+							PL.write_savegame(blobd_load)
+							print("[CLOUD][LOAD] blob applied to active career")
 							var ss_load := get_node_or_null("/root/SeasonState")
 							if ss_load != null and ss_load.has_method("hydrate_from_save"):
 								ss_load.call("hydrate_from_save", blobd_load)
@@ -1456,12 +1458,12 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 					else:
 						_save_text_file(FILE_CLOUD_BLOB_TXT, str(blobv_load))
 						if should_apply_load:
-							_save_text_file(FILE_SAVEGAME, str(blobv_load))
-							print("[CLOUD][LOAD] blob applied")
+							_save_text_file(active_save_path_load, str(blobv_load))
+							print("[CLOUD][LOAD] blob applied to active career")
 							_update_club_name_label_from_save()
 						else:
 							print("[APPLY] skipped (same checksum)")
-				var local_ck_after_load: String = _sha256_canonical_from_file(FILE_SAVEGAME)
+				var local_ck_after_load: String = _sha256_canonical_from_file(active_save_path_load)
 				_save_text_file(FILE_CLOUD_LAST_APPLY_JSON, JSON.stringify({
 					"applied_at_unix": Time.get_unix_time_from_system(),
 					"cloud_rev": int(Session.cloud_rev),
@@ -1472,7 +1474,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 				}, "\t"))
 
 		if is_empty_load and (not _did_auto_save):
-			var local_ck_load: String = _sha256_canonical_from_file(FILE_SAVEGAME)
+			var local_ck_load: String = _sha256_canonical_from_file(PL._resolve_save_path(FILE_SAVEGAME))
 			if local_ck_load == "":
 				pass
 			else:
@@ -1501,11 +1503,12 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 			is_empty = (bool(d.get("found", true)) == false)
 
 			var cloud_ck: String = str(d.get("checksum", ""))
-			var local_ck_before: String = _sha256_canonical_from_file(FILE_SAVEGAME)
+			var active_save_path_apply: String = PL._resolve_save_path(FILE_SAVEGAME)
+			var local_ck_before: String = _sha256_canonical_from_file(active_save_path_apply)
 			var should_apply: bool = true
 
 			# 🔒 GUARD: ne jamais écraser une save locale existante
-			var local_exists: bool = FileAccess.file_exists(FILE_SAVEGAME)
+			var local_exists: bool = FileAccess.file_exists(active_save_path_apply)
 			if local_exists:
 				print("[APPLY_SKIP][LOCAL_PRIORITY] local save exists -> skip cloud overwrite")
 				should_apply = false
@@ -1518,7 +1521,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 			# du même email/profile_uuid quand le nom cloud diffère du local
 			var _new_club_guard_active := FileAccess.file_exists(FILE_NEW_CLUB_PENDING_CLOUD)
 			if _new_club_guard_active:
-				var _local_any: Variant = _read_json_file(FILE_SAVEGAME)
+				var _local_any: Variant = PL.load_savegame()
 				var _local_team_name := ""
 				var _cloud_team_name := ""
 				if typeof(_local_any) == TYPE_DICTIONARY:
@@ -1557,7 +1560,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 				if typeof(blobv) == TYPE_DICTIONARY:
 					var blobd: Dictionary = blobv as Dictionary
 					var cloud_tn: String = str(blobd.get("team_name", "")).strip_edges()
-					var local_now: Variant = _read_json_file(FILE_SAVEGAME)
+					var local_now: Variant = PL.load_savegame()
 					var local_tn: String = ""
 					if typeof(local_now) == TYPE_DICTIONARY:
 						local_tn = str((local_now as Dictionary).get("team_name", "")).strip_edges()
@@ -1568,8 +1571,11 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 					if typeof(blobv) == TYPE_DICTIONARY or typeof(blobv) == TYPE_ARRAY:
 						_save_text_file(FILE_CLOUD_BLOB_JSON, JSON.stringify(blobv, "\t"))
 						if should_apply:
-							_save_text_file(FILE_SAVEGAME, JSON.stringify(blobv, "\t"))
-							print("[APPLY] wrote local savegame.json from cloud blob")
+							if typeof(blobv) == TYPE_DICTIONARY:
+								PL.write_savegame(blobd)
+							else:
+								_save_text_file(active_save_path_apply, JSON.stringify(blobv, "\t"))
+							print("[APPLY] wrote active career from cloud blob")
 							var ss := get_node_or_null("/root/SeasonState")
 							if ss != null and ss.has_method("hydrate_from_save") and typeof(blobv) == TYPE_DICTIONARY:
 								ss.call("hydrate_from_save", blobv as Dictionary)
@@ -1579,12 +1585,12 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 				else:
 					_save_text_file(FILE_CLOUD_BLOB_TXT, str(blobv))
 					if should_apply:
-						_save_text_file(FILE_SAVEGAME, str(blobv))
-						print("[APPLY] wrote local savegame.json from cloud blob (txt)")
+						_save_text_file(active_save_path_apply, str(blobv))
+						print("[APPLY] wrote active career from cloud blob (txt)")
 					else:
 						print("[APPLY] skipped (same checksum)")
 
-			var local_ck_after: String = _sha256_canonical_from_file(FILE_SAVEGAME)
+			var local_ck_after: String = _sha256_canonical_from_file(active_save_path_apply)
 			var chk: String = str(Session.get("cloud_checksum"))
 
 			_save_text_file(FILE_CLOUD_LAST_APPLY_JSON, JSON.stringify({
@@ -1608,7 +1614,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		_maybe_flush_dirty_local("load_ok")
 
 		if is_empty and (not _did_auto_save):
-			var local_ck: String = _sha256_canonical_from_file(FILE_SAVEGAME)
+			var local_ck: String = _sha256_canonical_from_file(PL._resolve_save_path(FILE_SAVEGAME))
 			if local_ck == "":
 				pass
 			else:
@@ -2281,7 +2287,7 @@ func _apply_gestion_background_from_save() -> void:
 		return
 
 	# --- lit club level
-	var d: Variant = _read_json_file(FILE_SAVEGAME)
+	var d: Variant = PL.load_savegame()
 	var club_lvl: int = 1
 	if typeof(d) == TYPE_DICTIONARY:
 		var dd := d as Dictionary
@@ -3309,7 +3315,7 @@ func _bm_wr_fmt_pct(x: float) -> String:
 	return str(v) + "%"
 
 func _bm_wr_local_row() -> Dictionary:
-	var local: Variant = _read_json_file(FILE_SAVEGAME)
+	var local: Variant = PL.load_savegame()
 
 	var club_name := "BM Club"
 	var wins := 0
@@ -3369,7 +3375,7 @@ func _bm_wr_fetch_top() -> void:
 	_bm_wr_show_loading()
 
 	var season_id := "2026-01"
-	var local: Variant = _read_json_file(FILE_SAVEGAME)
+	var local: Variant = PL.load_savegame()
 	if typeof(local) == TYPE_DICTIONARY:
 		season_id = str((local as Dictionary).get("season_id", season_id)).strip_edges()
 		if season_id == "":
@@ -3624,7 +3630,7 @@ func _bm_lb_submit_from_save() -> void:
 		print("[LB] skip submit: no profile_uuid")
 		return
 
-	var local: Variant = _read_json_file(FILE_SAVEGAME)
+	var local: Variant = PL.load_savegame()
 	if typeof(local) != TYPE_DICTIONARY:
 		print("[LB] skip submit: save not dict")
 		return

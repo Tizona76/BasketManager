@@ -46,6 +46,56 @@ const CLUB_BADGE_ACTION_SWITCH := "switch"
 const CLUB_BADGE_ACTION_UPGRADE := "upgrade"
 const CLUB_BADGE_ACTION_SWITCH_UPGRADE := "switch_upgrade"
 
+static func _bm_sanitize_save_id(raw_id: String) -> String:
+	var clean: String = str(raw_id).strip_edges()
+	if clean == "":
+		clean = "default"
+	clean = clean.replace("/", "_").replace("\\", "_").replace("..", "_").replace(" ", "_")
+	return clean
+
+static func _bm_profile_save_path(profile_id: String) -> String:
+	return "user://save_%s.json" % _bm_sanitize_save_id(profile_id)
+
+static func _bm_career_index_path(profile_id: String) -> String:
+	return "user://careers_%s.json" % _bm_sanitize_save_id(profile_id)
+
+static func _bm_career_save_path(profile_id: String, career_id: String) -> String:
+	return "user://save_%s_%s.json" % [_bm_sanitize_save_id(profile_id), _bm_sanitize_save_id(career_id)]
+
+static func _bm_read_json_no_write(path: String) -> Variant:
+	if not FileAccess.file_exists(path):
+		return null
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return null
+	var txt := f.get_as_text()
+	f.close()
+	if txt.strip_edges() == "":
+		return null
+	var json := JSON.new()
+	var err := json.parse(txt)
+	if err != OK:
+		return null
+	return json.data
+
+static func _bm_resolve_from_career_index(profile_id: String) -> String:
+	var parsed: Variant = _bm_read_json_no_write(_bm_career_index_path(profile_id))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return ""
+	var index: Dictionary = parsed as Dictionary
+	var active_id: String = str(index.get("active_career_id", "")).strip_edges()
+	if active_id == "" or typeof(index.get("careers")) != TYPE_ARRAY:
+		return ""
+	for raw_entry in index["careers"]:
+		if typeof(raw_entry) != TYPE_DICTIONARY:
+			continue
+		if str((raw_entry as Dictionary).get("career_id", "")).strip_edges() != active_id:
+			continue
+		var career_path: String = _bm_career_save_path(profile_id, active_id)
+		if FileAccess.file_exists(career_path):
+			return career_path
+	return ""
+
 static func _resolve_save_path(path: String = "user://savegame.json") -> String:
 	if path != "user://savegame.json":
 		return path
@@ -56,25 +106,35 @@ static func _resolve_save_path(path: String = "user://savegame.json") -> String:
 		if root != null:
 			var pm_node := root.get_node_or_null("/root/ProfileManager")
 			if pm_node != null:
+				if pm_node.has_method("get_active_career_save_path"):
+					var career_path := str(pm_node.call("get_active_career_save_path")).strip_edges()
+					if career_path != "":
+						return career_path
 				if pm_node.has_method("get_active_profile_id"):
 					var pid := str(pm_node.call("get_active_profile_id")).strip_edges()
+					var indexed_path := _bm_resolve_from_career_index(pid)
+					if indexed_path != "":
+						return indexed_path
 					if pid != "":
-						return "user://save_%s.json" % pid
+						return _bm_profile_save_path(pid)
 				if pm_node.has_method("get_current_profile_id"):
 					var pid2 := str(pm_node.call("get_current_profile_id")).strip_edges()
+					var indexed_path2 := _bm_resolve_from_career_index(pid2)
+					if indexed_path2 != "":
+						return indexed_path2
 					if pid2 != "":
-						return "user://save_%s.json" % pid2
+						return _bm_profile_save_path(pid2)
 
 	var profiles_path := "user://profiles.json"
-	if FileAccess.file_exists(profiles_path):
-		var f := FileAccess.open(profiles_path, FileAccess.READ)
-		if f != null:
-			var parsed = JSON.parse_string(f.get_as_text())
-			if typeof(parsed) == TYPE_DICTIONARY:
-				var d: Dictionary = parsed as Dictionary
-				var pid_file := str(d.get("active_profile_id", "")).strip_edges()
-				if pid_file != "":
-					return "user://save_%s.json" % pid_file
+	var parsed_profiles: Variant = _bm_read_json_no_write(profiles_path)
+	if typeof(parsed_profiles) == TYPE_DICTIONARY:
+		var d: Dictionary = parsed_profiles as Dictionary
+		var pid_file := str(d.get("active_profile_id", "")).strip_edges()
+		if pid_file != "":
+			var indexed_path_file := _bm_resolve_from_career_index(pid_file)
+			if indexed_path_file != "":
+				return indexed_path_file
+			return _bm_profile_save_path(pid_file)
 
 	return path
 
@@ -193,6 +253,7 @@ static func write_savegame(data: Dictionary, path: String = "user://savegame.jso
 	if f == null:
 		return
 	f.store_string(JSON.stringify(data, "\t"))
+	f.close()
 
 static func _repair_corrupted_salaries_on_load(save: Dictionary) -> void:
 	if save == null:
