@@ -503,6 +503,7 @@ func _bm_build_career_picker() -> void:
 		return
 	_career_picker = CenterContainer.new()
 	_career_picker.name = "YourTeamsPicker"
+	_career_picker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_career_picker.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_career_picker)
 
@@ -527,6 +528,7 @@ func _bm_build_career_picker() -> void:
 	box.add_child(create_gap)
 
 	var create_btn := Button.new()
+	create_btn.name = "YourTeamsCreateNewTeamButton"
 	create_btn.text = tr("multi_career.create_new.button")
 	create_btn.custom_minimum_size = Vector2(560, 68) if not _bm_is_mobile_layout() else Vector2(430, 76)
 	create_btn.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else 26)
@@ -535,6 +537,18 @@ func _bm_build_career_picker() -> void:
 	box.add_child(create_btn)
 	move_child(_career_picker, get_child_count() - 1)
 	call_deferred("_ensure_teamname_center_ball")
+
+
+func _bm_refresh_career_picker_i18n() -> void:
+	if _career_picker == null or not is_instance_valid(_career_picker):
+		return
+	var title := _career_picker.find_child("YourTeamsTitle", true, false) as Label
+	if title != null:
+		title.text = tr("multi_career.your_teams.title")
+	var create_btn := _career_picker.find_child("YourTeamsCreateNewTeamButton", true, false) as Button
+	if create_btn != null:
+		create_btn.text = tr("multi_career.create_new.button")
+	_bm_style_new_career_dialog()
 
 
 func _bm_is_mobile_layout() -> bool:
@@ -1392,6 +1406,7 @@ func _on_entry_flag_pressed(locale_code: String) -> void:
 	TranslationServer.set_locale(locale_code)
 	I18nSvc.apply_all()
 	get_tree().root.propagate_notification(NOTIFICATION_TRANSLATION_CHANGED)
+	_bm_refresh_career_picker_i18n()
 
 
 func _apply_entry_flag_tooltips() -> void:
