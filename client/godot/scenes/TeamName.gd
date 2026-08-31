@@ -528,7 +528,7 @@ func _bm_build_career_picker() -> void:
 		box.add_child(_bm_make_career_button(entry as Dictionary))
 
 	var create_gap := Control.new()
-	create_gap.custom_minimum_size = Vector2(1, 28 if not _bm_is_mobile_layout() else 30)
+	create_gap.custom_minimum_size = Vector2(1, 110 if not _bm_is_mobile_layout() else 112)
 	box.add_child(create_gap)
 
 	var create_btn := Button.new()
