@@ -221,7 +221,11 @@ func _bm_career_summary(entry: Dictionary) -> String:
 	var league_name := LeagueDataScript.get_league_name(league_id)
 	var season := maxi(1, int(entry.get("season", 1)))
 	var club_level := maxi(1, int(entry.get("club_level", 1)))
-	return "%s • Season %d • Club Lv. %d" % [league_name, season, club_level]
+	var save := _bm_read_career_save(entry)
+	var club_xp := 0
+	if not save.is_empty():
+		club_xp = PlayerLife.get_club_xp(save)
+	return "%s • Season %d • Club Lv. %d • %d XP" % [league_name, season, club_level, club_xp]
 
 
 func _bm_read_career_save(entry: Dictionary) -> Dictionary:
@@ -524,7 +528,7 @@ func _bm_build_career_picker() -> void:
 		box.add_child(_bm_make_career_button(entry as Dictionary))
 
 	var create_gap := Control.new()
-	create_gap.custom_minimum_size = Vector2(1, 4 if not _bm_is_mobile_layout() else 6)
+	create_gap.custom_minimum_size = Vector2(1, 28 if not _bm_is_mobile_layout() else 30)
 	box.add_child(create_gap)
 
 	var create_btn := Button.new()

@@ -2488,7 +2488,7 @@ func _ensure_season_day_label() -> void:
 		lbl_season_day = Label.new()
 		lbl_season_day.name = "LblSeasonDay"
 		lbl_season_day.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		lbl_season_day.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl_season_day.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 		lbl_season_day.add_theme_font_size_override("font_size", 20)
 		call_deferred("_bm_saison_apply_mobile_day_and_popularity_texts")
 		call_deferred("_bm_saison_align_mobile_play_and_day")
@@ -2520,11 +2520,12 @@ func _ensure_season_day_label() -> void:
 		add_child(lbl_season_day)
 		move_child(lbl_season_day, get_node("Overlays").get_index())
 
+	lbl_season_day.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	lbl_season_day.text = _get_current_season_day_text()
-	lbl_season_day.size = Vector2(320, 48)
+	lbl_season_day.size = Vector2(320, 72)
 	lbl_season_day.position = Vector2(
 		btn_match.position.x + (btn_match.size.x - lbl_season_day.size.x) * 0.5 + 24.0,
-		btn_match.position.y - 88
+		btn_match.position.y - 112
 	)
 
 
@@ -2541,7 +2542,11 @@ func _bm_current_league_name() -> String:
 func _bm_ensure_league_badge() -> void:
 	if btn_match == null:
 		return
+	if lbl_season_day == null or not is_instance_valid(lbl_season_day):
+		_ensure_season_day_label()
 	if lbl_league_badge != null and is_instance_valid(lbl_league_badge):
+		if lbl_season_day != null and is_instance_valid(lbl_season_day) and lbl_league_badge.get_parent() != lbl_season_day:
+			lbl_league_badge.reparent(lbl_season_day, false)
 		return
 
 	lbl_league_badge = Label.new()
@@ -2555,19 +2560,11 @@ func _bm_ensure_league_badge() -> void:
 	lbl_league_badge.add_theme_constant_override("shadow_offset_x", 1)
 	lbl_league_badge.add_theme_constant_override("shadow_offset_y", 2)
 
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.02, 0.06, 0.14, 0.86)
-	sb.border_color = Color(1.0, 0.72, 0.24, 0.72)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(16)
-	sb.content_margin_left = 16
-	sb.content_margin_right = 16
-	sb.content_margin_top = 6
-	sb.content_margin_bottom = 6
-	lbl_league_badge.add_theme_stylebox_override("normal", sb)
-
-	add_child(lbl_league_badge)
-	move_child(lbl_league_badge, get_node("Overlays").get_index())
+	if lbl_season_day != null and is_instance_valid(lbl_season_day):
+		lbl_season_day.add_child(lbl_league_badge)
+	else:
+		add_child(lbl_league_badge)
+		move_child(lbl_league_badge, get_node("Overlays").get_index())
 
 
 func _bm_refresh_league_badge() -> void:
@@ -2576,13 +2573,13 @@ func _bm_refresh_league_badge() -> void:
 		return
 	lbl_league_badge.text = _bm_current_league_name().to_upper()
 	lbl_league_badge.visible = btn_match.visible
-	lbl_league_badge.size = Vector2(250, 34)
 	if lbl_season_day != null and is_instance_valid(lbl_season_day):
-		lbl_league_badge.position = Vector2(
-			lbl_season_day.position.x + (lbl_season_day.size.x - lbl_league_badge.size.x) * 0.5,
-			lbl_season_day.position.y - lbl_league_badge.size.y - 8.0
-		)
+		if lbl_league_badge.get_parent() != lbl_season_day:
+			lbl_league_badge.reparent(lbl_season_day, false)
+		lbl_league_badge.size = Vector2(lbl_season_day.size.x, 28)
+		lbl_league_badge.position = Vector2(0, 8)
 	else:
+		lbl_league_badge.size = Vector2(250, 28)
 		lbl_league_badge.position = Vector2(
 			btn_match.position.x + (btn_match.size.x - lbl_league_badge.size.x) * 0.5,
 			btn_match.position.y + btn_match.size.y + 12.0
