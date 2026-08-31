@@ -41,6 +41,8 @@ const FILE_CLOUD_LAST_APPLY_JSON := "user://cloud_last_apply.json"
 const FILE_NEW_CLUB_PENDING_CLOUD := "user://new_club_pending_cloud.txt"
 const CLUB_STAFF_INTRO_SEEN_KEY := "club_staff_intro_seen"
 const CLUB_STAFF_INTRO_PENDING_KEY := "club_staff_intro_pending"
+const SAVE_LOCALE_KEY := "locale"
+const SAVE_LOCALE_FALLBACK_KEY := "language"
 
 # ✅ BONUS: persister aussi tokens/refresh depuis Menu (offline-first)
 const SESSION_FILE := "user://session.json"
@@ -578,7 +580,58 @@ func _bm_management_ensure_menu_music() -> void:
 	if am.has_method("play_music"):
 		am.call("play_music", "res://audio/music/menu.mp3", true, false)
 
+func _bm_clean_locale_code(value: Variant) -> String:
+	var code := str(value).strip_edges().to_lower()
+	if code.find("_") >= 0:
+		code = code.split("_")[0]
+	if code.find("-") >= 0:
+		code = code.split("-")[0]
+	if ["fr", "en", "es", "it", "pt"].has(code):
+		return code
+	return ""
+
+
+func _bm_saved_locale_from_save(save: Dictionary) -> String:
+	var code := _bm_clean_locale_code(save.get(SAVE_LOCALE_KEY, ""))
+	if code != "":
+		return code
+	return _bm_clean_locale_code(save.get(SAVE_LOCALE_FALLBACK_KEY, ""))
+
+
+func _bm_apply_locale_from_save(save: Dictionary) -> void:
+	var code := _bm_saved_locale_from_save(save)
+	if code == "":
+		return
+	TranslationServer.set_locale(code)
+	I18nSvc.apply_all()
+	get_tree().root.propagate_notification(NOTIFICATION_TRANSLATION_CHANGED)
+
+
+func _bm_restore_language_from_active_save() -> void:
+	var save_any: Variant = PL.load_savegame()
+	if typeof(save_any) != TYPE_DICTIONARY:
+		return
+	_bm_apply_locale_from_save(save_any as Dictionary)
+
+
+func _bm_persist_current_locale_to_save(save: Dictionary) -> void:
+	var code := _bm_clean_locale_code(TranslationServer.get_locale())
+	if code == "":
+		return
+	save[SAVE_LOCALE_KEY] = code
+
+
+func _bm_persist_current_locale_to_active_save() -> void:
+	var save_any: Variant = PL.load_savegame()
+	if typeof(save_any) != TYPE_DICTIONARY:
+		return
+	var save: Dictionary = save_any as Dictionary
+	_bm_persist_current_locale_to_save(save)
+	PL.write_savegame(save)
+
+
 func _ready() -> void:
+	_bm_restore_language_from_active_save()
 	_bm_reconcile_club_tokens_unlock_on_menu_load()
 	call_deferred("_bm_maybe_show_club_tokens_intro_popup_on_management")
 	call_deferred("_bm_management_ensure_menu_music")
@@ -1520,6 +1573,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 						_save_text_file(FILE_CLOUD_BLOB_JSON, JSON.stringify(blobv_load, "\t"))
 						if should_apply_load:
 							PL.write_savegame(blobd_load)
+							_bm_apply_locale_from_save(blobd_load)
 							print("[CLOUD][LOAD] blob applied to active career")
 							var ss_load := get_node_or_null("/root/SeasonState")
 							if ss_load != null and ss_load.has_method("hydrate_from_save"):
@@ -3135,9 +3189,13 @@ func _show_management_language_popup() -> void:
 
 
 func _bm_management_apply_language(code: String) -> void:
-	TranslationServer.set_locale(code)
+	var locale_code := _bm_clean_locale_code(code)
+	if locale_code == "":
+		return
+	TranslationServer.set_locale(locale_code)
 	I18nSvc.apply_all()
 	get_tree().root.propagate_notification(NOTIFICATION_TRANSLATION_CHANGED)
+	_bm_persist_current_locale_to_active_save()
 
 
 func _on_btn_music_toggle_pressed() -> void:
@@ -3577,6 +3635,7 @@ func _on_btn_save_pressed() -> void:
 
 func _save_local_only() -> void:
 	var save: Dictionary = PL.load_savegame()
+	_bm_persist_current_locale_to_save(save)
 	PL.write_savegame(save)
 	_dirty_local = true
 	_toast_status("Saved locally", 2.0)
