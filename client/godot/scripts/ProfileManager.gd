@@ -281,15 +281,25 @@ static func list_careers() -> Array:
 	if typeof(index_any) != TYPE_DICTIONARY:
 		return []
 	var index: Dictionary = _normalize_careers_index(index_any as Dictionary)
-	_write_careers_index(pid, index)
 	if typeof(index.get("careers")) != TYPE_ARRAY:
 		return []
+	var normalized_careers: Array = []
 	var result: Array = []
 	for raw_entry in index["careers"]:
-		if typeof(raw_entry) == TYPE_DICTIONARY:
-			var entry: Dictionary = _career_entry_from_index_entry(raw_entry as Dictionary)
-			if entry.get("career_id", "") != "":
-				result.append(entry)
+		if typeof(raw_entry) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = _career_entry_from_index_entry(raw_entry as Dictionary)
+		var cid: String = str(entry.get("career_id", "")).strip_edges()
+		if cid == "":
+			continue
+		if FileAccess.file_exists(_career_save_path(pid, cid)):
+			var save_any: Variant = _read_json(_career_save_path(pid, cid))
+			if typeof(save_any) == TYPE_DICTIONARY:
+				entry = _career_entry_from_save(save_any as Dictionary, cid, int(entry.get("last_played", 0)))
+		normalized_careers.append(entry)
+		result.append(entry)
+	index["careers"] = normalized_careers
+	_write_careers_index(pid, index)
 	return result
 
 static func set_active_career_id(career_id: String) -> bool:

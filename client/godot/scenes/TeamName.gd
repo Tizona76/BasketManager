@@ -84,6 +84,7 @@ var _league_inline_value: Label = null
 var _league_inline_change_btn: Button = null
 var _career_picker: Control = null
 var _create_new_career_dialog: ConfirmationDialog = null
+var _teamname_ball_tween: Tween = null
 
 
 const FLAG_SIZE := Vector2(58, 44)
@@ -223,6 +224,142 @@ func _bm_career_summary(entry: Dictionary) -> String:
 	return "%s • Season %d • Club Lv. %d" % [league_name, season, club_level]
 
 
+func _bm_read_career_save(entry: Dictionary) -> Dictionary:
+	var cid := str(entry.get("career_id", "")).strip_edges()
+	if cid == "":
+		return {}
+	var pid := ProfileManager.get_active_profile_id()
+	var path := ProfileManager._career_save_path(pid, cid)
+	if not FileAccess.file_exists(path):
+		return {}
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return {}
+	var txt := f.get_as_text()
+	f.close()
+	var json := JSON.new()
+	if json.parse(txt) != OK or typeof(json.data) != TYPE_DICTIONARY:
+		return {}
+	return json.data as Dictionary
+
+
+func _bm_career_crest_texture(entry: Dictionary) -> Texture2D:
+	var save := _bm_read_career_save(entry)
+	if save.is_empty():
+		return null
+	var crest_path := PlayerLife.get_display_crest_path(save, _bm_career_team_name(entry))
+	if crest_path == "" or not ResourceLoader.exists(crest_path):
+		return null
+	return load(crest_path) as Texture2D
+
+
+func _bm_make_new_career_dialog_style() -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.012, 0.026, 0.060, 0.97)
+	sb.border_color = Color(0.20, 0.58, 1.0, 0.82)
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(18)
+	sb.content_margin_left = 30
+	sb.content_margin_right = 30
+	sb.content_margin_top = 24
+	sb.content_margin_bottom = 22
+	sb.shadow_color = Color(0.08, 0.34, 0.95, 0.30)
+	sb.shadow_size = 20
+	sb.shadow_offset = Vector2(0, 5)
+	return sb
+
+
+func _bm_make_new_career_dialog_button_style(bg: Color, border: Color, glow_alpha: float) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.border_color = border
+	sb.border_width_left = 1
+	sb.border_width_top = 1
+	sb.border_width_right = 1
+	sb.border_width_bottom = 2
+	sb.corner_radius_top_left = 10
+	sb.corner_radius_top_right = 10
+	sb.corner_radius_bottom_left = 10
+	sb.corner_radius_bottom_right = 10
+	sb.content_margin_left = 18
+	sb.content_margin_right = 18
+	sb.content_margin_top = 9
+	sb.content_margin_bottom = 9
+	sb.shadow_color = Color(border.r, border.g, border.b, glow_alpha)
+	sb.shadow_size = 8 if glow_alpha > 0.0 else 0
+	sb.shadow_offset = Vector2(0, 3)
+	return sb
+
+
+func _bm_style_new_career_dialog_button(btn: Button, primary: bool) -> void:
+	if btn == null:
+		return
+	var normal := _bm_make_new_career_dialog_button_style(
+		Color(0.055, 0.18, 0.39, 0.98) if primary else Color(0.045, 0.070, 0.105, 0.96),
+		Color(0.34, 0.70, 1.0, 0.90) if primary else Color(0.20, 0.31, 0.44, 0.78),
+		0.22 if primary else 0.0
+	)
+	var hover := _bm_make_new_career_dialog_button_style(
+		Color(0.075, 0.26, 0.55, 1.0) if primary else Color(0.070, 0.105, 0.155, 0.98),
+		Color(0.45, 0.80, 1.0, 1.0) if primary else Color(0.28, 0.40, 0.56, 0.90),
+		0.30 if primary else 0.0
+	)
+	var pressed := _bm_make_new_career_dialog_button_style(
+		Color(0.035, 0.13, 0.32, 1.0) if primary else Color(0.030, 0.050, 0.080, 1.0),
+		Color(0.25, 0.56, 0.95, 1.0) if primary else Color(0.16, 0.25, 0.38, 0.90),
+		0.16 if primary else 0.0
+	)
+	btn.custom_minimum_size = Vector2(170, 44) if primary else Vector2(124, 44)
+	btn.add_theme_font_size_override("font_size", 17)
+	btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
+	btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_stylebox_override("focus", hover)
+
+
+func _bm_style_new_career_dialog() -> void:
+	if _create_new_career_dialog == null:
+		return
+	var panel_style := _bm_make_new_career_dialog_style()
+	_create_new_career_dialog.add_theme_stylebox_override("embedded_border", panel_style)
+	_create_new_career_dialog.add_theme_stylebox_override("embedded_unfocused_border", panel_style)
+	_create_new_career_dialog.add_theme_stylebox_override("panel", panel_style)
+	_create_new_career_dialog.add_theme_color_override("title_color", Color(1, 1, 1, 1))
+	_create_new_career_dialog.add_theme_color_override("title_outline_modulate", Color(0.20, 0.58, 1.0, 0.78))
+	_create_new_career_dialog.add_theme_font_size_override("title_font_size", 25)
+	_create_new_career_dialog.add_theme_constant_override("title_outline_size", 2)
+	_create_new_career_dialog.add_theme_constant_override("button_margin", 18)
+	var title_label := _create_new_career_dialog.find_child("CreateNewCareerTitle", true, false) as Label
+	if title_label != null:
+		title_label.text = tr("multi_career.create_new.title")
+		title_label.custom_minimum_size = Vector2(430, 0)
+		title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		title_label.clip_text = false
+		title_label.add_theme_font_size_override("font_size", 25)
+		title_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+		title_label.add_theme_color_override("font_outline_color", Color(0.20, 0.58, 1.0, 0.78))
+		title_label.add_theme_constant_override("outline_size", 2)
+	var body_label := _create_new_career_dialog.find_child("CreateNewCareerBody", true, false) as Label
+	if body_label != null:
+		body_label.text = tr("multi_career.create_new.body")
+		body_label.custom_minimum_size = Vector2(430, 0)
+		body_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		body_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		body_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body_label.clip_text = false
+		body_label.add_theme_font_size_override("font_size", 18)
+		body_label.add_theme_color_override("font_color", Color(0.90, 0.94, 1.0, 0.92))
+		body_label.add_theme_constant_override("line_spacing", 5)
+	_bm_style_new_career_dialog_button(_create_new_career_dialog.get_cancel_button(), false)
+	_bm_style_new_career_dialog_button(_create_new_career_dialog.get_ok_button(), true)
+
+
 func _bm_list_unique_careers() -> Array:
 	var out: Array = []
 	var seen := {}
@@ -243,10 +380,7 @@ func _bm_list_unique_careers() -> Array:
 
 
 func _bm_has_career_picker_data() -> bool:
-	for entry in _bm_list_unique_careers():
-		if _bm_career_team_name(entry) != "BM Club":
-			return true
-	return false
+	return _bm_list_unique_careers().size() > 0
 
 
 func _bm_clear_career_picker() -> void:
@@ -257,11 +391,52 @@ func _bm_clear_career_picker() -> void:
 
 func _bm_make_career_button(entry: Dictionary) -> Button:
 	var btn := Button.new()
-	btn.text = "%s\n%s" % [_bm_career_team_name(entry), _bm_career_summary(entry)]
+	btn.text = ""
 	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	btn.custom_minimum_size = Vector2(560, 86) if not _bm_is_mobile_layout() else Vector2(430, 96)
-	btn.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else 26)
 	_bm_style_entry_duplicate_button(btn, true)
+	btn.custom_minimum_size = Vector2(570, 104) if not _bm_is_mobile_layout() else Vector2(463, 112)
+
+	var row := HBoxContainer.new()
+	row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 20.0
+	row.offset_top = 10.0
+	row.offset_right = -20.0
+	row.offset_bottom = -30.0
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 14)
+	btn.add_child(row)
+
+	var crest := TextureRect.new()
+	crest.custom_minimum_size = Vector2(54, 54) if not _bm_is_mobile_layout() else Vector2(58, 58)
+	crest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	crest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	crest.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	crest.texture = _bm_career_crest_texture(entry)
+	row.add_child(crest)
+
+	var text_box := VBoxContainer.new()
+	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	text_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text_box.add_theme_constant_override("separation", 2)
+	row.add_child(text_box)
+
+	var name_label := Label.new()
+	name_label.text = _bm_career_team_name(entry)
+	name_label.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else 26)
+	name_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	text_box.add_child(name_label)
+
+	var summary_label := Label.new()
+	summary_label.text = _bm_career_summary(entry)
+	summary_label.add_theme_font_size_override("font_size", 18 if not _bm_is_mobile_layout() else 20)
+	summary_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.82))
+	summary_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	summary_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	text_box.add_child(summary_label)
+
 	var cid := str(entry.get("career_id", "")).strip_edges()
 	btn.pressed.connect(func() -> void:
 		if cid == "":
@@ -276,19 +451,49 @@ func _bm_ensure_create_new_career_dialog() -> void:
 		return
 	_create_new_career_dialog = ConfirmationDialog.new()
 	_create_new_career_dialog.name = "CreateNewCareerDialog"
-	_create_new_career_dialog.title = "Create a new club?"
-	_create_new_career_dialog.dialog_text = "Your existing clubs and progress will be preserved.\nYou can return to them at any time."
-	_create_new_career_dialog.ok_button_text = "Create New Team"
-	_create_new_career_dialog.cancel_button_text = "Cancel"
+	_create_new_career_dialog.title = ""
+	_create_new_career_dialog.dialog_text = ""
+	_create_new_career_dialog.ok_button_text = tr("multi_career.create_new.confirm")
+	_create_new_career_dialog.cancel_button_text = tr("multi_career.create_new.cancel")
 	_create_new_career_dialog.exclusive = true
+	var content := VBoxContainer.new()
+	content.name = "CreateNewCareerContent"
+	content.custom_minimum_size = Vector2(430, 0)
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.add_theme_constant_override("separation", 12)
+	_create_new_career_dialog.add_child(content)
+	var title_label := Label.new()
+	title_label.name = "CreateNewCareerTitle"
+	title_label.text = tr("multi_career.create_new.title")
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_label.clip_text = false
+	content.add_child(title_label)
+	var body_label := Label.new()
+	body_label.name = "CreateNewCareerBody"
+	body_label.text = tr("multi_career.create_new.body")
+	body_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body_label.clip_text = false
+	content.add_child(body_label)
+	var body_button_gap := Control.new()
+	body_button_gap.custom_minimum_size = Vector2(1, 14)
+	content.add_child(body_button_gap)
 	add_child(_create_new_career_dialog)
+	_bm_style_new_career_dialog()
 	_create_new_career_dialog.confirmed.connect(_on_create_new_team_confirmed)
 
 
 func _bm_show_create_new_career_confirm() -> void:
 	_bm_ensure_create_new_career_dialog()
 	if _create_new_career_dialog != null:
+		_bm_style_new_career_dialog()
 		_create_new_career_dialog.popup_centered()
+		call_deferred("_bm_style_new_career_dialog")
 
 
 func _bm_build_career_picker() -> void:
@@ -307,7 +512,8 @@ func _bm_build_career_picker() -> void:
 	(_career_picker as CenterContainer).add_child(box)
 
 	var title := Label.new()
-	title.text = "YOUR TEAMS"
+	title.name = "YourTeamsTitle"
+	title.text = tr("multi_career.your_teams.title")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 38 if not _bm_is_mobile_layout() else 34)
 	title.add_theme_color_override("font_color", Color(1.0, 0.86, 0.34, 1.0))
@@ -316,14 +522,19 @@ func _bm_build_career_picker() -> void:
 	for entry in careers:
 		box.add_child(_bm_make_career_button(entry as Dictionary))
 
+	var create_gap := Control.new()
+	create_gap.custom_minimum_size = Vector2(1, 4 if not _bm_is_mobile_layout() else 6)
+	box.add_child(create_gap)
+
 	var create_btn := Button.new()
-	create_btn.text = "+ Create New Team"
+	create_btn.text = tr("multi_career.create_new.button")
 	create_btn.custom_minimum_size = Vector2(560, 68) if not _bm_is_mobile_layout() else Vector2(430, 76)
 	create_btn.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else 26)
 	_bm_style_entry_duplicate_button(create_btn, false)
 	create_btn.pressed.connect(_on_create_new_team_pressed)
 	box.add_child(create_btn)
 	move_child(_career_picker, get_child_count() - 1)
+	call_deferred("_ensure_teamname_center_ball")
 
 
 func _bm_is_mobile_layout() -> bool:
@@ -1400,46 +1611,49 @@ func _on_entry_play_instantly_mouse_entered() -> void:
 
 
 func _ensure_teamname_center_ball() -> void:
-	if get_node_or_null("ImgBallTeamName") != null:
-		return
-
-	var tex := load("res://assets/images/ballon.png") as Texture2D
-	if tex == null:
-		push_error("[TEAMNAME] missing ball: res://assets/images/ballon.png")
-		return
-
-	var ball := TextureRect.new()
-	ball.name = "ImgBallTeamName"
-	ball.texture = tex
-	ball.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	ball.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	ball.custom_minimum_size = Vector2(72, 72)
-	ball.size = Vector2(72, 72)
-	ball.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ball.z_index = 50
-	add_child(ball)
+	var ball := get_node_or_null("ImgBallTeamName") as TextureRect
+	if ball == null:
+		var tex := load("res://assets/images/ballon.png") as Texture2D
+		if tex == null:
+			push_error("[TEAMNAME] missing ball: res://assets/images/ballon.png")
+			return
+		ball = TextureRect.new()
+		ball.name = "ImgBallTeamName"
+		ball.texture = tex
+		ball.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ball.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		ball.custom_minimum_size = Vector2(72, 72)
+		ball.size = Vector2(72, 72)
+		ball.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ball.z_index = 50
+		add_child(ball)
 
 	await get_tree().process_frame
-
 	await get_tree().process_frame
 
-	if input_team == null:
+	var anchor := find_child("YourTeamsTitle", true, false) as Control
+	var offset_y := 90.0
+	if anchor == null:
+		anchor = input_team
+		offset_y = 118.0
+	if anchor == null:
 		return
 
-	var input_pos := input_team.global_position
-	var input_size := input_team.size
-
+	var anchor_pos := anchor.global_position
+	var anchor_size := anchor.size
 	ball.position = Vector2(
-		input_pos.x + (input_size.x - ball.size.x) * 0.5,
-		input_pos.y - 118.0
+		anchor_pos.x + (anchor_size.x - ball.size.x) * 0.5,
+		anchor_pos.y - offset_y
 	)
 
+	if _teamname_ball_tween != null and _teamname_ball_tween.is_valid():
+		_teamname_ball_tween.kill()
 	var base_y := ball.position.y
-	var tw := create_tween()
-	tw.set_loops()
-	tw.tween_property(ball, "position:y", base_y - 18.0, 0.34).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tw.tween_property(ball, "position:y", base_y, 0.34).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_IN)
-	tw.tween_interval(0.10)
+	_teamname_ball_tween = create_tween()
+	_teamname_ball_tween.set_loops()
+	_teamname_ball_tween.tween_property(ball, "position:y", base_y - 18.0, 0.34).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_teamname_ball_tween.tween_property(ball, "position:y", base_y, 0.34).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_IN)
+	_teamname_ball_tween.tween_interval(0.10)
 
 
 func _setup_fallback_dialog() -> void:

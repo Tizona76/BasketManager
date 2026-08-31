@@ -624,6 +624,12 @@ club_identity.cancel,Annuler,Cancel,Cancelar,Annulla,Cancelar
 club_identity.confirm,Confirmer,Confirm,Confirmar,Conferma,Confirmar
 club_identity.premium_placeholder,Collection Premium — plus tard,Premium Collection — coming later,Colección Premium — más adelante,Collezione Premium — più avanti,Coleção Premium — mais tarde
 menu.continue_team.tooltip,Continuez votre progression avec {team},Continue your progress with {team},Continúa tu progreso con {team},Continua i tuoi progressi con {team},Continua o teu progresso com {team}
+multi_career.your_teams.title,VOS ÉQUIPES,YOUR TEAMS,TUS EQUIPOS,LE TUE SQUADRE,AS TUAS EQUIPAS
+multi_career.create_new.button,+ Créer une nouvelle équipe,+ Create New Team,+ Crear un nuevo equipo,+ Crea una nuova squadra,+ Criar nova equipa
+multi_career.create_new.title,Créer un nouveau club ?,Create a new club?,¿Crear un nuevo club?,Creare un nuovo club?,Criar um novo clube?
+multi_career.create_new.body,Vos clubs existants et votre progression seront conservés. Vous pourrez y revenir à tout moment.,Your existing clubs and progress will be preserved. You can return to them at any time.,Tus clubes existentes y tu progreso se conservarán. Podrás volver a ellos en cualquier momento.,I tuoi club esistenti e i tuoi progressi saranno conservati. Potrai tornarci in qualsiasi momento.,Os teus clubes existentes e o teu progresso serão preservados. Poderás voltar a eles a qualquer momento.
+multi_career.create_new.cancel,Annuler,Cancel,Cancelar,Annulla,Cancelar
+multi_career.create_new.confirm,Créer une nouvelle équipe,Create New Team,Crear un nuevo equipo,Crea una nuova squadra,Criar nova equipa
 teamname.create_new_team,Créer une nouvelle équipe,Create New Team,Crear nuevo equipo,Crea nuova squadra,Criar nova equipa
 teamname.create_new_team.tooltip,Créer une nouvelle équipe et repartir de zéro.,Create a new team and start from scratch.,Crear un equipo nuevo y empezar desde cero.,Crea una nuova squadra e ricomincia da zero.,Criar uma nova equipa e começar do zero.
 player.card.graph.attack,Attaque,Attack,Ataque,Attacco,Ataque
