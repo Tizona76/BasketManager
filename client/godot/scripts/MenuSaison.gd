@@ -2577,10 +2577,16 @@ func _bm_refresh_league_badge() -> void:
 	lbl_league_badge.text = _bm_current_league_name().to_upper()
 	lbl_league_badge.visible = btn_match.visible
 	lbl_league_badge.size = Vector2(250, 34)
-	lbl_league_badge.position = Vector2(
-		btn_match.position.x + (btn_match.size.x - lbl_league_badge.size.x) * 0.5,
-		btn_match.position.y + btn_match.size.y + 12.0
-	)
+	if lbl_season_day != null and is_instance_valid(lbl_season_day):
+		lbl_league_badge.position = Vector2(
+			lbl_season_day.position.x + (lbl_season_day.size.x - lbl_league_badge.size.x) * 0.5,
+			lbl_season_day.position.y - lbl_league_badge.size.y - 8.0
+		)
+	else:
+		lbl_league_badge.position = Vector2(
+			btn_match.position.x + (btn_match.size.x - lbl_league_badge.size.x) * 0.5,
+			btn_match.position.y + btn_match.size.y + 12.0
+		)
 	lbl_league_badge.pivot_offset = lbl_league_badge.size * 0.5
 
 

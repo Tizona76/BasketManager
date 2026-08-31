@@ -1207,7 +1207,23 @@ func _bm_make_away_road_sign_identity(rect: Rect2, crest_path: String, team_name
 		Vector2(rect.size.x - 8.0, rect.size.y),
 		Vector2(8.0, rect.size.y - 4.0)
 	])
+
+	var sign_glow := Line2D.new()
+	sign_glow.name = "RoadSignBlueGlow"
+	sign_glow.default_color = Color(0.086, 0.55, 1.0, 0.24)
+	sign_glow.width = 9.0
+	sign_glow.closed = true
+	sign_glow.points = sign.polygon
+	zone.add_child(sign_glow)
 	zone.add_child(sign)
+
+	var sign_border := Line2D.new()
+	sign_border.name = "RoadSignBlueBorder"
+	sign_border.default_color = Color(0.086, 0.55, 1.0, 0.92)
+	sign_border.width = 2.0
+	sign_border.closed = true
+	sign_border.points = sign.polygon
+	zone.add_child(sign_border)
 
 	var top_label := Label.new()
 	top_label.name = "OpponentName"
