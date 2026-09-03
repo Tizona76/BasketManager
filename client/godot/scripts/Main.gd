@@ -669,10 +669,13 @@ func _load_session_local_for_resume() -> void:
 	var d := parsed as Dictionary
 	var puid := str(d.get("profile_uuid", "")).strip_edges()
 	var rt := str(d.get("refresh_token", "")).strip_edges()
+	var at := str(d.get("access_token", "")).strip_edges()
 	if puid != "":
 		Session.profile_uuid = puid
 	if rt != "":
 		Session.refresh_token = rt
+	if at != "":
+		Session.access_token = at
 	print("[MAIN][SESSION] loaded resume profile_uuid=", str(Session.profile_uuid), " refresh_len=", str(str(Session.refresh_token).strip_edges().length()))
 
 func _show_menu() -> void:
@@ -1112,6 +1115,8 @@ func _on_teamname_career_selected(career_id: String) -> void:
 	_load_session_local_for_resume()
 	print("[MAIN][CAREER] selected=", cid, " active=", ProfileManager.get_active_career_id())
 	_show_menu()
+	if _menu_inst != null and _menu_inst.has_method("_update_club_name_label_from_save"):
+		_menu_inst.call_deferred("_update_club_name_label_from_save")
 
 
 func _create_new_career_from_pending_team_name() -> bool:

@@ -174,12 +174,45 @@ static func _bm_save_debug_caller() -> String:
 		if typeof(frame) != TYPE_DICTIONARY:
 			continue
 		var fn := str((frame as Dictionary).get("function", ""))
-		if fn == "" or fn.begins_with("_bm_save_debug") or fn == "load_savegame":
+		if fn == "" or fn.begins_with("_bm_save_debug") or fn.begins_with("_mc_reload_trace") or fn == "load_savegame":
 			continue
 		var src := str((frame as Dictionary).get("source", ""))
 		var line := int((frame as Dictionary).get("line", 0))
 		return "%s:%d:%s" % [src, line, fn]
 	return "unknown"
+
+static func _mc_reload_trace_save_values(save: Dictionary) -> Dictionary:
+	var xp: int = 0
+	if save.has("club") and typeof(save["club"]) == TYPE_DICTIONARY:
+		xp = int((save["club"] as Dictionary).get("xp", 0))
+	var journee: int = 1
+	if save.has("progress") and typeof(save["progress"]) == TYPE_DICTIONARY:
+		journee = int((save["progress"] as Dictionary).get("journee", 1))
+	return {
+		"xp": xp,
+		"round": int(save.get("season_round", 0)),
+		"journee": journee
+	}
+
+static func _mc_reload_trace_active_career(data: Dictionary) -> String:
+	var cid: String = str(data.get("career_id", "")).strip_edges()
+	if cid != "":
+		return cid
+	var pid: String = _bm_save_debug_active_profile_id()
+	var index_any: Variant = _bm_read_json_no_write(_bm_career_index_path(pid))
+	if typeof(index_any) == TYPE_DICTIONARY:
+		return str((index_any as Dictionary).get("active_career_id", "")).strip_edges()
+	return ""
+
+static func _mc_reload_trace_file_checksum(path: String) -> String:
+	if not FileAccess.file_exists(path):
+		return ""
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return ""
+	var txt: String = f.get_as_text()
+	f.close()
+	return txt.sha256_text()
 
 static func _bm_save_debug_player(save: Dictionary, wanted_id: int) -> void:
 	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
@@ -249,11 +282,17 @@ static func load_savegame(path: String = "user://savegame.json") -> Dictionary:
 static func write_savegame(data: Dictionary, path: String = "user://savegame.json") -> void:
 	path = _resolve_save_path(path)
 	ensure_progression_wallet_schema(data)
+	if Time.get_ticks_msec() <= 60000:
+		var vals_before: Dictionary = _mc_reload_trace_save_values(data)
+		print("[MC_RELOAD_TRACE][WRITE_BEGIN] caller=", _bm_save_debug_caller(), " active_career=", _mc_reload_trace_active_career(data), " path=", path, " club.xp=", int(vals_before.get("xp", 0)), " season_round=", int(vals_before.get("round", 0)), " progress.journee=", int(vals_before.get("journee", 1)))
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
+		print("[MC_RELOAD_TRACE][WRITE_OPEN_FAIL] caller=", _bm_save_debug_caller(), " active_career=", _mc_reload_trace_active_career(data), " path=", path)
 		return
 	f.store_string(JSON.stringify(data, "\t"))
 	f.close()
+	if Time.get_ticks_msec() <= 60000:
+		print("[MC_RELOAD_TRACE][WRITE_AFTER] caller=", _bm_save_debug_caller(), " active_career=", _mc_reload_trace_active_career(data), " path=", path, " checksum=", _mc_reload_trace_file_checksum(path))
 
 static func _repair_corrupted_salaries_on_load(save: Dictionary) -> void:
 	if save == null:

@@ -1312,6 +1312,14 @@ func _cloud_response_matches_request(response: Dictionary, requested_career_id: 
 		return false
 	return true
 
+func _mc_reload_trace_cloud_apply(label: String, blob: Dictionary, local_exists: bool, should_apply: bool, local_ck: String, cloud_ck: String, path: String) -> void:
+	var xp: int = PL.get_club_xp(blob)
+	var round: int = int(blob.get("season_round", 0))
+	var journee: int = 1
+	if blob.has("progress") and typeof(blob["progress"]) == TYPE_DICTIONARY:
+		journee = int((blob["progress"] as Dictionary).get("journee", 1))
+	print("[MC_RELOAD_TRACE][", label, "] career_id=", _cloud_active_career_id(), " path=", path, " blob.club.xp=", xp, " blob.season_round=", round, " blob.progress.journee=", journee, " local_exists=", local_exists, " should_apply=", should_apply, " local_ck=", local_ck, " cloud_ck=", cloud_ck)
+
 # ------------------------------------------------------------
 # CLOUD LOAD
 # ------------------------------------------------------------
@@ -1547,7 +1555,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 				if local_exists_load:
 					print("[APPLY_SKIP][LOCAL_PRIORITY] local save exists -> skip cloud overwrite")
 					should_apply_load = false
-				if cloud_ck_load != "" and local_ck_before_load != "":
+				if should_apply_load and cloud_ck_load != "" and local_ck_before_load != "":
 					should_apply_load = (cloud_ck_load != local_ck_before_load)
 				if dload.has("blob"):
 					var blobv_load: Variant = dload.get("blob")
@@ -1572,6 +1580,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 							should_apply_load = false
 						_save_text_file(FILE_CLOUD_BLOB_JSON, JSON.stringify(blobv_load, "\t"))
 						if should_apply_load:
+							_mc_reload_trace_cloud_apply("CLOUD_LOAD_APPLY", blobd_load, local_exists_load, should_apply_load, local_ck_before_load, cloud_ck_load, active_save_path_load)
 							PL.write_savegame(blobd_load)
 							_bm_apply_locale_from_save(blobd_load)
 							print("[CLOUD][LOAD] blob applied to active career")
@@ -1650,7 +1659,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 				print("[APPLY_SKIP][LOCAL_PRIORITY] local save exists -> skip cloud overwrite")
 				should_apply = false
 
-			if cloud_ck != "" and local_ck_before != "":
+			if should_apply and cloud_ck != "" and local_ck_before != "":
 				should_apply = (cloud_ck != local_ck_before)
 
 			# NEW CLUB CLOUD GUARD:
@@ -1709,6 +1718,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 						_save_text_file(FILE_CLOUD_BLOB_JSON, JSON.stringify(blobv, "\t"))
 						if should_apply:
 							if typeof(blobv) == TYPE_DICTIONARY:
+								_mc_reload_trace_cloud_apply("CLOUD_SAVE_APPLY", blobd, local_exists, should_apply, local_ck_before, cloud_ck, active_save_path_apply)
 								PL.write_savegame(blobd)
 							else:
 								_save_text_file(active_save_path_apply, JSON.stringify(blobv, "\t"))
@@ -3636,7 +3646,36 @@ func _on_btn_save_pressed() -> void:
 func _save_local_only() -> void:
 	var save: Dictionary = PL.load_savegame()
 	_bm_persist_current_locale_to_save(save)
+	var active_save_path: String = PL._resolve_save_path(FILE_SAVEGAME)
+	var career_id: String = _cloud_active_career_id()
+	var xp_before: int = PL.get_club_xp(save)
+	var round_before: int = int(save.get("season_round", 0))
+	var journee_before: int = 1
+	if save.has("progress") and typeof(save["progress"]) == TYPE_DICTIONARY:
+		journee_before = int((save["progress"] as Dictionary).get("journee", 1))
+	print("[MC_SAVELOCAL_TRACE][BEFORE_WRITE] career_id=", career_id, " path=", active_save_path, " club.xp=", xp_before, " season_round=", round_before, " progress.journee=", journee_before)
 	PL.write_savegame(save)
+	if OS.has_feature("web") and OS.is_userfs_persistent():
+		JavaScriptBridge.force_fs_sync()
+	var exists_after: bool = FileAccess.file_exists(active_save_path)
+	var size_after: int = -1
+	if exists_after:
+		var f_after := FileAccess.open(active_save_path, FileAccess.READ)
+		if f_after != null:
+			size_after = int(f_after.get_length())
+			f_after.close()
+	var readback: Variant = _read_json_file(active_save_path)
+	var xp_after: int = 0
+	var round_after: int = 0
+	var journee_after: int = 1
+	if typeof(readback) == TYPE_DICTIONARY:
+		var readback_dict: Dictionary = readback as Dictionary
+		xp_after = PL.get_club_xp(readback_dict)
+		round_after = int(readback_dict.get("season_round", 0))
+		if readback_dict.has("progress") and typeof(readback_dict["progress"]) == TYPE_DICTIONARY:
+			journee_after = int((readback_dict["progress"] as Dictionary).get("journee", 1))
+	var checksum_after: String = _sha256_canonical_from_file(active_save_path)
+	print("[MC_SAVELOCAL_TRACE][AFTER_WRITE] path=", active_save_path, " file_exists=", exists_after, " club.xp=", xp_after, " season_round=", round_after, " progress.journee=", journee_after, " size=", size_after, " checksum=", checksum_after)
 	_dirty_local = true
 	_toast_status("Saved locally", 2.0)
 

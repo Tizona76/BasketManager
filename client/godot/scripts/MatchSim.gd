@@ -1321,7 +1321,7 @@ func _bm_apply_away_match_identity_overlays() -> void:
 	overlay.z_index = -7
 	add_child(overlay)
 	overlay.add_child(_bm_make_away_road_sign_identity(
-		Rect2(Vector2(975.0 * sx, 192.0 * sy), Vector2(300.0 * sx, 226.0 * sy)),
+		Rect2(Vector2(975.0 * sx, 192.0 * sy), Vector2(345.0 * sx, 237.3 * sy)),
 		opponent_crest_path,
 		_opp_team_name,
 		58.0 * s,
@@ -4128,6 +4128,9 @@ func _fin_match() -> void:
 		# ----------------------------------------------------------------------
 
 		# 4) préparer l'adversaire suivant (optionnel)
+		if OS.has_feature("web") and OS.is_userfs_persistent():
+			JavaScriptBridge.force_fs_sync()
+
 		if ss.has_method("get_user_fixture_for_round"):
 			var fx: Dictionary = ss.call("get_user_fixture_for_round", _user_team_name, int(ss.matchs_joues))
 			if typeof(fx) == TYPE_DICTIONARY and fx.size() > 0:

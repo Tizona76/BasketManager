@@ -2166,6 +2166,7 @@ func _build_club_tokens_info_screen() -> void:
 
 
 func _add_buy_club_tokens_access(root: VBoxContainer) -> void:
+	return
 	_btn_buy_club_tokens = Button.new()
 	_btn_buy_club_tokens.name = "BtnBuyClubTokens"
 	var buy_text := _club_tokens_tr("club_tokens.buy", "BUY CLUB TOKENS")

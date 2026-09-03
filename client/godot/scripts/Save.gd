@@ -7,7 +7,8 @@ const FILE_SAVEGAME: String = "user://savegame.json"
 const StadiumDataRef = preload("res://scripts/StadiumData.gd")
 
 static func ensure_exists(profile_uuid: String = "") -> void:
-	if FileAccess.file_exists(FILE_SAVEGAME):
+	var active_save_path: String = PlayerLife._resolve_save_path(FILE_SAVEGAME)
+	if FileAccess.file_exists(active_save_path):
 		return
 
 	var d: Dictionary = {
@@ -169,7 +170,7 @@ static func set_finance_data(finance_data: Dictionary) -> void:
 static func stadium_level_str() -> String:
 	var s: Dictionary = get_stadium_data()
 	var ng: int = int(s.get("niveau_global_jeu", 1))
-	var ns: int = int(s.get("niveau_stade", 1))
+	var ns: int = int(s.get("niveau_stade", 0))
 	return str(ng) + "." + str(ns)
 
 static func stadium_current_capacity() -> int:
