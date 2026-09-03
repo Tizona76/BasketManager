@@ -84,6 +84,9 @@ var _league_inline_value: Label = null
 var _league_inline_change_btn: Button = null
 var _career_picker: Control = null
 var _create_new_career_dialog: ConfirmationDialog = null
+var _career_action_popup: PopupMenu = null
+var _delete_career_dialog: ConfirmationDialog = null
+var _pending_delete_career_id: String = ""
 var _teamname_ball_tween: Tween = null
 
 
@@ -324,6 +327,36 @@ func _bm_style_new_career_dialog_button(btn: Button, primary: bool) -> void:
 	btn.add_theme_stylebox_override("focus", hover)
 
 
+func _bm_make_career_action_popup_style(bg: Color, border: Color, glow_alpha: float = 0.0) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.border_color = border
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(9)
+	sb.content_margin_left = 14
+	sb.content_margin_right = 14
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 8
+	sb.shadow_color = Color(border.r, border.g, border.b, glow_alpha)
+	sb.shadow_size = 8 if glow_alpha > 0.0 else 0
+	sb.shadow_offset = Vector2(0, 3)
+	return sb
+
+
+func _bm_style_career_action_popup() -> void:
+	if _career_action_popup == null:
+		return
+	var panel_style := _bm_make_career_action_popup_style(Color(0.012, 0.026, 0.060, 0.98), Color(0.28, 0.66, 1.0, 0.86), 0.24)
+	var hover_style := _bm_make_career_action_popup_style(Color(0.055, 0.18, 0.39, 1.0), Color(0.42, 0.78, 1.0, 0.95), 0.18)
+	_career_action_popup.add_theme_stylebox_override("panel", panel_style)
+	_career_action_popup.add_theme_stylebox_override("hover", hover_style)
+	_career_action_popup.add_theme_color_override("font_color", Color(0.94, 0.97, 1.0, 1.0))
+	_career_action_popup.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
+	_career_action_popup.add_theme_font_size_override("font_size", 16)
+	_career_action_popup.add_theme_constant_override("h_separation", 8)
+	_career_action_popup.add_theme_constant_override("v_separation", 6)
+
+
 func _bm_style_new_career_dialog() -> void:
 	if _create_new_career_dialog == null:
 		return
@@ -442,12 +475,117 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	text_box.add_child(summary_label)
 
 	var cid := str(entry.get("career_id", "")).strip_edges()
+	var action_btn := Button.new()
+	action_btn.text = "⋮"
+	action_btn.custom_minimum_size = Vector2(38, 54)
+	action_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	action_btn.focus_mode = Control.FOCUS_NONE
+	action_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	action_btn.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else 26)
+	action_btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+	action_btn.pressed.connect(func() -> void:
+		_bm_show_career_action_popup(cid, action_btn)
+	)
+	row.add_child(action_btn)
+
 	btn.pressed.connect(func() -> void:
 		if cid == "":
 			return
 		emit_signal("career_selected", cid)
 	)
 	return btn
+
+
+func _bm_ensure_career_action_popup() -> void:
+	if _career_action_popup != null and is_instance_valid(_career_action_popup):
+		return
+	_career_action_popup = PopupMenu.new()
+	_career_action_popup.name = "CareerActionPopup"
+	_career_action_popup.add_item("Delete team", 1)
+	_bm_style_career_action_popup()
+	_career_action_popup.id_pressed.connect(_on_career_action_popup_id_pressed)
+	add_child(_career_action_popup)
+
+
+func _bm_show_career_action_popup(career_id: String, anchor: Control) -> void:
+	var cid := str(career_id).strip_edges()
+	if cid == "":
+		return
+	_bm_ensure_career_action_popup()
+	_pending_delete_career_id = cid
+	if _career_action_popup == null:
+		return
+	var pos := anchor.global_position + Vector2(anchor.size.x + 8.0, -4.0)
+	_career_action_popup.popup(Rect2i(Vector2i(pos), Vector2i(176, 42)))
+
+
+func _on_career_action_popup_id_pressed(id: int) -> void:
+	if id != 1:
+		return
+	_bm_show_delete_career_confirm()
+
+
+func _bm_style_delete_career_dialog() -> void:
+	if _delete_career_dialog == null:
+		return
+	var panel_style := _bm_make_new_career_dialog_style()
+	_delete_career_dialog.min_size = Vector2i(500, 168)
+	_delete_career_dialog.add_theme_stylebox_override("embedded_border", panel_style)
+	_delete_career_dialog.add_theme_stylebox_override("embedded_unfocused_border", panel_style)
+	_delete_career_dialog.add_theme_stylebox_override("panel", panel_style)
+	_delete_career_dialog.add_theme_constant_override("button_margin", 20)
+	var msg := _delete_career_dialog.get_label()
+	if msg != null:
+		msg.custom_minimum_size = Vector2(440, 52)
+		msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		msg.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		msg.add_theme_font_size_override("font_size", 24)
+		msg.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+		msg.add_theme_color_override("font_outline_color", Color(0.20, 0.58, 1.0, 0.68))
+		msg.add_theme_constant_override("outline_size", 1)
+	_bm_style_new_career_dialog_button(_delete_career_dialog.get_cancel_button(), false)
+	_bm_style_new_career_dialog_button(_delete_career_dialog.get_ok_button(), true)
+
+
+func _bm_ensure_delete_career_dialog() -> void:
+	if _delete_career_dialog != null and is_instance_valid(_delete_career_dialog):
+		return
+	_delete_career_dialog = ConfirmationDialog.new()
+	_delete_career_dialog.name = "DeleteCareerDialog"
+	_delete_career_dialog.title = ""
+	_delete_career_dialog.dialog_text = "Delete this team permanently?"
+	_delete_career_dialog.ok_button_text = "Delete permanently"
+	_delete_career_dialog.cancel_button_text = "Cancel"
+	_delete_career_dialog.exclusive = true
+	_delete_career_dialog.confirmed.connect(_on_delete_career_confirmed)
+	add_child(_delete_career_dialog)
+	_bm_style_delete_career_dialog()
+
+
+func _bm_show_delete_career_confirm() -> void:
+	if _pending_delete_career_id == "":
+		return
+	_bm_ensure_delete_career_dialog()
+	if _delete_career_dialog != null:
+		_bm_style_delete_career_dialog()
+		_delete_career_dialog.popup_centered(Vector2i(500, 168))
+
+
+func _on_delete_career_confirmed() -> void:
+	var cid := str(_pending_delete_career_id).strip_edges()
+	_pending_delete_career_id = ""
+	if cid == "":
+		return
+	if _career_action_popup != null:
+		_career_action_popup.hide()
+	if not ProfileManager.delete_career(cid):
+		return
+	if _bm_has_career_picker_data():
+		_bm_set_teamname_form_visible(false)
+		_bm_build_career_picker()
+	else:
+		_bm_clear_career_picker()
+		_bm_set_teamname_form_visible(true)
 
 
 func _bm_ensure_create_new_career_dialog() -> void:

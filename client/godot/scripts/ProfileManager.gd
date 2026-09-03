@@ -471,6 +471,42 @@ static func refresh_career_metadata(career_id: String) -> bool:
 	_write_careers_index(pid, index)
 	return true
 
+static func delete_career(career_id: String) -> bool:
+	var pid: String = get_active_profile_id()
+	_ensure_careers_for_profile(pid)
+	var cid: String = str(career_id).strip_edges()
+	if cid == "":
+		return false
+	cid = _sanitize_path_id(cid)
+	var index_any: Variant = _read_careers_index(pid)
+	if typeof(index_any) != TYPE_DICTIONARY:
+		return false
+	var index: Dictionary = _normalize_careers_index(index_any as Dictionary)
+	var idx: int = _career_entry_index(index, cid)
+	var save_path: String = _career_save_path(pid, cid)
+	if idx < 0 and not FileAccess.file_exists(save_path):
+		return false
+	if FileAccess.file_exists(save_path):
+		var err := DirAccess.remove_absolute(ProjectSettings.globalize_path(save_path))
+		if err != OK:
+			return false
+	var remaining: Array = []
+	if typeof(index.get("careers")) == TYPE_ARRAY:
+		for raw_entry in index["careers"]:
+			if typeof(raw_entry) != TYPE_DICTIONARY:
+				continue
+			var entry: Dictionary = _career_entry_from_index_entry(raw_entry as Dictionary)
+			if str(entry.get("career_id", "")).strip_edges() == cid:
+				continue
+			remaining.append(entry)
+	index["careers"] = remaining
+	var active_id: String = str(index.get("active_career_id", "")).strip_edges()
+	if active_id == cid or active_id == "" or not _career_exists_in_index(index, active_id):
+		index["active_career_id"] = "" if remaining.is_empty() else str((remaining[0] as Dictionary).get("career_id", ""))
+	_write_careers_index(pid, index)
+	_hydrate_season_state_from_active_save()
+	return true
+
 static func get_active_career_save_path() -> String:
 	var pid: String = get_active_profile_id()
 	_ensure_careers_for_profile(pid)

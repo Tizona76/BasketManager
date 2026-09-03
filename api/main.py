@@ -1479,6 +1479,39 @@ def _cloud_v2_load(user_id: str, profile_uuid: str, career_id: str, attach_legac
     }
 
 
+def _cloud_v2_delete_career(user_id: str, profile_uuid: str, career_id: str) -> Dict[str, Any]:
+    if not _auth_init_schema():
+        raise HTTPException(status_code=503, detail="CLOUD_DB_NOT_READY")
+
+    if not profile_uuid or len(profile_uuid) < 16:
+        raise HTTPException(status_code=400, detail="BAD_PROFILE_UUID")
+    cid = _clean_career_id(career_id)
+
+    eng = _lb_get_engine()
+    if eng is None:
+        raise HTTPException(status_code=503, detail="CLOUD_DB_NOT_READY")
+
+    with eng.begin() as conn:
+        cloud_row = conn.execute(text("""
+            DELETE FROM cloud_saves_v2
+            WHERE user_id = :uid AND profile_uuid = :p AND career_id = :c
+            RETURNING save_id;
+        """), {"uid": user_id, "p": profile_uuid, "c": cid}).fetchone()
+        wallet_row = conn.execute(text("""
+            DELETE FROM club_token_wallets
+            WHERE user_id = :uid AND profile_uuid = :p AND career_id = :c
+            RETURNING user_id;
+        """), {"uid": user_id, "p": profile_uuid, "c": cid}).fetchone()
+
+    return {
+        "ok": True,
+        "profile_uuid": profile_uuid,
+        "career_id": cid,
+        "cloud_save_deleted": cloud_row is not None,
+        "wallet_deleted": wallet_row is not None,
+    }
+
+
 # Legacy V1 (HMAC) helpers (kept for migration)
 def _cloud_v1_save(p: CloudSavePayload) -> Dict[str, Any]:
     if not _cloud_init_schema():
@@ -1593,6 +1626,23 @@ def cloud_load_v2(profile_uuid: str, request: Request, career_id: str = "", atta
         _audit("/v1/cloud/load", int(he.status_code), user_id=user_id, ip=ip)
         raise
 
+
+
+@app.delete("/v1/cloud/career")
+def cloud_delete_career_v2(profile_uuid: str, request: Request, career_id: str = "", authorization: str = Header(default="")):
+    claims = _require_bearer_claims(authorization)
+    user_id = str(claims.get("sub") or "")
+
+    _rl_global(user_id)
+
+    ip = request.client.host if request.client else None
+    try:
+        out = _cloud_v2_delete_career(user_id, profile_uuid, career_id)
+        _audit("/v1/cloud/career", 200, user_id=user_id, ip=ip)
+        return out
+    except HTTPException as he:
+        _audit("/v1/cloud/career", int(he.status_code), user_id=user_id, ip=ip)
+        raise
 
 
 # ============================================================
