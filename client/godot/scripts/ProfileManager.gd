@@ -46,32 +46,6 @@ static func _write_json(path: String, data: Variant) -> void:
 	f.store_string(JSON.stringify(data, "\t"))
 	f.close()
 
-static func _mc_reload_trace_profile_state(label: String, profile_id: String) -> void:
-	var pid: String = _sanitize_path_id(profile_id)
-	var active_id: String = ""
-	var index_any: Variant = _read_careers_index(pid)
-	if typeof(index_any) == TYPE_DICTIONARY:
-		active_id = str((index_any as Dictionary).get("active_career_id", "")).strip_edges()
-	var path: String = ""
-	if active_id != "":
-		path = _career_save_path(pid, active_id)
-	else:
-		path = _profile_path(pid)
-	var exists: bool = FileAccess.file_exists(path)
-	var xp: int = 0
-	var round: int = 0
-	var journee: int = 1
-	if exists:
-		var save_any: Variant = _read_json(path)
-		if typeof(save_any) == TYPE_DICTIONARY:
-			var save: Dictionary = save_any as Dictionary
-			if save.has("club") and typeof(save["club"]) == TYPE_DICTIONARY:
-				xp = int((save["club"] as Dictionary).get("xp", 0))
-			round = int(save.get("season_round", 0))
-			if save.has("progress") and typeof(save["progress"]) == TYPE_DICTIONARY:
-				journee = int((save["progress"] as Dictionary).get("journee", 1))
-	print("[MC_RELOAD_TRACE][PROFILE_", label, "] profile_uuid=", pid, " active_career_id=", active_id, " path=", path, " file_exists=", exists, " club.xp=", xp, " season_round=", round, " progress.journee=", journee)
-
 static func _copy_file(src: String, dst: String) -> bool:
 	if not FileAccess.file_exists(src):
 		return false
@@ -499,9 +473,7 @@ static func refresh_career_metadata(career_id: String) -> bool:
 
 static func get_active_career_save_path() -> String:
 	var pid: String = get_active_profile_id()
-	_mc_reload_trace_profile_state("RESOLVE_BEFORE_ENSURE", pid)
 	_ensure_careers_for_profile(pid)
-	_mc_reload_trace_profile_state("RESOLVE_AFTER_ENSURE", pid)
 	var index_any: Variant = _read_careers_index(pid)
 	if typeof(index_any) != TYPE_DICTIONARY:
 		var scanned_ids: Array[String] = _scan_existing_career_ids(pid)
@@ -584,10 +556,8 @@ static func flush_active_to_profile_file() -> void:
 
 static func activate_profile(profile_id: String) -> void:
 	var new_id: String = _sanitize_path_id(profile_id)
-	_mc_reload_trace_profile_state("ACTIVATE_BEFORE_ENSURE", new_id)
 
 	ensure_exists()
-	_mc_reload_trace_profile_state("ACTIVATE_AFTER_ENSURE", new_id)
 
 	var current_id: String = get_active_profile_id()
 	if new_id == current_id:
