@@ -630,6 +630,9 @@ multi_career.create_new.title,Créer un nouveau club ?,Create a new club?,¿Crea
 multi_career.create_new.body,Vos clubs existants et votre progression seront conservés. Vous pourrez y revenir à tout moment.,Your existing clubs and progress will be preserved. You can return to them at any time.,Tus clubes existentes y tu progreso se conservarán. Podrás volver a ellos en cualquier momento.,I tuoi club esistenti e i tuoi progressi saranno conservati. Potrai tornarci in qualsiasi momento.,Os teus clubes existentes e o teu progresso serão preservados. Poderás voltar a eles a qualquer momento.
 multi_career.create_new.cancel,Annuler,Cancel,Cancelar,Annulla,Cancelar
 multi_career.create_new.confirm,Créer une nouvelle équipe,Create New Team,Crear un nuevo equipo,Crea una nuova squadra,Criar nova equipa
+multi_career.delete_team,Supprimer l'équipe,Delete team,Eliminar equipo,Elimina squadra,Eliminar equipa
+multi_career.delete_confirm,Supprimer définitivement cette équipe ?,Delete this team permanently?,¿Eliminar este equipo definitivamente?,Eliminare definitivamente questa squadra?,Eliminar esta equipa permanentemente?
+multi_career.delete_permanently,Supprimer définitivement,Delete permanently,Eliminar definitivamente,Elimina definitivamente,Eliminar permanentemente
 teamname.create_new_team,Créer une nouvelle équipe,Create New Team,Crear nuevo equipo,Crea nuova squadra,Criar nova equipa
 teamname.create_new_team.tooltip,Créer une nouvelle équipe et repartir de zéro.,Create a new team and start from scratch.,Crear un equipo nuevo y empezar desde cero.,Crea una nuova squadra e ricomincia da zero.,Criar uma nova equipa e começar do zero.
 player.card.graph.attack,Attaque,Attack,Ataque,Attacco,Ataque

@@ -501,7 +501,7 @@ func _bm_ensure_career_action_popup() -> void:
 		return
 	_career_action_popup = PopupMenu.new()
 	_career_action_popup.name = "CareerActionPopup"
-	_career_action_popup.add_item("Delete team", 1)
+	_career_action_popup.add_item(tr("multi_career.delete_team"), 1)
 	_bm_style_career_action_popup()
 	_career_action_popup.id_pressed.connect(_on_career_action_popup_id_pressed)
 	add_child(_career_action_popup)
@@ -553,9 +553,9 @@ func _bm_ensure_delete_career_dialog() -> void:
 	_delete_career_dialog = ConfirmationDialog.new()
 	_delete_career_dialog.name = "DeleteCareerDialog"
 	_delete_career_dialog.title = ""
-	_delete_career_dialog.dialog_text = "Delete this team permanently?"
-	_delete_career_dialog.ok_button_text = "Delete permanently"
-	_delete_career_dialog.cancel_button_text = "Cancel"
+	_delete_career_dialog.dialog_text = tr("multi_career.delete_confirm")
+	_delete_career_dialog.ok_button_text = tr("multi_career.delete_permanently")
+	_delete_career_dialog.cancel_button_text = tr("multi_career.create_new.cancel")
 	_delete_career_dialog.exclusive = true
 	_delete_career_dialog.confirmed.connect(_on_delete_career_confirmed)
 	add_child(_delete_career_dialog)
