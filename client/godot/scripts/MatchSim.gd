@@ -2,6 +2,7 @@ extends Control
 const PlayerLife := preload("res://scripts/PlayerLife.gd")
 const SponsorDataRef := preload("res://scripts/SponsorData.gd")
 const LeagueDataScript := preload("res://scripts/LeagueData.gd")
+const StadiumDataRef := preload("res://scripts/StadiumData.gd")
 
 # BM_SKIP_FINAL_RESULT_TOKEN_MODE_V1
 # false = mode test actuel inchangé.
@@ -3368,6 +3369,258 @@ func _get_salary_league_coef(save: Dictionary) -> float:
 		league_id = LeagueDataScript.get_default_league_id()
 	return LeagueDataScript.get_coef(league_id, "salary")
 
+func _bm_ticketing_get_data(save: Dictionary) -> Dictionary:
+	if save.has("stadium") and typeof(save["stadium"]) == TYPE_DICTIONARY:
+		var stadium_d: Dictionary = save["stadium"] as Dictionary
+		if stadium_d.has("ticketing") and typeof(stadium_d["ticketing"]) == TYPE_DICTIONARY:
+			return stadium_d["ticketing"] as Dictionary
+	if save.has("ticketing") and typeof(save["ticketing"]) == TYPE_DICTIONARY:
+		return save["ticketing"] as Dictionary
+	return {}
+
+
+# BM_TICKETING_DEMAND_CAPACITY_V2
+# Capacité réelle du stade depuis le niveau sauvegardé.
+func _bm_stadium_capacity_from_save(save: Dictionary) -> int:
+	var stadium_d: Dictionary = {}
+
+	if save.has("stadium") and typeof(save["stadium"]) == TYPE_DICTIONARY:
+		stadium_d = save["stadium"] as Dictionary
+
+	var ng: int = int(stadium_d.get("niveau_global_jeu", 1))
+	var ns: int = int(stadium_d.get("niveau_stade", 1))
+
+	var capacity: int = int(
+		StadiumDataRef.get_capacity(ng, ns)
+	)
+
+	if capacity > 0:
+		return capacity
+
+	# Fallback non destructif : au minimum les places réellement proposées.
+	var ticketing_d: Dictionary = _bm_ticketing_get_data(save)
+
+	return maxi(
+		0,
+		int(ticketing_d.get("seats_a", 0))
+		+ int(ticketing_d.get("seats_b", 0))
+		+ int(ticketing_d.get("seats_c", 0))
+	)
+
+
+# Revenu facial d'UNE seule configuration Ticketing canonique.
+# Évite le double comptage root + stadium.ticketing.
+func _bm_ticketing_face_revenue(save: Dictionary) -> int:
+	var ticketing_d: Dictionary = _bm_ticketing_get_data(save)
+
+	if ticketing_d.is_empty():
+		return 0
+
+	return maxi(
+		0,
+		int(ticketing_d.get("price_a", 0))
+		* int(ticketing_d.get("seats_a", 0))
+		+ int(ticketing_d.get("price_b", 0))
+		* int(ticketing_d.get("seats_b", 0))
+		+ int(ticketing_d.get("price_c", 0))
+		* int(ticketing_d.get("seats_c", 0))
+	)
+
+
+func _bm_ticketing_weighted_price(save: Dictionary) -> float:
+	var ticketing_d: Dictionary = _bm_ticketing_get_data(save)
+	if ticketing_d.is_empty():
+		return 0.0
+
+	var price_a: float = float(ticketing_d.get("price_a", 0))
+	var price_b: float = float(ticketing_d.get("price_b", 0))
+	var price_c: float = float(ticketing_d.get("price_c", 0))
+
+	var seats_a: float = float(ticketing_d.get("seats_a", 0))
+	var seats_b: float = float(ticketing_d.get("seats_b", 0))
+	var seats_c: float = float(ticketing_d.get("seats_c", 0))
+
+	var seats_total: float = seats_a + seats_b + seats_c
+	if seats_total <= 0.0:
+		return 0.0
+
+	return (
+		price_a * seats_a
+		+ price_b * seats_b
+		+ price_c * seats_c
+	) / seats_total
+
+
+func _bm_ticketing_market_get(save: Dictionary) -> Dictionary:
+	var ticketing_d: Dictionary = _bm_ticketing_get_data(save)
+	if ticketing_d.has("market") and typeof(ticketing_d["market"]) == TYPE_DICTIONARY:
+		return (ticketing_d["market"] as Dictionary).duplicate(true)
+
+	return {
+		"obs_count": 0,
+		"obs_1": 0.0,
+		"obs_2": 0.0,
+		"reference_price": 0.0,
+		"signal": "",
+		"pending_response": false,
+		"advisor_code": ""
+	}
+
+
+func _bm_ticketing_market_store(save: Dictionary, market: Dictionary) -> void:
+	if not save.has("stadium") or typeof(save["stadium"]) != TYPE_DICTIONARY:
+		save["stadium"] = {}
+
+	var stadium_d: Dictionary = save["stadium"] as Dictionary
+	var stadium_ticketing: Dictionary = {}
+
+	if stadium_d.has("ticketing") and typeof(stadium_d["ticketing"]) == TYPE_DICTIONARY:
+		stadium_ticketing = stadium_d["ticketing"] as Dictionary
+
+	stadium_ticketing["market"] = market.duplicate(true)
+	stadium_d["ticketing"] = stadium_ticketing
+	save["stadium"] = stadium_d
+
+	if save.has("ticketing") and typeof(save["ticketing"]) == TYPE_DICTIONARY:
+		var root_ticketing: Dictionary = save["ticketing"] as Dictionary
+		root_ticketing["market"] = market.duplicate(true)
+		save["ticketing"] = root_ticketing
+
+
+func _bm_ticketing_market_reaction(save: Dictionary) -> Dictionary:
+	var result: Dictionary = {
+		"volume_coef": 1.0,
+		"pop_delta": 0,
+		"consumed": false,
+		"advisor_code": ""
+	}
+
+	var market: Dictionary = _bm_ticketing_market_get(save)
+	if not bool(market.get("pending_response", false)):
+		return result
+
+	var market_signal: String = str(market.get("signal", ""))
+	var reference_price: float = float(market.get("reference_price", 0.0))
+	var current_price: float = _bm_ticketing_weighted_price(save)
+
+	if reference_price <= 0.0 or current_price <= 0.0:
+		return result
+
+	var variation: float = (current_price - reference_price) / reference_price
+	result["consumed"] = true
+
+	if market_signal == "low":
+		if variation <= -0.15:
+			result["volume_coef"] = 1.08
+			result["pop_delta"] = 3
+			result["advisor_code"] = "ticket_good_response"
+		elif variation <= -0.05:
+			result["volume_coef"] = 1.04
+			result["pop_delta"] = 2
+			result["advisor_code"] = "ticket_good_response"
+		elif variation < 0.05:
+			result["volume_coef"] = 1.00
+			result["pop_delta"] = -1
+			result["advisor_code"] = "ticket_low_unchanged"
+		elif variation < 0.15:
+			result["volume_coef"] = 0.96
+			result["pop_delta"] = -2
+			result["advisor_code"] = "ticket_price_pressure"
+		else:
+			result["volume_coef"] = 0.92
+			result["pop_delta"] = -3
+			result["advisor_code"] = "ticket_price_pressure"
+
+	elif market_signal == "strong" or market_signal == "very_strong":
+		if variation <= -0.05:
+			result["volume_coef"] = 1.02
+			result["pop_delta"] = 0
+			result["advisor_code"] = "ticket_strong_demand"
+		elif variation < 0.05:
+			result["volume_coef"] = 1.00
+			result["pop_delta"] = 0
+			result["advisor_code"] = "ticket_premium_ok" if market_signal == "very_strong" else "ticket_strong_demand"
+		elif variation < 0.15:
+			result["volume_coef"] = 0.98
+			result["pop_delta"] = 0
+			result["advisor_code"] = "ticket_strong_demand"
+		elif variation < 0.25:
+			result["volume_coef"] = 0.95
+			result["pop_delta"] = -1
+			result["advisor_code"] = "ticket_price_pressure"
+		else:
+			result["volume_coef"] = 0.92
+			result["pop_delta"] = -2
+			result["advisor_code"] = "ticket_price_pressure"
+
+	return result
+
+
+func _bm_ticketing_market_after_home_match(
+	save: Dictionary,
+	demand_ratio: float,
+	current_weighted_price: float,
+	reaction: Dictionary
+) -> void:
+	var market: Dictionary = _bm_ticketing_market_get(save)
+
+	if bool(reaction.get("consumed", false)):
+		market["obs_count"] = 0
+		market["obs_1"] = 0.0
+		market["obs_2"] = 0.0
+		market["reference_price"] = 0.0
+		market["signal"] = ""
+		market["pending_response"] = false
+
+		var reaction_advisor: String = str(reaction.get("advisor_code", ""))
+		if reaction_advisor != "":
+			market["advisor_code"] = reaction_advisor
+
+	var obs_count: int = int(market.get("obs_count", 0))
+
+	if obs_count <= 0:
+		market["obs_1"] = clampf(demand_ratio, 0.0, 1.0)
+		market["obs_2"] = 0.0
+		market["obs_count"] = 1
+	else:
+		market["obs_2"] = clampf(demand_ratio, 0.0, 1.0)
+		market["obs_count"] = 2
+
+		var avg_demand: float = (
+			float(market.get("obs_1", 0.0))
+			+ float(market.get("obs_2", 0.0))
+		) / 2.0
+
+		var new_signal: String = ""
+		var advisor_code: String = ""
+
+		if avg_demand < 0.55:
+			new_signal = "low"
+			advisor_code = "ticket_low_demand"
+		elif avg_demand >= 0.95:
+			new_signal = "very_strong"
+			advisor_code = "ticket_premium_ok"
+		elif avg_demand >= 0.80:
+			new_signal = "strong"
+			advisor_code = "ticket_strong_demand"
+
+		if new_signal != "":
+			market["signal"] = new_signal
+			market["pending_response"] = true
+			market["reference_price"] = current_weighted_price
+			market["advisor_code"] = advisor_code
+		else:
+			market["obs_count"] = 0
+			market["obs_1"] = 0.0
+			market["obs_2"] = 0.0
+			market["signal"] = ""
+			market["pending_response"] = false
+			market["reference_price"] = 0.0
+			market["advisor_code"] = ""
+
+	_bm_ticketing_market_store(save, market)
+
+
 func _compute_shop_prevision(save: Dictionary) -> int:
 	# 1) shop.items = [{price, qty}...] ou shop.items_by_id = {id:{price,qty}}
 	var total := 0
@@ -3404,43 +3657,55 @@ func _compute_shop_prevision(save: Dictionary) -> int:
 	total = int((save.get("shop", {}) as Dictionary).get("total_forecast", 0))
 	return total
 
-func _bm_collect_shop_price_values(v: Variant, out: Array) -> void:
-	if typeof(v) == TYPE_DICTIONARY:
-		var d: Dictionary = v as Dictionary
-		for k in d.keys():
-			var key := str(k).to_lower()
-			var val: Variant = d[k]
-			if (key.find("price") != -1 or key.find("prix") != -1) and (typeof(val) == TYPE_INT or typeof(val) == TYPE_FLOAT):
-				out.append(float(val))
-			if typeof(val) == TYPE_DICTIONARY or typeof(val) == TYPE_ARRAY:
-				_bm_collect_shop_price_values(val, out)
-	elif typeof(v) == TYPE_ARRAY:
-		for item in (v as Array):
-			if typeof(item) == TYPE_DICTIONARY or typeof(item) == TYPE_ARRAY:
-				_bm_collect_shop_price_values(item, out)
-
-
 func _bm_shop_price_volume_coef_from_save(save: Dictionary) -> float:
+	# BM_SHOP_PRICE_VOLUME_COHERENCE_V2
+	# Seuls les produits réellement actifs et vendables influencent la demande.
 	if not save.has("shop") or typeof(save["shop"]) != TYPE_DICTIONARY:
 		return 1.0
 
-	var prices: Array = []
-	_bm_collect_shop_price_values(save["shop"], prices)
-	if prices.is_empty():
+	var shop_d: Dictionary = save["shop"] as Dictionary
+	var items_any: Variant = shop_d.get("items", {})
+
+	if typeof(items_any) != TYPE_DICTIONARY:
 		return 1.0
 
-	var total := 0.0
-	for raw_price in prices:
-		total += float(raw_price)
+	var items_d: Dictionary = items_any as Dictionary
+	var total_price: float = 0.0
+	var active_count: int = 0
 
-	var avg_price := total / float(prices.size())
+	for pid_v in items_d.keys():
+		var item_any: Variant = items_d.get(pid_v, {})
+		if typeof(item_any) != TYPE_DICTIONARY:
+			continue
+
+		var item: Dictionary = item_any as Dictionary
+
+		if not bool(item.get("enabled", true)):
+			continue
+
+		var price: float = float(item.get("price", 0.0))
+		if price <= 0.0:
+			continue
+
+		total_price += price
+		active_count += 1
+
+	if active_count <= 0:
+		return 1.0
+
+	var avg_price: float = total_price / float(active_count)
 
 	if avg_price <= 10.0:
 		return 1.0
+
 	if avg_price >= 25.0:
 		return 0.72
 
-	return lerpf(1.0, 0.72, (avg_price - 10.0) / 15.0)
+	return lerpf(
+		1.0,
+		0.72,
+		(avg_price - 10.0) / 15.0
+	)
 
 
 func _apply_popularity_after_match(save: Dictionary, did_win: bool, did_draw: bool) -> void:
@@ -3483,16 +3748,6 @@ func _apply_popularity_after_match(save: Dictionary, did_win: bool, did_draw: bo
 	pop = clampi(pop, 30, 100)
 	save["popularite"] = pop
 	var coef: float = float(pop) / 100.0
-
-	# --- Shop income computed from forecast * popularity coef (unchanged structure) ---
-	var shop_forecast: int = 0
-	if save.has("shop") and typeof(save["shop"]) == TYPE_DICTIONARY:
-		shop_forecast = int((save["shop"] as Dictionary).get("total_forecast", 0))
-
-	var shop_income: int = int(round(float(shop_forecast) * coef))
-	if shop_income < 0:
-		shop_income = 0
-	# NOTE: si tu stockes shop_income quelque part, fais-le dans la clé existante attendue (non modifiée ici)
 
 	# --- Update popularity after match result (win +8 / draw +1 / lose -7) ---
 	if did_draw:
@@ -3611,10 +3866,67 @@ func _fin_match() -> void:
 
 	if not already_applied and _user_is_home:
 		var coef := PlayerLife.popularity_coef(save)
-		var prev_ticket := _compute_ticketing_prevision(save)
 		var prev_shop := _compute_shop_prevision(save)
 		var ticketing_league_coef := _get_ticketing_league_coef(save)
-		var rec_ticket := int(round(float(prev_ticket) * coef * ticketing_league_coef))
+
+		# BM_TICKETING_MARKET_V1
+		# Prix = effet volume immédiat modéré + effet popularité différé.
+		# Aucun malus absolu sur un prix élevé : seul le diagnostic de demande
+		# précédent et la réaction du joueur sont évalués.
+		var ticket_market_reaction: Dictionary = _bm_ticketing_market_reaction(save)
+		var ticket_commercial_volume_coef: float = float(ticket_market_reaction.get("volume_coef", 1.0))
+		var ticket_commercial_pop_delta: int = int(ticket_market_reaction.get("pop_delta", 0))
+		var ticket_weighted_price: float = _bm_ticketing_weighted_price(save)
+
+		# BM_TICKETING_DEMAND_CAPACITY_V2
+		# La demande est générée par la capacité réelle du stade.
+		# Les places mises en vente plafonnent ensuite l'affluence.
+		var ticketing_demand_data: Dictionary = _bm_ticketing_get_data(save)
+
+		var ticket_offered_seats: int = maxi(
+			0,
+			int(ticketing_demand_data.get("seats_a", 0))
+			+ int(ticketing_demand_data.get("seats_b", 0))
+			+ int(ticketing_demand_data.get("seats_c", 0))
+		)
+
+		var ticket_stadium_capacity: int = _bm_stadium_capacity_from_save(save)
+
+		var ticket_potential_demand_ratio: float = clampf(
+			coef
+			* ticketing_league_coef
+			* ticket_commercial_volume_coef,
+			0.0,
+			1.0
+		)
+
+		var ticket_potential_attendance: int = int(round(
+			float(ticket_stadium_capacity)
+			* ticket_potential_demand_ratio
+		))
+
+		var ticket_actual_attendance: int = mini(
+			ticket_offered_seats,
+			ticket_potential_attendance
+		)
+
+		var ticket_offered_fill_ratio: float = 0.0
+
+		if ticket_offered_seats > 0:
+			ticket_offered_fill_ratio = clampf(
+				float(ticket_actual_attendance)
+				/ float(ticket_offered_seats),
+				0.0,
+				1.0
+			)
+
+		var ticket_face_revenue: int = _bm_ticketing_face_revenue(save)
+
+		var rec_ticket: int = int(round(
+			float(ticket_face_revenue)
+			* ticket_offered_fill_ratio
+		))
+
 		var shop_price_volume_coef := _bm_shop_price_volume_coef_from_save(save)
 		var rec_shop := int(round(float(prev_shop) * coef * shop_price_volume_coef))
 
@@ -3626,35 +3938,180 @@ func _fin_match() -> void:
 				var items_d: Dictionary = shop_d["items"] as Dictionary
 				var stock_state: Dictionary = shop_d["stock_state"] as Dictionary
 				var real_shop_income: int = 0
-				for pid_v in items_d.keys():
-					var pid := str(pid_v)
-					var item_any: Variant = items_d[pid_v]
+
+				# BM_SHOP_ATTENDANCE_DEMAND_V1
+				# La demande Shop dépend de l'affluence, jamais du stock.
+				# Le stock reste uniquement une limite d'offre.
+				# Même affluence réelle que Ticketing.
+				var shop_attendance: int = ticket_actual_attendance
+
+				# Environ 30 % des spectateurs achètent un article.
+				# Le coefficient prix Shop existant reste inchangé.
+				var shop_total_demand: int = maxi(
+					0,
+					int(round(
+						float(shop_attendance)
+						* 0.30
+						* shop_price_volume_coef
+					))
+				)
+
+				var active_shop_ids: Array = []
+
+				for pid_active_v in items_d.keys():
+					var active_any: Variant = items_d[pid_active_v]
+					if typeof(active_any) != TYPE_DICTIONARY:
+						continue
+
+					var active_item: Dictionary = active_any as Dictionary
+					if not bool(active_item.get("enabled", true)):
+						continue
+
+					if int(active_item.get("price", 0)) <= 0:
+						continue
+
+					var active_pid: String = str(pid_active_v)
+					if not stock_state.has(active_pid):
+						continue
+					if typeof(stock_state[active_pid]) != TYPE_DICTIONARY:
+						continue
+
+					active_shop_ids.append(active_pid)
+
+				var demand_remaining: int = shop_total_demand
+
+				for i in range(active_shop_ids.size()):
+					var pid: String = str(active_shop_ids[i])
+
+					var item_any: Variant = items_d.get(pid, {})
 					if typeof(item_any) != TYPE_DICTIONARY:
 						continue
+
 					var item: Dictionary = item_any as Dictionary
-					if not bool(item.get("enabled", true)):
-						continue
 					var price: int = int(item.get("price", 0))
 					if price <= 0:
 						continue
+
 					var st_any: Variant = stock_state.get(pid, {})
 					if typeof(st_any) != TYPE_DICTIONARY:
 						continue
+
 					var st: Dictionary = st_any as Dictionary
-					var current_stock: int = maxi(0, int(st.get("current", item.get("qty", 0))))
-					var wanted_sold: int = int(round(float(current_stock) * coef * shop_price_volume_coef))
-					var sold: int = clampi(wanted_sold, 0, current_stock)
-					st["current"] = maxi(0, current_stock - sold)
+					var current_stock: int = maxi(
+						0,
+						int(st.get("current", item.get("qty", 0)))
+					)
+
+					var products_left: int = maxi(
+						1,
+						active_shop_ids.size() - i
+					)
+
+					var wanted_sold: int = int(round(
+						float(demand_remaining)
+						/ float(products_left)
+					))
+
+					var sold: int = clampi(
+						wanted_sold,
+						0,
+						current_stock
+					)
+
+					demand_remaining = maxi(
+						0,
+						demand_remaining - sold
+					)
+
+					st["current"] = maxi(
+						0,
+						current_stock - sold
+					)
 					st["last_sold"] = sold
 					stock_state[pid] = st
+
 					real_shop_income += sold * price
+
 				shop_d["stock_state"] = stock_state
+				shop_d["last_attendance"] = shop_attendance
+				shop_d["last_total_demand"] = shop_total_demand
+
+				# BM_SHOP_OVERSTOCK_OBSERVATION_V1
+				# Surstock = stock restant très supérieur à la demande,
+				# confirmé sur 2 domiciles consécutifs.
+				var remaining_stock_total: int = 0
+
+				for active_pid_v in active_shop_ids:
+					var active_pid: String = str(active_pid_v)
+					var active_st_any: Variant = stock_state.get(active_pid, {})
+
+					if typeof(active_st_any) != TYPE_DICTIONARY:
+						continue
+
+					var active_st: Dictionary = active_st_any as Dictionary
+					remaining_stock_total += maxi(
+						0,
+						int(active_st.get("current", 0))
+					)
+
+				var stock_coverage_ratio: float = (
+					float(remaining_stock_total)
+					/ float(shop_total_demand)
+					if shop_total_demand > 0
+					else 0.0
+				)
+
+				# BM_SHOP_OVERSTOCK_COHERENCE_V2
+				# Le prix ne détermine pas si le surstock existe.
+				# Il servira uniquement à choisir le conseil approprié.
+				var overstock_candidate: bool = (
+					shop_total_demand >= 50
+					and stock_coverage_ratio >= 5.00
+				)
+
+				var overstock_streak: int = int(
+					shop_d.get("advisor_overstock_streak", 0)
+				)
+
+				if overstock_candidate:
+					overstock_streak += 1
+				else:
+					overstock_streak = 0
+
+				shop_d["advisor_overstock_streak"] = mini(
+					overstock_streak,
+					2
+				)
+				shop_d["advisor_last_stock_coverage"] = (
+					stock_coverage_ratio
+				)
+
 				save["shop"] = shop_d
 				rec_shop = real_shop_income
 
 		save["total_billetterie"] = int(save.get("total_billetterie", 0)) + rec_ticket
 		save["total_boutique"] = int(save.get("total_boutique", 0)) + rec_shop
 		save["total_recettes"] = int(save.get("total_recettes", 0)) + rec_ticket + rec_shop
+
+		# BM_TICKETING_MARKET_V1 — effet popularité APRES revenu du match :
+		# l'effet commercial persiste donc surtout sur les matchs suivants.
+		if ticket_commercial_pop_delta != 0:
+			var pop_after_commercial: int = int(save.get("popularite", 50))
+			pop_after_commercial = clampi(
+				pop_after_commercial + ticket_commercial_pop_delta,
+				30,
+				100
+			)
+			save["popularite"] = pop_after_commercial
+
+		var ticket_demand_ratio: float = ticket_offered_fill_ratio
+
+		_bm_ticketing_market_after_home_match(
+			save,
+			ticket_demand_ratio,
+			ticket_weighted_price,
+			ticket_market_reaction
+		)
 
 		if not save.has("shop") or typeof(save["shop"]) != TYPE_DICTIONARY:
 			save["shop"] = {}
@@ -3678,20 +4135,6 @@ func _fin_match() -> void:
 	else:
 		did_win = (score_ext > score_dom)
 	
-	# --- Shop income (local scope, no name collisions) ---
-	var _shop_pop_raw := 50
-	_shop_pop_raw = int(save.get("popularite", 50))
-	var _shop_pop_val := clampi(_shop_pop_raw, 30, 100)
-	var _shop_coef := float(_shop_pop_val) / 100.0
-
-	var _shop_forecast := 0
-	if save.has("shop") and typeof(save["shop"]) == TYPE_DICTIONARY:
-		_shop_forecast = int((save["shop"] as Dictionary).get("total_forecast", 0))
-		
-	var shop_income := int(round(float(_shop_forecast) * _shop_coef))
-	if shop_income < 0:
-		shop_income = 0
-	# -----------------------------------------------
 	print("[POP BEFORE apply_post_match] =", save.get("popularite", -1))
 
 	# --- KEEP STADIUM / FINANCE STADIUM FIELDS ------------------------------

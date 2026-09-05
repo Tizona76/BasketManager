@@ -426,6 +426,7 @@ func _ready() -> void:
 	_update_ticketing_capacity_labels()
 	_stadium_boost_ticketing_fonts()
 	call_deferred("_ensure_capacity_label")
+	call_deferred("_bm_refresh_ticketing_advisor")
 	call_deferred("_stadium_hide_title_and_fix_popularity")
 	call_deferred("_stadium_fix_popularity_badges_visual")
 
@@ -662,6 +663,27 @@ func _stadium_tr(key: String) -> String:
 "stadium.tab.upgrade": {"fr":"Évolution Stade","en":"Stadium Upgrade","es":"Mejora del estadio","it":"Evoluzione stadio","pt":"Evolução do estádio"},
 
 		"stadium.ticketing.title": {"fr":"Billetterie","en":"Ticketing","es":"Entradas","it":"Biglietteria","pt":"Bilhetes"},
+		"stadium.advisor.ticketing_manager": {
+			"fr":"Responsable Billetterie",
+			"en":"Ticketing Manager",
+			"es":"Responsable de Entradas",
+			"it":"Responsabile Biglietteria",
+			"pt":"Responsável da Bilheteria"
+		},
+		"stadium.advisor.got_it": {
+			"fr":"Compris",
+			"en":"Got it",
+			"es":"Entendido",
+			"it":"Capito",
+			"pt":"Entendido"
+		},
+		"stadium.advisor.shop_manager": {
+			"fr":"Responsable Boutique",
+			"en":"Shop Manager",
+			"es":"Responsable de Tienda",
+			"it":"Responsabile Negozio",
+			"pt":"Responsável da Loja"
+		},
 		"stadium.ticketing.total": {"fr":"Total","en":"Total","es":"Total","it":"Totale","pt":"Total"},
 
 					"stadium.ticketing.col.category": {"fr":"Catégorie","en":"Category","es":"Categoría","it":"Categoria","pt":"Categoria"},
@@ -961,6 +983,7 @@ func _on_ticketing_close_pressed() -> void:
 
 	if PanelTicketing != null:
 		PanelTicketing.visible = false
+		_bm_refresh_ticketing_advisor()
 		var btn_back_ticketing := find_child("BtnBackTicketing", true, false) as Button
 		if btn_back_ticketing != null:
 			btn_back_ticketing.visible = false
@@ -1167,6 +1190,628 @@ func _stadium_refresh_tabs_visibility() -> void:
 
 
 
+var _bm_current_ticketing_advisor_code: String = ""
+
+
+func _bm_ticketing_settings_changed_since_market(
+	advisor_save: Dictionary,
+	market: Dictionary
+) -> bool:
+	# BM_TICKETING_ADVISOR_COHERENCE_V2
+	# Si le joueur a déjà réagi au conseil, on garde le silence
+	# jusqu'au prochain domicile qui mesurera l'effet réel.
+	if not bool(market.get("pending_response", false)):
+		return false
+
+	var reference_price: float = float(
+		market.get("reference_price", 0.0)
+	)
+
+	var ticketing_d: Dictionary = {}
+
+	if (
+		advisor_save.has("stadium")
+		and typeof(advisor_save["stadium"]) == TYPE_DICTIONARY
+	):
+		var stadium_d: Dictionary = advisor_save["stadium"] as Dictionary
+		if (
+			stadium_d.has("ticketing")
+			and typeof(stadium_d["ticketing"]) == TYPE_DICTIONARY
+		):
+			ticketing_d = stadium_d["ticketing"] as Dictionary
+
+	if (
+		ticketing_d.is_empty()
+		and advisor_save.has("ticketing")
+		and typeof(advisor_save["ticketing"]) == TYPE_DICTIONARY
+	):
+		ticketing_d = advisor_save["ticketing"] as Dictionary
+
+	if ticketing_d.is_empty():
+		return false
+
+	var sa: int = int(ticketing_d.get("seats_a", 0))
+	var sb: int = int(ticketing_d.get("seats_b", 0))
+	var sc: int = int(ticketing_d.get("seats_c", 0))
+	var seats_total: int = sa + sb + sc
+
+	var pa: float = float(ticketing_d.get("price_a", 0.0))
+	var pb: float = float(ticketing_d.get("price_b", 0.0))
+	var pc: float = float(ticketing_d.get("price_c", 0.0))
+
+	var current_weighted_price: float = 0.0
+	if seats_total > 0:
+		current_weighted_price = (
+			(pa * float(sa))
+			+ (pb * float(sb))
+			+ (pc * float(sc))
+		) / float(seats_total)
+
+	# Changement prix >= 5 %
+	if reference_price > 0.0:
+		var price_variation: float = (
+			current_weighted_price - reference_price
+		) / reference_price
+
+		if absf(price_variation) >= 0.05:
+			return true
+
+	# Changement significatif de capacité offerte :
+	# on considère qu'une variation d'au moins 10 % du stade
+	# traduit une vraie réaction du joueur.
+	var stadium_capacity: int = _stadium_current_capacity_value()
+	if stadium_capacity > 0:
+		var offered_ratio: float = (
+			float(seats_total) / float(stadium_capacity)
+		)
+
+		# Si le signal précédent portait sur forte demande
+		# et que le joueur offre nettement plus de places,
+		# on ne répète pas l'ancien conseil.
+		var market_signal: String = str(market.get("signal", ""))
+
+		if (
+			(market_signal == "strong" or market_signal == "very_strong")
+			and offered_ratio >= 0.70
+		):
+			return true
+
+	return false
+
+
+func _bm_ticketing_advisor_text() -> String:
+	# BM_TICKETING_ADVISOR_FRESH_SAVE_V1
+	_bm_current_ticketing_advisor_code = ""
+	# L'Advisor lit toujours le save actif pour éviter un snapshot Stadium obsolète.
+	var advisor_save: Dictionary = PlayerLife.load_savegame()
+
+	if typeof(advisor_save) != TYPE_DICTIONARY:
+		return ""
+
+	var market: Dictionary = {}
+
+	if advisor_save.has("stadium") and typeof(advisor_save["stadium"]) == TYPE_DICTIONARY:
+		var stadium_d: Dictionary = advisor_save["stadium"] as Dictionary
+		if stadium_d.has("ticketing") and typeof(stadium_d["ticketing"]) == TYPE_DICTIONARY:
+			var ticketing_d: Dictionary = stadium_d["ticketing"] as Dictionary
+			if ticketing_d.has("market") and typeof(ticketing_d["market"]) == TYPE_DICTIONARY:
+				market = ticketing_d["market"] as Dictionary
+
+	if market.is_empty() and advisor_save.has("ticketing") and typeof(advisor_save["ticketing"]) == TYPE_DICTIONARY:
+		var ticketing_root: Dictionary = advisor_save["ticketing"] as Dictionary
+		if ticketing_root.has("market") and typeof(ticketing_root["market"]) == TYPE_DICTIONARY:
+			market = ticketing_root["market"] as Dictionary
+
+	if market.is_empty():
+		return ""
+
+	var advisor_code: String = str(market.get("advisor_code", "")).strip_edges()
+	if advisor_code == "":
+		return ""
+
+	if _bm_ticketing_settings_changed_since_market(advisor_save, market):
+		return ""
+
+	# BM_TICKETING_ADVISOR_CAPACITY_V1
+	# Si la demande est forte, privilégier l'ouverture de places
+	# avant de conseiller une hausse de prix lorsque l'offre est limitée.
+	var market_signal: String = str(market.get("signal", ""))
+	var pending_response: bool = bool(market.get("pending_response", false))
+
+	if (
+		(market_signal == "strong" or market_signal == "very_strong")
+		and (
+			advisor_code == "ticket_strong_demand"
+			or advisor_code == "ticket_premium_ok"
+			or advisor_code == "ticket_good_response"
+		)
+	):
+		var ticketing_capacity_d: Dictionary = {}
+
+		if advisor_save.has("stadium") and typeof(advisor_save["stadium"]) == TYPE_DICTIONARY:
+			var stadium_capacity_d: Dictionary = advisor_save["stadium"] as Dictionary
+
+			if (
+				stadium_capacity_d.has("ticketing")
+				and typeof(stadium_capacity_d["ticketing"]) == TYPE_DICTIONARY
+			):
+				ticketing_capacity_d = (
+					stadium_capacity_d["ticketing"] as Dictionary
+				)
+
+		if (
+			ticketing_capacity_d.is_empty()
+			and advisor_save.has("ticketing")
+			and typeof(advisor_save["ticketing"]) == TYPE_DICTIONARY
+		):
+			ticketing_capacity_d = advisor_save["ticketing"] as Dictionary
+
+		var seats_on_sale: int = (
+			int(ticketing_capacity_d.get("seats_a", 0))
+			+ int(ticketing_capacity_d.get("seats_b", 0))
+			+ int(ticketing_capacity_d.get("seats_c", 0))
+		)
+
+		var stadium_capacity: int = _stadium_current_capacity_value()
+
+		if stadium_capacity > 0 and seats_on_sale > 0:
+			var on_sale_ratio: float = clampf(
+				float(seats_on_sale) / float(stadium_capacity),
+				0.0,
+				1.0
+			)
+
+			if on_sale_ratio < 0.70:
+				advisor_code = "ticket_release_more_seats"
+			elif on_sale_ratio < 0.90:
+				advisor_code = "ticket_seats_or_price"
+
+	var locale: String = TranslationServer.get_locale()
+	var lang: String = locale.split("_")[0] if locale.find("_") != -1 else locale
+
+	var messages: Dictionary = {
+		"ticket_low_demand": {
+			"fr": "L’affluence reste décevante. Les prix des billets sont peut-être trop élevés pour la demande actuelle.",
+			"en": "Attendance remains disappointing. Ticket prices may be too high for current demand.",
+			"es": "La asistencia sigue siendo decepcionante. Los precios pueden ser demasiado altos para la demanda actual.",
+			"it": "L'affluenza resta deludente. I prezzi dei biglietti potrebbero essere troppo alti per la domanda attuale.",
+			"pt": "A assistência continua baixa. Os preços dos bilhetes podem estar altos demais para a procura atual."
+		},
+		"ticket_release_more_seats": {
+			"fr": "La demande est forte mais peu de places sont mises en vente. Ouvrir davantage de sièges pourrait augmenter les recettes.",
+			"en": "Demand is strong, but only part of the stadium is on sale. Releasing more seats could increase revenue.",
+			"es": "La demanda es fuerte, pero solo una parte del estadio está a la venta. Ofrecer más asientos podría aumentar los ingresos.",
+			"it": "La domanda è forte, ma solo una parte dello stadio è in vendita. Mettere a disposizione più posti potrebbe aumentare i ricavi.",
+			"pt": "A procura está forte, mas apenas parte do estádio está à venda. Disponibilizar mais lugares poderá aumentar as receitas."
+		},
+		"ticket_seats_or_price": {
+			"fr": "La demande est forte. Vous pouvez ouvrir davantage de places ou tester une légère hausse des prix.",
+			"en": "Demand is strong. You can release more seats or test a small ticket price increase.",
+			"es": "La demanda es fuerte. Puede ofrecer más asientos o probar una ligera subida de precios.",
+			"it": "La domanda è forte. Puoi mettere a disposizione più posti o provare un leggero aumento dei prezzi.",
+			"pt": "A procura está forte. Pode disponibilizar mais lugares ou testar um pequeno aumento dos preços."
+		},
+		"ticket_strong_demand": {
+			"fr": "La demande est forte. Vous avez peut-être une marge pour augmenter légèrement les prix.",
+			"en": "Demand is strong. You may have room to increase ticket prices.",
+			"es": "La demanda es fuerte. Puede haber margen para aumentar ligeramente los precios.",
+			"it": "La domanda è forte. Potrebbe esserci margine per aumentare leggermente i prezzi.",
+			"pt": "A procura está forte. Pode haver margem para aumentar ligeiramente os preços."
+		},
+		"ticket_premium_ok": {
+			"fr": "Les supporters continuent d’accepter des prix premium avec une très forte demande.",
+			"en": "Fans continue to accept premium ticket prices with very strong demand.",
+			"es": "Los aficionados siguen aceptando precios premium con una demanda muy fuerte.",
+			"it": "I tifosi continuano ad accettare prezzi premium con una domanda molto forte.",
+			"pt": "Os adeptos continuam a aceitar preços premium com uma procura muito forte."
+		},
+		"ticket_good_response": {
+			"fr": "La baisse des prix a été bien accueillie par les supporters.",
+			"en": "The lower ticket prices have been well received by the fans.",
+			"es": "La bajada de precios ha sido bien recibida por los aficionados.",
+			"it": "La riduzione dei prezzi è stata accolta bene dai tifosi.",
+			"pt": "A redução dos preços foi bem recebida pelos adeptos."
+		},
+		"ticket_low_unchanged": {
+			"fr": "La faible demande persiste alors que les prix restent inchangés.",
+			"en": "Demand remains weak while ticket prices remain unchanged.",
+			"es": "La demanda sigue baja mientras los precios permanecen sin cambios.",
+			"it": "La domanda resta debole mentre i prezzi rimangono invariati.",
+			"pt": "A procura continua baixa enquanto os preços permanecem inalterados."
+		},
+		"ticket_price_pressure": {
+			"fr": "Les supporters deviennent plus sensibles au niveau actuel des prix.",
+			"en": "Fans are becoming increasingly sensitive to current ticket prices.",
+			"es": "Los aficionados son cada vez más sensibles al nivel actual de precios.",
+			"it": "I tifosi stanno diventando più sensibili all'attuale livello dei prezzi.",
+			"pt": "Os adeptos estão cada vez mais sensíveis ao nível atual dos preços."
+		}
+	}
+
+	if not messages.has(advisor_code):
+		return ""
+
+	_bm_current_ticketing_advisor_code = advisor_code
+
+	var localized: Dictionary = messages[advisor_code] as Dictionary
+	return str(localized.get(lang, localized.get("en", "")))
+
+
+func _bm_shop_advisor_data() -> Dictionary:
+	# BM_SHOP_MANAGER_V1
+	# Silence par défaut : uniquement deux signaux forts et actionnables.
+	var result: Dictionary = {
+		"code": "",
+		"text": ""
+	}
+
+	var shop_save: Dictionary = PlayerLife.load_savegame()
+	if typeof(shop_save) != TYPE_DICTIONARY:
+		return result
+
+	if not shop_save.has("shop") or typeof(shop_save["shop"]) != TYPE_DICTIONARY:
+		return result
+
+	var shop_d: Dictionary = shop_save["shop"] as Dictionary
+	var demand: int = maxi(0, int(shop_d.get("last_total_demand", 0)))
+
+	# Pas de diagnostic sur un échantillon trop faible.
+	if demand < 50:
+		return result
+
+	var items_any: Variant = shop_d.get("items", {})
+	var stock_any: Variant = shop_d.get("stock_state", {})
+
+	if typeof(items_any) != TYPE_DICTIONARY or typeof(stock_any) != TYPE_DICTIONARY:
+		return result
+
+	var items_d: Dictionary = items_any as Dictionary
+	var stock_state: Dictionary = stock_any as Dictionary
+
+	var sold_total: int = 0
+
+	for pid_v in items_d.keys():
+		var item_any: Variant = items_d.get(pid_v, {})
+		if typeof(item_any) != TYPE_DICTIONARY:
+			continue
+
+		var item: Dictionary = item_any as Dictionary
+		if not bool(item.get("enabled", true)):
+			continue
+		if int(item.get("price", 0)) <= 0:
+			continue
+
+		var pid: String = str(pid_v)
+		var st_any: Variant = stock_state.get(pid, {})
+		if typeof(st_any) != TYPE_DICTIONARY:
+			continue
+
+		var st: Dictionary = st_any as Dictionary
+		sold_total += maxi(0, int(st.get("last_sold", 0)))
+
+	var fulfillment_ratio: float = (
+		float(sold_total) / float(demand)
+		if demand > 0
+		else 1.0
+	)
+
+	var price_volume_coef: float = float(
+		shop_d.get("last_price_volume_coef", 1.0)
+	)
+
+	var locale: String = TranslationServer.get_locale()
+	var lang: String = (
+		locale.split("_")[0]
+		if locale.find("_") != -1
+		else locale
+	)
+
+	var messages: Dictionary = {
+		"shop_stock_limiting": {
+			"fr":"La demande est bonne, mais le stock disponible limite les ventes. Un stock plus important pourrait soutenir davantage de recettes.",
+			"en":"Demand is healthy, but available stock is limiting sales. More inventory could support additional revenue.",
+			"es":"La demanda es buena, pero el stock disponible limita las ventas. Un inventario mayor podría generar más ingresos.",
+			"it":"La domanda è buona, ma lo stock disponibile limita le vendite. Più scorte potrebbero sostenere maggiori ricavi.",
+			"pt":"A procura é boa, mas o stock disponível limita as vendas. Mais inventário poderá gerar receitas adicionais."
+		},
+		"shop_price_pressure": {
+			"fr":"Le niveau actuel des prix freine sensiblement le volume des ventes. Une baisse modérée pourrait relancer la demande.",
+			"en":"Current prices are noticeably reducing sales volume. A moderate reduction could stimulate demand.",
+			"es":"Los precios actuales están reduciendo claramente el volumen de ventas. Una bajada moderada podría estimular la demanda.",
+			"it":"I prezzi attuali stanno riducendo sensibilmente il volume delle vendite. Una riduzione moderada potrebbe stimolare la domanda.",
+			"pt":"Os preços atuais estão a reduzir claramente o volume de vendas. Uma redução moderada poderá estimular a procura."
+		},
+		"shop_overstock": {
+			"fr":"Le stock s’accumule plus vite qu’il ne se vend. Une baisse modérée des prix pourrait aider à l’écouler.",
+			"en":"Inventory is building up faster than it is selling. A moderate price reduction could help move stock.",
+			"es":"El stock se acumula más rápido de lo que se vende. Una bajada moderada de precios podría ayudar a reducirlo.",
+			"it":"Le scorte si accumulano più rapidamente delle vendite. Una moderata riduzione dei prezzi potrebbe aiutare a smaltirle.",
+			"pt":"O stock está a acumular-se mais depressa do que é vendido. Uma redução moderada dos preços poderá ajudar a escoá-lo."
+		},
+		"shop_overstock_low_price": {
+			"fr":"Le stock est très supérieur à la demande actuelle. Évitez de réapprovisionner tant que les ventes ne l’ont pas réduit.",
+			"en":"Inventory is far above current demand. Avoid adding more stock until sales catch up.",
+			"es":"El stock está muy por encima de la demanda actual. Evite reponer hasta que las ventas lo reduzcan.",
+			"it":"Le scorte sono molto superiori alla domanda attuale. Evita nuovi rifornimenti finché le vendite non le avranno ridotte.",
+			"pt":"O stock está muito acima da procura atual. Evite novos reabastecimentos até que as vendas o reduzam."
+		}
+	}
+
+	# Priorités fortes uniquement. Sinon silence.
+	var overstock_streak: int = int(
+		shop_d.get("advisor_overstock_streak", 0)
+	)
+
+	if fulfillment_ratio <= 0.80:
+		result["code"] = "shop_stock_limiting"
+	elif price_volume_coef <= 0.82:
+		result["code"] = "shop_price_pressure"
+	elif overstock_streak >= 2:
+		if price_volume_coef >= 0.95:
+			result["code"] = "shop_overstock_low_price"
+		else:
+			result["code"] = "shop_overstock"
+
+	var code: String = str(result.get("code", ""))
+	if code == "":
+		return result
+
+	var localized: Dictionary = messages[code] as Dictionary
+	result["text"] = str(localized.get(lang, localized.get("en", "")))
+
+	return result
+
+
+var _bm_current_stadium_advisor_source: String = ""
+var _bm_current_stadium_advisor_code: String = ""
+
+
+func _bm_ack_ticketing_advisor() -> void:
+	if _bm_current_stadium_advisor_code == "":
+		return
+
+	var ack_save: Dictionary = PlayerLife.load_savegame()
+	if typeof(ack_save) != TYPE_DICTIONARY:
+		return
+
+	var stadium_ack: Dictionary = {}
+	if ack_save.has("stadium") and typeof(ack_save["stadium"]) == TYPE_DICTIONARY:
+		stadium_ack = ack_save["stadium"] as Dictionary
+
+	var ack_key: String = (
+		"advisor_ack_shop"
+		if _bm_current_stadium_advisor_source == "shop"
+		else "advisor_ack_ticketing"
+	)
+
+	stadium_ack[ack_key] = _bm_current_stadium_advisor_code
+	ack_save["stadium"] = stadium_ack
+
+	# BM_STADIUM_ADVISOR_ACK_PERSISTENCE_V2
+	# Synchronise aussi le snapshot mémoire de la scène pour qu'une écriture
+	# ultérieure de StadiumMinimal ne puisse pas effacer l'acquittement.
+	save = ack_save.duplicate(true)
+
+	PlayerLife.write_savegame(ack_save)
+	_bm_refresh_ticketing_advisor()
+
+
+func _bm_refresh_ticketing_advisor() -> void:
+	var layer := get_node_or_null("CapacityOverlayLayer") as CanvasLayer
+	if layer == null:
+		return
+
+	var advisor := layer.get_node_or_null("LblTicketingAdvisor") as RichTextLabel
+	var ack_button := layer.get_node_or_null("BtnStadiumAdvisorAck") as Button
+
+	# BM_STADIUM_GLOBAL_ADVISOR_V1
+	# Le conseil stratégique est visible uniquement sur l'écran Stadium principal.
+	var ticketing_open: bool = (
+		PanelTicketing != null
+		and PanelTicketing.is_visible_in_tree()
+	)
+
+	var shop_open: bool = false
+	var shop_panel := get_node_or_null("Content/CenterShop/PanelShop") as CanvasItem
+	if shop_panel != null:
+		shop_open = shop_panel.is_visible_in_tree()
+
+	var upgrade_open: bool = false
+	var upgrade_panel := get_node_or_null("Content/CenterUpgrade/PanelUpgrade") as CanvasItem
+	if upgrade_panel != null:
+		upgrade_open = upgrade_panel.is_visible_in_tree()
+
+	var stadium_main_open: bool = (
+		not ticketing_open
+		and not shop_open
+		and not upgrade_open
+	)
+
+	if not stadium_main_open:
+		if advisor != null:
+			advisor.text = ""
+			advisor.visible = false
+		if ack_button != null:
+			ack_button.visible = false
+		return
+
+	if advisor == null:
+		advisor = RichTextLabel.new()
+		advisor.name = "LblTicketingAdvisor"
+		advisor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		advisor.bbcode_enabled = true
+		advisor.fit_content = false
+		advisor.scroll_active = false
+		advisor.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+		var advisor_bg := StyleBoxFlat.new()
+		advisor_bg.bg_color = Color(0.035, 0.045, 0.065, 0.90)
+		advisor_bg.corner_radius_top_left = 16
+		advisor_bg.corner_radius_top_right = 16
+		advisor_bg.corner_radius_bottom_left = 16
+		advisor_bg.corner_radius_bottom_right = 16
+		# BM_STADIUM_ADVISOR_SPACING_V1
+		# Le texte garde sa propre zone ; la droite est réservée au bouton d'acquittement.
+		advisor_bg.content_margin_left = 32
+		advisor_bg.content_margin_right = 150
+		advisor_bg.content_margin_top = 18
+		advisor_bg.content_margin_bottom = 18
+		advisor.add_theme_stylebox_override("normal", advisor_bg)
+		advisor.add_theme_color_override(
+			"default_color",
+			Color(1, 1, 1, 1)
+		)
+		advisor.add_theme_color_override(
+			"font_shadow_color",
+			Color(0, 0, 0, 0.55)
+		)
+		advisor.add_theme_constant_override("shadow_offset_x", 2)
+		advisor.add_theme_constant_override("shadow_offset_y", 2)
+		advisor.add_theme_constant_override("line_separation", 4)
+		layer.add_child(advisor)
+
+	if ack_button == null:
+		ack_button = Button.new()
+		ack_button.name = "BtnStadiumAdvisorAck"
+		ack_button.text = _stadium_tr("stadium.advisor.got_it")
+		ack_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		ack_button.add_theme_font_size_override(
+			"font_size",
+			18 if _bm_stadium_is_mobile_layout() else 16
+		)
+
+		var ack_style := StyleBoxFlat.new()
+		ack_style.bg_color = Color(0.95, 0.50, 0.12, 0.96)
+		ack_style.corner_radius_top_left = 10
+		ack_style.corner_radius_top_right = 10
+		ack_style.corner_radius_bottom_left = 10
+		ack_style.corner_radius_bottom_right = 10
+		ack_style.content_margin_left = 14
+		ack_style.content_margin_right = 14
+		ack_style.content_margin_top = 6
+		ack_style.content_margin_bottom = 6
+		ack_button.add_theme_stylebox_override("normal", ack_style)
+
+		ack_button.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+		layer.add_child(ack_button)
+
+		if not ack_button.pressed.is_connected(_bm_ack_ticketing_advisor):
+			ack_button.pressed.connect(_bm_ack_ticketing_advisor)
+
+	# Plus lisible que l'ancien 22 mobile / 20 desktop.
+	advisor.add_theme_font_size_override(
+		"normal_font_size",
+		28 if _bm_stadium_is_mobile_layout() else 26
+	)
+	advisor.add_theme_font_size_override(
+		"italics_font_size",
+		28 if _bm_stadium_is_mobile_layout() else 26
+	)
+
+	_bm_current_stadium_advisor_source = ""
+	_bm_current_stadium_advisor_code = ""
+
+	var advisor_text: String = ""
+	var advisor_manager: String = ""
+
+	var ack_save: Dictionary = PlayerLife.load_savegame()
+	var ack_ticketing: String = ""
+	var ack_shop: String = ""
+
+	if typeof(ack_save) == TYPE_DICTIONARY:
+		var ack_stadium_any: Variant = ack_save.get("stadium", {})
+		if typeof(ack_stadium_any) == TYPE_DICTIONARY:
+			var ack_stadium: Dictionary = ack_stadium_any as Dictionary
+			ack_ticketing = str(
+				ack_stadium.get("advisor_ack_ticketing", "")
+			)
+			ack_shop = str(
+				ack_stadium.get("advisor_ack_shop", "")
+			)
+
+	# Priorité 1 : Ticketing non acquitté.
+	var ticketing_text: String = _bm_ticketing_advisor_text()
+	var ticketing_code: String = _bm_current_ticketing_advisor_code
+
+	if (
+		ticketing_code != ""
+		and ticketing_text != ""
+		and ack_ticketing != ticketing_code
+	):
+		advisor_text = ticketing_text
+		advisor_manager = _stadium_tr(
+			"stadium.advisor.ticketing_manager"
+		)
+		_bm_current_stadium_advisor_source = "ticketing"
+		_bm_current_stadium_advisor_code = ticketing_code
+
+	# Priorité 2 : Shop, uniquement si Ticketing n'a rien à afficher.
+	if advisor_text == "":
+		var shop_advisor: Dictionary = _bm_shop_advisor_data()
+		var shop_code: String = str(shop_advisor.get("code", ""))
+		var shop_text: String = str(shop_advisor.get("text", ""))
+
+		if (
+			shop_code != ""
+			and shop_text != ""
+			and ack_shop != shop_code
+		):
+			advisor_text = shop_text
+			advisor_manager = _stadium_tr(
+				"stadium.advisor.shop_manager"
+			)
+			_bm_current_stadium_advisor_source = "shop"
+			_bm_current_stadium_advisor_code = shop_code
+	var advisor_locale: String = TranslationServer.get_locale()
+	var advisor_lang: String = (
+		advisor_locale.split("_")[0]
+		if advisor_locale.find("_") != -1
+		else advisor_locale
+	)
+
+	var quote_open: String = "« " if advisor_lang == "fr" else "“"
+	var quote_close: String = " »" if advisor_lang == "fr" else "”"
+	var manager_separator: String = " : " if advisor_lang == "fr" else ": "
+
+	advisor.text = (
+		"[center][b]%s[/b]%s[i]%s%s%s[/i][/center]" % [
+			advisor_manager,
+			manager_separator,
+			quote_open,
+			advisor_text,
+			quote_close
+		]
+		if advisor_text != ""
+		else ""
+	)
+
+	advisor.visible = advisor_text != ""
+
+	if ack_button != null:
+		ack_button.text = _stadium_tr("stadium.advisor.got_it")
+		ack_button.visible = advisor.visible
+
+	if not advisor.visible:
+		return
+
+	var vp: Vector2 = get_viewport_rect().size
+	var advisor_w: float = minf(vp.x * 0.62, 860.0)
+	var advisor_h: float = 108.0
+
+	advisor.size = Vector2(advisor_w, advisor_h)
+	advisor.position = Vector2(
+		(vp.x - advisor_w) * 0.5,
+		vp.y - 214.0
+	)
+
+	if ack_button != null:
+		ack_button.size = Vector2(104.0, 36.0)
+		ack_button.position = Vector2(
+			advisor.position.x + advisor_w - 124.0,
+			advisor.position.y + (advisor_h - ack_button.size.y) * 0.5
+		)
+
+
 func _ensure_capacity_label() -> void:
 	# ✅ Overlay hors layout (CanvasLayer) => impossible d'être repositionné sous les onglets
 	var layer := get_node_or_null("CapacityOverlayLayer") as CanvasLayer
@@ -1228,6 +1873,8 @@ func _ensure_capacity_label() -> void:
 		LblStadiumLevel.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		LblStadiumLevel.size = LblStadiumLevel.get_combined_minimum_size()
 		LblStadiumLevel.position = Vector2((vpw - lvl_w) / 2.0, y + 30.0)
+
+	_bm_refresh_ticketing_advisor()
 
 	# --- AUDIT (1 run) ---
 func _stadium_apply_i18n() -> void:
@@ -3944,6 +4591,7 @@ func _on_tab_shop() -> void:
 	# Masque Billetterie
 	if PanelTicketing != null:
 		PanelTicketing.visible = false
+	_bm_refresh_ticketing_advisor()
 
 	var _pup := get_node_or_null("Content/CenterUpgrade/PanelUpgrade")
 	if _pup != null and _pup is CanvasItem:
@@ -4261,6 +4909,223 @@ func _shop_price_cap(pid: String) -> int:
 	return maxi(base_price, int(round(float(base_price) * coef)))
 
 
+# BM_SHOP_FORECAST_UI_V1
+# Prévision visuelle seulement.
+# Le stock plafonne les ventes mais ne crée jamais la demande.
+func _bm_shop_forecast_price_volume_coef() -> float:
+	var prices: Array = []
+
+	for row in SHOP_PRODUCTS:
+		var pid: String = str(row["id"])
+		var price: float = float(
+			_shop_price_by_id.get(
+				pid,
+				int(SHOP_DEFAULT_PRICES.get(pid, 0))
+			)
+		)
+
+		if price > 0.0:
+			prices.append(price)
+
+	if prices.is_empty():
+		return 1.0
+
+	var total_prices: float = 0.0
+
+	for price_v in prices:
+		total_prices += float(price_v)
+
+	var avg_price: float = total_prices / float(prices.size())
+
+	if avg_price <= 10.0:
+		return 1.0
+
+	if avg_price >= 25.0:
+		return 0.72
+
+	return lerpf(
+		1.0,
+		0.72,
+		(avg_price - 10.0) / 15.0
+	)
+
+
+func _bm_shop_forecast_current_stock(
+	pid: String,
+	fallback_stock: int
+) -> int:
+	if save.has("shop") and typeof(save["shop"]) == TYPE_DICTIONARY:
+		var shop_d: Dictionary = save["shop"] as Dictionary
+
+		if shop_d.has("stock_state") and typeof(shop_d["stock_state"]) == TYPE_DICTIONARY:
+			var stock_state: Dictionary = shop_d["stock_state"] as Dictionary
+			var st_any: Variant = stock_state.get(pid, {})
+
+			if typeof(st_any) == TYPE_DICTIONARY:
+				var st: Dictionary = st_any as Dictionary
+
+				return maxi(
+					0,
+					int(st.get("current", fallback_stock))
+				)
+
+	return maxi(0, fallback_stock)
+
+
+func _bm_shop_forecast_ui() -> Dictionary:
+	var result: Dictionary = {
+		"attendance": 0,
+		"total_demand": 0,
+		"total_revenue": 0,
+		"by_id": {}
+	}
+
+	var ticketing_d: Dictionary = {}
+
+	if save.has("stadium") and typeof(save["stadium"]) == TYPE_DICTIONARY:
+		var stadium_d: Dictionary = save["stadium"] as Dictionary
+
+		if stadium_d.has("ticketing") and typeof(stadium_d["ticketing"]) == TYPE_DICTIONARY:
+			ticketing_d = stadium_d["ticketing"] as Dictionary
+
+	if ticketing_d.is_empty() and save.has("ticketing") and typeof(save["ticketing"]) == TYPE_DICTIONARY:
+		ticketing_d = save["ticketing"] as Dictionary
+
+	var seats_total: int = (
+		int(ticketing_d.get("seats_a", 0))
+		+ int(ticketing_d.get("seats_b", 0))
+		+ int(ticketing_d.get("seats_c", 0))
+	)
+
+	# BM_SHOP_FORECAST_CAPACITY_V2
+	# Même principe d'affluence que Ticketing Demand V2 :
+	# demande potentielle sur la capacité totale, puis plafond par les places offertes.
+	var attendance_ratio: float = clampf(
+		PlayerLife.popularity_coef(save)
+		* _get_ticketing_league_coef(),
+		0.0,
+		1.0
+	)
+
+	var stadium_capacity: int = _stadium_current_capacity_value()
+	if stadium_capacity <= 0:
+		stadium_capacity = seats_total
+
+	var potential_attendance: int = maxi(
+		0,
+		int(round(
+			float(stadium_capacity)
+			* attendance_ratio
+		))
+	)
+
+	var attendance: int = mini(
+		maxi(0, seats_total),
+		potential_attendance
+	)
+
+	var price_volume_coef: float = (
+		_bm_shop_forecast_price_volume_coef()
+	)
+
+	var total_demand: int = maxi(
+		0,
+		int(round(
+			float(attendance)
+			* 0.30
+			* price_volume_coef
+		))
+	)
+
+	var active_rows: int = (
+		_get_shop_active_rows_for_level(_shop_level_cached)
+	)
+
+	var active_ids: Array = []
+	var idx: int = 0
+
+	for row in SHOP_PRODUCTS:
+		var pid: String = str(row["id"])
+
+		if idx < active_rows:
+			var price: int = int(
+				_shop_price_by_id.get(
+					pid,
+					int(SHOP_DEFAULT_PRICES.get(pid, 0))
+				)
+			)
+
+			if price > 0:
+				active_ids.append(pid)
+
+		idx += 1
+
+	var demand_remaining: int = total_demand
+	var by_id: Dictionary = {}
+	var total_revenue: int = 0
+
+	for i in range(active_ids.size()):
+		var pid: String = str(active_ids[i])
+
+		var fallback_stock: int = (
+			_get_shop_stock_for_level(
+				_shop_level_cached,
+				pid
+			)
+		)
+
+		var current_stock: int = (
+			_bm_shop_forecast_current_stock(
+				pid,
+				fallback_stock
+			)
+		)
+
+		var products_left: int = maxi(
+			1,
+			active_ids.size() - i
+		)
+
+		var wanted_sold: int = int(round(
+			float(demand_remaining)
+			/ float(products_left)
+		))
+
+		var forecast_sold: int = clampi(
+			wanted_sold,
+			0,
+			current_stock
+		)
+
+		demand_remaining = maxi(
+			0,
+			demand_remaining - forecast_sold
+		)
+
+		var price: int = int(
+			_shop_price_by_id.get(
+				pid,
+				int(SHOP_DEFAULT_PRICES.get(pid, 0))
+			)
+		)
+
+		var revenue: int = forecast_sold * price
+
+		by_id[pid] = {
+			"sold": forecast_sold,
+			"revenue": revenue
+		}
+
+		total_revenue += revenue
+
+	result["attendance"] = attendance
+	result["total_demand"] = total_demand
+	result["total_revenue"] = total_revenue
+	result["by_id"] = by_id
+
+	return result
+
+
 func _shop_price_step(pid: String, delta: int) -> void:
 	var cur: int = int(_shop_price_by_id.get(pid, int(SHOP_DEFAULT_PRICES.get(pid, 0))))
 	cur = max(0, cur + delta)
@@ -4274,33 +5139,70 @@ func _shop_price_step(pid: String, delta: int) -> void:
 	var le_any: Variant = _shop_price_le_by_id.get(pid)
 	if typeof(le_any) == TYPE_OBJECT and le_any is LineEdit:
 		(le_any as LineEdit).text = str(cur)
-	var row_any: Variant = _shop_row_by_id.get(pid)
-	if typeof(row_any) == TYPE_OBJECT and row_any is Node:
-		var est_lbl := (row_any as Node).get_node_or_null("LblEstimatedRevenue") as Label
-		if est_lbl != null:
-			var stock := _get_shop_stock_for_level(_shop_level_cached, pid)
-			est_lbl.text = _format_int(stock * cur) + " $"
-
+	# BM_SHOP_FORECAST_LEGACY_CLEANUP_V1
+	# Le forecast moderne recalcule les lignes et le total immédiatement.
 	_update_shop_total()
 
 func _update_shop_total() -> void:
 	if _shop_total_label == null:
 		return
-	var total := 0
-	var active_rows := _get_shop_active_rows_for_level(_shop_level_cached)
-	var idx := 0
-	for row in SHOP_PRODUCTS:
-		var pid := str(row["id"])
-		var stock := _get_shop_stock_for_level(_shop_level_cached, pid)
-		var price := int(_shop_price_by_id.get(pid, int(SHOP_DEFAULT_PRICES.get(pid, 0))))
-		if idx < active_rows:
-			var _pop2 := 50
-			if save.has("popularite"):
-				_pop2 = int(save.get("popularite", 50))
-			var _coef2 := float(clampi(_pop2, 30, 100)) / 100.0
-			total += int(round(float(stock * price) * _coef2))
-		idx += 1
-	_shop_total_label.text = _stadium_tr("stadium.shop.total_estimate") + " : " + _format_int(total) + " $"
+
+	var forecast: Dictionary = _bm_shop_forecast_ui()
+
+	var total: int = int(
+		forecast.get("total_revenue", 0)
+	)
+
+	var by_id: Dictionary = (
+		forecast.get("by_id", {}) as Dictionary
+	)
+
+	_shop_total_label.text = (
+		_stadium_tr("stadium.shop.total_estimate")
+		+ " : "
+		+ _format_int(total)
+		+ " $"
+	)
+
+	for pid_v in _shop_row_by_id.keys():
+		var pid: String = str(pid_v)
+
+		var row_any: Variant = (
+			_shop_row_by_id.get(pid_v)
+		)
+
+		if typeof(row_any) != TYPE_OBJECT:
+			continue
+
+		if not (row_any is Node):
+			continue
+
+		var est_lbl := (
+			(row_any as Node)
+			.get_node_or_null("LblEstimatedRevenue")
+			as Label
+		)
+
+		if est_lbl == null:
+			continue
+
+		var product_any: Variant = by_id.get(pid, {})
+		var revenue: int = 0
+
+		if typeof(product_any) == TYPE_DICTIONARY:
+			var product_forecast: Dictionary = (
+				product_any as Dictionary
+			)
+
+			revenue = int(
+				product_forecast.get("revenue", 0)
+			)
+
+		est_lbl.text = (
+			_format_int(revenue)
+			+ " $"
+		)
+
 
 func _collect_shop_for_save() -> Dictionary:
 	var items := {}
@@ -4316,15 +5218,11 @@ func _collect_shop_for_save() -> Dictionary:
 		items[pid] = {"price": price, "qty": stock, "enabled": (idx < active_rows)}
 		idx += 1
 
-	var total := 0
-	idx = 0
-	for row in SHOP_PRODUCTS:
-		var pid2 := str(row["id"])
-		var stock2 := _get_shop_stock_for_level(_shop_level_cached, pid2)
-		var price2 := int(_shop_price_by_id.get(pid2, int(SHOP_DEFAULT_PRICES.get(pid2, 0))))
-		if idx < active_rows:
-			total += stock2 * price2
-		idx += 1
+	# BM_SHOP_TOTAL_FORECAST_COMPAT_V2
+	# La clé total_forecast reste disponible pour compatibilité,
+	# mais reflète désormais le forecast économique moderne.
+	var modern_forecast: Dictionary = _bm_shop_forecast_ui()
+	var total: int = int(modern_forecast.get("total_revenue", 0))
 
 	# BM_SHOP_RESTOCK_SCHEMA_V1
 	# Schéma préparé pour le futur réassortiment.
@@ -5172,6 +6070,20 @@ func _on_confirm_ticketing_pressed() -> void:
 	if seats_b == null: seats_b = find_child("SeatsB", true, false)
 	if seats_c == null: seats_c = find_child("SeatsC", true, false)
 
+	var market_keep: Dictionary = {}
+
+	if save.has("stadium") and typeof(save["stadium"]) == TYPE_DICTIONARY:
+		var stadium_existing: Dictionary = save["stadium"] as Dictionary
+		if stadium_existing.has("ticketing") and typeof(stadium_existing["ticketing"]) == TYPE_DICTIONARY:
+			var ticketing_existing: Dictionary = stadium_existing["ticketing"] as Dictionary
+			if ticketing_existing.has("market") and typeof(ticketing_existing["market"]) == TYPE_DICTIONARY:
+				market_keep = (ticketing_existing["market"] as Dictionary).duplicate(true)
+
+	if market_keep.is_empty() and save.has("ticketing") and typeof(save["ticketing"]) == TYPE_DICTIONARY:
+		var root_existing: Dictionary = save["ticketing"] as Dictionary
+		if root_existing.has("market") and typeof(root_existing["market"]) == TYPE_DICTIONARY:
+			market_keep = (root_existing["market"] as Dictionary).duplicate(true)
+
 	var t := {}
 	t["price_a"] = max(0, _to_int(price_a))
 	t["price_b"] = max(0, _to_int(price_b))
@@ -5179,6 +6091,9 @@ func _on_confirm_ticketing_pressed() -> void:
 	t["seats_a"] = max(0, _safe_int(seats_a.text if seats_a != null else "0"))
 	t["seats_b"] = max(0, _safe_int(seats_b.text if seats_b != null else "0"))
 	t["seats_c"] = max(0, _safe_int(seats_c.text if seats_c != null else "0"))
+
+	if not market_keep.is_empty():
+		t["market"] = market_keep
 
 	save["ticketing"] = t
 	if not save.has("stadium") or typeof(save["stadium"]) != TYPE_DICTIONARY:
