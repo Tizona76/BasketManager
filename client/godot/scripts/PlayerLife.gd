@@ -1000,8 +1000,6 @@ static func ensure_finance_schema(save: Dictionary) -> void:
 
 	if not save.has("popularite"):
 		save["popularite"] = 50
-	elif int(save.get("season_round", 0)) == 0:
-		save["popularite"] = 50
 	save["popularite"] = clampi(int(save["popularite"]), 30, 100)
 
 	if not save.has("total_billetterie"):

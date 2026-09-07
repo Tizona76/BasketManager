@@ -1083,7 +1083,9 @@ func _bm_maybe_show_sponsors_intro_popup(on_closed: Callable = Callable()) -> bo
 		return false
 	if bool(save.get("intro_popup_sponsors_seen", false)):
 		return false
-	if int(save.get("season_round", 0)) < 7:
+	if int(save.get("season_number", 1)) < 2:
+		return false
+	if int(save.get("season_round", 0)) < 3:
 		return false
 	_bm_show_auto_info_popup("popup.sponsors.title", "popup.sponsors.body", "SponsorsIntroOverlay", func():
 		var save_close: Dictionary = PL.load_savegame()
