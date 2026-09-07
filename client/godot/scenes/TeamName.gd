@@ -1024,6 +1024,15 @@ func _bm_league_card_style(selected: bool) -> StyleBoxFlat:
 	return sb
 
 
+func _bm_make_league_image_frame_style() -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.0, 0.0, 0.0, 0.0)
+	sb.border_color = Color(0.18, 0.62, 1.0, 0.95)
+	sb.set_border_width_all(3)
+	sb.set_corner_radius_all(8)
+	return sb
+
+
 func _bm_make_league_nav_button(text_value: String) -> Button:
 	var btn := Button.new()
 	btn.text = text_value
@@ -1242,12 +1251,32 @@ func _bm_show_league_choice(team_name: String) -> void:
 	title.add_theme_constant_override("shadow_outline_size", 10)
 	card_box.add_child(title)
 
+	var image_size := Vector2(327, 266) if _bm_is_mobile_layout() else Vector2(811, 508)
+	var frame_size := Vector2(172, 266) if _bm_is_mobile_layout() else Vector2(427, 508)
+
+	var image_wrap := Control.new()
+	image_wrap.custom_minimum_size = image_size
+	image_wrap.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	image_wrap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	image_wrap.mouse_filter = Control.MOUSE_FILTER_STOP
+	image_wrap.gui_input.connect(_bm_on_league_card_gui_input)
+	card_box.add_child(image_wrap)
+
 	_league_image = TextureRect.new()
-	_league_image.custom_minimum_size = Vector2(327, 266) if _bm_is_mobile_layout() else Vector2(811, 508)
+	_league_image.custom_minimum_size = image_size
+	_league_image.size = image_size
 	_league_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_league_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_league_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card_box.add_child(_league_image)
+	image_wrap.add_child(_league_image)
+
+	var image_frame := PanelContainer.new()
+	image_frame.custom_minimum_size = frame_size
+	image_frame.size = frame_size
+	image_frame.position = Vector2((image_size.x - frame_size.x) * 0.5, 0.0)
+	image_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	image_frame.add_theme_stylebox_override("panel", _bm_make_league_image_frame_style())
+	image_wrap.add_child(image_frame)
 
 	var next_btn := _bm_make_league_nav_button("›")
 	next_btn.pressed.connect(func(): _bm_shift_league(1))
