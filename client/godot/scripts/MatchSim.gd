@@ -1885,32 +1885,19 @@ func _get_selected_team_rating_average(save_override: Dictionary = {}) -> float:
 
 func _get_opponent_team_rating_estimate(save_override: Dictionary = {}) -> float:
 	var save: Dictionary = save_override if not save_override.is_empty() else PlayerLife.load_savegame()
-	var my_rating: float = _get_selected_team_rating_average(save)
-
-	var ss := get_node_or_null("/root/SeasonState")
-	var my_name := str(save.get("team_name", "")).strip_edges()
-	var my_rank := 8
-
-	if ss != null and ss.has_method("get_current_club_rank"):
-		my_rank = int(ss.call("get_current_club_rank", my_name))
-
-	var opp_rating := my_rating
-
-	if my_rank <= 3:
-		opp_rating = my_rating - 1.5
-	elif my_rank <= 6:
-		opp_rating = my_rating - 0.5
-	elif my_rank <= 9:
-		opp_rating = my_rating + 0.5
-	else:
-		opp_rating = my_rating + 1.5
+	var division: int = clampi(int(save.get("division_level", 3)), 1, 3)
+	var division_base: float = 72.0
+	if division == 2:
+		division_base = 75.0
+	elif division == 1:
+		division_base = 79.0
 
 	var opponent_league_id: String = str(save.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
 	if opponent_league_id == "":
 		opponent_league_id = LeagueDataScript.get_default_league_id()
 	var ai_strength_coef: float = LeagueDataScript.get_coef(opponent_league_id, "ai_strength")
 	var league_rating_pressure: float = clampf((ai_strength_coef - 1.0) * 7.0, -1.5, 1.6)
-	return clampf(opp_rating + league_rating_pressure, 68.0, 82.0)
+	return clampf(division_base + league_rating_pressure, 68.0, 82.0)
 
 func _estimate_strength_dom(save_override: Dictionary = {}) -> float:
 	return _get_selected_team_rating_average(save_override) if _user_is_home else _get_opponent_team_rating_estimate(save_override)
