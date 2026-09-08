@@ -3762,6 +3762,8 @@ func _apply_popularity_after_match(save: Dictionary, did_win: bool, did_draw: bo
 	save["popularite"] = pop
 	print("[POP] UPDATED =", pop)
 func _fin_match() -> void:
+	if match_fini:
+		return
 	match_fini = true
 	_live_comment_token += 1
 	_live_comment_clear_minute = -1
@@ -4405,6 +4407,9 @@ func _fin_match() -> void:
 		if typeof(save_sync) != TYPE_DICTIONARY:
 			save_sync = {}
 
+		# Consume once, only when this completed round advances the saved season.
+		if int(save_sync.get("season_round", 0)) < int(ss.matchs_joues):
+			PlayerLife.consume_paid_lineup_match(save_sync)
 		save_sync["season_round"] = int(ss.matchs_joues)
 
 		print(

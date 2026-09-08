@@ -242,9 +242,38 @@ static func load_savegame(path: String = "user://savegame.json") -> Dictionary:
 	_repair_corrupted_salaries_on_load(save)
 	var repaired_identity: bool = _repair_duplicate_player_identities_on_load(save)
 	var repaired_incomplete_mercato_identity: bool = _repair_incomplete_mercato_identities_on_load(save)
-	if had_legacy_wallet or repaired_identity or repaired_incomplete_mercato_identity:
+	var repaired_lineup_duration := ensure_paid_lineup_duration(save)
+	if had_legacy_wallet or repaired_identity or repaired_incomplete_mercato_identity or repaired_lineup_duration:
 		write_savegame(save, path)
 	return save
+
+static func ensure_paid_lineup_duration(save: Dictionary) -> bool:
+	if typeof(save.get("roster")) != TYPE_DICTIONARY:
+		return false
+	var roster: Dictionary = save["roster"]
+	var paid := bool(roster.get("auto_save_match_selection_paid", false))
+	# Legacy paid saves receive five matches once; load persists this migration.
+	var remaining := maxi(0, int(roster.get("auto_save_match_selection_matches_left", 5))) if paid else 0
+	var changed := not roster.has("auto_save_match_selection_matches_left") or int(roster["auto_save_match_selection_matches_left"]) != remaining
+	roster["auto_save_match_selection_matches_left"] = remaining
+	if paid and remaining == 0:
+		roster["auto_save_match_selection_paid"] = false
+		roster["match_selected_ids"] = []
+		changed = true
+	return changed
+
+static func consume_paid_lineup_match(save: Dictionary) -> void:
+	ensure_paid_lineup_duration(save)
+	if typeof(save.get("roster")) != TYPE_DICTIONARY:
+		return
+	var roster: Dictionary = save["roster"]
+	if not bool(roster.get("auto_save_match_selection_paid", false)):
+		return
+	var remaining := maxi(0, int(roster["auto_save_match_selection_matches_left"]) - 1)
+	roster["auto_save_match_selection_matches_left"] = remaining
+	if remaining == 0:
+		roster["auto_save_match_selection_paid"] = false
+		roster["match_selected_ids"] = []
 
 static func write_savegame(data: Dictionary, path: String = "user://savegame.json") -> void:
 	path = _resolve_save_path(path)

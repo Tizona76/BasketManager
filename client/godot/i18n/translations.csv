@@ -708,3 +708,11 @@ teamname.league_confirm.motivation.growth,Progressez avec ambition. Transformez 
 teamname.league_confirm.motivation.classic,Relevez le défi. Construisez un club fait pour durer.,Take on the challenge. Build something that lasts.,Acepta el desafío. Construye un club hecho para durar.,Accetta la sfida. Costruisci un club destinato a durare.,Aceite o desafio. Construa um clube feito para durar.
 teamname.league_confirm.motivation.premium,Voyez grand. Transformez chaque opportunité en réussite.,Think big. Turn opportunity into success.,Piensa en grande. Convierte cada oportunidad en éxito.,Pensa in grande. Trasforma ogni opportunità in successo.,Pense grande. Transforme cada oportunidade em sucesso.
 teamname.league_confirm.motivation.stars,Visez le sommet. Les plus grands succès méritent les plus grandes récompenses.,Aim for the top. Greatness brings the greatest rewards.,Apunta a lo más alto. Los mayores éxitos traen las mayores recompensas.,Punta al massimo. I più grandi successi meritano le ricompense più grandi.,Mire no topo. Os maiores sucessos merecem as maiores recompensas.
+END_SEASON_DIVISION_SUBTITLE,Saison %d · Division %d,Season %d · Division %d,Temporada %d · División %d,Stagione %d · Divisione %d,Temporada %d · Divisão %d
+END_SEASON_FINAL_POSITION,POSITION FINALE,FINAL POSITION,POSICIÓN FINAL,POSIZIONE FINALE,POSIÇÃO FINAL
+END_SEASON_VERDICT_PROMOTED,PROMOTION,PROMOTED,ASCENSO,PROMOZIONE,PROMOÇÃO
+END_SEASON_VERDICT_MAINTAINED,MAINTIEN,STAYING UP,PERMANENCIA,PERMANENZA,PERMANÊNCIA
+END_SEASON_VERDICT_RELEGATED,RELÉGATION,RELEGATED,DESCENSO,RETROCESSIONE,REBAIXAMENTO
+END_SEASON_VERDICT_CHAMPION,CHAMPION,CHAMPION,CAMPEÓN,CAMPIONE,CAMPEÃO
+END_SEASON_DIVISION_TRANSITION,Division %d → Division %d,Division %d → Division %d,División %d → División %d,Divisione %d → Divisione %d,Divisão %d → Divisão %d
+END_SEASON_PROMOTED_TO_DIVISION,PROMU EN DIVISION %d,PROMOTED TO DIVISION %d,ASCENSO A DIVISIÓN %d,PROMOSSO IN DIVISIONE %d,PROMOVIDO À DIVISÃO %d

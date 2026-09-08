@@ -1149,6 +1149,7 @@ func _on_confirm_match_selection_pressed() -> void:
 	if d_confirm.has("roster") and typeof(d_confirm["roster"]) == TYPE_DICTIONARY:
 		var roster_confirm: Dictionary = d_confirm["roster"] as Dictionary
 		roster_confirm["auto_save_match_selection_paid"] = false
+		roster_confirm["auto_save_match_selection_matches_left"] = 0
 		d_confirm["roster"] = roster_confirm
 		Save.write_dict(d_confirm)
 	_bm_close_lineup_summary_popup()
@@ -1169,6 +1170,7 @@ func _on_auto_save_match_selection_pressed() -> void:
 		_refresh_match_selection_footer()
 		return
 	roster_confirm["auto_save_match_selection_paid"] = true
+	roster_confirm["auto_save_match_selection_matches_left"] = SAVE_LINEUP_MATCH_COUNT
 	roster_confirm["match_selected_ids"] = pending_match_ids.duplicate()
 	d_confirm["roster"] = roster_confirm
 	Save.write_dict(d_confirm)
@@ -1350,6 +1352,7 @@ func _show_auto_save_match_selection_popup() -> void:
 			return
 
 		roster_confirm["auto_save_match_selection_paid"] = true
+		roster_confirm["auto_save_match_selection_matches_left"] = SAVE_LINEUP_MATCH_COUNT
 		roster_confirm["match_selected_ids"] = pending_match_ids.duplicate()
 		d_confirm["roster"] = roster_confirm
 		Save.write_dict(d_confirm)

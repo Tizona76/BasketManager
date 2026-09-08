@@ -11,6 +11,7 @@ const TOKEN_ICON := preload("res://assets/images/token.png")
 
 
 var _close_x_lock_until_ms: int = 0
+var _end_season_summary: Dictionary = {}
 var _last_match_finance_popup_shown_this_entry: bool = false
 var _shop_out_of_stock_popup_allowed_this_entry: bool = false
 @onready var standings_panel: Control = get_node_or_null("StandingsPanel") as Control
@@ -1930,6 +1931,10 @@ func _bm_ensure_season_start_progress_baseline() -> void:
 	if typeof(save) != TYPE_DICTIONARY:
 		return
 	var changed := false
+	var division := clampi(int(save.get("division_level", 3)), 1, 3)
+	if not save.has("division_level") or save["division_level"] != division:
+		save["division_level"] = division
+		changed = true
 	if not save.has("season_start_xp"):
 		save["season_start_xp"] = PL.get_club_xp(save)
 		changed = true
@@ -2302,7 +2307,8 @@ func _prepare_new_season() -> void:
 	var current_season_number := int(save.get("season_number", 1))
 	if current_season_number < 1:
 		current_season_number = 1
-	var end_summary_for_crest: Dictionary = _get_end_season_summary()
+	var end_summary_for_crest: Dictionary = _end_season_summary if not _end_season_summary.is_empty() else _get_end_season_summary()
+	save["division_level"] = int(end_summary_for_crest["next_division"])
 	if int(end_summary_for_crest.get("rank", 12)) == 1:
 		save["club_season_winner_badge_until_season"] = current_season_number + 1
 	SponsorDataRef.advance_season_contract(save)
@@ -2311,11 +2317,13 @@ func _prepare_new_season() -> void:
 
 	save["season_round"] = 0
 	save["last_pop_fin_round"] = -1
+	save["goal_climb_standings_match17_seen"] = false
 	save["season_results"] = {}
 
 	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
 		var roster_reset: Dictionary = save["roster"] as Dictionary
 		roster_reset["auto_save_match_selection_paid"] = false
+		roster_reset["auto_save_match_selection_matches_left"] = 0
 		roster_reset["match_selected_ids"] = []
 		save["roster"] = roster_reset
 	save["season_start_xp"] = PL.get_club_xp(save)
@@ -2414,6 +2422,7 @@ func _prepare_new_season() -> void:
 		legacy_save_file.store_string(JSON.stringify(save, "\t"))
 		legacy_save_file.close()
 
+	_end_season_summary = {}
 	SeasonState.matchs_joues = 0
 	SeasonState.popup_bienvenue_saison_deja_vu = true
 	SeasonState.standings = {}
@@ -2425,6 +2434,21 @@ func _prepare_new_season() -> void:
 
 	_ensure_season_day_label()
 	
+static func _get_division_verdict(division: int, rank: int) -> Dictionary:
+	var current := clampi(division, 1, 3)
+	var next := current
+	var verdict := "maintained"
+	if current == 1 and rank == 1:
+		verdict = "champion"
+	elif current > 1 and rank >= 1 and rank <= 2:
+		verdict = "promoted"
+		next = current - 1
+	elif current < 3 and rank >= 11 and rank <= 12:
+		verdict = "relegated"
+		next = current + 1
+	return {"verdict_code": verdict, "current_division": current, "next_division": next}
+
+
 func _get_end_season_summary() -> Dictionary:
 	var save := PL.load_savegame()
 	var my_name := str(save.get("team_name", "Mon équipe")).strip_edges()
@@ -2448,7 +2472,12 @@ func _get_end_season_summary() -> Dictionary:
 	var xp_gain: int = maxi(0, int(save.get("season_xp_earned", max(0, xp_now - season_start_xp))))
 	var tokens_gain: int = maxi(0, int(save.get("season_tokens_earned", 0)))
 
+	var division_verdict := _get_division_verdict(int(save.get("division_level", 3)), rank)
 	return {
+		"season_number": int(save.get("season_number", 1)),
+		"current_division": division_verdict["current_division"],
+		"next_division": division_verdict["next_division"],
+		"verdict_code": division_verdict["verdict_code"],
 		"team_name": my_name,
 		"rank": rank,
 		"wins": wins,
@@ -2745,7 +2774,10 @@ func _on_confirm_new_season_pressed() -> void:
 func _open_end_season_popup() -> void:
 	_close_end_season_popup()
 
-	var summary := _get_end_season_summary()
+	_end_season_summary = _get_end_season_summary()
+	var summary := _end_season_summary
+	var verdict: String = str(summary["verdict_code"])
+	var celebrate := verdict == "promoted" or verdict == "champion"
 	var rank: int = int(summary.get("rank", 12))
 	var wins: int = int(summary.get("wins", 0))
 	var losses: int = int(summary.get("losses", 0))
@@ -2755,7 +2787,7 @@ func _open_end_season_popup() -> void:
 
 	popup_fin_saison = Panel.new()
 	var popup_sb := StyleBoxFlat.new()
-	popup_sb.bg_color = Color(0.03, 0.03, 0.05, 1.0)
+	popup_sb.bg_color = Color(0.035, 0.08, 0.22, 1.0)
 	popup_sb.corner_radius_top_left = 18
 	popup_sb.corner_radius_top_right = 18
 	popup_sb.corner_radius_bottom_left = 18
@@ -2764,7 +2796,9 @@ func _open_end_season_popup() -> void:
 	popup_sb.border_width_top = 2
 	popup_sb.border_width_right = 2
 	popup_sb.border_width_bottom = 2
-	popup_sb.border_color = Color(0.85, 0.75, 0.25, 0.35)
+	popup_sb.border_color = Color(0.20, 0.48, 1.0, 0.90)
+	popup_sb.shadow_color = Color(0.10, 0.35, 1.0, 0.35)
+	popup_sb.shadow_size = 10
 	popup_fin_saison.add_theme_stylebox_override("panel", popup_sb)
 	popup_fin_saison.name = "PopupFinSaison"
 	popup_fin_saison.set_anchors_preset(Control.PRESET_TOP_LEFT)
@@ -2789,68 +2823,62 @@ func _open_end_season_popup() -> void:
 	title.add_theme_font_size_override("font_size", 30)
 	vbox.add_child(title)
 
-	# Confettis blancs style Tournois
-	var confetti := CPUParticles2D.new()
-	confetti.amount = 90
-	confetti.lifetime = 2.2
-	confetti.one_shot = false
-	confetti.emitting = true
-	confetti.explosiveness = 0.25
-	confetti.spread = 180.0
-	confetti.gravity = Vector2(0, 260)
-	confetti.initial_velocity_min = 90.0
-	confetti.initial_velocity_max = 170.0
-	confetti.scale_amount_min = 4.0
-	confetti.scale_amount_max = 7.0
-	confetti.position = Vector2(popup_fin_saison.size.x * 0.5, 40)
-	confetti.modulate = Color(1, 1, 1, 1)
-	confetti.z_index = 60
-	popup_fin_saison.add_child(confetti)
+	var subtitle := Label.new()
+	subtitle.text = tr("END_SEASON_DIVISION_SUBTITLE") % [int(summary["season_number"]), int(summary["current_division"])]
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	subtitle.add_theme_font_size_override("font_size", 20)
+	vbox.add_child(subtitle)
 
-	if rank == 1 or rank == 2:
-		var img := TextureRect.new()
-		img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		img.custom_minimum_size = Vector2(230, 143.75)
+	var position_value := Label.new()
+	position_value.text = "#" + str(rank)
+	position_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	position_value.add_theme_font_size_override("font_size", 44)
+	vbox.add_child(position_value)
 
-		var texture_path := ""
-		if rank == 1:
-			texture_path = "res://assets/images/recompenses/coupe.png"
-		elif rank == 2:
-			texture_path = "res://assets/images/medaille_argent.png"
+	var verdict_label := Label.new()
+	verdict_label.text = (tr("END_SEASON_PROMOTED_TO_DIVISION") % int(summary["next_division"])) if verdict == "promoted" else tr("END_SEASON_VERDICT_" + verdict.to_upper())
+	verdict_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	verdict_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	verdict_label.add_theme_font_size_override("font_size", 28)
+	verdict_label.add_theme_color_override("font_color", Color(1.0, 0.78, 0.25) if celebrate else Color(0.82, 0.85, 0.90))
+	vbox.add_child(verdict_label)
 
-		if texture_path != "" and ResourceLoader.exists(texture_path):
-			img.texture = load(texture_path)
-			vbox.add_child(img)
-
-	var rank_text := ""
-	if rank == 1:
-		rank_text = tr("END_SEASON_RANK_1")
-	elif rank == 2:
-		rank_text = tr("END_SEASON_RANK_2")
-	else:
-		rank_text = tr("END_SEASON_RANK") % rank
-
-	var body := RichTextLabel.new()
-	body.bbcode_enabled = false
-	body.fit_content = true
-	body.scroll_active = false
-	body.custom_minimum_size = Vector2(0, 56)
-	body.text = rank_text + "\n\n" \
-		+ tr("END_SEASON_SUMMARY") + " :\n" \
-		+ str(wins) + " " + tr("END_SEASON_WINS").to_lower() + " - " + str(losses) + " " + tr("END_SEASON_LOSSES").to_lower()
+	var body := Label.new()
+	body.text = str(wins) + " " + tr("END_SEASON_WINS").to_lower() + " · " + str(losses) + " " + tr("END_SEASON_LOSSES").to_lower()
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_theme_font_size_override("normal_font_size", 22)
+	body.add_theme_font_size_override("font_size", 20)
 	vbox.add_child(body)
 
-	var summary_box := VBoxContainer.new()
+	if celebrate:
+		# Confettis blancs style Tournois
+		var confetti := CPUParticles2D.new()
+		confetti.amount = 90
+		confetti.lifetime = 2.2
+		confetti.one_shot = false
+		confetti.emitting = true
+		confetti.explosiveness = 0.25
+		confetti.spread = 180.0
+		confetti.gravity = Vector2(0, 260)
+		confetti.initial_velocity_min = 90.0
+		confetti.initial_velocity_max = 170.0
+		confetti.scale_amount_min = 4.0
+		confetti.scale_amount_max = 7.0
+		confetti.position = Vector2(popup_fin_saison.size.x * 0.5, 40)
+		confetti.modulate = Color(1, 1, 1, 1)
+		confetti.z_index = 60
+		popup_fin_saison.add_child(confetti)
+
+	var summary_box := HBoxContainer.new()
 	summary_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	summary_box.add_theme_constant_override("separation", 2)
+	summary_box.add_theme_constant_override("separation", 18)
 	vbox.add_child(summary_box)
 
 	var lbl_xp_gain := Label.new()
 	lbl_xp_gain.text = "XP : +" + str(xp_gain)
 	lbl_xp_gain.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl_xp_gain.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl_xp_gain.add_theme_font_size_override("font_size", 22)
 	summary_box.add_child(lbl_xp_gain)
 
@@ -2872,6 +2900,11 @@ func _open_end_season_popup() -> void:
 	lbl_tokens_gain.add_theme_font_size_override("font_size", 22)
 	lbl_tokens_gain.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	tokens_row.add_child(lbl_tokens_gain)
+
+	var button_spacing := Control.new()
+	button_spacing.custom_minimum_size.y = 24
+	button_spacing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(button_spacing)
 
 	btn_popup_fin_saison = Button.new()
 	btn_popup_fin_saison.text = tr("END_SEASON_NEW_SEASON")
@@ -2923,7 +2956,7 @@ func _open_end_season_popup() -> void:
 	popup_fin_saison.call_deferred("move_to_front")
 
 	var victory_path := "res://audio/sfx/victory_jingle.mp3"
-	if ResourceLoader.exists(victory_path):
+	if celebrate and ResourceLoader.exists(victory_path):
 		var player := AudioStreamPlayer.new()
 		player.name = "EndSeasonVictoryJingle"
 		player.stream = load(victory_path)
