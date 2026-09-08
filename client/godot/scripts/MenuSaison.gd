@@ -2511,7 +2511,64 @@ func _get_current_season_day_text() -> String:
 	txt = txt.replace("{day}", ("%02d / 22" % journee))
 	return txt.to_upper()
 
+func _bm_refresh_division_label(save: Dictionary) -> void:
+	var hud := get_node_or_null("UI/HudProgressPanel") as Control
+	if hud == null:
+		return
+	var label := hud.get_node_or_null("LblDivision") as Label
+	if label == null:
+		label = Label.new()
+		label.name = "LblDivision"
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.add_theme_font_size_override("font_size", 18)
+		label.add_theme_color_override("font_color", Color(0.98, 0.99, 1.0, 1.0))
+		label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.85))
+		label.add_theme_constant_override("shadow_offset_y", 2)
+		hud.add_child(label)
+		label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+		label.offset_top = 8.0
+		label.offset_bottom = 46.0
+		var icon_anchor := Control.new()
+		icon_anchor.name = "DivisionIcon"
+		icon_anchor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		label.add_child(icon_anchor)
+		icon_anchor.anchor_top = 0.5
+		icon_anchor.anchor_bottom = 0.5
+		icon_anchor.offset_left = 10.0
+		icon_anchor.offset_top = -9.0
+		var symbol := Polygon2D.new()
+		symbol.name = "Symbol"
+		icon_anchor.add_child(symbol)
+	var division: int = clampi(int(save.get("division_level", 3)), 1, 3)
+	label.text = "DIVISION %d" % division
+	var accent := Color(0.25, 0.85, 0.55)
+	var points := PackedVector2Array([Vector2(1, 1), Vector2(17, 1), Vector2(16, 11), Vector2(9, 18), Vector2(2, 11)])
+	if division == 2:
+		accent = Color(1.0, 0.78, 0.25)
+		points = PackedVector2Array([Vector2(9, 0), Vector2(12, 6), Vector2(18, 7), Vector2(13, 11), Vector2(15, 18), Vector2(9, 14), Vector2(3, 18), Vector2(5, 11), Vector2(0, 7), Vector2(6, 6)])
+	elif division == 1:
+		accent = Color(0.30, 0.65, 1.0)
+		points = PackedVector2Array([Vector2(0, 3), Vector2(5, 8), Vector2(9, 0), Vector2(13, 8), Vector2(18, 3), Vector2(16, 17), Vector2(2, 17)])
+	var symbol := label.get_node("DivisionIcon/Symbol") as Polygon2D
+	symbol.polygon = points
+	symbol.color = accent
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.04, 0.07, 0.13, 0.96)
+	style.set_border_width_all(1)
+	style.border_color = accent
+	style.set_corner_radius_all(10)
+	style.shadow_color = Color(accent.r, accent.g, accent.b, 0.18)
+	style.shadow_size = 3
+	style.content_margin_left = 34.0
+	style.content_margin_right = 10.0
+	style.content_margin_top = 3.0
+	style.content_margin_bottom = 3.0
+	label.add_theme_stylebox_override("normal", style)
+
+
 func _ensure_season_day_label() -> void:
+	_bm_refresh_division_label(PL.load_savegame())
 	if btn_match == null:
 		return
 
