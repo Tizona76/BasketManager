@@ -490,7 +490,7 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 
 	var cid := str(entry.get("career_id", "")).strip_edges()
 	var action_btn := Button.new()
-	action_btn.text = "⋮"
+	action_btn.text = "..."
 	action_btn.custom_minimum_size = Vector2(38, 54)
 	action_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	action_btn.focus_mode = Control.FOCUS_NONE
