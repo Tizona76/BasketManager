@@ -467,7 +467,6 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	name_label.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else 26)
 	name_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	title_row.add_child(name_label)
 
 	var league_id := str(entry.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
@@ -479,7 +478,6 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	league_label.add_theme_font_size_override("font_size", 16 if not _bm_is_mobile_layout() else 18)
 	league_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.68))
 	league_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	league_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	title_row.add_child(league_label)
 
 	var summary_label := Label.new()
