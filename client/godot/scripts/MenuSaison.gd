@@ -1959,6 +1959,10 @@ func _bm_ensure_season_start_progress_baseline() -> void:
 	if not save.has("division_level") or save["division_level"] != division:
 		save["division_level"] = division
 		changed = true
+	if int(save.get("division_streak_level", 0)) != division or not save.has("division_streak_seasons"):
+		save["division_streak_level"] = division
+		save["division_streak_seasons"] = 1
+		changed = true
 	if not save.has("season_start_xp"):
 		save["season_start_xp"] = PL.get_club_xp(save)
 		changed = true
@@ -2340,7 +2344,12 @@ func _prepare_new_season() -> void:
 	if current_season_number < 1:
 		current_season_number = 1
 	var end_summary_for_crest: Dictionary = _end_season_summary if not _end_season_summary.is_empty() else _get_end_season_summary()
-	save["division_level"] = int(end_summary_for_crest["next_division"])
+	var current_division: int = clampi(int(save.get("division_level", 3)), 1, 3)
+	var next_division: int = int(end_summary_for_crest["next_division"])
+	var streak: int = maxi(1, int(save.get("division_streak_seasons", 1))) if int(save.get("division_streak_level", 0)) == current_division else 1
+	save["division_streak_level"] = next_division
+	save["division_streak_seasons"] = streak + 1 if next_division == current_division else 1
+	save["division_level"] = next_division
 	if int(end_summary_for_crest.get("rank", 12)) == 1:
 		save["club_season_winner_badge_until_season"] = current_season_number + 1
 	SponsorDataRef.advance_season_contract(save)
@@ -2349,6 +2358,7 @@ func _prepare_new_season() -> void:
 
 	save["season_round"] = 0
 	save["last_pop_fin_round"] = -1
+	save["goal_climb_standings_seen"] = false
 	save["goal_climb_standings_match17_seen"] = false
 	save["season_results"] = {}
 

@@ -4289,6 +4289,15 @@ func _bm_maybe_show_climb_standings_goal_once() -> void:
 	if typeof(save) != TYPE_DICTIONARY:
 		return
 
+	var division: int = clampi(int(save.get("division_level", 3)), 1, 3)
+	if int(save.get("division_streak_level", 0)) != division or not save.has("division_streak_seasons"):
+		save["division_streak_level"] = division
+		save["division_streak_seasons"] = 1
+		PL.write_savegame(save)
+	var streak: int = maxi(1, int(save.get("division_streak_seasons", 1)))
+	var stage: String = ["first", "second", "third", "veteran"][mini(streak, 4) - 1]
+	var objective_key: String = "goal.division_objective.d%d.%s" % [division, stage]
+
 	var crest_level: int = int(save.get("club_crest_level", 1))
 	var target_level: int = 2
 	var upgrade_cost: int = 190
@@ -4321,9 +4330,9 @@ func _bm_maybe_show_climb_standings_goal_once() -> void:
 
 	var card := Panel.new()
 	card.name = "GoalClimbStandingsCard"
-	var card_size := Vector2(780, 190)
+	var card_size := Vector2(780, 230)
 	if mobile:
-		card_size = Vector2(minf(vp.x * 0.88, 720.0), 178.0)
+		card_size = Vector2(minf(vp.x * 0.88, 720.0), 220.0)
 	card.size = card_size
 	card.position = (vp - card_size) * 0.5
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -4345,25 +4354,39 @@ func _bm_maybe_show_climb_standings_goal_once() -> void:
 	card.add_theme_stylebox_override("panel", sb)
 	overlay.add_child(card)
 
-	var lbl := Label.new()
-	lbl.text = tr(goal_text_key).replace("{rank}", _bm_goal_ordinal_rank(_bm_goal_current_rank(save))).replace("<br>", "\n")
-	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lbl.add_theme_font_size_override("font_size", 44 if not mobile else 36)
-	lbl.add_theme_color_override("font_color", Color(1.0, 0.86, 0.28, 1.0))
-	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 1.0))
-	lbl.add_theme_constant_override("outline_size", 8)
-	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(lbl)
+	var rank: int = _bm_goal_current_rank(save)
+	var rank_text: String = _bm_goal_ordinal_rank(rank) if TranslationServer.get_locale().begins_with("en") else str(rank)
+	var lines: PackedStringArray = tr(goal_text_key).replace("{rank}", rank_text).split("<br>")
+	lines.append(tr(objective_key))
+	for line_index in range(3):
+		var lbl := Label.new()
+		lbl.text = lines[line_index]
+		lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+		lbl.anchor_top = 0.0
+		lbl.anchor_bottom = 0.0
+		lbl.offset_left = 16.0
+		lbl.offset_right = -16.0
+		lbl.offset_top = 12.0 + float(line_index) * (48.0 if mobile else 54.0)
+		lbl.offset_bottom = card_size.y - 12.0 if line_index == 2 else lbl.offset_top + (48.0 if mobile else 54.0)
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if line_index == 2 else TextServer.AUTOWRAP_OFF
+		lbl.add_theme_color_override("font_color", Color(1.0, 0.86, 0.28, 1.0))
+		lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 1.0))
+		lbl.add_theme_constant_override("outline_size", 8)
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(lbl)
+		var font_size: int = 44 if not mobile else 36
+		if line_index == 2:
+			font_size = 24 if mobile else 26
+		lbl.add_theme_font_size_override("font_size", font_size)
 
 	card.scale = Vector2(0.92, 0.92)
 	card.pivot_offset = card.size * 0.5
 
 	var tw := create_tween()
 	tw.tween_property(card, "scale", Vector2.ONE, 0.22)
-	tw.tween_interval(4.0)
+	tw.tween_interval(6.0)
 	tw.tween_property(overlay, "modulate:a", 0.0, 0.45)
 	tw.tween_callback(overlay.queue_free)
 
