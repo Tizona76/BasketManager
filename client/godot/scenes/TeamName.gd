@@ -218,17 +218,15 @@ func _bm_career_team_name(entry: Dictionary) -> String:
 
 
 func _bm_career_summary(entry: Dictionary) -> String:
-	var league_id := str(entry.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
-	if league_id == "":
-		league_id = LeagueDataScript.get_default_league_id()
-	var league_name := LeagueDataScript.get_league_name(league_id)
 	var season := maxi(1, int(entry.get("season", 1)))
 	var club_level := maxi(1, int(entry.get("club_level", 1)))
 	var save := _bm_read_career_save(entry)
 	var club_xp := 0
+	var division := 3
 	if not save.is_empty():
 		club_xp = PlayerLife.get_club_xp(save)
-	return "%s • Season %d • Club Lv. %d • %d XP" % [league_name, season, club_level, club_xp]
+		division = clampi(int(save.get("division_level", 3)), 1, 3)
+	return "Div. %d • Season %d • Club Lv. %d • %d XP" % [division, season, club_level, club_xp]
 
 
 func _bm_read_career_save(entry: Dictionary) -> Dictionary:
@@ -458,13 +456,31 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	text_box.add_theme_constant_override("separation", 2)
 	row.add_child(text_box)
 
+	var title_row := HBoxContainer.new()
+	title_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_theme_constant_override("separation", 8)
+	title_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text_box.add_child(title_row)
+
 	var name_label := Label.new()
 	name_label.text = _bm_career_team_name(entry)
 	name_label.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else 26)
 	name_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	text_box.add_child(name_label)
+	title_row.add_child(name_label)
+
+	var league_id := str(entry.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+	if league_id == "":
+		league_id = LeagueDataScript.get_default_league_id()
+
+	var league_label := Label.new()
+	league_label.text = "• " + LeagueDataScript.get_league_name(league_id)
+	league_label.add_theme_font_size_override("font_size", 16 if not _bm_is_mobile_layout() else 18)
+	league_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.68))
+	league_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	league_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	title_row.add_child(league_label)
 
 	var summary_label := Label.new()
 	summary_label.text = _bm_career_summary(entry)
