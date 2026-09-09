@@ -2062,7 +2062,15 @@ func _ready() -> void:
 	get_node("Overlays").mouse_filter = Control.MOUSE_FILTER_IGNORE
 		
 	# Fond d'écran Saison
-	bg.texture = load("res://assets/images/backgrounds/fond_saison.png")
+	var division := clampi(int(save.get("division_level", 3)), 1, 3)
+
+	match division:
+		1:
+			bg.texture = load("res://assets/images/backgrounds/fond_saison_D1.png")
+		2:
+			bg.texture = load("res://assets/images/backgrounds/fond_saison_D2.png")
+		_:
+			bg.texture = load("res://assets/images/backgrounds/fond_saison.png")
 
 	# ✅ CRITIQUE : ne bloque pas les clics
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
