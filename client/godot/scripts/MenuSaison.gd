@@ -805,18 +805,42 @@ func _bm_maybe_show_climb_standings_goal_match17() -> void:
 	overlay.call_deferred("move_to_front")
 	card.call_deferred("move_to_front")
 
-	var lbl := Label.new()
-	lbl.text = tr("goal.climb_standings_match17").replace("{rank}", _bm_goal_ordinal_rank(_bm_goal_current_rank(save))).replace("<br>", "\n")
-	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lbl.add_theme_font_size_override("font_size", 44 if not mobile else 36)
-	lbl.add_theme_color_override("font_color", Color(1.0, 0.86, 0.28, 1.0))
-	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 1.0))
-	lbl.add_theme_constant_override("outline_size", 8)
-	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(lbl)
+	var rank: int = _bm_goal_current_rank(save)
+	var division: int = clampi(int(save.get("division_level", 3)), 1, 3)
+	# Motivational copy only; sporting promotion/relegation rules stay separate.
+	var sprint_key: String
+	match division:
+		3:
+			sprint_key = "goal.division_sprint.d3_promotion" if rank <= 4 else "goal.division_sprint.d3_push"
+		2:
+			sprint_key = "goal.division_sprint.d2_promotion" if rank <= 4 else ("goal.division_sprint.d2_secure" if rank <= 9 else "goal.division_sprint.d2_survival")
+		_:
+			sprint_key = "goal.division_sprint.d1_title" if rank <= 2 else ("goal.division_sprint.d1_secure" if rank <= 9 else "goal.division_sprint.d1_survival")
+
+	var rank_text: String = _bm_goal_ordinal_rank(rank) if TranslationServer.get_locale().begins_with("en") else str(rank)
+	var lines: Array[String] = [tr("goal.climb_standings_match17").replace("{rank}", rank_text), tr(sprint_key)]
+	for line_index in range(2):
+		var lbl := Label.new()
+		lbl.text = lines[line_index]
+		lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+		lbl.anchor_top = float(line_index) * 0.5
+		lbl.anchor_bottom = float(line_index + 1) * 0.5
+		lbl.offset_left = 16.0
+		lbl.offset_right = -16.0
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM if line_index == 0 else VERTICAL_ALIGNMENT_TOP
+		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lbl.add_theme_color_override("font_color", Color(1.0, 0.86, 0.28, 1.0))
+		lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 1.0))
+		lbl.add_theme_constant_override("outline_size", 8)
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(lbl)
+		var font_size: int = 44 if not mobile else 36
+		if line_index == 1:
+			var font: Font = lbl.get_theme_font("font")
+			while font_size > 16 and font.get_string_size(lbl.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > card_size.x - 48.0:
+				font_size -= 1
+		lbl.add_theme_font_size_override("font_size", font_size)
 
 	card.scale = Vector2(0.92, 0.92)
 	card.pivot_offset = card.size * 0.5
