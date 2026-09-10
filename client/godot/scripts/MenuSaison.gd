@@ -12,6 +12,7 @@ const TOKEN_ICON := preload("res://assets/images/token.png")
 
 var _close_x_lock_until_ms: int = 0
 var _end_season_summary: Dictionary = {}
+var _pending_division_transition: Dictionary = {}
 var _last_match_finance_popup_shown_this_entry: bool = false
 var _shop_out_of_stock_popup_allowed_this_entry: bool = false
 @onready var standings_panel: Control = get_node_or_null("StandingsPanel") as Control
@@ -624,6 +625,826 @@ func _bm_goal_current_rank(save: Dictionary) -> int:
 	return 1
 
 
+
+func _bm_division_transition_bg_path(division: int) -> String:
+	match clampi(division, 1, 3):
+		1:
+			return "res://assets/images/backgrounds/fond_saison_D1.png"
+		2:
+			return "res://assets/images/backgrounds/fond_saison_D2.png"
+		_:
+			return "res://assets/images/backgrounds/fond_saison.png"
+
+
+func _bm_division_transition_accent(division: int) -> Color:
+	match clampi(division, 1, 3):
+		1:
+			return Color(0.30, 0.65, 1.0, 1.0)
+		2:
+			return Color(1.0, 0.78, 0.25, 1.0)
+		_:
+			return Color(0.25, 0.85, 0.55, 1.0)
+
+
+func _bm_division_transition_label(division: int) -> String:
+	var txt: String = _bm_tr_or_fallback(
+		"division_transition.division_label",
+		"DIVISION {division}"
+	)
+	return txt.replace("{division}", str(clampi(division, 1, 3))).to_upper()
+
+
+func _bm_division_transition_copy(
+	old_division: int,
+	new_division: int,
+	new_season_number: int
+) -> Dictionary:
+	var promoted: bool = new_division < old_division
+
+	var title_key: String = (
+		"division_transition.title.promoted"
+		if promoted
+		else "division_transition.title.relegated"
+	)
+
+	var subtitle_key: String = ""
+	if promoted:
+		subtitle_key = (
+			"division_transition.subtitle.promoted_d1"
+			if new_division == 1
+			else "division_transition.subtitle.promoted_d2"
+		)
+	else:
+		subtitle_key = (
+			"division_transition.subtitle.relegated_d3"
+			if new_division == 3
+			else "division_transition.subtitle.relegated_d2"
+		)
+
+	var title_fallback: String = (
+		"PROMOTED TO DIVISION {division}"
+		if promoted
+		else "RELEGATED TO DIVISION {division}"
+	)
+
+	var subtitle_fallback: String = ""
+	if promoted:
+		subtitle_fallback = (
+			"A BIGGER STAGE AWAITS."
+			if new_division == 1
+			else "A NEW CHAPTER BEGINS."
+		)
+	else:
+		subtitle_fallback = (
+			"THE ROAD BACK BEGINS NOW."
+			if new_division == 3
+			else "A SETBACK — TIME TO REBUILD."
+		)
+
+	var title_text: String = _bm_tr_or_fallback(
+		title_key,
+		title_fallback
+	).replace("{division}", str(new_division))
+
+	var subtitle_text: String = _bm_tr_or_fallback(
+		subtitle_key,
+		subtitle_fallback
+	)
+
+	var route_text: String = _bm_tr_or_fallback(
+		"division_transition.route",
+		"DIVISION {old}  →  DIVISION {new}"
+	)
+	route_text = route_text.replace("{old}", str(old_division))
+	route_text = route_text.replace("{new}", str(new_division))
+
+	var season_text: String = _bm_tr_or_fallback(
+		"division_transition.season_good_luck",
+		"GOOD LUCK FOR THE START OF SEASON {season}!"
+	)
+	season_text = season_text.replace(
+		"{season}",
+		str(maxi(1, new_season_number))
+	)
+
+	var closing_key: String = ""
+	if promoted:
+		closing_key = (
+			"division_transition.closing_line.promoted_d1"
+			if new_division == 1
+			else "division_transition.closing_line.promoted_d2"
+		)
+	else:
+		closing_key = (
+			"division_transition.closing_line.relegated_d3"
+			if new_division == 3
+			else "division_transition.closing_line.relegated_d2"
+		)
+
+	var closing_fallback: String = ""
+	if promoted:
+		closing_fallback = (
+			"A BIGGER STAGE AWAITS... GOOD LUCK IN SEASON {season}!"
+			if new_division == 1
+			else "A NEW CHAPTER BEGINS... GOOD LUCK IN SEASON {season}!"
+		)
+	else:
+		closing_fallback = (
+			"THE ROAD BACK BEGINS NOW... GOOD LUCK IN SEASON {season}!"
+			if new_division == 3
+			else "A SETBACK... TIME TO REBUILD IN SEASON {season}."
+		)
+
+	var closing_text: String = _bm_tr_or_fallback(
+		closing_key,
+		closing_fallback
+	)
+	closing_text = closing_text.replace(
+		"{season}",
+		str(maxi(1, new_season_number))
+	)
+
+	return {
+		"promoted": promoted,
+		"title": title_text.to_upper(),
+		"subtitle": closing_text.to_upper(),
+		"route": route_text.to_upper(),
+		"season": ""
+	}
+
+
+func _bm_make_division_transition_badge(
+	badge_text: String,
+	accent: Color,
+	badge_size: Vector2
+) -> Panel:
+	var panel: Panel = Panel.new()
+	panel.size = badge_size
+	panel.custom_minimum_size = badge_size
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var sb: StyleBoxFlat = StyleBoxFlat.new()
+	sb.bg_color = Color(0.018, 0.025, 0.055, 0.96)
+	sb.border_color = accent
+	sb.set_border_width_all(3)
+	sb.set_corner_radius_all(20)
+	sb.shadow_color = Color(accent.r, accent.g, accent.b, 0.38)
+	sb.shadow_size = 22
+	sb.shadow_offset = Vector2.ZERO
+	panel.add_theme_stylebox_override("panel", sb)
+
+	var label: Label = Label.new()
+	label.text = badge_text
+	label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override(
+		"font_size",
+		38 if not _bm_saison_is_mobile_layout() else 29
+	)
+	label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	label.add_theme_color_override(
+		"font_outline_color",
+		Color(0, 0, 0, 0.96)
+	)
+	label.add_theme_constant_override("outline_size", 7)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(label)
+
+	return panel
+
+
+func _bm_play_division_transition(
+	old_division: int,
+	new_division: int,
+	new_season_number: int
+) -> void:
+	# Sécurité : aucune animation si la Division ne change pas.
+	if old_division == new_division:
+		return
+
+	if get_node_or_null("DivisionTransitionOverlay") != null:
+		return
+
+	var vp: Vector2 = get_viewport_rect().size
+	if vp.x <= 1.0 or vp.y <= 1.0:
+		return
+
+	old_division = clampi(old_division, 1, 3)
+	new_division = clampi(new_division, 1, 3)
+	new_season_number = maxi(1, new_season_number)
+
+	var copy: Dictionary = _bm_division_transition_copy(
+		old_division,
+		new_division,
+		new_season_number
+	)
+	var promoted: bool = bool(copy["promoted"])
+
+	print(
+		"[DIVISION TRANSITION] play D",
+		old_division,
+		" -> D",
+		new_division,
+		" / visual season=",
+		new_season_number
+	)
+
+	var old_accent: Color = _bm_division_transition_accent(old_division)
+	var new_accent: Color = _bm_division_transition_accent(new_division)
+
+	var mood_accent: Color = (
+		new_accent
+		if promoted
+		else Color(0.46, 0.58, 0.74, 1.0)
+	)
+
+	var overlay: Control = Control.new()
+	overlay.name = "DivisionTransitionOverlay"
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.size = vp
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	overlay.z_as_relative = false
+	overlay.set_as_top_level(true)
+	overlay.global_position = Vector2.ZERO
+	overlay.modulate.a = 0.0
+
+	var overlays: Control = get_node_or_null("Overlays") as Control
+	if overlays != null:
+		overlays.add_child(overlay)
+	else:
+		add_child(overlay)
+	overlay.move_to_front()
+
+	# --------------------------------------------------
+	# Backgrounds : ancienne réalité -> nouvelle réalité
+	# --------------------------------------------------
+
+	var old_bg: TextureRect = TextureRect.new()
+	old_bg.name = "OldDivisionBackground"
+	old_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	old_bg.size = vp
+	old_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	old_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	old_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	old_bg.texture = load(
+		_bm_division_transition_bg_path(old_division)
+	) as Texture2D
+	old_bg.pivot_offset = vp * 0.5
+	old_bg.scale = Vector2(1.08, 1.08)
+	overlay.add_child(old_bg)
+
+	var new_bg: TextureRect = TextureRect.new()
+	new_bg.name = "NewDivisionBackground"
+	new_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	new_bg.size = vp
+	new_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	new_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	new_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	new_bg.texture = load(
+		_bm_division_transition_bg_path(new_division)
+	) as Texture2D
+	new_bg.modulate.a = 0.0
+	new_bg.pivot_offset = vp * 0.5
+	new_bg.scale = Vector2(1.12, 1.12)
+	overlay.add_child(new_bg)
+
+	var dark: ColorRect = ColorRect.new()
+	dark.name = "CinematicDark"
+	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dark.color = (
+		Color(0.004, 0.010, 0.030, 0.43)
+		if promoted
+		else Color(0.005, 0.010, 0.022, 0.62)
+	)
+	dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(dark)
+
+	# --------------------------------------------------
+	# Broadcast arena lights
+	# --------------------------------------------------
+
+	var beam_left: Polygon2D = Polygon2D.new()
+	beam_left.polygon = PackedVector2Array([
+		Vector2(vp.x * 0.04, 0),
+		Vector2(vp.x * 0.15, 0),
+		Vector2(vp.x * 0.44, vp.y * 0.90),
+		Vector2(vp.x * 0.31, vp.y * 0.90)
+	])
+	beam_left.color = Color(
+		0.62,
+		0.80,
+		1.0,
+		0.13 if promoted else 0.07
+	)
+	overlay.add_child(beam_left)
+
+	var beam_right: Polygon2D = Polygon2D.new()
+	beam_right.polygon = PackedVector2Array([
+		Vector2(vp.x * 0.85, 0),
+		Vector2(vp.x * 0.96, 0),
+		Vector2(vp.x * 0.69, vp.y * 0.90),
+		Vector2(vp.x * 0.56, vp.y * 0.90)
+	])
+	beam_right.color = (
+		Color(1.0, 0.79, 0.32, 0.15)
+		if promoted
+		else Color(0.55, 0.68, 0.86, 0.07)
+	)
+	overlay.add_child(beam_right)
+
+	# --------------------------------------------------
+	# Halo TV derrière le hero
+	# --------------------------------------------------
+
+	var halo: TextureRect = TextureRect.new()
+	halo.name = "DivisionBroadcastHalo"
+	halo.texture = load(
+		"res://assets/images/ui/playoffs/halo_round.png"
+	) as Texture2D
+	halo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	halo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	halo.size = Vector2(vp.x * 0.82, vp.y * 0.82)
+	halo.position = Vector2(
+		(vp.x - halo.size.x) * 0.5,
+		(vp.y - halo.size.y) * 0.5
+	)
+	halo.pivot_offset = halo.size * 0.5
+	halo.modulate = Color(
+		mood_accent.r,
+		mood_accent.g,
+		mood_accent.b,
+		0.0
+	)
+	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(halo)
+
+	# --------------------------------------------------
+	# Hero panel NBA broadcast : finit à ~80 % de largeur
+	# --------------------------------------------------
+
+	var hero_size: Vector2 = Vector2(
+		vp.x * 0.80,
+		minf(vp.y * 0.63, 610.0)
+	)
+
+	var hero: Panel = Panel.new()
+	hero.name = "DivisionBroadcastHero"
+	hero.size = hero_size
+	hero.custom_minimum_size = hero_size
+	hero.position = Vector2(
+		(vp.x - hero_size.x) * 0.5,
+		(vp.y - hero_size.y) * 0.5
+	)
+	hero.pivot_offset = hero_size * 0.5
+	hero.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var hero_style: StyleBoxFlat = StyleBoxFlat.new()
+	hero_style.bg_color = Color(
+		0.012,
+		0.020,
+		0.050,
+		0.94 if promoted else 0.97
+	)
+	hero_style.border_color = mood_accent
+	hero_style.set_border_width_all(3)
+	hero_style.set_corner_radius_all(30)
+	hero_style.shadow_color = Color(
+		mood_accent.r,
+		mood_accent.g,
+		mood_accent.b,
+		0.34 if promoted else 0.20
+	)
+	hero_style.shadow_size = 34
+	hero_style.shadow_offset = Vector2.ZERO
+	hero.add_theme_stylebox_override("panel", hero_style)
+
+	hero.scale = Vector2(0.46, 0.46)
+	hero.rotation = deg_to_rad(-10.0 if promoted else -6.0)
+	hero.modulate.a = 0.0
+	overlay.add_child(hero)
+
+	# Broadcast bars
+	var top_bar: ColorRect = ColorRect.new()
+	top_bar.position = Vector2(hero_size.x * 0.04, 18.0)
+	top_bar.size = Vector2(hero_size.x * 0.92, 4.0)
+	top_bar.color = mood_accent
+	top_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hero.add_child(top_bar)
+
+	var bottom_bar: ColorRect = ColorRect.new()
+	bottom_bar.position = Vector2(
+		hero_size.x * 0.20,
+		hero_size.y - 22.0
+	)
+	bottom_bar.size = Vector2(hero_size.x * 0.60, 3.0)
+	bottom_bar.color = Color(
+		mood_accent.r,
+		mood_accent.g,
+		mood_accent.b,
+		0.65
+	)
+	bottom_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hero.add_child(bottom_bar)
+
+	# --------------------------------------------------
+	# Ancien badge / flèche / nouveau badge
+	# --------------------------------------------------
+
+	# --------------------------------------------------
+	# Ancien badge / flèche / nouveau badge
+	# --------------------------------------------------
+
+	var badge_size: Vector2 = Vector2(
+		minf(350.0, hero_size.x * 0.34),
+		minf(120.0, hero_size.y * 0.22)
+	)
+
+	var badge_y: float = hero_size.y * 0.18
+
+	var old_badge: Panel = _bm_make_division_transition_badge(
+		_bm_division_transition_label(old_division),
+		old_accent,
+		badge_size
+	)
+	old_badge.name = "OldDivisionBadge"
+	old_badge.position = Vector2(
+		hero_size.x * 0.08,
+		badge_y
+	)
+	old_badge.pivot_offset = badge_size * 0.5
+	old_badge.modulate.a = 0.0
+	hero.add_child(old_badge)
+
+	var arrow: Label = Label.new()
+	arrow.name = "DivisionArrow"
+	arrow.text = "→"
+	arrow.position = Vector2(
+		hero_size.x * 0.44,
+		badge_y
+	)
+	arrow.size = Vector2(hero_size.x * 0.12, badge_size.y)
+	arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	arrow.add_theme_font_size_override(
+		"font_size",
+		54 if not _bm_saison_is_mobile_layout() else 40
+	)
+	arrow.add_theme_color_override("font_color", mood_accent)
+	arrow.add_theme_color_override(
+		"font_outline_color",
+		Color(0, 0, 0, 1)
+	)
+	arrow.add_theme_constant_override("outline_size", 7)
+	arrow.modulate.a = 0.0
+	arrow.scale = Vector2(0.65, 0.65)
+	arrow.pivot_offset = arrow.size * 0.5
+	arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hero.add_child(arrow)
+
+	var new_badge: Panel = _bm_make_division_transition_badge(
+		_bm_division_transition_label(new_division),
+		new_accent,
+		badge_size
+	)
+	new_badge.name = "NewDivisionBadge"
+	new_badge.position = Vector2(
+		hero_size.x - hero_size.x * 0.08 - badge_size.x,
+		badge_y
+	)
+	new_badge.pivot_offset = badge_size * 0.5
+	new_badge.scale = Vector2(0.68, 0.68)
+	new_badge.modulate.a = 0.0
+	hero.add_child(new_badge)
+
+	# --------------------------------------------------
+	# Message principal
+	# --------------------------------------------------
+
+	var title: Label = Label.new()
+	title.name = "DivisionTransitionTitle"
+	title.text = str(copy["title"])
+	title.position = Vector2(hero_size.x * 0.05, hero_size.y * 0.44)
+	title.size = Vector2(hero_size.x * 0.90, hero_size.y * 0.15)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.add_theme_font_size_override(
+		"font_size",
+		47 if not _bm_saison_is_mobile_layout() else 34
+	)
+	title.add_theme_color_override(
+		"font_color",
+		(
+			Color(1.0, 0.90, 0.48, 1.0)
+			if promoted
+			else Color(0.82, 0.88, 0.98, 1.0)
+		)
+	)
+	title.add_theme_color_override(
+		"font_outline_color",
+		Color(0.005, 0.010, 0.030, 1.0)
+	)
+	title.add_theme_constant_override("outline_size", 9)
+	title.modulate.a = 0.0
+	title.scale = Vector2(0.90, 0.90)
+	title.pivot_offset = title.size * 0.5
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hero.add_child(title)
+
+	var subtitle: Label = Label.new()
+	subtitle.name = "DivisionTransitionSubtitle"
+	subtitle.text = str(copy["subtitle"])
+	subtitle.position = Vector2(hero_size.x * 0.10, hero_size.y * 0.62)
+	subtitle.size = Vector2(hero_size.x * 0.84, hero_size.y * 0.12)
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	subtitle.add_theme_font_size_override(
+		"font_size",
+		25 if not _bm_saison_is_mobile_layout() else 19
+	)
+	subtitle.add_theme_color_override(
+		"font_color",
+		Color(0.90, 0.94, 1.0, 1.0)
+	)
+	subtitle.add_theme_color_override(
+		"font_outline_color",
+		Color(0, 0, 0, 1)
+	)
+	subtitle.add_theme_constant_override("outline_size", 5)
+	subtitle.modulate.a = 0.0
+	subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hero.add_child(subtitle)
+
+	var season_line: Label = Label.new()
+	season_line.name = "DivisionTransitionSeason"
+	season_line.text = str(copy["season"])
+	season_line.position = Vector2(hero_size.x * 0.08, hero_size.y * 0.72)
+	season_line.size = Vector2(hero_size.x * 0.84, hero_size.y * 0.10)
+	season_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	season_line.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	season_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	season_line.add_theme_font_size_override(
+		"font_size",
+		24 if not _bm_saison_is_mobile_layout() else 18
+	)
+	season_line.add_theme_color_override("font_color", mood_accent)
+	season_line.add_theme_color_override(
+		"font_outline_color",
+		Color(0, 0, 0, 1)
+	)
+	season_line.add_theme_constant_override("outline_size", 5)
+	season_line.modulate.a = 0.0
+	season_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hero.add_child(season_line)
+
+	# --------------------------------------------------
+	# Supporters foreground
+	# --------------------------------------------------
+
+	var crowd: Polygon2D = Polygon2D.new()
+	crowd.name = "CrowdSilhouette"
+	crowd.polygon = PackedVector2Array([
+		Vector2(0, vp.y),
+		Vector2(0, vp.y * 0.88),
+		Vector2(vp.x * 0.07, vp.y * 0.83),
+		Vector2(vp.x * 0.14, vp.y * 0.87),
+		Vector2(vp.x * 0.22, vp.y * 0.82),
+		Vector2(vp.x * 0.31, vp.y * 0.86),
+		Vector2(vp.x * 0.40, vp.y * 0.81),
+		Vector2(vp.x * 0.50, vp.y * 0.86),
+		Vector2(vp.x * 0.60, vp.y * 0.81),
+		Vector2(vp.x * 0.69, vp.y * 0.86),
+		Vector2(vp.x * 0.78, vp.y * 0.82),
+		Vector2(vp.x * 0.86, vp.y * 0.87),
+		Vector2(vp.x * 0.94, vp.y * 0.83),
+		Vector2(vp.x, vp.y * 0.88),
+		Vector2(vp.x, vp.y)
+	])
+	crowd.color = Color(0.003, 0.006, 0.016, 0.96)
+	crowd.position.y = 55.0
+	overlay.add_child(crowd)
+
+	# --------------------------------------------------
+	# Timeline ~9.9 s
+	# --------------------------------------------------
+
+	var tw_overlay: Tween = create_tween()
+	tw_overlay.tween_property(
+		overlay,
+		"modulate:a",
+		1.0,
+		0.28
+	)
+	tw_overlay.tween_interval(9.00)
+	tw_overlay.tween_property(
+		overlay,
+		"modulate:a",
+		0.0,
+		0.57
+	)
+	tw_overlay.tween_callback(func() -> void:
+		if is_instance_valid(overlay):
+			overlay.queue_free()
+	)
+
+	var tw_old_bg: Tween = create_tween()
+	tw_old_bg.tween_property(
+		old_bg,
+		"scale",
+		Vector2.ONE,
+		1.55
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+	var tw_new_bg: Tween = create_tween()
+	tw_new_bg.tween_interval(1.20)
+	tw_new_bg.parallel().tween_property(
+		new_bg,
+		"modulate:a",
+		1.0,
+		0.95
+	)
+	tw_new_bg.parallel().tween_property(
+		new_bg,
+		"scale",
+		Vector2.ONE,
+		2.35
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+	var tw_halo: Tween = create_tween()
+	tw_halo.tween_interval(0.35)
+	tw_halo.parallel().tween_property(
+		halo,
+		"modulate:a",
+		0.34 if promoted else 0.18,
+		0.70
+	)
+	tw_halo.parallel().tween_property(
+		halo,
+		"scale",
+		Vector2(1.08, 1.08),
+		3.20
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+	var tw_hero: Tween = create_tween()
+	tw_hero.tween_interval(0.34)
+	tw_hero.parallel().tween_property(
+		hero,
+		"modulate:a",
+		1.0,
+		2.10
+	)
+	tw_hero.parallel().tween_property(
+		hero,
+		"scale",
+		Vector2.ONE,
+		2.70
+	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw_hero.parallel().tween_property(
+		hero,
+		"rotation",
+		0.0,
+		2.70
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+	var tw_old_badge: Tween = create_tween()
+	tw_old_badge.tween_interval(0.62)
+	tw_old_badge.tween_property(
+		old_badge,
+		"modulate:a",
+		1.0,
+		0.34
+	)
+
+	var tw_arrow: Tween = create_tween()
+	tw_arrow.tween_interval(3.15)
+	tw_arrow.tween_property(
+		arrow,
+		"modulate:a",
+		1.0,
+		0.28
+	)
+	tw_arrow.parallel().tween_property(
+		arrow,
+		"scale",
+		Vector2(1.08, 1.08),
+		0.42
+	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+	var tw_new_badge: Tween = create_tween()
+	tw_new_badge.tween_interval(3.15)
+	tw_new_badge.tween_property(
+		new_badge,
+		"modulate:a",
+		1.0,
+		0.38
+	)
+	tw_new_badge.parallel().tween_property(
+		new_badge,
+		"scale",
+		Vector2.ONE,
+		0.55
+	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+	var tw_new_badge_focus: Tween = create_tween()
+	tw_new_badge_focus.tween_interval(3.85)
+	tw_new_badge_focus.tween_property(
+		new_badge,
+		"scale",
+		Vector2(1.05, 1.05),
+		0.34
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw_new_badge_focus.tween_property(
+		new_badge,
+		"scale",
+		Vector2.ONE,
+		0.30
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+	var tw_old_dim: Tween = create_tween()
+	tw_old_dim.tween_interval(3.85)
+	tw_old_dim.tween_property(
+		old_badge,
+		"modulate",
+		Color(0.42, 0.46, 0.54, 0.42),
+		0.42
+	)
+
+	var tw_title: Tween = create_tween()
+	tw_title.tween_interval(3.50)
+	tw_title.tween_property(
+		title,
+		"modulate:a",
+		1.0,
+		0.40
+	)
+	tw_title.parallel().tween_property(
+		title,
+		"scale",
+		Vector2.ONE,
+		0.54
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+	var tw_subtitle: Tween = create_tween()
+	tw_subtitle.tween_interval(3.85)
+	tw_subtitle.tween_property(
+		subtitle,
+		"modulate:a",
+		1.0,
+		0.36
+	)
+
+	var tw_season: Tween = create_tween()
+	tw_season.tween_interval(3.25)
+	tw_season.tween_property(
+		season_line,
+		"modulate:a",
+		1.0,
+		0.40
+	)
+
+	var tw_hero_breathe: Tween = create_tween()
+	tw_hero_breathe.tween_interval(3.65)
+	tw_hero_breathe.tween_property(
+		hero,
+		"scale",
+		Vector2(1.015, 1.015),
+		0.52
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw_hero_breathe.tween_property(
+		hero,
+		"scale",
+		Vector2.ONE,
+		0.60
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+	var tw_halo_breathe: Tween = create_tween()
+	tw_halo_breathe.tween_interval(3.40)
+	tw_halo_breathe.tween_property(
+		halo,
+		"scale",
+		Vector2(1.12, 1.12),
+		0.74
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw_halo_breathe.tween_property(
+		halo,
+		"scale",
+		Vector2(1.08, 1.08),
+		0.72
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+	var tw_crowd: Tween = create_tween()
+	tw_crowd.tween_property(
+		crowd,
+		"position:y",
+		0.0,
+		1.10
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
 func _bm_maybe_show_shop_restock_notice_match14() -> void:
 	var save: Dictionary = PL.load_savegame()
 	if typeof(save) != TYPE_DICTIONARY:
@@ -1173,11 +1994,49 @@ func _bm_show_pending_intro_after_token_reward_popup_close() -> void:
 
 
 func _bm_maybe_show_pending_intro_after_new_season() -> void:
+	# Laisser le popup Rewards différé se créer.
 	await get_tree().process_frame
-	var guard := 0
-	while get_node_or_null("SeasonRewardPopup") != null and guard < 12:
-		guard += 1
-		await get_tree().create_timer(0.5).timeout
+	await get_tree().process_frame
+
+	# La transition ne peut démarrer qu'APRÈS fermeture des Rewards.
+	while get_node_or_null("SeasonRewardPopup") != null:
+		await get_tree().create_timer(0.10).timeout
+
+	var transition: Dictionary = _pending_division_transition.duplicate(true)
+	_pending_division_transition = {}
+
+	if not transition.is_empty():
+		var old_division: int = clampi(
+			int(transition.get("old_division", 3)),
+			1,
+			3
+		)
+
+		var new_division: int = clampi(
+			int(transition.get("new_division", old_division)),
+			1,
+			3
+		)
+
+		var new_season_number: int = maxi(
+			1,
+			int(transition.get("new_season_number", 1))
+		)
+
+		# CONDITION UNIQUE DE PRODUCTION.
+		if old_division != new_division:
+			_bm_play_division_transition(
+				old_division,
+				new_division,
+				new_season_number
+			)
+
+			# Attendre la disparition réelle de l'overlay avant
+			# de reprendre la chaîne normale des popups/intros.
+			while get_node_or_null("DivisionTransitionOverlay") != null:
+				await get_tree().process_frame
+
+	# Suite normale existante.
 	_bm_maybe_show_pending_sponsors_popup()
 
 
@@ -1836,6 +2695,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 		_shop_out_of_stock_popup_allowed_this_entry = true
 		call_deferred("_bm_show_pending_tokens_or_intro_popups")
 
+
 		if _open_finances_cta and tree != null and ResourceLoader.exists("res://scenes/Finances.tscn"):
 			tree.call_deferred("change_scene_to_file", "res://scenes/Finances.tscn")
 	)
@@ -2242,6 +3102,8 @@ func _ready() -> void:
 			_select_zone("calendrier")
 		)
 		
+
+
 func _input(event):
 	if event is InputEventMouseButton and event.pressed:
 		print("CLICK DETECTED AT ROOT")
@@ -2864,9 +3726,41 @@ func _close_end_season_popup() -> void:
 
 
 func _on_confirm_new_season_pressed() -> void:
+	# Capture AVANT _prepare_new_season(), qui applique réellement
+	# la nouvelle Division et incrémente la Saison.
+	var summary: Dictionary = (
+		_end_season_summary.duplicate(true)
+		if not _end_season_summary.is_empty()
+		else _get_end_season_summary()
+	)
+
+	var old_division: int = clampi(
+		int(summary.get("current_division", 3)),
+		1,
+		3
+	)
+
+	var new_division: int = clampi(
+		int(summary.get("next_division", old_division)),
+		1,
+		3
+	)
+
+	var new_season_number: int = maxi(
+		1,
+		int(summary.get("season_number", 1)) + 1
+	)
+
+	_pending_division_transition = {
+		"old_division": old_division,
+		"new_division": new_division,
+		"new_season_number": new_season_number
+	}
+
 	_close_end_season_popup()
 	_show_pending_season_reward_popup_after_end_season()
 	_prepare_new_season()
+
 	call_deferred("_bm_maybe_show_pending_intro_after_new_season")
 
 
