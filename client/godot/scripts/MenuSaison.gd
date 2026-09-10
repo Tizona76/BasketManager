@@ -847,7 +847,7 @@ func _bm_maybe_show_climb_standings_goal_match17() -> void:
 
 	var tw := create_tween()
 	tw.tween_property(card, "scale", Vector2.ONE, 0.22)
-	tw.tween_interval(4.0)
+	tw.tween_interval(5.33)
 	tw.tween_property(overlay, "modulate:a", 0.0, 0.45)
 	tw.tween_callback(overlay.queue_free)
 

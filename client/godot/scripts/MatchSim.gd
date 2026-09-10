@@ -4439,13 +4439,14 @@ func _fin_match() -> void:
 		var season_results_sync: Dictionary = save_sync["season_results"] as Dictionary
 		var round_key_sync := str(round_index)
 		var round_results_sync: Dictionary = {}
-		if season_results_sync.has(round_key_sync) and typeof(season_results_sync[round_key_sync]) == TYPE_DICTIONARY:
-			round_results_sync = season_results_sync[round_key_sync] as Dictionary
-		var result_key_sync := str(_team_dom_name) + "||" + str(_team_ext_name)
-		round_results_sync[result_key_sync] = {
-			"score_dom": int(score_dom),
-			"score_ext": int(score_ext)
-		}
+		if ss.season_results_by_round.has(round_index) and typeof(ss.season_results_by_round[round_index]) == TYPE_DICTIONARY:
+			round_results_sync = (ss.season_results_by_round[round_index] as Dictionary).duplicate(true)
+		else:
+			var result_key_sync := str(_team_dom_name) + "||" + str(_team_ext_name)
+			round_results_sync[result_key_sync] = {
+				"score_dom": int(score_dom),
+				"score_ext": int(score_ext)
+			}
 		season_results_sync[round_key_sync] = round_results_sync
 		save_sync["season_results"] = season_results_sync
 
