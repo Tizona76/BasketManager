@@ -3122,7 +3122,7 @@ func _input(event):
 	# _close_x_intercept_root
 	# Si Classement est affiché et que le clic tombe sur la croix, on ferme immédiatement
 	# + lock anti-réouverture (même frame / même clic) + hide UI fallback.
-	if SeasonState.zone_selectionnee_saison == "classement" and btn_close_classement != null and btn_close_classement.visible:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and SeasonState.zone_selectionnee_saison == "classement" and btn_close_classement != null and btn_close_classement.visible:
 		# Si on vient juste de fermer, on ignore les clics ROOT le temps que l'UI se mette à jour
 		if Time.get_ticks_msec() < _close_x_lock_until_ms:
 			return
@@ -4087,10 +4087,12 @@ func _render_standings_bbcode() -> String:
 		return pfa > pfb
 	)
 
-	var out := ""
-	out += "\n"
-	out += "Pos   " + _bm_tr_or_fallback("standings.team_header", "Équipe") + "                        Pts   W   L     PF    PA    Diff\n"
-	out += "--------------------------------------------------------------\n"
+	var out := "[font_size=22][color=#B8CADD]" + tr("saison.tab.standings") + "[/color][/font_size]\n\n[table=8]"
+	var headers := ["Pos", _bm_tr_or_fallback("standings.team_header", "Équipe"), "Pts", "W", "L", "PF", "PA", "Diff"]
+	for column in range(headers.size()):
+		var align := "left" if column == 1 else "right"
+		var expand := " expand=1" if column == 1 else ""
+		out += "[cell%s bg=#182A40 padding=4,6,4,6][%s][color=#B8CADD]%s[/color][/%s][/cell]" % [expand, align, headers[column], align]
 
 	var pos: int = 1
 	for t in teams:
@@ -4105,8 +4107,6 @@ func _render_standings_bbcode() -> String:
 		var name: String = raw_name
 		if name.length() > 20:
 			name = name.substr(0, 20)
-		var row := "%2d    %-20s    %3d   %2d  %2d    %4d  %4d    %+4d
-" % [pos, name, pts, w, l, pf, pa, diff]
 		var my_team_name := ""
 		for n in get_tree().root.get_children():
 			if my_team_name == "" and n.has_method("get_current_profile"):
@@ -4123,19 +4123,25 @@ func _render_standings_bbcode() -> String:
 		var raw_cmp := raw_name.to_lower()
 		var short_cmp := name.to_lower()
 		print("[CLASSEMENT] raw_name=", raw_name, " | name=", name, " | my_team_name=", my_team_name)
-		if team_cmp != "" and (raw_cmp == team_cmp or short_cmp == team_cmp):
-			row = "[color=#40C7FF]" + row + "[/color]"
-		out += row
+		var is_player := team_cmp != "" and (raw_cmp == team_cmp or short_cmp == team_cmp)
+		var cells := [str(pos), name, str(pts), str(w), str(l), str(pf), str(pa), "%+d" % diff]
+		var row_bg := "#173449" if is_player else ("#122034" if pos % 2 == 0 else "#101C2E")
+		for column in range(cells.size()):
+			var align := "left" if column == 1 else "right"
+			var expand := " expand=1" if column == 1 else ""
+			var color := "#40C7FF" if is_player and column < 2 else "#E1E8F0"
+			var content: String = cells[column].replace("[", "[lb]")
+			out += "[cell%s bg=%s padding=4,3,4,3][%s][color=%s]%s[/color][/%s][/cell]" % [expand, row_bg, align, color, content, align]
 		pos += 1
 
-	return out
+	return out + "[/table]"
 
 
 func _on_btn_classement_show_standings_pressed() -> void:
 	if standings_panel == null or lbl_standings == null:
 		return
-	# BM_STANDINGS_CONTENT_TEXT_PLUS2_DIRECT_V1
-	lbl_standings.add_theme_font_size_override("normal_font_size", 28)
+	# Local standings typography; keep the existing RichTextLabel.
+	lbl_standings.add_theme_font_size_override("normal_font_size", 24)
 	lbl_standings.text = _render_standings_bbcode()
 	standings_panel.z_index = 700
 	standings_panel.visible = true

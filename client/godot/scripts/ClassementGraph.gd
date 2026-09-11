@@ -1,7 +1,7 @@
 extends Control
 
 const GRAPH_PADDING: float = 12.0
-const GRAPH_LINE_WIDTH: float = 2.0
+const GRAPH_LINE_WIDTH: float = 2.5
 
 var ranking_series: Array = []
 var total_matches: int = 22
@@ -31,19 +31,19 @@ func _draw() -> void:
 	)
 
 	# fond discret
-	draw_rect(inner, Color(1, 1, 1, 0.035), true)
+	draw_rect(inner, Color(1, 1, 1, 0.018), true)
 
 	# axes
 	draw_line(
 		Vector2(inner.position.x, inner.position.y + inner.size.y),
 		Vector2(inner.position.x + inner.size.x, inner.position.y + inner.size.y),
-		Color(1, 1, 1, 0.18),
+		Color(1, 1, 1, 0.12),
 		1.0
 	)
 	draw_line(
 		Vector2(inner.position.x, inner.position.y),
 		Vector2(inner.position.x, inner.position.y + inner.size.y),
-		Color(1, 1, 1, 0.12),
+		Color(1, 1, 1, 0.09),
 		1.0
 	)
 
@@ -53,7 +53,7 @@ func _draw() -> void:
 		draw_line(
 			Vector2(inner.position.x, y),
 			Vector2(inner.position.x + inner.size.x, y),
-			Color(1, 1, 1, 0.06),
+			Color(1, 1, 1, 0.035),
 			1.0
 		)
 
@@ -63,7 +63,7 @@ func _draw() -> void:
 		draw_line(
 			Vector2(x, inner.position.y),
 			Vector2(x, inner.position.y + inner.size.y),
-			Color(1, 1, 1, 0.045),
+			Color(1, 1, 1, 0.025),
 			1.0
 		)
 

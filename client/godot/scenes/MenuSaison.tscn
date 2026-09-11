@@ -334,8 +334,8 @@ text = "popup_intro_title"
 [node name="StandingsPanel" type="Control" parent="."]
 visible = false
 layout_mode = 1
-anchor_left = 0.511
-anchor_right = 0.801
+anchor_left = 0.47
+anchor_right = 0.74
 anchor_bottom = 1.0
 offset_left = -330.0
 offset_top = 80.0
@@ -353,13 +353,19 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0, 0, 0, 0.52)
+color = Color(0.07, 0.10, 0.16, 0.94)
 
 [node name="LblStandings" type="RichTextLabel" parent="StandingsPanel"]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
-theme_override_font_sizes/normal_font_size = 26
+offset_left = 16.0
+offset_top = 20.0
+offset_right = -16.0
+offset_bottom = -16.0
+theme_override_font_sizes/normal_font_size = 24
+theme_override_constants/table_h_separation = 0
+theme_override_constants/table_v_separation = 1
 bbcode_enabled = true
 
 [node name="StandingsGraphPanel" type="ColorRect" parent="."]
@@ -374,15 +380,17 @@ offset_left = 0.0
 offset_top = 0.0
 offset_right = 0.0
 offset_bottom = 0.0
-color = Color(0.08, 0.08, 0.08, 0.72)
+color = Color(0.07, 0.10, 0.16, 0.94)
 
 [node name="StandingsGraphTitle" type="Label" parent="StandingsGraphPanel"]
 layout_mode = 1
 offset_left = 18.0
 offset_top = 14.0
-offset_right = 240.0
+anchor_right = 1.0
+offset_right = -18.0
 offset_bottom = 42.0
 theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.72, 0.79, 0.87, 1)
 text = "Évolution classement"
 
 [node name="StandingsGraph" type="Control" parent="StandingsGraphPanel"]
