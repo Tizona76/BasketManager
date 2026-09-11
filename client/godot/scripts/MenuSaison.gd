@@ -3223,6 +3223,7 @@ func _prepare_new_season() -> void:
 	save["goal_climb_standings_seen"] = false
 	save["goal_climb_standings_match17_seen"] = false
 	save["season_results"] = {}
+	save["ranking_history"] = []
 
 	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
 		var roster_reset: Dictionary = save["roster"] as Dictionary
