@@ -1086,6 +1086,10 @@ func _maybe_show_tournament_victory_popup() -> void:
 	var card := Panel.new()
 	card.custom_minimum_size = Vector2(560, 320)
 	card.size = Vector2(560, 320)
+	card.pivot_offset = card.size * 0.5
+	card.scale = Vector2(0.46, 0.46)
+	card.rotation = deg_to_rad(-10.0)
+	card.modulate.a = 0.0
 	card.position = Vector2(
 		(get_viewport_rect().size.x - 560.0) * 0.5,
 		(get_viewport_rect().size.y - 320.0) * 0.5
@@ -1093,16 +1097,18 @@ func _maybe_show_tournament_victory_popup() -> void:
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.clip_contents = true
 	var card_style := StyleBoxFlat.new()
-	card_style.bg_color = Color(0.015, 0.018, 0.030, 1.0)
-	card_style.border_width_left = 2
-	card_style.border_width_top = 2
-	card_style.border_width_right = 2
-	card_style.border_width_bottom = 2
-	card_style.border_color = Color(0.95, 0.58, 0.14, 0.72)
+	card_style.bg_color = Color(0.045, 0.095, 0.18, 1.0)
+	card_style.border_width_left = 1
+	card_style.border_width_top = 1
+	card_style.border_width_right = 1
+	card_style.border_width_bottom = 1
+	card_style.border_color = Color(0.88, 0.73, 0.43, 0.60)
 	card_style.corner_radius_top_left = 12
 	card_style.corner_radius_top_right = 12
 	card_style.corner_radius_bottom_left = 12
 	card_style.corner_radius_bottom_right = 12
+	card_style.shadow_color = Color(0.88, 0.73, 0.43, 0.40)
+	card_style.shadow_size = 24
 	card.add_theme_stylebox_override("panel", card_style)
 	popup.add_child(card)
 
@@ -1175,6 +1181,42 @@ func _maybe_show_tournament_victory_popup() -> void:
 				player.queue_free()
 		)
 		player.play()
+
+	var tw_hero: Tween = create_tween()
+	tw_hero.tween_interval(0.34)
+	tw_hero.parallel().tween_property(
+		card,
+		"modulate:a",
+		1.0,
+		2.10
+	)
+	tw_hero.parallel().tween_property(
+		card,
+		"scale",
+		Vector2.ONE,
+		2.70
+	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw_hero.parallel().tween_property(
+		card,
+		"rotation",
+		0.0,
+		2.70
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+	var tw_hero_breathe: Tween = create_tween()
+	tw_hero_breathe.tween_interval(3.65)
+	tw_hero_breathe.tween_property(
+		card,
+		"scale",
+		Vector2(1.015, 1.015),
+		0.52
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw_hero_breathe.tween_property(
+		card,
+		"scale",
+		Vector2.ONE,
+		0.60
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _tr_or(key: String, fallback: String) -> String:
 	var t := tr(key)
