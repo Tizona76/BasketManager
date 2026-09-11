@@ -4285,6 +4285,18 @@ func _bm_goal_current_rank(save: Dictionary) -> int:
 
 
 func _bm_maybe_show_climb_standings_goal_once() -> void:
+	# Laisser les popups prioritaires de Management se créer d'abord.
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	# Les popups automatiques prioritaires de Management doivent être lus
+	# avant "Next game matters", jamais simultanément.
+	while (
+		get_node_or_null("StaffIntroPopup") != null
+		or get_node_or_null("Overlays/ClubTokensIntroOverlay") != null
+	):
+		await get_tree().process_frame
+
 	var save: Dictionary = PL.load_savegame()
 	if typeof(save) != TYPE_DICTIONARY:
 		return
