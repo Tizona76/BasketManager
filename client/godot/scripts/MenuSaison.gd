@@ -17,6 +17,9 @@ var _last_match_finance_popup_shown_this_entry: bool = false
 var _shop_out_of_stock_popup_allowed_this_entry: bool = false
 @onready var standings_panel: Control = get_node_or_null("StandingsPanel") as Control
 @onready var lbl_standings: RichTextLabel = get_node_or_null("StandingsPanel/LblStandings") as RichTextLabel
+@onready var standings_scroll: ScrollContainer = get_node_or_null("StandingsPanel/StandingsScroll") as ScrollContainer
+@onready var standings_rows: VBoxContainer = get_node_or_null("StandingsPanel/StandingsScroll/Rows") as VBoxContainer
+var _standings_layout_pending := false
 
 var _tw_match_pulse: Tween = null
 var _btn_match_base_pos: Vector2 = Vector2.ZERO
@@ -3293,12 +3296,15 @@ func _prepare_new_season() -> void:
 				continue
 			var p: Dictionary = pl as Dictionary
 			p["age"] = int(p.get("age", 25)) + 1
-			if p.has("pondération"):
-				p["pondération"] = selection_calc._bm_calc_ponderation(p)
-			elif p.has("ponderation"):
-				p["ponderation"] = selection_calc._bm_calc_ponderation(p)
-			else:
-				p["pondération"] = selection_calc._bm_calc_ponderation(p)
+			p["motivation"] = 80
+			p["fatigue"] = 0
+			p["matchs_consecutifs"] = 0
+			p["repos_consecutifs"] = 0
+			var ponderation: float = selection_calc._bm_calc_ponderation(p)
+			if p.has("pondération") or not p.has("ponderation"):
+				p["pondération"] = ponderation
+			if p.has("ponderation"):
+				p["ponderation"] = ponderation
 			# salaire annuel conservé : ne pas le réécrire ici
 			by_id[pid] = p
 		save["players_by_id"] = by_id
@@ -3781,17 +3787,17 @@ func _open_end_season_popup() -> void:
 
 	popup_fin_saison = Panel.new()
 	var popup_sb := StyleBoxFlat.new()
-	popup_sb.bg_color = Color(0.035, 0.08, 0.22, 1.0)
+	popup_sb.bg_color = Color(0.012, 0.020, 0.050, 1.0)
 	popup_sb.corner_radius_top_left = 18
 	popup_sb.corner_radius_top_right = 18
 	popup_sb.corner_radius_bottom_left = 18
 	popup_sb.corner_radius_bottom_right = 18
-	popup_sb.border_width_left = 2
-	popup_sb.border_width_top = 2
-	popup_sb.border_width_right = 2
-	popup_sb.border_width_bottom = 2
-	popup_sb.border_color = Color(0.20, 0.48, 1.0, 0.90)
-	popup_sb.shadow_color = Color(0.10, 0.35, 1.0, 0.35)
+	popup_sb.border_width_left = 1
+	popup_sb.border_width_top = 1
+	popup_sb.border_width_right = 1
+	popup_sb.border_width_bottom = 1
+	popup_sb.border_color = Color(0.32, 0.48, 0.66, 0.65)
+	popup_sb.shadow_color = Color(0.38, 0.62, 0.82, 0.12)
 	popup_sb.shadow_size = 10
 	popup_fin_saison.add_theme_stylebox_override("panel", popup_sb)
 	popup_fin_saison.name = "PopupFinSaison"
@@ -3815,6 +3821,7 @@ func _open_end_season_popup() -> void:
 	title.text = tr("END_SEASON_TITLE")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 30)
+	title.add_theme_color_override("font_color", Color(0.94, 0.97, 1.0, 1.0))
 	vbox.add_child(title)
 
 	var subtitle := Label.new()
@@ -3822,12 +3829,14 @@ func _open_end_season_popup() -> void:
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	subtitle.add_theme_font_size_override("font_size", 20)
+	subtitle.add_theme_color_override("font_color", Color(0.62, 0.70, 0.80, 1.0))
 	vbox.add_child(subtitle)
 
 	var position_value := Label.new()
 	position_value.text = "#" + str(rank)
 	position_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	position_value.add_theme_font_size_override("font_size", 44)
+	position_value.add_theme_color_override("font_color", Color(0.58, 0.82, 1.0, 1.0))
 	vbox.add_child(position_value)
 
 	var verdict_label := Label.new()
@@ -3843,26 +3852,8 @@ func _open_end_season_popup() -> void:
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_theme_font_size_override("font_size", 20)
+	body.add_theme_color_override("font_color", Color(0.72, 0.78, 0.86, 1.0))
 	vbox.add_child(body)
-
-	if celebrate:
-		# Confettis blancs style Tournois
-		var confetti := CPUParticles2D.new()
-		confetti.amount = 90
-		confetti.lifetime = 2.2
-		confetti.one_shot = false
-		confetti.emitting = true
-		confetti.explosiveness = 0.25
-		confetti.spread = 180.0
-		confetti.gravity = Vector2(0, 260)
-		confetti.initial_velocity_min = 90.0
-		confetti.initial_velocity_max = 170.0
-		confetti.scale_amount_min = 4.0
-		confetti.scale_amount_max = 7.0
-		confetti.position = Vector2(popup_fin_saison.size.x * 0.5, 40)
-		confetti.modulate = Color(1, 1, 1, 1)
-		confetti.z_index = 60
-		popup_fin_saison.add_child(confetti)
 
 	var summary_box := HBoxContainer.new()
 	summary_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -3874,6 +3865,7 @@ func _open_end_season_popup() -> void:
 	lbl_xp_gain.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl_xp_gain.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl_xp_gain.add_theme_font_size_override("font_size", 22)
+	lbl_xp_gain.add_theme_color_override("font_color", Color(0.66, 0.82, 0.92, 1.0))
 	summary_box.add_child(lbl_xp_gain)
 
 	var tokens_row := HBoxContainer.new()
@@ -3892,6 +3884,7 @@ func _open_end_season_popup() -> void:
 	var lbl_tokens_gain := Label.new()
 	lbl_tokens_gain.text = "+" + str(tokens_gain)
 	lbl_tokens_gain.add_theme_font_size_override("font_size", 22)
+	lbl_tokens_gain.add_theme_color_override("font_color", Color(0.94, 0.77, 0.45, 1.0))
 	lbl_tokens_gain.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	tokens_row.add_child(lbl_tokens_gain)
 
@@ -3948,6 +3941,29 @@ func _open_end_season_popup() -> void:
 	popup_fin_saison.mouse_filter = Control.MOUSE_FILTER_STOP
 	popup_fin_saison.move_to_front()
 	popup_fin_saison.call_deferred("move_to_front")
+
+	# Local reveal: self_modulate fades only the panel, keeping the button visible.
+	popup_fin_saison.self_modulate.a = 0.0
+	title.modulate.a = 0.35
+	subtitle.modulate.a = 0.35
+	position_value.modulate.a = 0.35
+	verdict_label.modulate.a = 0.35
+	body.modulate.a = 0.35
+	summary_box.modulate.a = 0.35
+	var reveal := popup_fin_saison.create_tween().set_parallel(true)
+	reveal.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	reveal.tween_property(popup_fin_saison, "self_modulate:a", 1.0, 0.25)
+	reveal.tween_property(title, "modulate:a", 1.0, 0.30)
+	reveal.tween_property(subtitle, "modulate:a", 1.0, 0.38)
+	reveal.tween_property(position_value, "modulate:a", 1.0, 0.45)
+	reveal.tween_property(verdict_label, "modulate:a", 1.0, 0.45)
+	reveal.tween_property(body, "modulate:a", 1.0, 0.50)
+	reveal.tween_property(summary_box, "modulate:a", 1.0, 0.55)
+	# One soft breath of the existing local shadow; no extra overlay or asset.
+	var breath := popup_fin_saison.create_tween()
+	breath.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	breath.tween_property(popup_sb, "shadow_color", Color(0.38, 0.62, 0.82, 0.20), 0.20)
+	breath.tween_property(popup_sb, "shadow_color", Color(0.38, 0.62, 0.82, 0.12), 0.35)
 
 	var victory_path := "res://audio/sfx/victory_jingle.mp3"
 	if celebrate and ResourceLoader.exists(victory_path):
@@ -4061,14 +4077,25 @@ func _on_calendrier_closed() -> void:
 	SeasonState.zone_selectionnee_saison = ""
 	print("[SAISON] calendrier modal fermé -> zone_selectionnee_saison cleared")
 
-func _render_standings_bbcode() -> String:
+func _refresh_standings_rows() -> void:
+	for child in standings_rows.get_children():
+		standings_rows.remove_child(child)
+		child.queue_free()
+	lbl_standings.text = "[font_size=22][color=#B8CADD]" + tr("saison.tab.standings") + "[/color][/font_size]"
+	if not standings_scroll.resized.is_connected(_queue_standings_layout):
+		standings_scroll.resized.connect(_queue_standings_layout)
+		# Refresh the scroll range after wrapped rows have settled their height.
+		standings_rows.sort_children.connect(standings_scroll.queue_sort, CONNECT_DEFERRED)
+		standings_scroll.get_v_scroll_bar().visibility_changed.connect(_queue_standings_layout)
 	var ss := get_node_or_null("/root/SeasonState") as SeasonState
 	if ss == null:
-		return "[b]Classement indisponible[/b]"
+		_add_standings_message("Classement indisponible")
+		return
 
 	var st: Dictionary = ss.standings
 	if st.size() == 0:
-		return "[b]Classement vide[/b]"
+		_add_standings_message("Classement vide")
+		return
 
 	var teams: Array = st.keys()
 	teams.sort_custom(func(a, b):
@@ -4087,12 +4114,8 @@ func _render_standings_bbcode() -> String:
 		return pfa > pfb
 	)
 
-	var out := "[font_size=22][color=#B8CADD]" + tr("saison.tab.standings") + "[/color][/font_size]\n\n[table=8]"
 	var headers := ["Pos", _bm_tr_or_fallback("standings.team_header", "Équipe"), "Pts", "W", "L", "PF", "PA", "Diff"]
-	for column in range(headers.size()):
-		var align := "left" if column == 1 else "right"
-		var expand := " expand=1" if column == 1 else ""
-		out += "[cell%s bg=#182A40 padding=4,6,4,6][%s][color=#B8CADD]%s[/color][/%s][/cell]" % [expand, align, headers[column], align]
+	_add_standings_row(headers, "#182A40", false, true)
 
 	var pos: int = 1
 	for t in teams:
@@ -4126,23 +4149,110 @@ func _render_standings_bbcode() -> String:
 		var is_player := team_cmp != "" and (raw_cmp == team_cmp or short_cmp == team_cmp)
 		var cells := [str(pos), name, str(pts), str(w), str(l), str(pf), str(pa), "%+d" % diff]
 		var row_bg := "#173449" if is_player else ("#122034" if pos % 2 == 0 else "#101C2E")
-		for column in range(cells.size()):
-			var align := "left" if column == 1 else "right"
-			var expand := " expand=1" if column == 1 else ""
-			var color := "#40C7FF" if is_player and column < 2 else "#E1E8F0"
-			var content: String = cells[column].replace("[", "[lb]")
-			out += "[cell%s bg=%s padding=4,3,4,3][%s][color=%s]%s[/color][/%s][/cell]" % [expand, row_bg, align, color, content, align]
+		_add_standings_row(cells, row_bg, is_player, false)
 		pos += 1
 
-	return out + "[/table]"
+	_queue_standings_layout()
+
+
+func _add_standings_message(message: String) -> void:
+	var label := Label.new()
+	label.text = message
+	label.add_theme_font_override("font", lbl_standings.get_theme_font("bold_font"))
+	label.add_theme_font_size_override("font_size", 24)
+	standings_rows.add_child(label)
+
+
+func _add_standings_row(cells: Array, background: String, is_player: bool, is_header: bool) -> void:
+	var panel := PanelContainer.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_PASS
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(background)
+	style.content_margin_left = 0
+	style.content_margin_right = 0
+	style.content_margin_top = 6 if is_header else 3
+	style.content_margin_bottom = 6 if is_header else 3
+	panel.add_theme_stylebox_override("panel", style)
+	var line := HBoxContainer.new()
+	line.mouse_filter = Control.MOUSE_FILTER_PASS
+	line.add_theme_constant_override("separation", 0)
+	panel.add_child(line)
+	for column in range(cells.size()):
+		var label := Label.new()
+		label.text = str(cells[column])
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if column == 1 else HORIZONTAL_ALIGNMENT_RIGHT
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		label.add_theme_font_override("font", lbl_standings.get_theme_font("normal_font"))
+		label.add_theme_font_size_override("font_size", 24)
+		var color := "#B8CADD" if is_header else ("#40C7FF" if is_player and column < 2 else "#E1E8F0")
+		label.add_theme_color_override("font_color", Color(color))
+		var inset := StyleBoxEmpty.new()
+		inset.content_margin_left = 4
+		inset.content_margin_right = 4
+		label.add_theme_stylebox_override("normal", inset)
+		if column == 1:
+			label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		line.add_child(label)
+	standings_rows.add_child(panel)
+
+
+func _queue_standings_layout() -> void:
+	if _standings_layout_pending:
+		return
+	_standings_layout_pending = true
+	call_deferred("_layout_standings_columns")
+
+
+func _layout_standings_columns() -> void:
+	_standings_layout_pending = false
+	if standings_scroll == null or standings_rows == null:
+		return
+	var widths: Array[float] = [40.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+	var font := lbl_standings.get_theme_font("normal_font")
+	# Reserve four digits for PF/PA and a sign for Diff, using the widest digit.
+	var digit_width := 0.0
+	for digit in "0123456789":
+		digit_width = maxf(digit_width, font.get_string_size(digit, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x)
+	widths[5] = digit_width * 4.0
+	widths[6] = digit_width * 4.0
+	widths[7] = digit_width * 4.0 + maxf(font.get_string_size("+", HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x, font.get_string_size("-", HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x)
+	for panel in standings_rows.get_children():
+		if not panel is PanelContainer:
+			continue
+		var line := panel.get_child(0) as HBoxContainer
+		for column in range(8):
+			if column != 1:
+				var label := line.get_child(column) as Label
+				widths[column] = maxf(widths[column], font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x)
+	var available := standings_scroll.size.x
+	var scrollbar := standings_scroll.get_v_scroll_bar()
+	if scrollbar.visible:
+		available -= scrollbar.size.x
+	var fixed_width := 0.0
+	for column in range(8):
+		if column != 1:
+			fixed_width += ceilf(widths[column]) + 8.0
+	# Native left margins separate the five numeric boundaries; Team gets the rest.
+	var extra_gap := clampf(floorf((available - fixed_width - 160.0) / 5.0), 0.0, 12.0)
+	for panel in standings_rows.get_children():
+		if not panel is PanelContainer:
+			continue
+		var line := panel.get_child(0) as HBoxContainer
+		for column in range(8):
+			var label := line.get_child(column) as Label
+			var inset := label.get_theme_stylebox("normal")
+			var gap := extra_gap if column >= 3 else 0.0
+			inset.content_margin_left = 4.0 + gap
+			if column != 1:
+				label.custom_minimum_size.x = ceilf(widths[column]) + 8.0 + gap
 
 
 func _on_btn_classement_show_standings_pressed() -> void:
-	if standings_panel == null or lbl_standings == null:
+	if standings_panel == null or lbl_standings == null or standings_scroll == null or standings_rows == null:
 		return
-	# Local standings typography; keep the existing RichTextLabel.
-	lbl_standings.add_theme_font_size_override("normal_font_size", 24)
-	lbl_standings.text = _render_standings_bbcode()
+	_refresh_standings_rows()
 	standings_panel.z_index = 700
 	standings_panel.visible = true
 	standings_panel.move_to_front()

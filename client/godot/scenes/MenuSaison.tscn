@@ -358,15 +358,30 @@ color = Color(0.07, 0.10, 0.16, 0.94)
 [node name="LblStandings" type="RichTextLabel" parent="StandingsPanel"]
 layout_mode = 0
 anchor_right = 1.0
-anchor_bottom = 1.0
 offset_left = 16.0
 offset_top = 20.0
 offset_right = -16.0
-offset_bottom = -16.0
+offset_bottom = 54.0
+mouse_filter = 2
 theme_override_font_sizes/normal_font_size = 24
-theme_override_constants/table_h_separation = 0
-theme_override_constants/table_v_separation = 1
 bbcode_enabled = true
+scroll_active = false
+
+[node name="StandingsScroll" type="ScrollContainer" parent="StandingsPanel"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 80.0
+offset_right = -16.0
+offset_bottom = -16.0
+horizontal_scroll_mode = 0
+
+[node name="Rows" type="VBoxContainer" parent="StandingsPanel/StandingsScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 0
+theme_override_constants/separation = 1
 
 [node name="StandingsGraphPanel" type="ColorRect" parent="."]
 visible = false
