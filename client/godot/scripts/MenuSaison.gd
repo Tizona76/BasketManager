@@ -3787,7 +3787,7 @@ func _open_end_season_popup() -> void:
 
 	popup_fin_saison = Panel.new()
 	var popup_sb := StyleBoxFlat.new()
-	popup_sb.bg_color = Color(0.012, 0.020, 0.050, 1.0)
+	popup_sb.bg_color = Color(0.045, 0.095, 0.18, 1.0)
 	popup_sb.corner_radius_top_left = 18
 	popup_sb.corner_radius_top_right = 18
 	popup_sb.corner_radius_bottom_left = 18
@@ -3797,13 +3797,17 @@ func _open_end_season_popup() -> void:
 	popup_sb.border_width_right = 1
 	popup_sb.border_width_bottom = 1
 	popup_sb.border_color = Color(0.32, 0.48, 0.66, 0.65)
-	popup_sb.shadow_color = Color(0.38, 0.62, 0.82, 0.12)
-	popup_sb.shadow_size = 10
+	popup_sb.shadow_color = Color(0.38, 0.62, 0.82, 0.32)
+	popup_sb.shadow_size = 24
 	popup_fin_saison.add_theme_stylebox_override("panel", popup_sb)
 	popup_fin_saison.name = "PopupFinSaison"
 	popup_fin_saison.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	popup_fin_saison.custom_minimum_size = Vector2(620, 520)
 	popup_fin_saison.size = Vector2(620, 520)
+	popup_fin_saison.pivot_offset = Vector2(310, 260)
+	popup_fin_saison.scale = Vector2(0.46, 0.46)
+	popup_fin_saison.rotation = deg_to_rad(-10.0)
+	popup_fin_saison.modulate.a = 0.0
 	popup_fin_saison.position = (get_viewport_rect().size - popup_fin_saison.size) * 0.5
 	popup_fin_saison.mouse_filter = Control.MOUSE_FILTER_STOP
 
@@ -3833,6 +3837,7 @@ func _open_end_season_popup() -> void:
 	vbox.add_child(subtitle)
 
 	var position_value := Label.new()
+	position_value.modulate.a = 0.0
 	position_value.text = "#" + str(rank)
 	position_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	position_value.add_theme_font_size_override("font_size", 44)
@@ -3840,6 +3845,7 @@ func _open_end_season_popup() -> void:
 	vbox.add_child(position_value)
 
 	var verdict_label := Label.new()
+	verdict_label.modulate.a = 0.0
 	verdict_label.text = (tr("END_SEASON_PROMOTED_TO_DIVISION") % int(summary["next_division"])) if verdict == "promoted" else tr("END_SEASON_VERDICT_" + verdict.to_upper())
 	verdict_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	verdict_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -3942,28 +3948,58 @@ func _open_end_season_popup() -> void:
 	popup_fin_saison.move_to_front()
 	popup_fin_saison.call_deferred("move_to_front")
 
-	# Local reveal: self_modulate fades only the panel, keeping the button visible.
-	popup_fin_saison.self_modulate.a = 0.0
-	title.modulate.a = 0.35
-	subtitle.modulate.a = 0.35
-	position_value.modulate.a = 0.35
-	verdict_label.modulate.a = 0.35
-	body.modulate.a = 0.35
-	summary_box.modulate.a = 0.35
-	var reveal := popup_fin_saison.create_tween().set_parallel(true)
-	reveal.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	reveal.tween_property(popup_fin_saison, "self_modulate:a", 1.0, 0.25)
-	reveal.tween_property(title, "modulate:a", 1.0, 0.30)
-	reveal.tween_property(subtitle, "modulate:a", 1.0, 0.38)
-	reveal.tween_property(position_value, "modulate:a", 1.0, 0.45)
-	reveal.tween_property(verdict_label, "modulate:a", 1.0, 0.45)
-	reveal.tween_property(body, "modulate:a", 1.0, 0.50)
-	reveal.tween_property(summary_box, "modulate:a", 1.0, 0.55)
-	# One soft breath of the existing local shadow; no extra overlay or asset.
-	var breath := popup_fin_saison.create_tween()
-	breath.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	breath.tween_property(popup_sb, "shadow_color", Color(0.38, 0.62, 0.82, 0.20), 0.20)
-	breath.tween_property(popup_sb, "shadow_color", Color(0.38, 0.62, 0.82, 0.12), 0.35)
+	var tw_hero: Tween = create_tween()
+	tw_hero.tween_interval(0.34)
+	tw_hero.parallel().tween_property(
+		popup_fin_saison,
+		"modulate:a",
+		1.0,
+		2.10
+	)
+	tw_hero.parallel().tween_property(
+		popup_fin_saison,
+		"scale",
+		Vector2.ONE,
+		2.70
+	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw_hero.parallel().tween_property(
+		popup_fin_saison,
+		"rotation",
+		0.0,
+		2.70
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+	var tw_hero_breathe: Tween = create_tween()
+	tw_hero_breathe.tween_interval(3.65)
+	tw_hero_breathe.tween_property(
+		popup_fin_saison,
+		"scale",
+		Vector2(1.015, 1.015),
+		0.52
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw_hero_breathe.tween_property(
+		popup_fin_saison,
+		"scale",
+		Vector2.ONE,
+		0.60
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+	# Only rank and verdict: preserve layout space while hidden.
+	var labels_reveal := create_tween()
+	labels_reveal.tween_interval(2.5)
+	labels_reveal.tween_callback(func():
+		for label in [position_value, verdict_label]:
+			label.pivot_offset = label.size * 0.5
+			label.scale = Vector2(0.08, 0.08)
+	)
+	labels_reveal.tween_property(position_value, "scale", Vector2.ONE, 0.55).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	labels_reveal.parallel().tween_property(verdict_label, "scale", Vector2.ONE, 0.55).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	labels_reveal.parallel().tween_property(position_value, "modulate:a", 1.0, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	labels_reveal.parallel().tween_property(verdict_label, "modulate:a", 1.0, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	labels_reveal.tween_property(position_value, "modulate", Color(1.6, 1.6, 1.6, 1.0), 0.08).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	labels_reveal.parallel().tween_property(verdict_label, "modulate", Color(1.6, 1.6, 1.6, 1.0), 0.08).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	labels_reveal.tween_property(position_value, "modulate", Color.WHITE, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	labels_reveal.parallel().tween_property(verdict_label, "modulate", Color.WHITE, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 	var victory_path := "res://audio/sfx/victory_jingle.mp3"
 	if celebrate and ResourceLoader.exists(victory_path):
