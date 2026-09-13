@@ -219,7 +219,7 @@ static func stadium_launch_upgrade(target_ng: int, target_ns: int, current_match
 	var cost: int = int(round(float(StadiumDataRef.get_cost(target_ng, target_ns)) * _get_stadium_league_coef(d)))
 	var duration: int = int(StadiumDataRef.get_duration(target_ng, target_ns))
 	var capacity: int = int(StadiumDataRef.get_capacity(target_ng, target_ns))
-	var is_basic_improvements := int(stadium.get("niveau_global_jeu", 1)) == 1 and int(stadium.get("niveau_stade", 1)) == 0 and target_ng == 1 and target_ns == 1
+	var is_basic_improvements := int(stadium.get("niveau_global_jeu", 1)) == 1 and int(stadium.get("niveau_stade", 0)) == 0 and target_ng == 1 and target_ns == 1
 
 	if cost <= 0:
 		return {"ok": false, "reason": "invalid_target"}
