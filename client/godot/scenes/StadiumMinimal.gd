@@ -2760,8 +2760,19 @@ func _refresh_upgrade_works_ui(ng_cur: int, ns_cur: int, rem: int, total: int) -
 	if lbl_title != null:
 		lbl_title.visible = false
 	if target_title != null:
-		target_title.add_theme_color_override("font_color", Color(1, 1, 1, 1))
-		target_title.visible = false
+		target_title.add_theme_color_override("font_color", Color(0.08, 0.10, 0.13, 1.0))
+		target_title.add_theme_constant_override("outline_size", 0)
+		target_title.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+		target_title.text = _stadium_tr("stadium.upgrade.works_in_progress_title")
+		target_title.add_theme_font_size_override("font_size", 36)
+		target_title.set_as_top_level(true)
+		var works_title_rect := panel.get_global_rect()
+		target_title.global_position = works_title_rect.position + Vector2(works_title_rect.size.x * 0.25, 96)
+		target_title.size = Vector2(works_title_rect.size.x * 0.5, 52)
+		target_title.z_as_relative = false
+		target_title.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+		target_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		target_title.visible = true
 	if info != null:
 		info.add_theme_color_override("default_color", Color(0, 0, 0, 1))
 		info.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0))
@@ -2815,8 +2826,7 @@ func _refresh_upgrade_works_ui(ng_cur: int, ns_cur: int, rem: int, total: int) -
 		info.bbcode_enabled = true
 		info.add_theme_font_size_override("normal_font_size", 34)
 		info.text = "[center]" \
-			+ "[b]" + _stadium_tr("stadium.upgrade.works_in_progress_title") + "[/b]" \
-			+ "\n" + _stadium_fmt("stadium.upgrade.remaining_matches", {"remaining": rem}) \
+			+ _stadium_fmt("stadium.upgrade.remaining_matches", {"remaining": rem}) \
 			+ "\n" + _stadium_tr("stadium.target_level") + " : " + str(ng_cur) + "." + str(ns_cur) \
 			+ "[/center]"
 
