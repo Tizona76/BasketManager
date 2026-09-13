@@ -645,6 +645,8 @@ func _stadium_tr(key: String) -> String:
 	var lang: String = loc.split("_")[0] if loc.find("_") != -1 else loc
 
 	var fb: Dictionary = {
+		"stadium.upgrade.required": {"fr":"Requis : {cost} $","en":"Required: {cost} $","es":"Necesario: {cost} $","it":"Richiesto: {cost} $","pt":"Necessário: {cost} $"},
+		"stadium.upgrade.insufficient_funds_explanation": {"fr":"Vous n'avez pas assez de fonds disponibles pour lancer cette amélioration.","en":"You don't have enough available funds to start this upgrade.","es":"No tienes fondos disponibles suficientes para iniciar esta mejora.","it":"Non hai fondi disponibili sufficienti per avviare questo miglioramento.","pt":"Não tens fundos disponíveis suficientes para iniciar esta melhoria."},
 		"btn.back": {"fr":"Retour","en":"Back","es":"Volver","it":"Indietro","pt":"Voltar"},
 
 		"stadium.title": {"fr":"Stadium","en":"Stadium","es":"Estadio","it":"Stadio","pt":"Estádio"},
@@ -2221,10 +2223,10 @@ func _ensure_upgrade_dialogs() -> void:
 		add_child(ad)
 		_upgrade_info_dialog = ad
 
-func _show_upgrade_info(message: String, alert_red: bool = false) -> void:
+func _show_upgrade_info(message: String, alert_red: bool = false, required_cost: int = -1) -> void:
 	_ensure_upgrade_dialogs()
 	if alert_red:
-		_show_upgrade_insufficient_funds_popup(message)
+		_show_upgrade_insufficient_funds_popup(message, required_cost)
 		return
 	if _upgrade_info_dialog != null:
 		_upgrade_info_dialog.remove_theme_stylebox_override("panel")
@@ -2522,72 +2524,80 @@ func _show_upgrade_acceleration_popup(message: String) -> void:
 	buttons.add_child(confirm_btn)
 
 
-func _show_upgrade_insufficient_funds_popup(message: String) -> void:
+func _show_upgrade_insufficient_funds_popup(message: String, required_cost: int = -1) -> void:
 	var old_popup := get_node_or_null("UpgradeInsufficientFundsPopup")
 	if old_popup != null:
+		remove_child(old_popup)
 		old_popup.queue_free()
+	if is_instance_valid(_upgrade_info_dialog):
+		_upgrade_info_dialog.hide()
 
-	var popup := Control.new()
+	var popup := CanvasLayer.new()
 	popup.name = "UpgradeInsufficientFundsPopup"
-	popup.set_anchors_preset(Control.PRESET_FULL_RECT)
-	popup.mouse_filter = Control.MOUSE_FILTER_STOP
-	popup.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	popup.layer = 100
 	add_child(popup)
-	popup.set_as_top_level(true)
-	popup.global_position = Vector2.ZERO
-	popup.size = get_viewport_rect().size
 
-	var card := Control.new()
+	var overlay := ColorRect.new()
+	overlay.name = "ModalBackdrop"
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.color = Color(0, 0, 0, 0.65)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.add_child(overlay)
+
+	var card := Panel.new()
 	card.name = "UpgradeInsufficientFundsCard"
-	card.size = Vector2(760, 300)
+	card.size = Vector2(560, 360)
 	card.position = (get_viewport_rect().size - card.size) * 0.5
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
-	card.clip_contents = true
-	popup.add_child(card)
-	card.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.025, 0.045, 0.085, 1.0)
+	style.set_corner_radius_all(16)
+	style.set_border_width_all(1)
+	style.border_color = Color(0.32, 0.48, 0.66, 0.8)
+	style.shadow_color = Color(0, 0, 0, 0.4)
+	style.shadow_size = 16
+	card.add_theme_stylebox_override("panel", style)
+	overlay.add_child(card)
 
-	var bg := TextureRect.new()
-	bg.name = "UpgradeInsufficientFundsBG"
-	var bg_atlas := AtlasTexture.new()
-	bg_atlas.atlas = load("res://assets/images/backgrounds/save.png") as Texture2D
-	bg_atlas.region = Rect2(238, 208, 1059, 604)
-	bg.texture = bg_atlas
-	bg.position = Vector2.ZERO
-	bg.size = card.size
-	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bg.stretch_mode = TextureRect.STRETCH_SCALE
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(bg)
-
+	var lines := message.replace("\\n", "\n").replace("[/color] $", " $[/color]").replace("[color=#F21F1F]", "").replace("[/color]", "").split("\n", false)
 	var title := Label.new()
 	title.name = "LblUpgradeInsufficientFundsTitle"
-	title.text = _stadium_tr("stadium.upgrade.insufficient_funds_title")
-	if title.text == "stadium.upgrade.insufficient_funds_title":
-		title.text = "Insufficient funds"
-	title.position = Vector2(28, 22)
-	title.size = Vector2(704, 42)
+	title.text = lines[0].strip_edges().trim_suffix(".")
+	title.position = Vector2(24, 24)
+	title.size = Vector2(512, 46)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 28)
-	title.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	title.add_theme_color_override("font_color", Color.WHITE)
 	card.add_child(title)
 
 	var body := Label.new()
 	body.name = "LblUpgradeInsufficientFundsBody"
-	body.text = message.replace("[/color] $", " $[/color]").replace("[color=#F21F1F]", "").replace("[/color]", "")
-	body.position = Vector2(44, 96)
-	body.size = Vector2(672, 92)
+	body.text = "\n".join(lines.slice(1))
+	if required_cost >= 0:
+		body.text += "\n" + _stadium_fmt("stadium.upgrade.required", {"cost": _format_int(required_cost)})
+	body.position = Vector2(24, 88)
+	body.size = Vector2(512, 88)
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_theme_font_size_override("font_size", 26)
-	body.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	body.add_theme_font_size_override("font_size", 24)
+	body.add_theme_color_override("font_color", Color.WHITE)
 	card.add_child(body)
+
+	var explanation := Label.new()
+	explanation.text = _stadium_tr("stadium.upgrade.insufficient_funds_explanation")
+	explanation.position = Vector2(24, 188)
+	explanation.size = Vector2(512, 74)
+	explanation.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	explanation.add_theme_font_size_override("font_size", 20)
+	explanation.add_theme_color_override("font_color", Color(0.77, 0.83, 0.91))
+	card.add_child(explanation)
 
 	var ok_btn := Button.new()
 	ok_btn.name = "BtnUpgradeInsufficientFundsOK"
 	ok_btn.text = "OK"
-	ok_btn.position = Vector2(300, 220)
+	ok_btn.position = Vector2(200, 282)
 	ok_btn.size = Vector2(160, 54)
 	ok_btn.add_theme_font_size_override("font_size", 26)
 	_shop_apply_confirm_style(ok_btn)
@@ -2595,7 +2605,7 @@ func _show_upgrade_insufficient_funds_popup(message: String) -> void:
 		popup.queue_free()
 	)
 	card.add_child(ok_btn)
-
+	ok_btn.grab_focus()
 
 
 func _stadium_refresh_token_labels() -> void:
@@ -3390,7 +3400,7 @@ func _on_upgrade_confirmed() -> void:
 				solde_finances = recettes_finances - depenses_finances
 			_show_upgrade_info(_stadium_fmt("stadium.upgrade.insufficient_funds", {
 				"wallet": "[color=#F21F1F]" + _format_int(solde_finances) + "[/color]"
-			}), true)
+			}), true, int(result.get("cost", 0)))
 		elif reason == "invalid_target":
 			_show_upgrade_info(_stadium_tr("stadium.upgrade.invalid_step"))
 		else:

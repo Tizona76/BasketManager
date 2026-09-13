@@ -177,14 +177,14 @@ static func stadium_current_capacity() -> int:
 	var s: Dictionary = get_stadium_data()
 	return int(StadiumDataRef.get_capacity(
 		int(s.get("niveau_global_jeu", 1)),
-		int(s.get("niveau_stade", 1))
+		int(s.get("niveau_stade", 0))
 	))
 
 static func stadium_next_level() -> Variant:
 	var s: Dictionary = get_stadium_data()
 	return StadiumDataRef.get_next_level(
 		int(s.get("niveau_global_jeu", 1)),
-		int(s.get("niveau_stade", 1))
+		int(s.get("niveau_stade", 0))
 	)
 
 static func _get_stadium_league_coef(d: Dictionary) -> float:
@@ -204,7 +204,7 @@ static func stadium_tabs_unlocked() -> Array:
 	var s: Dictionary = get_stadium_data()
 	return StadiumDataRef.get_tabs_for_level(
 		int(s.get("niveau_global_jeu", 1)),
-		int(s.get("niveau_stade", 1))
+		int(s.get("niveau_stade", 0))
 	)
 
 static func stadium_launch_upgrade(target_ng: int, target_ns: int, current_matchs_saison: int, ignore_budget := false) -> Dictionary:
