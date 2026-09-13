@@ -226,7 +226,7 @@ func _bm_career_summary(entry: Dictionary) -> String:
 	if not save.is_empty():
 		club_xp = PlayerLife.get_club_xp(save)
 		division = clampi(int(save.get("division_level", 3)), 1, 3)
-	return "Div. %d • Season %d • Club Lv. %d • %d XP" % [division, season, club_level, club_xp]
+	return tr("division.career_summary") % [I18nSvc.division_display_name(division), season, club_level, club_xp]
 
 
 func _bm_read_career_save(entry: Dictionary) -> Dictionary:
@@ -481,6 +481,8 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	title_row.add_child(league_label)
 
 	var summary_label := Label.new()
+	summary_label.name = "CareerDivisionSummary"
+	summary_label.set_meta("career_summary_entry", entry)
 	summary_label.text = _bm_career_summary(entry)
 	summary_label.add_theme_font_size_override("font_size", 18 if not _bm_is_mobile_layout() else 20)
 	summary_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.82))
@@ -698,6 +700,8 @@ func _bm_build_career_picker() -> void:
 func _bm_refresh_career_picker_i18n() -> void:
 	if _career_picker == null or not is_instance_valid(_career_picker):
 		return
+	for summary_label in _career_picker.find_children("CareerDivisionSummary", "Label", true, false):
+		summary_label.text = _bm_career_summary(summary_label.get_meta("career_summary_entry"))
 	var title := _career_picker.find_child("YourTeamsTitle", true, false) as Label
 	if title != null:
 		title.text = tr("multi_career.your_teams.title")

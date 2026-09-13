@@ -1,6 +1,10 @@
 extends Node
 
 
+func division_display_name(level: int) -> String:
+	return tr("division.name.%d" % clampi(level, 1, 3))
+
+
 # Applique tr() partout dans l'arbre.
 # Règle :
 # - Si un Control a un texte non vide, on le considère comme une KEY (ex: "BTN_ADD")

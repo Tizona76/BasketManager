@@ -652,9 +652,9 @@ func _bm_division_transition_accent(division: int) -> Color:
 func _bm_division_transition_label(division: int) -> String:
 	var txt: String = _bm_tr_or_fallback(
 		"division_transition.division_label",
-		"DIVISION {division}"
+		"{division}"
 	)
-	return txt.replace("{division}", str(clampi(division, 1, 3))).to_upper()
+	return txt.replace("{division}", I18nSvc.division_display_name(division)).to_upper()
 
 
 func _bm_division_transition_copy(
@@ -685,9 +685,9 @@ func _bm_division_transition_copy(
 		)
 
 	var title_fallback: String = (
-		"PROMOTED TO DIVISION {division}"
+		"PROMOTED TO {division} DIVISION"
 		if promoted
-		else "RELEGATED TO DIVISION {division}"
+		else "RELEGATED TO {division} DIVISION"
 	)
 
 	var subtitle_fallback: String = ""
@@ -707,7 +707,7 @@ func _bm_division_transition_copy(
 	var title_text: String = _bm_tr_or_fallback(
 		title_key,
 		title_fallback
-	).replace("{division}", str(new_division))
+	).replace("{division}", I18nSvc.division_display_name(new_division))
 
 	var subtitle_text: String = _bm_tr_or_fallback(
 		subtitle_key,
@@ -716,10 +716,10 @@ func _bm_division_transition_copy(
 
 	var route_text: String = _bm_tr_or_fallback(
 		"division_transition.route",
-		"DIVISION {old}  →  DIVISION {new}"
+		"{old} DIVISION  →  {new} DIVISION"
 	)
-	route_text = route_text.replace("{old}", str(old_division))
-	route_text = route_text.replace("{new}", str(new_division))
+	route_text = route_text.replace("{old}", I18nSvc.division_display_name(old_division))
+	route_text = route_text.replace("{new}", I18nSvc.division_display_name(new_division))
 
 	var season_text: String = _bm_tr_or_fallback(
 		"division_transition.season_good_luck",
@@ -3433,8 +3433,8 @@ func _bm_refresh_division_label(save: Dictionary) -> void:
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.add_theme_font_size_override("font_size", 18)
-		label.add_theme_color_override("font_color", Color(0.98, 0.99, 1.0, 1.0))
-		label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.85))
+		label.add_theme_color_override("font_color", Color(0.025, 0.03, 0.04, 1.0))
+		label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0))
 		label.add_theme_constant_override("shadow_offset_y", 2)
 		hud.add_child(label)
 		label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
@@ -3452,22 +3452,23 @@ func _bm_refresh_division_label(save: Dictionary) -> void:
 		symbol.name = "Symbol"
 		icon_anchor.add_child(symbol)
 	var division: int = clampi(int(save.get("division_level", 3)), 1, 3)
-	label.text = "DIVISION %d" % division
-	var accent := Color(0.25, 0.85, 0.55)
+	label.text = (tr("division.label") % I18nSvc.division_display_name(division)).to_upper()
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var accent := Color("#B87333")
 	var points := PackedVector2Array([Vector2(1, 1), Vector2(17, 1), Vector2(16, 11), Vector2(9, 18), Vector2(2, 11)])
 	if division == 2:
-		accent = Color(1.0, 0.78, 0.25)
+		accent = Color("#C0C0C0")
 		points = PackedVector2Array([Vector2(9, 0), Vector2(12, 6), Vector2(18, 7), Vector2(13, 11), Vector2(15, 18), Vector2(9, 14), Vector2(3, 18), Vector2(5, 11), Vector2(0, 7), Vector2(6, 6)])
 	elif division == 1:
-		accent = Color(0.30, 0.65, 1.0)
+		accent = Color("#D4AF37")
 		points = PackedVector2Array([Vector2(0, 3), Vector2(5, 8), Vector2(9, 0), Vector2(13, 8), Vector2(18, 3), Vector2(16, 17), Vector2(2, 17)])
 	var symbol := label.get_node("DivisionIcon/Symbol") as Polygon2D
 	symbol.polygon = points
-	symbol.color = accent
+	symbol.color = accent.darkened(0.55)
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.04, 0.07, 0.13, 0.96)
+	style.bg_color = accent
 	style.set_border_width_all(1)
-	style.border_color = accent
+	style.border_color = accent.darkened(0.35)
 	style.set_corner_radius_all(10)
 	style.shadow_color = Color(accent.r, accent.g, accent.b, 0.18)
 	style.shadow_size = 3
@@ -3829,7 +3830,7 @@ func _open_end_season_popup() -> void:
 	vbox.add_child(title)
 
 	var subtitle := Label.new()
-	subtitle.text = tr("END_SEASON_DIVISION_SUBTITLE") % [int(summary["season_number"]), int(summary["current_division"])]
+	subtitle.text = tr("END_SEASON_DIVISION_SUBTITLE") % [int(summary["season_number"]), I18nSvc.division_display_name(int(summary["current_division"]))]
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	subtitle.add_theme_font_size_override("font_size", 20)
@@ -3846,7 +3847,7 @@ func _open_end_season_popup() -> void:
 
 	var verdict_label := Label.new()
 	verdict_label.modulate.a = 0.0
-	verdict_label.text = (tr("END_SEASON_PROMOTED_TO_DIVISION") % int(summary["next_division"])) if verdict == "promoted" else tr("END_SEASON_VERDICT_" + verdict.to_upper())
+	verdict_label.text = (tr("END_SEASON_PROMOTED_TO_DIVISION") % I18nSvc.division_display_name(int(summary["next_division"]))) if verdict == "promoted" else tr("END_SEASON_VERDICT_" + verdict.to_upper())
 	verdict_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	verdict_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	verdict_label.add_theme_font_size_override("font_size", 28)
@@ -4559,6 +4560,7 @@ func _ensure_saison_buttons_active() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSLATION_CHANGED:
 		_apply_i18n_tabs()
+		_bm_refresh_division_label(PL.load_savegame())
 		return
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
 		call_deferred("_bm_saison_apply_mobile_bg_and_halo_layout")
