@@ -190,6 +190,126 @@ const MISSIONS_BY_LEVEL: Dictionary = {
 			"check_counter": "win_streak",
 			"target": 3
 		}
+	],
+	3: [
+		{
+			"id": "lv3_100pts_1",
+			"label_key": "missions.lv3.100pts_1",
+			"reward_tokens": 3,
+			"check_counter": "pts_100_plus",
+			"target": 1
+		},
+		{
+			"id": "lv3_season_wins_4",
+			"label_key": "missions.lv3.season_wins_4",
+			"reward_tokens": 4,
+			"condition_type": "season_wins",
+			"target": 4
+		},
+		{
+			"id": "lv3_stadium_12",
+			"label_key": "missions.lv3.stadium_12",
+			"reward_tokens": 4,
+			"condition_type": "stadium_level",
+			"target_level": [1, 2]
+		},
+		{
+			"id": "lv3_tournament_played",
+			"label_key": "missions.lv3.tournament_played",
+			"reward_tokens": 4,
+			"condition_type": "tournament_result",
+			"minimum_result": "played"
+		}
+	],
+	4: [
+		{
+			"id": "lv4_100pts_2",
+			"label_key": "missions.lv4.100pts_2",
+			"reward_tokens": 4,
+			"check_counter": "pts_100_plus",
+			"target": 2
+		},
+		{
+			"id": "lv4_season_wins_5",
+			"label_key": "missions.lv4.season_wins_5",
+			"reward_tokens": 4,
+			"condition_type": "season_wins",
+			"target": 5
+		},
+		{
+			"id": "lv4_stadium_13",
+			"label_key": "missions.lv4.stadium_13",
+			"reward_tokens": 5,
+			"condition_type": "stadium_level",
+			"target_level": [1, 3]
+		},
+		{
+			"id": "lv4_tournament_final",
+			"label_key": "missions.lv4.tournament_final",
+			"reward_tokens": 5,
+			"condition_type": "tournament_result",
+			"minimum_result": "finalist"
+		}
+	],
+	5: [
+		{
+			"id": "lv5_100pts_3",
+			"label_key": "missions.lv5.100pts_3",
+			"reward_tokens": 5,
+			"check_counter": "pts_100_plus",
+			"target": 3
+		},
+		{
+			"id": "lv5_season_wins_6",
+			"label_key": "missions.lv5.season_wins_6",
+			"reward_tokens": 5,
+			"condition_type": "season_wins",
+			"target": 6
+		},
+		{
+			"id": "lv5_stadium_21",
+			"label_key": "missions.lv5.stadium_21",
+			"reward_tokens": 5,
+			"condition_type": "stadium_level",
+			"target_level": [2, 1]
+		},
+		{
+			"id": "lv5_final_rank_6",
+			"label_key": "missions.lv5.final_rank_6",
+			"reward_tokens": 6,
+			"condition_type": "final_rank",
+			"target": 6
+		}
+	],
+	6: [
+		{
+			"id": "lv6_100pts_4",
+			"label_key": "missions.lv6.100pts_4",
+			"reward_tokens": 5,
+			"check_counter": "pts_100_plus",
+			"target": 4
+		},
+		{
+			"id": "lv6_season_wins_7",
+			"label_key": "missions.lv6.season_wins_7",
+			"reward_tokens": 6,
+			"condition_type": "season_wins",
+			"target": 7
+		},
+		{
+			"id": "lv6_stadium_22",
+			"label_key": "missions.lv6.stadium_22",
+			"reward_tokens": 6,
+			"condition_type": "stadium_level",
+			"target_level": [2, 2]
+		},
+		{
+			"id": "lv6_final_rank_4",
+			"label_key": "missions.lv6.final_rank_4",
+			"reward_tokens": 7,
+			"condition_type": "final_rank",
+			"target": 4
+		}
 	]
 }
 

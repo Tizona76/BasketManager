@@ -754,3 +754,19 @@ division.name.2,Argent,Silver,Plata,Argento,Prata
 division.name.1,Or,Gold,Oro,Oro,Ouro
 division.label,Division %s,%s Division,División %s,Divisione %s,Divisão %s
 division.career_summary,Div. %s • Saison %d • Club niv. %d • %d XP,Div. %s • Season %d • Club Lv. %d • %d XP,Div. %s • Temporada %d • Club niv. %d • %d XP,Div. %s • Stagione %d • Club liv. %d • %d XP,Div. %s • Temporada %d • Clube nv. %d • %d XP
+missions.lv3.100pts_1,Marquer 100 points dans 1 match,Score 100 points in 1 game,Anotar 100 puntos en 1 partido,Segnare 100 punti in 1 partita,Marcar 100 pontos em 1 jogo
+missions.lv3.season_wins_4,Gagner 4 matchs de championnat cette saison,Win 4 league games this season,Ganar 4 partidos de liga esta temporada,Vincere 4 partite di campionato in questa stagione,Ganhar 4 jogos do campeonato nesta temporada
+missions.lv3.stadium_12,Atteindre le niveau de stade 1.2,Reach stadium level 1.2,Alcanzar el nivel 1.2 del estadio,Raggiungere il livello 1.2 dello stadio,Atingir o nível 1.2 do estádio
+missions.lv3.tournament_played,Terminer un tournoi cette saison,Complete a tournament this season,Completar un torneo esta temporada,Completare un torneo in questa stagione,Concluir um torneio nesta temporada
+missions.lv4.100pts_2,Marquer 100 points dans 2 matchs,Score 100 points in 2 games,Anotar 100 puntos en 2 partidos,Segnare 100 punti in 2 partite,Marcar 100 pontos em 2 jogos
+missions.lv4.season_wins_5,Gagner 5 matchs de championnat cette saison,Win 5 league games this season,Ganar 5 partidos de liga esta temporada,Vincere 5 partite di campionato in questa stagione,Ganhar 5 jogos do campeonato nesta temporada
+missions.lv4.stadium_13,Atteindre le niveau de stade 1.3,Reach stadium level 1.3,Alcanzar el nivel 1.3 del estadio,Raggiungere il livello 1.3 dello stadio,Atingir o nível 1.3 do estádio
+missions.lv4.tournament_final,Atteindre une finale de tournoi cette saison,Reach a tournament final this season,Llegar a una final de torneo esta temporada,Raggiungere una finale di torneo in questa stagione,Chegar à final de um torneio nesta temporada
+missions.lv5.100pts_3,Marquer 100 points dans 3 matchs,Score 100 points in 3 games,Anotar 100 puntos en 3 partidos,Segnare 100 punti in 3 partite,Marcar 100 pontos em 3 jogos
+missions.lv5.season_wins_6,Gagner 6 matchs de championnat cette saison,Win 6 league games this season,Ganar 6 partidos de liga esta temporada,Vincere 6 partite di campionato in questa stagione,Ganhar 6 jogos do campeonato nesta temporada
+missions.lv5.stadium_21,Atteindre le niveau de stade 2.1,Reach stadium level 2.1,Alcanzar el nivel 2.1 del estadio,Raggiungere il livello 2.1 dello stadio,Atingir o nível 2.1 do estádio
+missions.lv5.final_rank_6,Terminer la saison dans le Top 6,Finish the season in the Top 6,Terminar la temporada entre los 6 primeros,Concludere la stagione tra i primi 6,Terminar a temporada entre os 6 primeiros
+missions.lv6.100pts_4,Marquer 100 points dans 4 matchs,Score 100 points in 4 games,Anotar 100 puntos en 4 partidos,Segnare 100 punti in 4 partite,Marcar 100 pontos em 4 jogos
+missions.lv6.season_wins_7,Gagner 7 matchs de championnat cette saison,Win 7 league games this season,Ganar 7 partidos de liga esta temporada,Vincere 7 partite di campionato in questa stagione,Ganhar 7 jogos do campeonato nesta temporada
+missions.lv6.stadium_22,Atteindre le niveau de stade 2.2,Reach stadium level 2.2,Alcanzar el nivel 2.2 del estadio,Raggiungere il livello 2.2 dello stadio,Atingir o nível 2.2 do estádio
+missions.lv6.final_rank_4,Terminer la saison dans le Top 4,Finish the season in the Top 4,Terminar la temporada entre los 4 primeros,Concludere la stagione tra i primi 4,Terminar a temporada entre os 4 primeiros
