@@ -3352,8 +3352,18 @@ func _on_upgrade_confirmed() -> void:
 			_show_upgrade_info(_stadium_tr("stadium.upgrade.impossible"))
 			return
 		var stadium: Dictionary = save_cur["stadium"] as Dictionary
+		var old_level := Vector2i(int(stadium.get("niveau_global_jeu", 1)), int(stadium.get("niveau_stade", 0)))
 		stadium["niveau_global_jeu"] = _upgrade_target_ng
 		stadium["niveau_stade"] = _upgrade_target_ns
+		var new_level := Vector2i(int(stadium["niveau_global_jeu"]), int(stadium["niveau_stade"]))
+		if new_level != old_level and StadiumDataRef.level_leq(old_level, new_level):
+			if typeof(save_cur.get("missions_state")) != TYPE_DICTIONARY:
+				save_cur["missions_state"] = {}
+			var missions: Dictionary = save_cur["missions_state"] as Dictionary
+			if typeof(missions.get("counters")) != TYPE_DICTIONARY:
+				missions["counters"] = {}
+			var counters: Dictionary = missions["counters"] as Dictionary
+			counters["stadium_upgraded"] = int(counters.get("stadium_upgraded", 0)) + 1
 		stadium["travaux_en_cours"] = false
 		stadium["travaux_cible_ng"] = 0
 		stadium["travaux_cible_ns"] = 0

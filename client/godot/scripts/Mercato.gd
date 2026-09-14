@@ -1239,7 +1239,7 @@ func _sync_mercato_owned_players_into_roster(save: Dictionary) -> void:
 	save["salary_total_per_match"] = int(round(float(total_salary) / 22.0))
 	var ms_buy: Dictionary = save.get("missions_state", {}) as Dictionary
 	var c_buy: Dictionary = ms_buy.get("counters", {}) as Dictionary
-	c_buy["mercato_achats"] = int(_get_purchased_ids().size())
+	c_buy["mercato_achats"] = int(purchased_ids.size())
 	ms_buy["counters"] = c_buy
 	save["missions_state"] = ms_buy
 
