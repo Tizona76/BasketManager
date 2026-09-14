@@ -5,6 +5,7 @@ const PL = preload("res://scripts/PlayerLife.gd")
 const Selection := preload("res://scripts/Selection.gd")
 const TuningData := preload("res://scripts/TuningData.gd")
 const SponsorDataRef := preload("res://scripts/SponsorData.gd")
+const StadiumDataRef := preload("res://scripts/StadiumData.gd")
 const StadiumMinimal := preload("res://scenes/StadiumMinimal.gd")
 const LeagueDataScript := preload("res://scripts/LeagueData.gd")
 const TOKEN_ICON := preload("res://assets/images/token.png")
@@ -4769,10 +4770,109 @@ func _missions_current_index(level_missions: Array, completed: Array) -> int:
 			return i
 	return level_missions.size()
 
-func _missions_is_done(mission: Dictionary, counters: Dictionary) -> bool:
-	var key := str(mission.get("check_counter", ""))
-	var target := int(mission.get("target", 0))
-	return int(counters.get(key, 0)) >= target
+func _missions_nonnegative_int(value: Variant) -> int:
+	if typeof(value) not in [TYPE_INT, TYPE_FLOAT]:
+		return -1
+	if not is_finite(float(value)) or value < 0 or value > 2147483647 or float(value) != floor(float(value)):
+		return -1
+	return int(value)
+
+func _missions_season_wins(save: Dictionary) -> int:
+	var team_name: String = str(save.get("team_name", "")).strip_edges()
+	if team_name.is_empty() and typeof(save.get("club")) == TYPE_DICTIONARY:
+		team_name = str((save["club"] as Dictionary).get("name", "")).strip_edges()
+	if team_name.is_empty() or typeof(save.get("season_results")) != TYPE_DICTIONARY:
+		return 0
+	var wins := 0
+	var results: Dictionary = save["season_results"]
+	for round_key in results:
+		var round_text := str(round_key)
+		if not round_text.is_valid_int() or int(round_text) < 0 or int(round_text) >= int(SeasonState.total_matchs_saison):
+			continue
+		if typeof(results[round_key]) != TYPE_DICTIONARY:
+			continue
+		var matches: Dictionary = results[round_key]
+		var club_matches := 0
+		var round_wins := 0
+		for match_key in matches:
+			var teams := str(match_key).split("||")
+			if teams.size() != 2 or teams[0].strip_edges().is_empty() or teams[1].strip_edges().is_empty():
+				continue
+			var home := teams[0].strip_edges()
+			var away := teams[1].strip_edges()
+			if home == away or (home != team_name and away != team_name) or typeof(matches[match_key]) != TYPE_DICTIONARY:
+				continue
+			var result: Dictionary = matches[match_key]
+			var home_score := _missions_nonnegative_int(result.get("score_dom"))
+			var away_score := _missions_nonnegative_int(result.get("score_ext"))
+			if home_score < 0 or away_score < 0:
+				continue
+			club_matches += 1
+			if (home == team_name and home_score > away_score) or (away == team_name and away_score > home_score):
+				round_wins += 1
+		if club_matches == 1:
+			wins += round_wins
+	return wins
+
+func _missions_stadium_level(value: Variant) -> Vector2i:
+	if typeof(value) != TYPE_ARRAY or value.size() != 2:
+		return Vector2i(-1, -1)
+	var level := Vector2i(_missions_nonnegative_int(value[0]), _missions_nonnegative_int(value[1]))
+	return level if StadiumDataRef.get_all_levels().has(level) else Vector2i(-1, -1)
+
+func _missions_is_done(mission: Dictionary, counters: Dictionary, save: Dictionary) -> bool:
+	match str(mission.get("condition_type", "counter")):
+		"counter":
+			var key := str(mission.get("check_counter", ""))
+			var target := int(mission.get("target", 0))
+			return int(counters.get(key, 0)) >= target
+		"season_wins":
+			var target := _missions_nonnegative_int(mission.get("target"))
+			return target > 0 and _missions_season_wins(save) >= target
+		"stadium_level":
+			if typeof(save.get("stadium")) != TYPE_DICTIONARY:
+				return false
+			var stadium: Dictionary = save["stadium"]
+			var current_level := _missions_stadium_level([stadium.get("niveau_global_jeu"), stadium.get("niveau_stade")])
+			var target_level := _missions_stadium_level(mission.get("target_level"))
+			return current_level.x > 0 and target_level.x > 0 and StadiumDataRef.level_leq(target_level, current_level)
+		"tournament_result":
+			var season_id: Variant = save.get("season_id")
+			if typeof(season_id) != TYPE_STRING or season_id.strip_edges().is_empty():
+				return false
+			var season_key: String = season_id.strip_edges()
+			if season_key.begins_with("season_"):
+				var season_suffix := season_key.trim_prefix("season_")
+				if not season_suffix.is_valid_int() or int(season_suffix) < 1:
+					return false
+				if save.has("season_number") and _missions_nonnegative_int(save["season_number"]) != int(season_suffix):
+					return false
+			var ranks := {"played": 1, "finalist": 2, "winner": 3}
+			var minimum: int = int(ranks.get(str(mission.get("minimum_result", "")), 0))
+			if minimum == 0 or typeof(save.get("tournament_results_by_season")) != TYPE_DICTIONARY:
+				return false
+			var archive: Dictionary = save["tournament_results_by_season"]
+			if typeof(archive.get(season_key)) != TYPE_DICTIONARY:
+				return false
+			var results: Dictionary = archive[season_key]
+			for tournament in ["tournoi_a", "intermediaire", "elite"]:
+				if typeof(results.get(tournament)) == TYPE_STRING and int(ranks.get(results[tournament], 0)) >= minimum:
+					return true
+			return false
+		"final_rank":
+			var total_matches := int(SeasonState.total_matchs_saison)
+			if total_matches <= 0 or _missions_nonnegative_int(save.get("season_round")) != total_matches:
+				return false
+			if typeof(save.get("ranking_history")) != TYPE_ARRAY:
+				return false
+			var history: Array = save["ranking_history"]
+			if history.size() < total_matches:
+				return false
+			var rank := _missions_nonnegative_int(history.back())
+			var target := _missions_nonnegative_int(mission.get("target"))
+			var team_count := LeagueDataScript.CLASSIC_OPPONENT_NAMES.size() + 1
+			return rank > 0 and rank <= team_count and target > 0 and target <= team_count and rank <= target
+	return false
 
 func _missions_clear_canvas() -> void:
 	if metro_canvas == null:
@@ -5154,7 +5254,7 @@ func _missions_auto_claim_reached(save: Dictionary, level_missions: Array, count
 				changed = true
 			continue
 
-		if not _missions_is_done(mission, counters):
+		if not _missions_is_done(mission, counters, save):
 			continue
 
 		completed.append(mid)
@@ -5236,7 +5336,7 @@ func _refresh_missions_panel() -> void:
 		var mission: Dictionary = level_missions[i]
 		var state := "locked"
 		var mid := str(mission.get("id", ""))
-		var reached := _missions_is_done(mission, counters)
+		var reached := _missions_is_done(mission, counters, save)
 		if completed.has(mid) or reached:
 			state = "done"
 		elif i == current_idx:
@@ -5255,10 +5355,7 @@ func _refresh_missions_panel() -> void:
 		return
 
 	var cur: Dictionary = level_missions[current_idx]
-	var cur_key := str(cur.get("check_counter", ""))
-	var cur_target := int(cur.get("target", 0))
-	var cur_val := int(counters.get(cur_key, 0))
-	var done := _missions_is_done(cur, counters)
+	var done := _missions_is_done(cur, counters, save)
 
 	if btn_claim_mission != null:
 		btn_claim_mission.visible = false
@@ -5312,7 +5409,7 @@ func _on_claim_mission_pressed() -> void:
 	if current_idx >= level_missions.size():
 		return
 	var cur: Dictionary = level_missions[current_idx]
-	if not _missions_is_done(cur, counters):
+	if not _missions_is_done(cur, counters, save):
 		return
 	if not save.has("missions_progress") or typeof(save["missions_progress"]) != TYPE_DICTIONARY:
 		save["missions_progress"] = {"completed": [], "in_progress": [], "selected": []}
