@@ -5154,6 +5154,8 @@ func _missions_preview_missions(level: int, level_missions: Array, current_idx: 
 	var preview: Array = []
 	if current_idx + 1 < level_missions.size():
 		return preview
+	if not TuningData.MISSIONS_BY_LEVEL.has(level + 1):
+		return preview
 	var next_level_missions: Array = _missions_get_level_data(level + 1)
 	for mission_any in next_level_missions:
 		if typeof(mission_any) == TYPE_DICTIONARY:
