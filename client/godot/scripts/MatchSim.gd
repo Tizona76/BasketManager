@@ -4547,7 +4547,7 @@ func _fin_match() -> void:
 		# --- STADIUM WORKS SYNC -------------------------------------------------
 		var save_singleton := get_node_or_null("/root/SaveSingleton")
 		if save_singleton != null and save_singleton.has_method("stadium_sync_travaux"):
-			var current_matchs_saison: int = int(save.get("season_round", 0))
+			var current_matchs_saison: int = int(save_sync.get("season_round", 0))
 			var sync_any: Variant = save_singleton.call("stadium_sync_travaux", current_matchs_saison)
 			if typeof(sync_any) == TYPE_DICTIONARY:
 				var sync_result: Dictionary = sync_any as Dictionary

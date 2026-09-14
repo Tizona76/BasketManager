@@ -3222,6 +3222,16 @@ func _prepare_new_season() -> void:
 	save["season_id"] = "season_" + str(int(save["season_number"]))
 
 	save["season_round"] = 0
+	if typeof(save.get("stadium")) == TYPE_DICTIONARY:
+		var stadium_works: Dictionary = save["stadium"]
+		if typeof(stadium_works.get("travaux_en_cours")) == TYPE_BOOL and stadium_works["travaux_en_cours"]:
+			var works_duration: Variant = stadium_works.get("travaux_duree_totale")
+			var works_remaining: Variant = stadium_works.get("travaux_matches_restants")
+			if typeof(works_duration) in [TYPE_INT, TYPE_FLOAT] and typeof(works_remaining) in [TYPE_INT, TYPE_FLOAT]:
+				if is_finite(float(works_duration)) and is_finite(float(works_remaining)):
+					if works_duration == floor(float(works_duration)) and works_remaining == floor(float(works_remaining)):
+						if works_duration > 0 and works_remaining > 0 and works_remaining <= works_duration:
+							stadium_works["travaux_baseline_matchs_saison"] = -(int(works_duration) - int(works_remaining))
 	save["last_pop_fin_round"] = -1
 	save["goal_climb_standings_seen"] = false
 	save["goal_climb_standings_match17_seen"] = false
