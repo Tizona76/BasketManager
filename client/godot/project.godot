@@ -28,12 +28,17 @@ MobilePinchZoom="*res://scripts/MobilePinchZoom.gd"
 
 [display]
 
-window/size/viewport_width=1600
-window/size/viewport_height=900
+window/size/viewport_width=844
+window/size/viewport_height=390
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/stretch/scale=1.15
+window/handheld/orientation=6
 
 [internationalization]
 
 locale/translations=PackedStringArray("res://i18n/translations.fr.translation", "res://i18n/translations.en.translation", "res://i18n/translations.es.translation", "res://i18n/translations.it.translation", "res://i18n/translations.pt.translation")
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true

@@ -197,15 +197,16 @@ func _ready() -> void:
 	if _bm_is_mobile_layout():
 		var ui_box: Control = $UI as Control
 		ui_box.set_anchors_preset(Control.PRESET_CENTER)
-		ui_box.offset_left = -220.0
-		ui_box.offset_right = 220.0
-		ui_box.offset_top = -85.0
-		ui_box.offset_bottom = 85.0
+		ui_box.offset_left = -170.0
+		ui_box.offset_right = 170.0
+		ui_box.offset_top = -65.0
+		ui_box.offset_bottom = 65.0
 		ui_box.alignment = BoxContainer.ALIGNMENT_CENTER
-		btn.custom_minimum_size = Vector2(360, 96)
-		btn.add_theme_font_size_override("font_size", 32)
+		lbl.visible = false
+		btn.custom_minimum_size = Vector2(300, 72)
+		btn.add_theme_font_size_override("font_size", 28)
 		btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		btn.scale = Vector2(2.04, 2.04)
+		btn.scale = Vector2.ONE
 	else:
 		btn.custom_minimum_size = Vector2(195, 60)
 		btn.add_theme_font_size_override("font_size", 24)
@@ -245,9 +246,9 @@ func _show_accueil() -> void:
 	$UI.visible = true
 	btn.visible = true
 	if _bm_is_mobile_layout():
-		btn.custom_minimum_size = Vector2(366, 113)
-		btn.add_theme_font_size_override("font_size", 45)
-		btn.scale = Vector2(3.375, 3.375)
+		btn.custom_minimum_size = Vector2(300, 72)
+		btn.add_theme_font_size_override("font_size", 28)
+		btn.scale = Vector2.ONE
 	else:
 		btn.scale *= 1.2
 	btn.disabled = false
@@ -472,6 +473,9 @@ func _bm_set_preparing_club_text(text_value: String, show_ball: bool = false, al
 	preparing_label.add_theme_font_size_override("font_size", int(display_font_size))
 	var max_w := minf(1320.0, vp.x * 0.86)
 	var min_w := 520.0 if char_count > 70 else 430.0
+	if vp.x < 600.0:
+		max_w = maxf(220.0, vp.x - 108.0)
+		min_w = minf(min_w, max_w)
 	var estimated_w := float(char_count) * display_font_size * 0.42 + 120.0
 	var label_w := clampf(estimated_w, min_w, max_w)
 	var usable_chars_per_line := maxf(20.0, (label_w - 80.0) / (display_font_size * 0.44))

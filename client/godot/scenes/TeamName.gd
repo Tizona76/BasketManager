@@ -144,8 +144,10 @@ func _bm_style_create_team_button() -> void:
 	btn_confirm.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
 	btn_confirm.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
 	btn_confirm.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.55))
-	btn_confirm.add_theme_font_size_override("font_size", 26)
-	btn_confirm.custom_minimum_size = Vector2(363, 75)
+	btn_confirm.add_theme_font_size_override("font_size", 25 if _bm_is_mobile_layout() else 26)
+	btn_confirm.custom_minimum_size = Vector2(276, 68) if _bm_is_mobile_layout() else Vector2(363, 75)
+	if _bm_is_mobile_layout():
+		btn_confirm.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 	if btn_play_instantly_entry != null:
 		btn_play_instantly_entry.add_theme_stylebox_override("normal", normal)
@@ -226,6 +228,8 @@ func _bm_career_summary(entry: Dictionary) -> String:
 	if not save.is_empty():
 		club_xp = PlayerLife.get_club_xp(save)
 		division = clampi(int(save.get("division_level", 3)), 1, 3)
+	if _bm_is_mobile_layout():
+		return "%s • S%d • Lv.%d" % [I18nSvc.division_display_name(division), season, club_level]
 	return tr("division.career_summary") % [I18nSvc.division_display_name(division), season, club_level, club_xp]
 
 
@@ -344,55 +348,78 @@ func _bm_make_career_action_popup_style(bg: Color, border: Color, glow_alpha: fl
 func _bm_style_career_action_popup() -> void:
 	if _career_action_popup == null:
 		return
+	var popup_window := DisplayServer.window_get_size()
+	var popup_portrait := _bm_is_mobile_layout() and popup_window.y > popup_window.x
 	var panel_style := _bm_make_career_action_popup_style(Color(0.012, 0.026, 0.060, 0.98), Color(0.28, 0.66, 1.0, 0.86), 0.24)
 	var hover_style := _bm_make_career_action_popup_style(Color(0.055, 0.18, 0.39, 1.0), Color(0.42, 0.78, 1.0, 0.95), 0.18)
 	_career_action_popup.add_theme_stylebox_override("panel", panel_style)
 	_career_action_popup.add_theme_stylebox_override("hover", hover_style)
 	_career_action_popup.add_theme_color_override("font_color", Color(0.94, 0.97, 1.0, 1.0))
 	_career_action_popup.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
-	_career_action_popup.add_theme_font_size_override("font_size", 16)
-	_career_action_popup.add_theme_constant_override("h_separation", 8)
-	_career_action_popup.add_theme_constant_override("v_separation", 6)
+	_career_action_popup.add_theme_font_size_override("font_size", 19 if popup_portrait else 16)
+	_career_action_popup.add_theme_constant_override("h_separation", 10 if popup_portrait else 8)
+	_career_action_popup.add_theme_constant_override("v_separation", 7 if popup_portrait else 6)
 
 
 func _bm_style_new_career_dialog() -> void:
 	if _create_new_career_dialog == null:
 		return
+	var dialog_window := DisplayServer.window_get_size()
+	var dialog_portrait := _bm_is_mobile_layout() and dialog_window.y > dialog_window.x
 	var panel_style := _bm_make_new_career_dialog_style()
+	_create_new_career_dialog.min_size = Vector2i(440, 264) if dialog_portrait else (Vector2i(286, 220) if _bm_is_mobile_layout() else Vector2i.ZERO)
 	_create_new_career_dialog.add_theme_stylebox_override("embedded_border", panel_style)
 	_create_new_career_dialog.add_theme_stylebox_override("embedded_unfocused_border", panel_style)
 	_create_new_career_dialog.add_theme_stylebox_override("panel", panel_style)
 	_create_new_career_dialog.add_theme_color_override("title_color", Color(1, 1, 1, 1))
 	_create_new_career_dialog.add_theme_color_override("title_outline_modulate", Color(0.20, 0.58, 1.0, 0.78))
-	_create_new_career_dialog.add_theme_font_size_override("title_font_size", 25)
+	_create_new_career_dialog.add_theme_font_size_override("title_font_size", 31 if dialog_portrait else (20 if _bm_is_mobile_layout() else 25))
 	_create_new_career_dialog.add_theme_constant_override("title_outline_size", 2)
-	_create_new_career_dialog.add_theme_constant_override("button_margin", 18)
+	_create_new_career_dialog.add_theme_constant_override("button_margin", 8 if _bm_is_mobile_layout() else 18)
 	var title_label := _create_new_career_dialog.find_child("CreateNewCareerTitle", true, false) as Label
 	if title_label != null:
 		title_label.text = tr("multi_career.create_new.title")
-		title_label.custom_minimum_size = Vector2(430, 0)
+		title_label.custom_minimum_size = Vector2(286, 0) if dialog_portrait else (Vector2(238, 0) if _bm_is_mobile_layout() else Vector2(430, 0))
 		title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		title_label.clip_text = false
-		title_label.add_theme_font_size_override("font_size", 25)
+		title_label.add_theme_font_size_override("font_size", 31 if dialog_portrait else (20 if _bm_is_mobile_layout() else 25))
 		title_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 		title_label.add_theme_color_override("font_outline_color", Color(0.20, 0.58, 1.0, 0.78))
 		title_label.add_theme_constant_override("outline_size", 2)
 	var body_label := _create_new_career_dialog.find_child("CreateNewCareerBody", true, false) as Label
 	if body_label != null:
 		body_label.text = tr("multi_career.create_new.body")
-		body_label.custom_minimum_size = Vector2(430, 0)
+		body_label.custom_minimum_size = Vector2(286, 0) if dialog_portrait else (Vector2(238, 0) if _bm_is_mobile_layout() else Vector2(430, 0))
 		body_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		body_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		body_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		body_label.clip_text = false
-		body_label.add_theme_font_size_override("font_size", 18)
+		body_label.add_theme_font_size_override("font_size", 24 if dialog_portrait else (16 if _bm_is_mobile_layout() else 18))
 		body_label.add_theme_color_override("font_color", Color(0.90, 0.94, 1.0, 0.92))
 		body_label.add_theme_constant_override("line_spacing", 5)
-	_bm_style_new_career_dialog_button(_create_new_career_dialog.get_cancel_button(), false)
-	_bm_style_new_career_dialog_button(_create_new_career_dialog.get_ok_button(), true)
+	var cancel_btn := _create_new_career_dialog.get_cancel_button()
+	var ok_btn := _create_new_career_dialog.get_ok_button()
+
+	_bm_style_new_career_dialog_button(cancel_btn, false)
+	_bm_style_new_career_dialog_button(ok_btn, true)
+
+	if dialog_portrait:
+		if cancel_btn != null:
+			cancel_btn.custom_minimum_size = Vector2(98, 50)
+			cancel_btn.add_theme_font_size_override("font_size", 20)
+		if ok_btn != null:
+			ok_btn.custom_minimum_size = Vector2(168, 50)
+			ok_btn.add_theme_font_size_override("font_size", 20)
+	elif _bm_is_mobile_layout():
+		if cancel_btn != null:
+			cancel_btn.custom_minimum_size = Vector2(82, 42)
+			cancel_btn.add_theme_font_size_override("font_size", 15)
+		if ok_btn != null:
+			ok_btn.custom_minimum_size = Vector2(140, 42)
+			ok_btn.add_theme_font_size_override("font_size", 15)
 
 
 func _bm_list_unique_careers() -> Array:
@@ -425,24 +452,32 @@ func _bm_clear_career_picker() -> void:
 
 
 func _bm_make_career_button(entry: Dictionary) -> Button:
+	var mobile_window := DisplayServer.window_get_size()
+	var mobile_viewport := get_viewport_rect().size
+	var mobile_landscape := _bm_is_mobile_layout() and mobile_window.x > mobile_window.y
+	print("[IOS_LAYOUT] window=", mobile_window, " viewport=", mobile_viewport, " landscape=", mobile_landscape)
 	var btn := Button.new()
+	btn.name = "CareerCard"
 	btn.text = ""
 	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_bm_style_entry_duplicate_button(btn, true)
-	btn.custom_minimum_size = Vector2(570, 104) if not _bm_is_mobile_layout() else Vector2(463, 112)
+	btn.custom_minimum_size = Vector2(570, 104) if not _bm_is_mobile_layout() else (Vector2(520, 108) if mobile_landscape else Vector2(430, 121))
+	if _bm_is_mobile_layout():
+		btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 	var row := HBoxContainer.new()
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
-	row.offset_left = 20.0
-	row.offset_top = 10.0
-	row.offset_right = -20.0
-	row.offset_bottom = -30.0
+	row.offset_left = 8.0 if _bm_is_mobile_layout() else 20.0
+	row.offset_top = 8.0 if _bm_is_mobile_layout() else 10.0
+	row.offset_right = -8.0 if _bm_is_mobile_layout() else -20.0
+	row.offset_bottom = -12.0 if _bm_is_mobile_layout() else -30.0
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override("separation", 14)
+	row.add_theme_constant_override("separation", 6 if _bm_is_mobile_layout() else 14)
 	btn.add_child(row)
 
 	var crest := TextureRect.new()
-	crest.custom_minimum_size = Vector2(54, 54) if not _bm_is_mobile_layout() else Vector2(58, 58)
+	crest.name = "CareerCrest"
+	crest.custom_minimum_size = Vector2(54, 54) if not _bm_is_mobile_layout() else (Vector2(52, 52) if mobile_landscape else Vector2(56, 56))
 	crest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	crest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	crest.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -452,6 +487,8 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	var text_box := VBoxContainer.new()
 	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	text_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	if _bm_is_mobile_layout():
+		text_box.custom_minimum_size = Vector2.ZERO
 	text_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	text_box.add_theme_constant_override("separation", 2)
 	row.add_child(text_box)
@@ -463,10 +500,16 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	text_box.add_child(title_row)
 
 	var name_label := Label.new()
+	name_label.name = "CareerTeamName"
 	name_label.text = _bm_career_team_name(entry)
-	name_label.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else 26)
+	name_label.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else (25 if mobile_landscape else 31))
 	name_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if _bm_is_mobile_layout():
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_label.custom_minimum_size = Vector2.ZERO
+		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		name_label.clip_text = true
 	title_row.add_child(name_label)
 
 	var league_id := str(entry.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
@@ -478,26 +521,33 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	league_label.add_theme_font_size_override("font_size", 16 if not _bm_is_mobile_layout() else 18)
 	league_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.68))
 	league_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	league_label.visible = not _bm_is_mobile_layout()
 	title_row.add_child(league_label)
 
 	var summary_label := Label.new()
 	summary_label.name = "CareerDivisionSummary"
 	summary_label.set_meta("career_summary_entry", entry)
 	summary_label.text = _bm_career_summary(entry)
-	summary_label.add_theme_font_size_override("font_size", 18 if not _bm_is_mobile_layout() else 20)
+	summary_label.add_theme_font_size_override("font_size", 18 if not _bm_is_mobile_layout() else (18 if mobile_landscape else 24))
 	summary_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.82))
 	summary_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	summary_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	if _bm_is_mobile_layout():
+		summary_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		summary_label.custom_minimum_size = Vector2.ZERO
+		summary_label.clip_text = true
 	text_box.add_child(summary_label)
 
 	var cid := str(entry.get("career_id", "")).strip_edges()
 	var action_btn := Button.new()
+	action_btn.name = "CareerActionButton"
 	action_btn.text = "..."
-	action_btn.custom_minimum_size = Vector2(38, 54)
+	action_btn.custom_minimum_size = (Vector2(46, 54) if mobile_landscape else Vector2(56, 64)) if _bm_is_mobile_layout() else Vector2(38, 54)
+	action_btn.size_flags_horizontal = Control.SIZE_SHRINK_END
 	action_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	action_btn.focus_mode = Control.FOCUS_NONE
 	action_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	action_btn.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else 26)
+	action_btn.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else 18)
 	action_btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
 	action_btn.pressed.connect(func() -> void:
 		_bm_show_career_action_popup(cid, action_btn)
@@ -545,22 +595,34 @@ func _bm_style_delete_career_dialog() -> void:
 	if _delete_career_dialog == null:
 		return
 	var panel_style := _bm_make_new_career_dialog_style()
-	_delete_career_dialog.min_size = Vector2i(500, 168)
+	_delete_career_dialog.min_size = Vector2i(286, 156) if _bm_is_mobile_layout() else Vector2i(500, 168)
 	_delete_career_dialog.add_theme_stylebox_override("embedded_border", panel_style)
 	_delete_career_dialog.add_theme_stylebox_override("embedded_unfocused_border", panel_style)
 	_delete_career_dialog.add_theme_stylebox_override("panel", panel_style)
-	_delete_career_dialog.add_theme_constant_override("button_margin", 20)
+	_delete_career_dialog.add_theme_constant_override("button_margin", 10 if _bm_is_mobile_layout() else 20)
 	var msg := _delete_career_dialog.get_label()
 	if msg != null:
-		msg.custom_minimum_size = Vector2(440, 52)
+		msg.custom_minimum_size = Vector2(238, 48) if _bm_is_mobile_layout() else Vector2(440, 52)
 		msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		msg.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		msg.add_theme_font_size_override("font_size", 24)
+		msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		msg.add_theme_font_size_override("font_size", 18 if _bm_is_mobile_layout() else 24)
 		msg.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 		msg.add_theme_color_override("font_outline_color", Color(0.20, 0.58, 1.0, 0.68))
 		msg.add_theme_constant_override("outline_size", 1)
-	_bm_style_new_career_dialog_button(_delete_career_dialog.get_cancel_button(), false)
-	_bm_style_new_career_dialog_button(_delete_career_dialog.get_ok_button(), true)
+	var cancel_btn := _delete_career_dialog.get_cancel_button()
+	var ok_btn := _delete_career_dialog.get_ok_button()
+
+	_bm_style_new_career_dialog_button(cancel_btn, false)
+	_bm_style_new_career_dialog_button(ok_btn, true)
+
+	if _bm_is_mobile_layout():
+		if cancel_btn != null:
+			cancel_btn.custom_minimum_size = Vector2(82, 42)
+			cancel_btn.add_theme_font_size_override("font_size", 15)
+		if ok_btn != null:
+			ok_btn.custom_minimum_size = Vector2(146, 42)
+			ok_btn.add_theme_font_size_override("font_size", 15)
 
 
 func _bm_ensure_delete_career_dialog() -> void:
@@ -584,7 +646,24 @@ func _bm_show_delete_career_confirm() -> void:
 	_bm_ensure_delete_career_dialog()
 	if _delete_career_dialog != null:
 		_bm_style_delete_career_dialog()
-		_delete_career_dialog.popup_centered(Vector2i(500, 168))
+		var delete_window := DisplayServer.window_get_size()
+		var delete_portrait := _bm_is_mobile_layout() and delete_window.y > delete_window.x
+		if delete_portrait:
+			var delete_cancel := _delete_career_dialog.get_cancel_button()
+			var delete_ok := _delete_career_dialog.get_ok_button()
+			if delete_cancel != null:
+				delete_cancel.custom_minimum_size = Vector2(98, 50)
+				delete_cancel.add_theme_font_size_override("font_size", 18)
+			if delete_ok != null:
+				delete_ok.custom_minimum_size = Vector2(175, 50)
+				delete_ok.add_theme_font_size_override("font_size", 18)
+			var delete_label := _delete_career_dialog.find_child("Label", true, false) as Label
+			if delete_label != null:
+				delete_label.custom_minimum_size = Vector2(286, 0)
+				delete_label.add_theme_font_size_override("font_size", 23)
+			_delete_career_dialog.popup_centered(Vector2i(343, 187))
+		else:
+			_delete_career_dialog.popup_centered(Vector2i(286, 156) if _bm_is_mobile_layout() else Vector2i(500, 168))
 
 
 func _on_delete_career_confirmed() -> void:
@@ -616,7 +695,7 @@ func _bm_ensure_create_new_career_dialog() -> void:
 	_create_new_career_dialog.exclusive = true
 	var content := VBoxContainer.new()
 	content.name = "CreateNewCareerContent"
-	content.custom_minimum_size = Vector2(430, 0)
+	content.custom_minimum_size = Vector2(238, 0) if _bm_is_mobile_layout() else Vector2(430, 0)
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
 	content.add_theme_constant_override("separation", 12)
@@ -639,7 +718,7 @@ func _bm_ensure_create_new_career_dialog() -> void:
 	body_label.clip_text = false
 	content.add_child(body_label)
 	var body_button_gap := Control.new()
-	body_button_gap.custom_minimum_size = Vector2(1, 14)
+	body_button_gap.custom_minimum_size = Vector2(1, 8) if _bm_is_mobile_layout() else Vector2(1, 14)
 	content.add_child(body_button_gap)
 	add_child(_create_new_career_dialog)
 	_bm_style_new_career_dialog()
@@ -650,7 +729,14 @@ func _bm_show_create_new_career_confirm() -> void:
 	_bm_ensure_create_new_career_dialog()
 	if _create_new_career_dialog != null:
 		_bm_style_new_career_dialog()
-		_create_new_career_dialog.popup_centered()
+		var create_window := DisplayServer.window_get_size()
+		var create_portrait := _bm_is_mobile_layout() and create_window.y > create_window.x
+		if create_portrait:
+			_create_new_career_dialog.popup_centered(Vector2i(440, 276))
+		elif _bm_is_mobile_layout():
+			_create_new_career_dialog.popup_centered(Vector2i(286, 230))
+		else:
+			_create_new_career_dialog.popup_centered()
 		call_deferred("_bm_style_new_career_dialog")
 
 
@@ -659,6 +745,34 @@ func _bm_build_career_picker() -> void:
 	var careers := _bm_list_unique_careers()
 	if careers.is_empty():
 		return
+	if _bm_is_mobile_layout():
+		var scroll := ScrollContainer.new()
+		scroll.name = "YourTeamsPicker"
+		scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+		scroll.offset_top = 54.0
+		scroll.offset_bottom = -8.0
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+		_career_picker = scroll
+		add_child(_career_picker)
+
+		var mobile_center := CenterContainer.new()
+		mobile_center.name = "YourTeamsMobileCenter"
+		scroll.add_child(mobile_center)
+		scroll.resized.connect(_bm_apply_career_picker_orientation_layout)
+
+		var box := VBoxContainer.new()
+		box.alignment = BoxContainer.ALIGNMENT_CENTER
+		box.add_theme_constant_override("separation", 8)
+		mobile_center.add_child(box)
+
+		_bm_populate_career_picker_box(box, careers)
+		_bm_apply_career_picker_orientation_layout()
+		move_child(_career_picker, get_child_count() - 1)
+		call_deferred("_ensure_teamname_center_ball")
+		return
+
 	_career_picker = CenterContainer.new()
 	_career_picker.name = "YourTeamsPicker"
 	_career_picker.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -674,7 +788,7 @@ func _bm_build_career_picker() -> void:
 	title.name = "YourTeamsTitle"
 	title.text = tr("multi_career.your_teams.title")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 38 if not _bm_is_mobile_layout() else 34)
+	title.add_theme_font_size_override("font_size", 38 if not _bm_is_mobile_layout() else 28)
 	title.add_theme_color_override("font_color", Color(1.0, 0.86, 0.34, 1.0))
 	box.add_child(title)
 
@@ -682,18 +796,93 @@ func _bm_build_career_picker() -> void:
 		box.add_child(_bm_make_career_button(entry as Dictionary))
 
 	var create_gap := Control.new()
-	create_gap.custom_minimum_size = Vector2(1, 110 if not _bm_is_mobile_layout() else 112)
+	create_gap.custom_minimum_size = Vector2(1, 110 if not _bm_is_mobile_layout() else 12)
 	box.add_child(create_gap)
 
 	var create_btn := Button.new()
 	create_btn.name = "YourTeamsCreateNewTeamButton"
 	create_btn.text = tr("multi_career.create_new.button")
-	create_btn.custom_minimum_size = Vector2(560, 68) if not _bm_is_mobile_layout() else Vector2(430, 76)
-	create_btn.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else 26)
+	create_btn.custom_minimum_size = Vector2(560, 68) if not _bm_is_mobile_layout() else Vector2(296, 58)
+	create_btn.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else 20)
+	if _bm_is_mobile_layout():
+		create_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_bm_style_entry_duplicate_button(create_btn, false)
 	create_btn.pressed.connect(_on_create_new_team_pressed)
 	box.add_child(create_btn)
 	move_child(_career_picker, get_child_count() - 1)
+	call_deferred("_ensure_teamname_center_ball")
+
+
+func _bm_populate_career_picker_box(box: VBoxContainer, careers: Array) -> void:
+	var mobile_window := DisplayServer.window_get_size()
+	var mobile_landscape := _bm_is_mobile_layout() and mobile_window.x > mobile_window.y
+	var title := Label.new()
+	title.name = "YourTeamsTitle"
+	title.text = tr("multi_career.your_teams.title")
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 34 if mobile_landscape else 31)
+	title.add_theme_color_override("font_color", Color(1.0, 0.86, 0.34, 1.0))
+	box.add_child(title)
+
+	for entry in careers:
+		box.add_child(_bm_make_career_button(entry as Dictionary))
+
+	var create_gap := Control.new()
+	create_gap.custom_minimum_size = Vector2(1, 12)
+	box.add_child(create_gap)
+
+	var create_btn := Button.new()
+	create_btn.name = "YourTeamsCreateNewTeamButton"
+	create_btn.text = tr("multi_career.create_new.button")
+	create_btn.custom_minimum_size = Vector2(420, 68) if mobile_landscape else Vector2(363, 70)
+	create_btn.add_theme_font_size_override("font_size", 24 if mobile_landscape else 24)
+	create_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_bm_style_entry_duplicate_button(create_btn, false)
+	create_btn.pressed.connect(_on_create_new_team_pressed)
+	box.add_child(create_btn)
+
+
+func _bm_apply_career_picker_orientation_layout() -> void:
+	if not _bm_is_mobile_layout():
+		return
+	var win := DisplayServer.window_get_size()
+	var landscape := win.x > win.y
+	var vp := get_viewport_rect().size
+
+	if _career_picker != null and is_instance_valid(_career_picker):
+		var center := _career_picker.find_child("YourTeamsMobileCenter", true, false) as Control
+		if center != null:
+			center.custom_minimum_size = Vector2(vp.x, 0) if landscape else Vector2(vp.x, maxf(0.0, vp.y - 62.0))
+
+		var title := _career_picker.find_child("YourTeamsTitle", true, false) as Label
+		if title != null:
+			title.add_theme_font_size_override("font_size", 34 if landscape else 31)
+
+		for node in _career_picker.find_children("CareerCard", "Button", true, false):
+			var card := node as Button
+			card.custom_minimum_size = Vector2(520, 108) if landscape else Vector2(430, 121)
+			var crest := card.find_child("CareerCrest", true, false) as TextureRect
+			if crest != null:
+				crest.custom_minimum_size = Vector2(52, 52) if landscape else Vector2(56, 56)
+			var team_name := card.find_child("CareerTeamName", true, false) as Label
+			if team_name != null:
+				team_name.add_theme_font_size_override("font_size", 25 if landscape else 31)
+			var summary := card.find_child("CareerDivisionSummary", true, false) as Label
+			if summary != null:
+				summary.add_theme_font_size_override("font_size", 18 if landscape else 24)
+			var action := card.find_child("CareerActionButton", true, false) as Button
+			if action != null:
+				action.custom_minimum_size = Vector2(46, 54) if landscape else Vector2(56, 64)
+
+		var create_btn := _career_picker.find_child("YourTeamsCreateNewTeamButton", true, false) as Button
+		if create_btn != null:
+			create_btn.custom_minimum_size = Vector2(420, 68) if landscape else Vector2(363, 70)
+			create_btn.add_theme_font_size_override("font_size", 24)
+
+		if landscape and _career_picker is ScrollContainer:
+			(_career_picker as ScrollContainer).scroll_vertical = 0
+
+	_apply_entry_flags_size()
 	call_deferred("_ensure_teamname_center_ball")
 
 
@@ -722,12 +911,23 @@ func _bm_apply_mobile_layout() -> void:
 		return
 
 	if input_team != null:
-		input_team.custom_minimum_size = Vector2(413, 70)
-		input_team.add_theme_font_size_override("font_size", 32)
+		input_team.custom_minimum_size = Vector2(276, 60)
+		input_team.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		input_team.add_theme_font_size_override("font_size", 26)
+
+	var wrap_input := get_node_or_null("Center/Box/WrapInput") as Control
+	if wrap_input != null:
+		wrap_input.custom_minimum_size = Vector2(276, 60)
+		wrap_input.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 	if btn_confirm != null:
-		btn_confirm.custom_minimum_size = Vector2(454, 94)
-		btn_confirm.add_theme_font_size_override("font_size", 33)
+		btn_confirm.custom_minimum_size = Vector2(276, 68)
+		btn_confirm.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		btn_confirm.add_theme_font_size_override("font_size", 25)
+
+	var mobile_title := get_node_or_null("Center/Box/LblTitle") as CanvasItem
+	if mobile_title != null:
+		mobile_title.visible = false
 	if btn_reprendre_entry != null:
 		btn_reprendre_entry.custom_minimum_size = Vector2(325, 90)
 		btn_reprendre_entry.add_theme_font_size_override("font_size", 28)
@@ -864,7 +1064,10 @@ func _bm_set_teamname_form_visible(v: bool) -> void:
 		_league_inline_row
 	]:
 		if n != null and n is CanvasItem:
-			(n as CanvasItem).visible = v
+			if _bm_is_mobile_layout() and n == get_node_or_null("Center/Box/LblTitle"):
+				(n as CanvasItem).visible = false
+			else:
+				(n as CanvasItem).visible = v
 	if input_team != null:
 		input_team.editable = v
 		input_team.mouse_filter = Control.MOUSE_FILTER_STOP if v else Control.MOUSE_FILTER_IGNORE
@@ -981,25 +1184,25 @@ func _bm_ensure_inline_league_row() -> void:
 	_league_inline_row = HBoxContainer.new()
 	_league_inline_row.name = "InlineLeagueChoice"
 	_league_inline_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_league_inline_row.add_theme_constant_override("separation", 12)
-	_league_inline_row.custom_minimum_size = Vector2(0, 58)
+	_league_inline_row.add_theme_constant_override("separation", 8 if _bm_is_mobile_layout() else 12)
+	_league_inline_row.custom_minimum_size = Vector2(0, 52) if _bm_is_mobile_layout() else Vector2(0, 58)
 
 	var badge := PanelContainer.new()
-	badge.custom_minimum_size = Vector2(190, 54)
+	badge.custom_minimum_size = Vector2(154, 44) if _bm_is_mobile_layout() else Vector2(190, 54)
 	badge.add_theme_stylebox_override("panel", _bm_make_inline_league_badge_style())
 	_league_inline_row.add_child(badge)
 
 	_league_inline_value = Label.new()
 	_league_inline_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_league_inline_value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_league_inline_value.add_theme_font_size_override("font_size", 25)
+	_league_inline_value.add_theme_font_size_override("font_size", 21 if _bm_is_mobile_layout() else 25)
 	_league_inline_value.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	_league_inline_value.add_theme_color_override("font_outline_color", Color(0.08, 0.48, 1.0, 0.95))
 	_league_inline_value.add_theme_color_override("font_shadow_color", Color(0.08, 0.48, 1.0, 0.38))
 	_league_inline_value.add_theme_constant_override("outline_size", 4)
 	_league_inline_value.add_theme_constant_override("shadow_offset_x", 0)
 	_league_inline_value.add_theme_constant_override("shadow_offset_y", 0)
-	_league_inline_value.custom_minimum_size = Vector2(176, 34)
+	_league_inline_value.custom_minimum_size = Vector2(128, 26) if _bm_is_mobile_layout() else Vector2(176, 34)
 	badge.add_child(_league_inline_value)
 
 	_league_inline_change_btn = Button.new()
@@ -1008,6 +1211,10 @@ func _bm_ensure_inline_league_row() -> void:
 	_league_inline_change_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_league_inline_change_btn.pressed.connect(_bm_on_change_league_pressed)
 	_bm_style_inline_league_button(_league_inline_change_btn)
+	if _bm_is_mobile_layout():
+		_league_inline_change_btn.custom_minimum_size = Vector2(112, 24)
+		_league_inline_change_btn.add_theme_font_size_override("font_size", 14)
+		_league_inline_change_btn.scale = Vector2.ONE
 	_league_inline_row.add_child(_league_inline_change_btn)
 
 	var confirm_index := btn_confirm.get_index() if btn_confirm != null else box.get_child_count()
@@ -1350,7 +1557,7 @@ func _on_league_confirmed() -> void:
 
 func _ready() -> void:
 	print("[TEAMNAME] _ready reached")
-	call_deferred("_bm_teamname_apply_mobile_plus15")
+	# iOS isolated: ancien agrandissement mobile global +15% neutralisé
 	_ensure_bg_joueurs()
 	_setup_fallback_dialog()
 	call_deferred("_focus_input")
@@ -1416,13 +1623,13 @@ func _apply_i18n() -> void:
 
 	# Boutons
 	if btn_confirm != null:
-		if _bm_entry_real_team_name() != "":
-			btn_confirm.text = _bm_entry_real_team_name()
-		elif _bm_single_play_revealed:
+		if _bm_single_play_revealed:
 			var c := tr("teamname.create")
 			if c == "teamname.create":
 				c = tr("TEAMNAME_CREATE")
 			btn_confirm.text = c
+		elif _bm_entry_real_team_name() != "":
+			btn_confirm.text = _bm_entry_real_team_name()
 		else:
 			btn_confirm.text = "Play Instantly"
 
@@ -1611,15 +1818,38 @@ func _apply_entry_flag_tooltips() -> void:
 func _apply_entry_flags_size() -> void:
 	if lang_bar_entry == null:
 		return
+
+	var mobile_window := DisplayServer.window_get_size()
+	var mobile_portrait := _bm_is_mobile_layout() and mobile_window.y > mobile_window.x
+	if mobile_portrait:
+		lang_bar_entry.anchor_left = 0.0
+		lang_bar_entry.anchor_right = 1.0
+		lang_bar_entry.offset_left = 16.0
+		lang_bar_entry.offset_right = -16.0
+		lang_bar_entry.offset_top = 60.0
+		lang_bar_entry.offset_bottom = 94.0
+		lang_bar_entry.alignment = BoxContainer.ALIGNMENT_CENTER
+		lang_bar_entry.add_theme_constant_override("separation", 22)
+	else:
+		lang_bar_entry.anchor_left = 0.98200005
+		lang_bar_entry.anchor_right = 1.0
+		lang_bar_entry.offset_left = -240.0
+		lang_bar_entry.offset_top = 16.0
+		lang_bar_entry.offset_right = -16.0
+		lang_bar_entry.offset_bottom = 50.0
+		lang_bar_entry.alignment = BoxContainer.ALIGNMENT_BEGIN
+		lang_bar_entry.add_theme_constant_override("separation", 22)
+	lang_bar_entry.clip_contents = false
 	for child in lang_bar_entry.get_children():
 		if child is Control:
 			var ctrl := child as Control
 			ctrl.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 			ctrl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			ctrl.size_flags_stretch_ratio = 0.0
-			ctrl.custom_minimum_size = FLAG_SIZE
-			ctrl.size = FLAG_SIZE
-			ctrl.scale = Vector2(0.72, 0.72)
+			var flag_size := Vector2(38, 29) if _bm_is_mobile_layout() else FLAG_SIZE
+			ctrl.custom_minimum_size = flag_size
+			ctrl.size = flag_size
+			ctrl.scale = Vector2(0.62, 0.62) if _bm_is_mobile_layout() else Vector2(0.72, 0.72)
 			if ctrl is TextureButton:
 				(ctrl as TextureButton).ignore_texture_size = true
 
