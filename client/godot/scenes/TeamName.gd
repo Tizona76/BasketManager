@@ -88,6 +88,7 @@ var _career_action_popup: PopupMenu = null
 var _delete_career_dialog: ConfirmationDialog = null
 var _pending_delete_career_id: String = ""
 var _teamname_ball_tween: Tween = null
+var _mobile_keyboard_dismiss_btn: Button = null
 
 
 const FLAG_SIZE := Vector2(58, 44)
@@ -1043,12 +1044,61 @@ func _bm_teamname_popup_caret_blink_tick() -> void:
 	_dlg_edit.placeholder_text = "_" if _teamname_popup_caret_blink_visible else ""
 
 
+func _bm_ensure_keyboard_dismiss_button() -> void:
+	if _mobile_keyboard_dismiss_btn != null and is_instance_valid(_mobile_keyboard_dismiss_btn):
+		return
+	_mobile_keyboard_dismiss_btn = Button.new()
+	_mobile_keyboard_dismiss_btn.name = "MobileKeyboardDismiss"
+	_mobile_keyboard_dismiss_btn.text = "⌄"
+	_mobile_keyboard_dismiss_btn.custom_minimum_size = Vector2(58, 44)
+	_mobile_keyboard_dismiss_btn.add_theme_font_size_override("font_size", 30)
+	_mobile_keyboard_dismiss_btn.focus_mode = Control.FOCUS_NONE
+	_mobile_keyboard_dismiss_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_mobile_keyboard_dismiss_btn.z_index = 300
+	_mobile_keyboard_dismiss_btn.visible = false
+	_mobile_keyboard_dismiss_btn.pressed.connect(_bm_hide_mobile_keyboard)
+	add_child(_mobile_keyboard_dismiss_btn)
+
+
+func _bm_hide_mobile_keyboard() -> void:
+	if input_team != null:
+		input_team.release_focus()
+	DisplayServer.virtual_keyboard_hide()
+	_bm_update_keyboard_dismiss_button()
+
+
+func _bm_update_keyboard_dismiss_button() -> void:
+	_bm_ensure_keyboard_dismiss_button()
+	if _mobile_keyboard_dismiss_btn == null:
+		return
+	var win := DisplayServer.window_get_size()
+	var vp := get_viewport_rect().size
+	var landscape := win.x > win.y
+	var keyboard_h := DisplayServer.virtual_keyboard_get_height()
+	var keyboard_h_vp := float(keyboard_h)
+	if win.y > 0:
+		keyboard_h_vp *= vp.y / float(win.y)
+	var dismiss_y := 18.0
+	if keyboard_h_vp > 40.0:
+		dismiss_y = maxf(18.0, vp.y - keyboard_h_vp - 52.0)
+	_mobile_keyboard_dismiss_btn.position = Vector2(
+		vp.x - 68.0,
+		dismiss_y
+	)
+	var show_btn := _bm_is_mobile_layout() and landscape and input_team != null and input_team.has_focus()
+	_mobile_keyboard_dismiss_btn.visible = show_btn
+
+
 func _bm_teamname_input_focus_entered() -> void:
 	_bm_start_teamname_input_caret_blink()
+	_bm_update_keyboard_dismiss_button()
+	call_deferred("_bm_update_keyboard_dismiss_button")
+	get_tree().create_timer(0.2).timeout.connect(_bm_update_keyboard_dismiss_button, CONNECT_ONE_SHOT)
 
 
 func _bm_teamname_input_focus_exited() -> void:
 	_bm_stop_teamname_input_caret_blink(true)
+	_bm_update_keyboard_dismiss_button()
 
 
 # BM_TEAMNAME_SINGLE_PLAY_ENTRY_V1
@@ -1188,33 +1238,40 @@ func _bm_ensure_inline_league_row() -> void:
 	_league_inline_row.custom_minimum_size = Vector2(0, 52) if _bm_is_mobile_layout() else Vector2(0, 58)
 
 	var badge := PanelContainer.new()
-	badge.custom_minimum_size = Vector2(154, 44) if _bm_is_mobile_layout() else Vector2(190, 54)
+	var inline_window := DisplayServer.window_get_size()
+	var inline_portrait := _bm_is_mobile_layout() and inline_window.y > inline_window.x
+	badge.custom_minimum_size = Vector2(185, 53) if inline_portrait else (Vector2(154, 44) if _bm_is_mobile_layout() else Vector2(190, 54))
 	badge.add_theme_stylebox_override("panel", _bm_make_inline_league_badge_style())
 	_league_inline_row.add_child(badge)
 
 	_league_inline_value = Label.new()
 	_league_inline_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_league_inline_value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_league_inline_value.add_theme_font_size_override("font_size", 21 if _bm_is_mobile_layout() else 25)
+	_league_inline_value.add_theme_font_size_override("font_size", 25 if inline_portrait else (21 if _bm_is_mobile_layout() else 25))
 	_league_inline_value.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	_league_inline_value.add_theme_color_override("font_outline_color", Color(0.08, 0.48, 1.0, 0.95))
 	_league_inline_value.add_theme_color_override("font_shadow_color", Color(0.08, 0.48, 1.0, 0.38))
 	_league_inline_value.add_theme_constant_override("outline_size", 4)
 	_league_inline_value.add_theme_constant_override("shadow_offset_x", 0)
 	_league_inline_value.add_theme_constant_override("shadow_offset_y", 0)
-	_league_inline_value.custom_minimum_size = Vector2(128, 26) if _bm_is_mobile_layout() else Vector2(176, 34)
+	_league_inline_value.custom_minimum_size = Vector2(154, 31) if inline_portrait else (Vector2(128, 26) if _bm_is_mobile_layout() else Vector2(176, 34))
 	badge.add_child(_league_inline_value)
 
 	_league_inline_change_btn = Button.new()
 	_league_inline_change_btn.text = "Change league"
 	_league_inline_change_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_league_inline_change_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_league_inline_change_btn.pressed.connect(_bm_on_change_league_pressed)
+	_league_inline_change_btn.button_down.connect(_bm_on_change_league_pressed)
 	_bm_style_inline_league_button(_league_inline_change_btn)
 	if _bm_is_mobile_layout():
-		_league_inline_change_btn.custom_minimum_size = Vector2(112, 24)
-		_league_inline_change_btn.add_theme_font_size_override("font_size", 14)
+		var league_window := DisplayServer.window_get_size()
+		var league_portrait := league_window.y > league_window.x
+		_league_inline_change_btn.custom_minimum_size = Vector2(129, 28) if league_portrait else Vector2(112, 24)
+		_league_inline_change_btn.add_theme_font_size_override("font_size", 16 if league_portrait else 14)
 		_league_inline_change_btn.scale = Vector2.ONE
+	_league_inline_change_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_league_inline_change_btn.focus_mode = Control.FOCUS_NONE
+	_league_inline_change_btn.z_index = 20
 	_league_inline_row.add_child(_league_inline_change_btn)
 
 	var confirm_index := btn_confirm.get_index() if btn_confirm != null else box.get_child_count()
@@ -1224,7 +1281,11 @@ func _bm_ensure_inline_league_row() -> void:
 
 
 func _bm_on_change_league_pressed() -> void:
-	_bm_show_league_choice(input_team.text if input_team != null else "")
+	var team_name := input_team.text if input_team != null else ""
+	if input_team != null:
+		input_team.release_focus()
+	DisplayServer.virtual_keyboard_hide()
+	call_deferred("_bm_show_league_choice", team_name)
 
 
 func _bm_league_card_style(selected: bool) -> StyleBoxFlat:
@@ -1450,7 +1511,9 @@ func _bm_show_league_choice(team_name: String) -> void:
 	row.add_child(prev_btn)
 
 	_league_card_panel = PanelContainer.new()
-	_league_card_panel.custom_minimum_size = Vector2(363, 424) if _bm_is_mobile_layout() else Vector2(871, 629)
+	var league_choice_window := DisplayServer.window_get_size()
+	var league_choice_portrait := _bm_is_mobile_layout() and league_choice_window.y > league_choice_window.x
+	_league_card_panel.custom_minimum_size = Vector2(654, 764) if league_choice_portrait else (Vector2(363, 424) if _bm_is_mobile_layout() else Vector2(871, 629))
 	_league_card_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_league_card_panel.gui_input.connect(_bm_on_league_card_gui_input)
 	_league_card_panel.add_theme_stylebox_override("panel", _bm_league_card_style(false))
@@ -1476,8 +1539,8 @@ func _bm_show_league_choice(team_name: String) -> void:
 	title.add_theme_constant_override("shadow_outline_size", 10)
 	card_box.add_child(title)
 
-	var image_size := Vector2(327, 266) if _bm_is_mobile_layout() else Vector2(811, 508)
-	var frame_size := Vector2(172, 266) if _bm_is_mobile_layout() else Vector2(427, 508)
+	var image_size := Vector2(588, 479) if league_choice_portrait else (Vector2(327, 266) if _bm_is_mobile_layout() else Vector2(811, 508))
+	var frame_size := Vector2(309, 479) if league_choice_portrait else (Vector2(172, 266) if _bm_is_mobile_layout() else Vector2(427, 508))
 
 	var image_wrap := Control.new()
 	image_wrap.custom_minimum_size = image_size
@@ -1594,9 +1657,38 @@ func _ready() -> void:
 		_bm_set_teamname_form_visible(true)
 
 
+func _input(event: InputEvent) -> void:
+	if not _bm_is_mobile_layout():
+		return
+	if _league_inline_change_btn == null or not is_instance_valid(_league_inline_change_btn):
+		return
+	if not _league_inline_change_btn.visible:
+		return
+
+	var win := DisplayServer.window_get_size()
+	if win.x <= win.y:
+		return
+
+	if event is InputEventScreenTouch:
+		var touch := event as InputEventScreenTouch
+		if not touch.pressed:
+			return
+
+		var button_rect := Rect2(
+			_league_inline_change_btn.global_position,
+			_league_inline_change_btn.size
+		)
+
+		if button_rect.has_point(touch.position):
+			_bm_on_change_league_pressed()
+			get_viewport().set_input_as_handled()
+
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSLATION_CHANGED:
 		_apply_i18n()
+	elif what == NOTIFICATION_RESIZED:
+		call_deferred("_bm_update_keyboard_dismiss_button")
 
 
 # BM_ENTRY_TWO_BUTTONS_MODE_V1
@@ -1725,7 +1817,9 @@ func _bm_raise_entry_duplicate_controls() -> void:
 		var c := n as Control
 		c.mouse_filter = Control.MOUSE_FILTER_STOP
 		c.z_index = 100
-		move_child(c, get_child_count() - 1)
+		var control_parent := c.get_parent()
+		if control_parent != null:
+			control_parent.move_child(c, control_parent.get_child_count() - 1)
 	for b in [btn_reprendre_entry, btn_inscrire_entry]:
 		if b != null:
 			b.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -1774,7 +1868,11 @@ func _on_create_new_team_confirmed() -> void:
 	_bm_update_inline_league()
 	if input_team != null:
 		input_team.text = ""
-		input_team.grab_focus()
+		if _bm_is_mobile_layout():
+			input_team.release_focus()
+			DisplayServer.virtual_keyboard_hide()
+		else:
+			input_team.grab_focus()
 
 
 func _on_entry_play_instantly_pressed() -> void:
