@@ -1416,13 +1416,13 @@ func _apply_i18n() -> void:
 
 	# Boutons
 	if btn_confirm != null:
-		if _bm_entry_real_team_name() != "":
-			btn_confirm.text = _bm_entry_real_team_name()
-		elif _bm_single_play_revealed:
+		if _bm_single_play_revealed:
 			var c := tr("teamname.create")
 			if c == "teamname.create":
 				c = tr("TEAMNAME_CREATE")
 			btn_confirm.text = c
+		elif _bm_entry_real_team_name() != "":
+			btn_confirm.text = _bm_entry_real_team_name()
 		else:
 			btn_confirm.text = "Play Instantly"
 
