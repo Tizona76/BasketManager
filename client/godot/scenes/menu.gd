@@ -334,6 +334,118 @@ func _bm_club_popup_intro_text() -> String:
 func _bm_popup_cta_text() -> String:
 	return _bm_club_tr_or_fallback("popup_intro_select_players", "Select Players")
 
+var _bm_club_popup_backdrop: ColorRect = null
+
+
+func _bm_ensure_club_popup_backdrop() -> void:
+	if popup_bienvenue_club == null:
+		return
+
+	var overlays := popup_bienvenue_club.get_parent() as Control
+	if overlays == null:
+		return
+
+	if _bm_club_popup_backdrop == null or not is_instance_valid(_bm_club_popup_backdrop):
+		_bm_club_popup_backdrop = ColorRect.new()
+		_bm_club_popup_backdrop.name = "PopupBienvenueBackdrop"
+		_bm_club_popup_backdrop.color = Color(0, 0, 0, 0.90)
+		_bm_club_popup_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+		overlays.add_child(_bm_club_popup_backdrop)
+		_bm_club_popup_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	# Le backdrop doit bloquer le menu, mais rester derrière le popup
+	# dans l'ordre GUI pour que les boutons du popup reçoivent les touchs.
+	if _bm_club_popup_backdrop.get_parent() == overlays and popup_bienvenue_club.get_parent() == overlays:
+		overlays.move_child(_bm_club_popup_backdrop, popup_bienvenue_club.get_index())
+
+	_bm_club_popup_backdrop.z_index = 2999
+	popup_bienvenue_club.z_index = 3000
+
+
+func _bm_set_club_popup_modal_visible(v: bool) -> void:
+	_bm_ensure_club_popup_backdrop()
+	if _bm_club_popup_backdrop != null:
+		_bm_club_popup_backdrop.visible = v
+
+
+func _bm_apply_mobile_club_popup_layout() -> void:
+	if not _bm_menu_is_mobile_layout():
+		return
+	if popup_bienvenue_club == null or lbl_bienvenue_club == null:
+		return
+
+	_bm_ensure_club_popup_backdrop()
+
+	var vp := get_viewport_rect().size
+	var landscape := vp.x > vp.y
+
+	var popup_w: float
+	var popup_h: float
+	var title_size: int
+	var body_size: int
+
+	if landscape:
+		popup_w = minf(vp.x - 120.0, 700.0)
+		popup_h = minf(vp.y - 36.0, 330.0)
+		title_size = 25
+		body_size = 18
+	else:
+		popup_w = minf(vp.x - 28.0, 370.0)
+		popup_h = minf(vp.y - 120.0, 390.0)
+		title_size = 30
+		body_size = 21
+
+	popup_bienvenue_club.custom_minimum_size = Vector2.ZERO
+	popup_bienvenue_club.set_anchors_preset(Control.PRESET_CENTER)
+	popup_bienvenue_club.offset_left = -popup_w * 0.5
+	popup_bienvenue_club.offset_top = -popup_h * 0.5
+	popup_bienvenue_club.offset_right = popup_w * 0.5
+	popup_bienvenue_club.offset_bottom = popup_h * 0.5
+
+	lbl_bienvenue_club.offset_left = 22.0
+	lbl_bienvenue_club.offset_top = 18.0
+	lbl_bienvenue_club.offset_right = -22.0
+	lbl_bienvenue_club.offset_bottom = -88.0
+	lbl_bienvenue_club.position.y = 0.0
+
+	var title := _bm_club_tr_or_fallback("popup_intro_title", "Build Your Roster")
+	var body := _bm_club_tr_or_fallback(
+		"popup_intro_build_body",
+		"Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players."
+	).replace("\\n", "\n")
+
+	body = body.replace("\n", "\n\n")
+
+	lbl_bienvenue_club.text = (
+		"[center][font_size=%d][b]%s[/b][/font_size][/center]\n\n"
+		+ "[font_size=%d][color=#EAF2FF]%s[/color][/font_size]"
+	) % [title_size, title, body_size, body]
+
+	if btn_close_bienvenue_club != null:
+		if landscape:
+			btn_close_bienvenue_club.custom_minimum_size = Vector2(190, 56)
+			btn_close_bienvenue_club.add_theme_font_size_override("font_size", 22)
+			btn_close_bienvenue_club.offset_left = -95.0
+			btn_close_bienvenue_club.offset_top = -62.0
+			btn_close_bienvenue_club.offset_right = 95.0
+			btn_close_bienvenue_club.offset_bottom = -6.0
+		else:
+			btn_close_bienvenue_club.custom_minimum_size = Vector2(230, 64)
+			btn_close_bienvenue_club.add_theme_font_size_override("font_size", 26)
+			btn_close_bienvenue_club.offset_left = -115.0
+			btn_close_bienvenue_club.offset_top = -70.0
+			btn_close_bienvenue_club.offset_right = 115.0
+			btn_close_bienvenue_club.offset_bottom = -6.0
+
+	if img_popup_ball != null:
+		var ball_size := 42.0 if landscape else 48.0
+		img_popup_ball.custom_minimum_size = Vector2(ball_size, ball_size)
+		img_popup_ball.offset_left = -ball_size * 0.5
+		img_popup_ball.offset_right = ball_size * 0.5
+		img_popup_ball.offset_top = -118.0 if landscape else -126.0
+		img_popup_ball.offset_bottom = img_popup_ball.offset_top + ball_size
+
+
 func _bm_menu_play_season_text() -> String:
 	var season_number := 1
 	var save_any: Variant = PL.load_savegame()
@@ -361,12 +473,9 @@ func _bm_apply_mobile_popup_cta_button_size() -> void:
 		return
 	if btn_close_bienvenue_club == null:
 		return
-	btn_close_bienvenue_club.add_theme_font_size_override("font_size", 34)
-	btn_close_bienvenue_club.custom_minimum_size = Vector2(260, 86)
-	btn_close_bienvenue_club.offset_left = -130.0
-	btn_close_bienvenue_club.offset_top = -92.0
-	btn_close_bienvenue_club.offset_right = 130.0
-	btn_close_bienvenue_club.offset_bottom = -6.0
+
+	# Le layout mobile portrait/paysage est la source de vérité.
+	_bm_apply_mobile_club_popup_layout()
 	btn_close_bienvenue_club.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	btn_close_bienvenue_club.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
@@ -385,6 +494,8 @@ func _on_close_bienvenue_club_pressed() -> void:
 	if popup_bienvenue_club != null:
 		popup_bienvenue_club.visible = false
 		popup_bienvenue_club.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if _bm_menu_is_mobile_layout():
+		_bm_set_club_popup_modal_visible(false)
 	_go_selection_from_popup()
 
 func _go_selection_from_popup() -> void:
@@ -829,11 +940,19 @@ func _ready() -> void:
 			var bienvenue_flat := (bienvenue_sb as StyleBoxFlat).duplicate() as StyleBoxFlat
 			bienvenue_flat.bg_color = Color(0, 0, 0, 0.94)
 			popup_bienvenue_club.add_theme_stylebox_override("panel", bienvenue_flat)
-		popup_bienvenue_club.size = Vector2(popup_bienvenue_club.size.x + 90.0, popup_bienvenue_club.size.y * 0.85)
+		if _bm_menu_is_mobile_layout():
+			_bm_apply_mobile_club_popup_layout()
+		else:
+			popup_bienvenue_club.size = Vector2(
+				popup_bienvenue_club.size.x + 90.0,
+				popup_bienvenue_club.size.y * 0.85
+			)
 		var save := PL.load_savegame()
 		var popup_seen := bool(save.get("popup_bienvenue_club_deja_vu", false))
 		popup_bienvenue_club.visible = !popup_seen
 		popup_bienvenue_club.mouse_filter = (Control.MOUSE_FILTER_STOP if popup_bienvenue_club.visible else Control.MOUSE_FILTER_IGNORE)
+		if _bm_menu_is_mobile_layout():
+			_bm_set_club_popup_modal_visible(popup_bienvenue_club.visible)
 		if popup_bienvenue_club.visible:
 			_bm_play_club_popup_intro_anim()
 	if btn_close_bienvenue_club != null and not btn_close_bienvenue_club.pressed.is_connected(_on_close_bienvenue_club_pressed):

@@ -462,23 +462,23 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	btn.text = ""
 	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_bm_style_entry_duplicate_button(btn, true)
-	btn.custom_minimum_size = Vector2(570, 104) if not _bm_is_mobile_layout() else (Vector2(520, 108) if mobile_landscape else Vector2(430, 121))
+	btn.custom_minimum_size = Vector2(570, 104) if not _bm_is_mobile_layout() else (Vector2(500, 72) if mobile_landscape else Vector2(430, 121))
 	if _bm_is_mobile_layout():
 		btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 	var row := HBoxContainer.new()
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	row.offset_left = 8.0 if _bm_is_mobile_layout() else 20.0
-	row.offset_top = 8.0 if _bm_is_mobile_layout() else 10.0
+	row.offset_top = 4.0 if mobile_landscape else (8.0 if _bm_is_mobile_layout() else 10.0)
 	row.offset_right = -8.0 if _bm_is_mobile_layout() else -20.0
-	row.offset_bottom = -12.0 if _bm_is_mobile_layout() else -30.0
+	row.offset_bottom = -4.0 if mobile_landscape else (-12.0 if _bm_is_mobile_layout() else -30.0)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 6 if _bm_is_mobile_layout() else 14)
 	btn.add_child(row)
 
 	var crest := TextureRect.new()
 	crest.name = "CareerCrest"
-	crest.custom_minimum_size = Vector2(54, 54) if not _bm_is_mobile_layout() else (Vector2(52, 52) if mobile_landscape else Vector2(56, 56))
+	crest.custom_minimum_size = Vector2(54, 54) if not _bm_is_mobile_layout() else (Vector2(42, 42) if mobile_landscape else Vector2(56, 56))
 	crest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	crest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	crest.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -503,7 +503,7 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	var name_label := Label.new()
 	name_label.name = "CareerTeamName"
 	name_label.text = _bm_career_team_name(entry)
-	name_label.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else (25 if mobile_landscape else 31))
+	name_label.add_theme_font_size_override("font_size", 24 if not _bm_is_mobile_layout() else (22 if mobile_landscape else 31))
 	name_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if _bm_is_mobile_layout():
@@ -529,7 +529,7 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	summary_label.name = "CareerDivisionSummary"
 	summary_label.set_meta("career_summary_entry", entry)
 	summary_label.text = _bm_career_summary(entry)
-	summary_label.add_theme_font_size_override("font_size", 18 if not _bm_is_mobile_layout() else (18 if mobile_landscape else 24))
+	summary_label.add_theme_font_size_override("font_size", 18 if not _bm_is_mobile_layout() else (16 if mobile_landscape else 24))
 	summary_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.82))
 	summary_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	summary_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -543,7 +543,7 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	var action_btn := Button.new()
 	action_btn.name = "CareerActionButton"
 	action_btn.text = "..."
-	action_btn.custom_minimum_size = (Vector2(46, 54) if mobile_landscape else Vector2(56, 64)) if _bm_is_mobile_layout() else Vector2(38, 54)
+	action_btn.custom_minimum_size = (Vector2(40, 44) if mobile_landscape else Vector2(56, 64)) if _bm_is_mobile_layout() else Vector2(38, 54)
 	action_btn.size_flags_horizontal = Control.SIZE_SHRINK_END
 	action_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	action_btn.focus_mode = Control.FOCUS_NONE
@@ -821,7 +821,7 @@ func _bm_populate_career_picker_box(box: VBoxContainer, careers: Array) -> void:
 	title.name = "YourTeamsTitle"
 	title.text = tr("multi_career.your_teams.title")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 34 if mobile_landscape else 31)
+	title.add_theme_font_size_override("font_size", 26 if mobile_landscape else 31)
 	title.add_theme_color_override("font_color", Color(1.0, 0.86, 0.34, 1.0))
 	box.add_child(title)
 
@@ -835,8 +835,8 @@ func _bm_populate_career_picker_box(box: VBoxContainer, careers: Array) -> void:
 	var create_btn := Button.new()
 	create_btn.name = "YourTeamsCreateNewTeamButton"
 	create_btn.text = tr("multi_career.create_new.button")
-	create_btn.custom_minimum_size = Vector2(420, 68) if mobile_landscape else Vector2(363, 70)
-	create_btn.add_theme_font_size_override("font_size", 24 if mobile_landscape else 24)
+	create_btn.custom_minimum_size = Vector2(360, 46) if mobile_landscape else Vector2(363, 70)
+	create_btn.add_theme_font_size_override("font_size", 18 if mobile_landscape else 24)
 	create_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_bm_style_entry_duplicate_button(create_btn, false)
 	create_btn.pressed.connect(_on_create_new_team_pressed)
@@ -851,34 +851,60 @@ func _bm_apply_career_picker_orientation_layout() -> void:
 	var vp := get_viewport_rect().size
 
 	if _career_picker != null and is_instance_valid(_career_picker):
+		if landscape:
+			_career_picker.offset_top = 38.0
+			_career_picker.offset_bottom = -4.0
+		else:
+			_career_picker.offset_top = 54.0
+			_career_picker.offset_bottom = -8.0
+
 		var center := _career_picker.find_child("YourTeamsMobileCenter", true, false) as Control
 		if center != null:
 			center.custom_minimum_size = Vector2(vp.x, 0) if landscape else Vector2(vp.x, maxf(0.0, vp.y - 62.0))
+			if landscape and center.get_child_count() > 0:
+				var career_box := center.get_child(0) as VBoxContainer
+				if career_box != null:
+					career_box.add_theme_constant_override("separation", 5)
 
 		var title := _career_picker.find_child("YourTeamsTitle", true, false) as Label
 		if title != null:
-			title.add_theme_font_size_override("font_size", 34 if landscape else 31)
+			title.add_theme_font_size_override("font_size", 23 if landscape else 31)
 
 		for node in _career_picker.find_children("CareerCard", "Button", true, false):
 			var card := node as Button
-			card.custom_minimum_size = Vector2(520, 108) if landscape else Vector2(430, 121)
+			card.custom_minimum_size = Vector2(490, 60) if landscape else Vector2(430, 121)
+
+			if landscape:
+				for style_name in ["normal", "hover", "pressed", "focus"]:
+					var current_style := card.get_theme_stylebox(style_name)
+					if current_style is StyleBoxFlat:
+						var compact_style := (current_style as StyleBoxFlat).duplicate() as StyleBoxFlat
+						compact_style.content_margin_top = 5.0
+						compact_style.content_margin_bottom = 5.0
+						card.add_theme_stylebox_override(style_name, compact_style)
+
+				var row := card.get_child(0) as Control if card.get_child_count() > 0 else null
+				if row != null:
+					row.offset_top = 4.0
+					row.offset_bottom = -4.0
+
 			var crest := card.find_child("CareerCrest", true, false) as TextureRect
 			if crest != null:
-				crest.custom_minimum_size = Vector2(52, 52) if landscape else Vector2(56, 56)
+				crest.custom_minimum_size = Vector2(36, 36) if landscape else Vector2(56, 56)
 			var team_name := card.find_child("CareerTeamName", true, false) as Label
 			if team_name != null:
-				team_name.add_theme_font_size_override("font_size", 25 if landscape else 31)
+				team_name.add_theme_font_size_override("font_size", 19 if landscape else 31)
 			var summary := card.find_child("CareerDivisionSummary", true, false) as Label
 			if summary != null:
-				summary.add_theme_font_size_override("font_size", 18 if landscape else 24)
+				summary.add_theme_font_size_override("font_size", 14 if landscape else 24)
 			var action := card.find_child("CareerActionButton", true, false) as Button
 			if action != null:
-				action.custom_minimum_size = Vector2(46, 54) if landscape else Vector2(56, 64)
+				action.custom_minimum_size = Vector2(38, 38) if landscape else Vector2(56, 64)
 
 		var create_btn := _career_picker.find_child("YourTeamsCreateNewTeamButton", true, false) as Button
 		if create_btn != null:
-			create_btn.custom_minimum_size = Vector2(420, 68) if landscape else Vector2(363, 70)
-			create_btn.add_theme_font_size_override("font_size", 24)
+			create_btn.custom_minimum_size = Vector2(340, 40) if landscape else Vector2(363, 70)
+			create_btn.add_theme_font_size_override("font_size", 17 if landscape else 24)
 
 		if landscape and _career_picker is ScrollContainer:
 			(_career_picker as ScrollContainer).scroll_vertical = 0
@@ -1049,9 +1075,9 @@ func _bm_ensure_keyboard_dismiss_button() -> void:
 		return
 	_mobile_keyboard_dismiss_btn = Button.new()
 	_mobile_keyboard_dismiss_btn.name = "MobileKeyboardDismiss"
-	_mobile_keyboard_dismiss_btn.text = "⌄"
-	_mobile_keyboard_dismiss_btn.custom_minimum_size = Vector2(58, 44)
-	_mobile_keyboard_dismiss_btn.add_theme_font_size_override("font_size", 30)
+	_mobile_keyboard_dismiss_btn.text = "Close"
+	_mobile_keyboard_dismiss_btn.custom_minimum_size = Vector2(82, 44)
+	_mobile_keyboard_dismiss_btn.add_theme_font_size_override("font_size", 16)
 	_mobile_keyboard_dismiss_btn.focus_mode = Control.FOCUS_NONE
 	_mobile_keyboard_dismiss_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_mobile_keyboard_dismiss_btn.z_index = 300
@@ -1513,7 +1539,8 @@ func _bm_show_league_choice(team_name: String) -> void:
 	_league_card_panel = PanelContainer.new()
 	var league_choice_window := DisplayServer.window_get_size()
 	var league_choice_portrait := _bm_is_mobile_layout() and league_choice_window.y > league_choice_window.x
-	_league_card_panel.custom_minimum_size = Vector2(654, 764) if league_choice_portrait else (Vector2(363, 424) if _bm_is_mobile_layout() else Vector2(871, 629))
+	var league_choice_landscape := _bm_is_mobile_layout() and not league_choice_portrait
+	_league_card_panel.custom_minimum_size = Vector2(654, 764) if league_choice_portrait else (Vector2(340, 330) if league_choice_landscape else Vector2(871, 629))
 	_league_card_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_league_card_panel.gui_input.connect(_bm_on_league_card_gui_input)
 	_league_card_panel.add_theme_stylebox_override("panel", _bm_league_card_style(false))
@@ -1523,13 +1550,13 @@ func _bm_show_league_choice(team_name: String) -> void:
 	card_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	card_box.mouse_filter = Control.MOUSE_FILTER_STOP
 	card_box.gui_input.connect(_bm_on_league_card_gui_input)
-	card_box.add_theme_constant_override("separation", 12)
+	card_box.add_theme_constant_override("separation", 8 if league_choice_landscape else 12)
 	_league_card_panel.add_child(card_box)
 
 	var title := Label.new()
 	title.text = "Choose Your League"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 42)
+	title.add_theme_font_size_override("font_size", 30 if league_choice_landscape else 42)
 	title.add_theme_color_override("font_color", Color(1.0, 0.86, 0.34, 1.0))
 	title.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.95))
 	title.add_theme_constant_override("outline_size", 5)
@@ -1539,8 +1566,8 @@ func _bm_show_league_choice(team_name: String) -> void:
 	title.add_theme_constant_override("shadow_outline_size", 10)
 	card_box.add_child(title)
 
-	var image_size := Vector2(588, 479) if league_choice_portrait else (Vector2(327, 266) if _bm_is_mobile_layout() else Vector2(811, 508))
-	var frame_size := Vector2(309, 479) if league_choice_portrait else (Vector2(172, 266) if _bm_is_mobile_layout() else Vector2(427, 508))
+	var image_size := Vector2(588, 479) if league_choice_portrait else (Vector2(300, 215) if league_choice_landscape else Vector2(811, 508))
+	var frame_size := Vector2(309, 479) if league_choice_portrait else (Vector2(158, 215) if league_choice_landscape else Vector2(427, 508))
 
 	var image_wrap := Control.new()
 	image_wrap.custom_minimum_size = image_size

@@ -127,6 +127,199 @@ var current_sort_key: String = ""
 var current_sort_ascending: bool = true
 
 
+func _selection_apply_mobile_player_rows(landscape: bool) -> void:
+	if box == null:
+		return
+
+	for child in box.get_children():
+		var row := child as Control
+		if row == null:
+			continue
+
+		if landscape:
+			row.custom_minimum_size = Vector2(0, 44)
+		else:
+			row.custom_minimum_size = Vector2(0, 66)
+
+		var avatar_box := row.get_node_or_null("AvatarBox") as Control
+		if avatar_box != null:
+			avatar_box.custom_minimum_size = Vector2(48, 44) if landscape else Vector2(62, 64)
+
+		var avatar := row.get_node_or_null("AvatarBox/Avatar") as TextureRect
+		if avatar != null:
+			avatar.custom_minimum_size = Vector2(38, 38) if landscape else Vector2(48, 48)
+
+		var player_name := row.get_node_or_null("AvatarBox/LabelName") as Label
+		if player_name != null:
+			player_name.visible = not landscape
+			if not landscape:
+				player_name.add_theme_font_size_override("font_size", 14)
+
+		var select_btn := row.get_node_or_null("BtnSelect") as Button
+		if select_btn != null:
+			select_btn.custom_minimum_size = Vector2(72, 42) if landscape else Vector2(82, 54)
+			select_btn.add_theme_font_size_override("font_size", 15 if landscape else 17)
+
+		for node in row.find_children("*", "Label", true, false):
+			var lbl := node as Label
+			if lbl == null or lbl == player_name:
+				continue
+			lbl.add_theme_font_size_override("font_size", 16 if landscape else 18)
+
+
+func _selection_apply_mobile_orientation_layout() -> void:
+	if not _selection_is_mobile_layout():
+		return
+
+	var vp := get_viewport_rect().size
+	var landscape := vp.x > vp.y
+	_selection_apply_mobile_player_rows(landscape)
+
+	# Titre / compteur
+	if lbl_title != null:
+		lbl_title.add_theme_font_size_override("font_size", 24 if landscape else 30)
+		lbl_title.offset_top = 8.0
+		lbl_title.offset_bottom = 40.0
+
+	if lbl_count != null:
+		lbl_count.add_theme_font_size_override("font_size", 22 if landscape else 28)
+		lbl_count.offset_top = 42.0
+		lbl_count.offset_bottom = 74.0
+
+	# Moyennes : compactes et regroupées
+	var avg_labels := [lbl_avg_age, lbl_avg_perf, lbl_avg_salary]
+	for lbl in avg_labels:
+		if lbl == null:
+			continue
+		lbl.add_theme_font_size_override("font_size", 14 if landscape else 18)
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+
+	if landscape:
+		if lbl_avg_age != null:
+			lbl_avg_age.position = Vector2(vp.x - 260.0, 8.0)
+			lbl_avg_age.size = Vector2(240, 20)
+		if lbl_avg_perf != null:
+			lbl_avg_perf.position = Vector2(vp.x - 260.0, 29.0)
+			lbl_avg_perf.size = Vector2(240, 20)
+		if lbl_avg_salary != null:
+			lbl_avg_salary.position = Vector2(vp.x - 260.0, 50.0)
+			lbl_avg_salary.size = Vector2(240, 20)
+	else:
+		if lbl_avg_age != null:
+			lbl_avg_age.position = Vector2(vp.x - 250.0, 78.0)
+			lbl_avg_age.size = Vector2(230, 22)
+		if lbl_avg_perf != null:
+			lbl_avg_perf.position = Vector2(vp.x - 250.0, 101.0)
+			lbl_avg_perf.size = Vector2(230, 22)
+		if lbl_avg_salary != null:
+			lbl_avg_salary.position = Vector2(vp.x - 250.0, 124.0)
+			lbl_avg_salary.size = Vector2(230, 22)
+
+	# Headers
+	var header_row := get_node_or_null("HeaderRow") as Control
+	if header_row != null:
+		header_row.offset_left = 18.0 if landscape else 8.0
+		header_row.offset_right = -4.0 if landscape else -8.0
+		header_row.offset_top = 68.0 if landscape else 150.0
+		header_row.offset_bottom = header_row.offset_top + (34.0 if landscape else 42.0)
+
+	if landscape:
+		var h_avatar := find_child("HeaderAvatar", true, false) as Label
+		if h_avatar != null:
+			h_avatar.custom_minimum_size = Vector2(48, 0)
+			h_avatar.text = ""
+
+		var h_stars := find_child("HeaderStars", true, false) as Control
+		if h_stars != null:
+			h_stars.custom_minimum_size = Vector2(72, 0)
+
+		var h_btn := find_child("HeaderBtn", true, false) as Control
+		if h_btn != null:
+			h_btn.custom_minimum_size = Vector2(72, 0)
+
+	if landscape:
+		var compact_headers := {
+			"HeaderGender": "SHOOT",
+			"HeaderSpeed": "SPD",
+			"HeaderDefense": "DEF",
+			"HeaderPrecision": "ACC",
+			"HeaderMotivation": "MOT.",
+			"HeaderSalary": "SAL."
+		}
+		for header_name in compact_headers.keys():
+			var compact_header := find_child(header_name, true, false) as BaseButton
+			if compact_header != null:
+				compact_header.text = str(compact_headers[header_name])
+
+	if landscape:
+		var header_widths := {
+			"HeaderAvatar": 48.0,
+			"HeaderStars": 58.0,
+			"HeaderBtn": 72.0
+		}
+
+		for header_name in header_widths.keys():
+			var header_ctrl := find_child(header_name, true, false) as Control
+			if header_ctrl != null:
+				header_ctrl.custom_minimum_size.x = float(header_widths[header_name])
+				header_ctrl.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+
+		for header_name in [
+			"HeaderPos", "HeaderAge", "HeaderGender", "HeaderSpeed",
+			"HeaderDefense", "HeaderPrecision", "HeaderMotivation", "HeaderSalary"
+		]:
+			var header_ctrl := find_child(header_name, true, false) as Control
+			if header_ctrl != null:
+				header_ctrl.custom_minimum_size.x = 0.0
+				header_ctrl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	for node_name in [
+		"HeaderAvatar", "HeaderStars", "HeaderPos", "HeaderAge",
+		"HeaderGender", "HeaderSpeed", "HeaderDefense",
+		"HeaderPrecision", "HeaderMotivation", "HeaderSalary"
+	]:
+		var h := find_child(node_name, true, false) as Control
+		if h != null:
+			h.add_theme_font_size_override("font_size", 9 if landscape else 16)
+			if landscape and h is BaseButton:
+				var hb := h as BaseButton
+				var compact_normal := hb.get_theme_stylebox("normal")
+				if compact_normal is StyleBoxFlat:
+					var sb := (compact_normal as StyleBoxFlat).duplicate() as StyleBoxFlat
+					sb.content_margin_left = 5.0
+					sb.content_margin_right = 5.0
+					hb.add_theme_stylebox_override("normal", sb)
+
+					var sb_hover := sb.duplicate() as StyleBoxFlat
+					hb.add_theme_stylebox_override("hover", sb_hover)
+
+					var sb_pressed := sb.duplicate() as StyleBoxFlat
+					hb.add_theme_stylebox_override("pressed", sb_pressed)
+
+	# Zone joueurs
+	if scroll != null:
+		scroll.offset_left = 8.0
+		scroll.offset_right = -8.0
+		scroll.offset_top = 102.0 if landscape else 196.0
+		scroll.offset_bottom = -68.0 if landscape else -82.0
+
+	# Barre basse
+	var bar := get_node_or_null("BottomActionsBar") as HBoxContainer
+	if bar != null:
+		bar.offset_left = 12.0
+		bar.offset_right = -12.0
+		bar.offset_top = -56.0 if landscape else -72.0
+		bar.offset_bottom = -6.0
+
+	if btn_back != null:
+		btn_back.custom_minimum_size = Vector2(112, 42) if landscape else Vector2(132, 50)
+		btn_back.add_theme_font_size_override("font_size", 18 if landscape else 20)
+
+	if btn_val != null:
+		btn_val.custom_minimum_size = Vector2(220, 46) if landscape else Vector2(250, 58)
+		btn_val.add_theme_font_size_override("font_size", 20 if landscape else 24)
+
+
 func _selection_is_mobile_layout() -> bool:
 	var vp: Vector2 = get_viewport_rect().size
 	var win: Vector2i = DisplayServer.window_get_size()
@@ -241,6 +434,7 @@ func _ready() -> void:
 	_ensure_bottom_actions_bar()
 	_update_selection_top_stats()
 
+	call_deferred("_selection_apply_mobile_orientation_layout")
 	_print_node_map()
 
 	# --- anti-block: décor ignore souris
@@ -905,16 +1099,19 @@ func _sort_players_in_place(players: Array, sort_key: String, ascending: bool) -
 	)
 
 func _update_sort_header_titles() -> void:
+	var vp := get_viewport_rect().size
+	var compact_landscape := _selection_is_mobile_layout() and vp.x > vp.y
+
 	var labels := {
 		"HeaderStars": "RANK",
 		"HeaderPos": "POS.",
 		"HeaderAge": "AGE",
-		"HeaderGender": tr("player.attr.tir"),
-		"HeaderSpeed": "SPEED",
-		"HeaderDefense": "DEFENSE",
-		"HeaderPrecision": "ACCURACY",
-		"HeaderMotivation": tr("selection.header.motivation"),
-		"HeaderSalary": "SALARY",
+		"HeaderGender": "SHOT" if compact_landscape else tr("player.attr.tir"),
+		"HeaderSpeed": "SPD" if compact_landscape else "SPEED",
+		"HeaderDefense": "DEF" if compact_landscape else "DEFENSE",
+		"HeaderPrecision": "ACC" if compact_landscape else "ACCURACY",
+		"HeaderMotivation": "MOT." if compact_landscape else tr("selection.header.motivation"),
+		"HeaderSalary": "SAL." if compact_landscape else "SALARY",
 	}
 	for node_name in labels.keys():
 		var b := get_node_or_null(node_name) as BaseButton
@@ -1001,6 +1198,7 @@ func _build_list(players: Array) -> void:
 	_refresh_quota_ui()
 	_update_selection_top_stats()
 	_bm_refresh_selection_crest_popup()
+	call_deferred("_selection_apply_mobile_orientation_layout")
 
 
 func _on_row_toggled(pid: int) -> void:
@@ -1379,7 +1577,10 @@ func _bm_show_player_card_popup(data: Dictionary) -> void:
 
 	var btn_close := Button.new()
 	btn_close.text = "X"
-	btn_close.position = Vector2(card_w - 52.0, 14.0)
+	if _selection_is_mobile_layout():
+		btn_close.position = Vector2(card_w - 78.0, 30.0)
+	else:
+		btn_close.position = Vector2(card_w - 52.0, 14.0)
 	btn_close.size = Vector2(36, 36)
 	btn_close.add_theme_font_size_override("font_size", 18)
 	btn_close.pressed.connect(_bm_player_card_close)
@@ -2226,6 +2427,8 @@ func _on_scroll_gui_input(event: InputEvent) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSLATION_CHANGED:
 		_apply_i18n()
+	elif what == NOTIFICATION_RESIZED and _selection_is_mobile_layout():
+		call_deferred("_selection_apply_mobile_orientation_layout")
 
 
 # ------------------------------------------------------------
@@ -2396,5 +2599,4 @@ func _bm_mobile_confirm_selection_plus15_textplus4() -> void:
 		return
 	if btn_val == null:
 		return
-	btn_val.custom_minimum_size = Vector2(299, 71)
-	btn_val.add_theme_font_size_override("font_size", 28)
+	call_deferred("_selection_apply_mobile_orientation_layout")

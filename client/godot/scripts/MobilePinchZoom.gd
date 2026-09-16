@@ -1,91 +1,155 @@
 extends Node
 
 const MIN_ZOOM := 1.0
-const MAX_ZOOM := 1.45
-const ZOOM_SPEED := 0.002
+const MAX_ZOOM := 2.0
 
-var _touch_points := {}
-var _pressed_touches := {}
-var _last_distance: float = 0.0
-var _current_target: Control = null
+var _touches: Dictionary = {}
+var _last_distance := 0.0
+var _last_center := Vector2.ZERO
+
+var _zoom := 1.0
+var _pan := Vector2.ZERO
+var _last_viewport_size := Vector2.ZERO
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_last_viewport_size = get_viewport().get_visible_rect().size
+	_apply_transform()
 
 
-func _bm_is_mobile_layout() -> bool:
-	var vp := get_viewport().get_visible_rect().size
-	var win := DisplayServer.window_get_size()
-	if OS.has_feature("android") or OS.has_feature("ios") or minf(vp.x, float(win.x)) < 900.0:
-		return true
-	if OS.has_feature("web"):
-		var js_mobile: Variant = JavaScriptBridge.eval("(window.innerWidth < 900) || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)", true)
-		return bool(js_mobile)
-	return false
+func _ios_enabled() -> bool:
+	return OS.has_feature("ios")
+
+
+func _process(_delta: float) -> void:
+	if not _ios_enabled():
+		return
+
+	var vp_size := get_viewport().get_visible_rect().size
+
+	if vp_size != _last_viewport_size:
+		_last_viewport_size = vp_size
+		_reset_zoom()
 
 
 func _input(event: InputEvent) -> void:
-	if not _bm_is_mobile_layout():
+	if not _ios_enabled():
 		return
 
 	if event is InputEventScreenTouch:
 		var touch := event as InputEventScreenTouch
+
 		if touch.pressed:
-			_pressed_touches[touch.index] = true
-			_touch_points[touch.index] = touch.position
+			_touches[touch.index] = touch.position
 		else:
-			_pressed_touches.erase(touch.index)
-			_touch_points.erase(touch.index)
-			_last_distance = 0.0
+			_touches.erase(touch.index)
+
+			if _touches.size() < 2:
+				_last_distance = 0.0
+				_last_center = Vector2.ZERO
+
 		return
 
 	if event is InputEventScreenDrag:
-		if _pressed_touches.size() != 2:
-			_last_distance = 0.0
-			return
 		var drag := event as InputEventScreenDrag
-		if not _pressed_touches.has(drag.index):
+
+		if _touches.has(drag.index):
+			_touches[drag.index] = drag.position
+
+		if _touches.size() == 2:
+			_apply_two_finger_gesture()
+			get_viewport().set_input_as_handled()
 			return
-		_touch_points[drag.index] = drag.position
-		_apply_pinch_zoom()
+
+		# Une fois zoomé : déplacement libre à un doigt.
+		if _touches.size() == 1 and _zoom > MIN_ZOOM + 0.001:
+			_pan += drag.relative
+			_clamp_pan()
+			_apply_transform()
+			get_viewport().set_input_as_handled()
 
 
-func _apply_pinch_zoom() -> void:
-	if _pressed_touches.size() != 2 or _touch_points.size() != 2:
-		_last_distance = 0.0
+func _apply_two_finger_gesture() -> void:
+	if _touches.size() != 2:
 		return
 
-	var target := get_tree().current_scene as Control
-	if target == null:
-		return
+	var keys := _touches.keys()
 
-	if _current_target != target:
-		_reset_target()
-		_current_target = target
+	var p0 := _touches[keys[0]] as Vector2
+	var p1 := _touches[keys[1]] as Vector2
 
-	var points := _touch_points.values()
-	var p0 := points[0] as Vector2
-	var p1 := points[1] as Vector2
 	var distance := p0.distance_to(p1)
+	var center := (p0 + p1) * 0.5
 
 	if _last_distance <= 0.0:
 		_last_distance = distance
+		_last_center = center
 		return
 
-	var delta := distance - _last_distance
+	if distance <= 1.0:
+		return
+
+	var old_zoom := _zoom
+	var ratio := distance / _last_distance
+	var new_zoom := clampf(old_zoom * ratio, MIN_ZOOM, MAX_ZOOM)
+
+	# Conserve sous les doigts le point actuellement pincé.
+	if absf(new_zoom - old_zoom) > 0.0001:
+		var scale_ratio := new_zoom / old_zoom
+		_pan = center - ((center - _pan) * scale_ratio)
+		_zoom = new_zoom
+
+	# Les deux doigts peuvent également déplacer l'écran.
+	_pan += center - _last_center
+
+	if _zoom <= MIN_ZOOM + 0.001:
+		_zoom = MIN_ZOOM
+		_pan = Vector2.ZERO
+	else:
+		_clamp_pan()
+
+	_apply_transform()
+
 	_last_distance = distance
-	if absf(delta) < 2.0:
+	_last_center = center
+
+
+func _apply_transform() -> void:
+	var vp := get_viewport()
+
+	var xform := Transform2D(
+		Vector2(_zoom, 0.0),
+		Vector2(0.0, _zoom),
+		_pan
+	)
+
+	vp.set_canvas_transform(xform)
+
+
+func _clamp_pan() -> void:
+	if _zoom <= MIN_ZOOM:
+		_pan = Vector2.ZERO
 		return
 
-	var next_zoom := clampf(target.scale.x + (delta * ZOOM_SPEED), MIN_ZOOM, MAX_ZOOM)
-	var center := (p0 + p1) * 0.5
-	target.pivot_offset = target.get_global_transform().affine_inverse() * center
-	target.scale = Vector2(next_zoom, next_zoom)
+	var vp_size := get_viewport().get_visible_rect().size
+
+	var scaled_size := vp_size * _zoom
+
+	var min_x := vp_size.x - scaled_size.x
+	var min_y := vp_size.y - scaled_size.y
+
+	_pan.x = clampf(_pan.x, min_x, 0.0)
+	_pan.y = clampf(_pan.y, min_y, 0.0)
 
 
-func _reset_target() -> void:
-	if _current_target != null and is_instance_valid(_current_target):
-		_current_target.scale = Vector2.ONE
-		_current_target.pivot_offset = Vector2.ZERO
-	_current_target = null
+func _reset_zoom() -> void:
+	_touches.clear()
+
+	_last_distance = 0.0
+	_last_center = Vector2.ZERO
+
+	_zoom = MIN_ZOOM
+	_pan = Vector2.ZERO
+
+	_apply_transform()
