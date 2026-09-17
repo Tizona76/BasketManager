@@ -1734,6 +1734,7 @@ func _notification(what: int) -> void:
 		_apply_i18n()
 	elif what == NOTIFICATION_RESIZED:
 		call_deferred("_bm_update_keyboard_dismiss_button")
+		call_deferred("_bm_apply_career_picker_orientation_layout")
 
 
 # BM_ENTRY_TWO_BUTTONS_MODE_V1
