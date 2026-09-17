@@ -133,10 +133,32 @@ func _show_login_explainer_popup() -> void:
 	popup.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
 	add_child(popup)
 
+	# Masquer complètement le formulaire pendant l'explication.
+	# Evite le mélange visuel formulaire + texte explicatif.
+	var explainer_backdrop := ColorRect.new()
+	explainer_backdrop.name = "LoginExplainerBackdrop"
+	explainer_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	explainer_backdrop.color = Color(0, 0, 0, 0.88)
+	explainer_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.add_child(explainer_backdrop)
+
 	var card := Panel.new()
 	card.name = "LoginExplainerCard"
+
+	var vp := get_viewport_rect().size
+	var mobile_landscape := (
+		(OS.has_feature("ios") or OS.has_feature("android") or vp.x < 900.0)
+		and vp.x > vp.y
+	)
+
 	card.size = Vector2(760, 430)
-	card.position = (get_viewport_rect().size - card.size) * 0.5
+	if mobile_landscape:
+		card.size = Vector2(
+			minf(vp.x - 80.0, 660.0),
+			minf(vp.y - 36.0, 340.0)
+		)
+
+	card.position = (vp - card.size) * 0.5
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.clip_contents = true
 	card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
@@ -159,11 +181,17 @@ func _show_login_explainer_popup() -> void:
 	var title := Label.new()
 	title.name = "LoginExplainerTitle"
 	title.text = "Why do we ask for your email?"
-	title.position = Vector2(28, 22)
-	title.size = Vector2(704, 42)
+	if mobile_landscape:
+		title.position = Vector2(24, 14)
+		title.size = Vector2(card.size.x - 48.0, 34)
+		title.add_theme_font_size_override("font_size", 20)
+	else:
+		title.position = Vector2(28, 22)
+		title.size = Vector2(704, 42)
+		title.add_theme_font_size_override("font_size", 26)
+
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 26)
 	title.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	card.add_child(title)
 
@@ -178,10 +206,16 @@ func _show_login_explainer_popup() -> void:
 • A one-time code is sent for secure verification
 
 • Safe, secure and confidential"
-	body.position = Vector2(54, 90)
-	body.size = Vector2(652, 230)
+	if mobile_landscape:
+		body.position = Vector2(42, 58)
+		body.size = Vector2(card.size.x - 84.0, card.size.y - 122.0)
+		body.add_theme_font_size_override("font_size", 16)
+	else:
+		body.position = Vector2(54, 90)
+		body.size = Vector2(652, 230)
+		body.add_theme_font_size_override("font_size", 22)
+
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_theme_font_size_override("font_size", 22)
 	body.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	body.add_theme_constant_override("line_spacing", 5)
 	card.add_child(body)
@@ -189,15 +223,22 @@ func _show_login_explainer_popup() -> void:
 	var ok_btn := Button.new()
 	ok_btn.name = "BtnLoginExplainerOK"
 	ok_btn.text = "OK"
-	ok_btn.position = Vector2(594, 352)
-	ok_btn.size = Vector2(138, 50)
+	if mobile_landscape:
+		ok_btn.size = Vector2(110, 40)
+		ok_btn.position = Vector2(
+			card.size.x - ok_btn.size.x - 24.0,
+			card.size.y - ok_btn.size.y - 18.0
+		)
+	else:
+		ok_btn.position = Vector2(594, 352)
+		ok_btn.size = Vector2(138, 50)
 	var ok_normal := _make_button_style(Color(0.12, 0.68, 0.28, 1.0), Color(0.08, 0.48, 0.20, 1.0))
 	var ok_hover := _make_button_style(Color(0.16, 0.76, 0.34, 1.0), Color(0.10, 0.56, 0.24, 1.0))
 	var ok_pressed := _make_button_style(Color(0.08, 0.54, 0.22, 1.0), Color(0.06, 0.38, 0.16, 1.0))
 	ok_btn.add_theme_stylebox_override("normal", ok_normal)
 	ok_btn.add_theme_stylebox_override("hover", ok_hover)
 	ok_btn.add_theme_stylebox_override("pressed", ok_pressed)
-	ok_btn.add_theme_font_size_override("font_size", 20)
+	ok_btn.add_theme_font_size_override("font_size", 16 if mobile_landscape else 20)
 	ok_btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	ok_btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
 	ok_btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
@@ -271,12 +312,98 @@ func _apply_i18n() -> void:
 	if btn_cancel != null:
 		btn_cancel.text = tr("login.btn.cancel")
 
+func _apply_login_mobile_landscape_fit() -> void:
+	var vp := get_viewport_rect().size
+	var mobile_landscape := (
+		(OS.has_feature("ios") or OS.has_feature("android") or vp.x < 900.0)
+		and vp.x > vp.y
+	)
+
+	if not mobile_landscape:
+		return
+
+	var ui := get_node_or_null("UI") as VBoxContainer
+	if ui == null:
+		return
+
+	# Scroll vertical tactile dédié au Login paysage.
+	var scroll := ScrollContainer.new()
+	scroll.name = "LoginLandscapeScroll"
+	scroll.set_anchors_preset(Control.PRESET_TOP_LEFT)
+
+	var scroll_w := minf(vp.x - 80.0, 430.0)
+	scroll.position = Vector2((vp.x - scroll_w) * 0.5, 10.0)
+	scroll.size = Vector2(scroll_w, vp.y - 20.0)
+
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.scroll_deadzone = 8
+	scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	add_child(scroll)
+
+	# Garder les références existantes intactes, mais déplacer le VBox
+	# dans le ScrollContainer.
+	remove_child(ui)
+	scroll.add_child(ui)
+
+	ui.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	ui.position = Vector2.ZERO
+	ui.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ui.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	ui.custom_minimum_size = Vector2(scroll_w, 0)
+	ui.add_theme_constant_override("separation", 6)
+
+	var title := ui.get_node_or_null("TitleRow/Title") as Button
+	var ball := ui.get_node_or_null("TitleRow/BallLeft") as TextureRect
+	var spacer := ui.get_node_or_null("SpacerAfterTitle") as Control
+
+	if title != null:
+		title.custom_minimum_size = Vector2(0, 36)
+		title.add_theme_font_size_override("font_size", 22)
+
+	if ball != null:
+		ball.custom_minimum_size = Vector2(30, 30)
+
+	if spacer != null:
+		spacer.custom_minimum_size = Vector2(0, 4)
+
+	for lbl in [lbl_step_email, lbl_step_send_code, lbl_step_code, lbl_step_validate]:
+		if lbl != null:
+			lbl.add_theme_font_size_override("font_size", 15)
+			lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			lbl.custom_minimum_size = Vector2(0, 24)
+
+	if lbl_step_send_code != null:
+		lbl_step_send_code.custom_minimum_size = Vector2(0, 42)
+
+	for field in [email, code]:
+		if field != null:
+			field.custom_minimum_size = Vector2(300, 42)
+			field.add_theme_font_size_override("font_size", 15)
+
+	for btn in [btn_send, btn_val]:
+		if btn != null:
+			btn.custom_minimum_size = Vector2(230, 42)
+			btn.add_theme_font_size_override("font_size", 15)
+
+	if btn_cancel != null:
+		btn_cancel.custom_minimum_size = Vector2(180, 38)
+		btn_cancel.add_theme_font_size_override("font_size", 14)
+
+	if status != null:
+		status.custom_minimum_size = Vector2(0, 22)
+		status.add_theme_font_size_override("font_size", 12)
+
+
+
 func _ready() -> void:
 	_apply_login_modern_styles()
 	_apply_login_label_font_sizes()
 	_apply_login_i18n_texts()
 	_play_login_intro()
 	_play_login_ball_float()
+	_apply_login_mobile_landscape_fit()
 	call_deferred("_show_login_explainer_popup")
 	_apply_i18n()
 	print("[LOGIN_READY] script=", get_script().resource_path, " node=", name)
@@ -296,13 +423,10 @@ func _ready() -> void:
 	print("[HTTP] timeout=", http.timeout)
 
 func _on_cancel() -> void:
-	if FileAccess.file_exists("user://save_cloud_signup_return_menu.txt"):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path("user://save_cloud_signup_return_menu.txt"))
-		var tree := get_tree()
-		if tree != null:
-			tree.call_deferred("change_scene_to_file", "res://scenes/Menu.tscn")
-		return
+	# Navigation toujours déléguée à Main.
+	# Main gère lui-même le marqueur Save Cloud et le retour Management.
 	emit_signal("cancel_requested")
+
 
 func _on_send() -> void:
 	# anti double-clic / anti requêtes concurrentes
@@ -430,12 +554,8 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 
 		print("[DBG][SESSION_MARK]", Session.SESSION_MARK)
 
-		if FileAccess.file_exists("user://save_cloud_signup_return_menu.txt"):
-			var tree := get_tree()
-			if tree != null:
-				tree.call_deferred("change_scene_to_file", "res://scenes/Menu.tscn")
-			return
-
+		# Main décide de la destination selon le marqueur Save Cloud.
+		# Ne jamais remplacer Main par Menu.tscn directement.
 		emit_signal("auth_success")
 		return
 

@@ -154,9 +154,10 @@ func _bm_scale_mobile_button(btn: Button) -> void:
 
 
 func _bm_apply_mobile_management_buttons_plus10() -> void:
-	for btn in [BtnSave, BtnMatch, BtnMercato, BtnStadium, BtnFinances, BtnSponsors, BtnMyTeam, BtnCoachs, btn_close_bienvenue_club]:
-		_bm_scale_mobile_button(btn)
-
+	# Legacy mobile Management neutralisé.
+	# _bm_apply_mobile_management_adaptive_layout() est désormais
+	# l’unique source de vérité du layout mobile.
+	return
 
 func _ensure_save_hover_tooltip() -> void:
 	if _save_hover_tooltip != null and is_instance_valid(_save_hover_tooltip):
@@ -793,6 +794,7 @@ func _ready() -> void:
 		_bind_ranking_hover_tooltip()
 
 	_ensure_music_toggle_button()
+	_bm_ensure_management_back_button()
 	call_deferred("_bm_menu_apply_mobile_top_left_buttons_plus15_text_plus2")
 	call_deferred("_bm_menu_apply_mobile_top_left_buttons_extra_plus10_text_plus2")
 
@@ -1049,7 +1051,13 @@ func _ready() -> void:
 	call_deferred("_bm_apply_stadium_unlock_from_save")
 	call_deferred("_bm_apply_finances_unlock_from_save")
 	call_deferred("_bm_refresh_coachs_button_visibility")
+	call_deferred("_bm_restore_management_mobile_layout")
+	call_deferred("_hide_menu_debug_texts")
 	call_deferred("_bm_maybe_show_staff_intro_popup")
+
+	var management_viewport := get_viewport()
+	if not management_viewport.size_changed.is_connected(_bm_on_management_mobile_viewport_changed):
+		management_viewport.size_changed.connect(_bm_on_management_mobile_viewport_changed)
 	_try_cloud_load()
 
 
@@ -2210,6 +2218,9 @@ func _bm_update_club_crest_header_menu(save: Dictionary) -> void:
 
 	icon.position = Vector2(x, y)
 
+	if _bm_menu_is_mobile_layout():
+		call_deferred("_bm_restore_management_mobile_layout")
+
 
 
 func _bm_refresh_division_label(save: Dictionary) -> void:
@@ -2267,6 +2278,9 @@ func _bm_refresh_division_label(save: Dictionary) -> void:
 	style.content_margin_top = 3.0
 	style.content_margin_bottom = 3.0
 	label.add_theme_stylebox_override("normal", style)
+
+	if _bm_menu_is_mobile_layout():
+		call_deferred("_bm_restore_management_mobile_layout")
 
 
 func _update_club_name_label_from_save() -> void:
@@ -2349,9 +2363,10 @@ func _update_club_name_label_from_save() -> void:
 				losses = int(club_row.get("L", 0))
 
 	if LblProgress != null:
-		var s := tr("menu.day_progress")
-		s = s.replace("{j}", str(journee)).replace("{w}", str(wins)).replace("{l}", str(losses))
-		LblProgress.text = s
+		# Ancien Day / W-L retiré de l'interface sur toutes plateformes.
+		LblProgress.text = ""
+		LblProgress.visible = false
+		LblProgress.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	# --- Title (optionnel)
 	if Title != null:
@@ -2375,8 +2390,68 @@ func _on_btn_shop_tokens_debug() -> void:
 		print("[SHOP][DEBUG] ShopTokens.tscn not created yet")
 
 
+func _bm_ensure_management_back_button() -> void:
+	if BtnBack == null:
+		if BtnTabWinrates == null:
+			return
+
+		var parent_ctrl := BtnTabWinrates.get_parent()
+		if parent_ctrl == null:
+			return
+
+		BtnBack = Button.new()
+		BtnBack.name = "BtnBack"
+		BtnBack.focus_mode = Control.FOCUS_NONE
+		BtnBack.mouse_filter = Control.MOUSE_FILTER_STOP
+		parent_ctrl.add_child(BtnBack)
+
+	# Toujours appliquer le style Back rouge,
+	# que le bouton vienne de Menu.tscn ou soit créé dynamiquement.
+	var back_normal := StyleBoxFlat.new()
+	back_normal.bg_color = Color(0.78, 0.10, 0.16, 1.0)
+	back_normal.set_corner_radius_all(14)
+	back_normal.set_border_width_all(2)
+	back_normal.border_color = Color(1, 1, 1, 0.14)
+	back_normal.shadow_color = Color(0, 0, 0, 0.55)
+	back_normal.shadow_size = 10
+	back_normal.shadow_offset = Vector2(0, 5)
+
+	var back_hover := back_normal.duplicate() as StyleBoxFlat
+	back_hover.bg_color = Color(0.90, 0.18, 0.22, 1.0)
+
+	var back_pressed := back_normal.duplicate() as StyleBoxFlat
+	back_pressed.bg_color = Color(0.56, 0.07, 0.11, 1.0)
+	back_pressed.shadow_size = 5
+	back_pressed.shadow_offset = Vector2(0, 3)
+
+	BtnBack.add_theme_stylebox_override("normal", back_normal)
+	BtnBack.add_theme_stylebox_override("hover", back_hover)
+	BtnBack.add_theme_stylebox_override("pressed", back_pressed)
+	BtnBack.add_theme_color_override("font_color", Color.WHITE)
+	BtnBack.add_theme_color_override("font_hover_color", Color.WHITE)
+	BtnBack.add_theme_color_override("font_pressed_color", Color.WHITE)
+
+	BtnBack.text = tr("menu.back")
+	BtnBack.visible = true
+	BtnBack.disabled = false
+	BtnBack.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	if not BtnBack.pressed.is_connected(_on_btn_back):
+		BtnBack.pressed.connect(_on_btn_back)
+
+
+
 func _on_btn_back() -> void:
-	emit_signal("go_back")
+	# Flux normal : Main reçoit go_back et affiche YOUR TEAMS.
+	var main := get_tree().root.find_child("Main", true, false)
+	if main != null:
+		emit_signal("go_back")
+		return
+
+	# Fallback uniquement si Menu est devenu une scène autonome.
+	var tree := get_tree()
+	if tree != null and ResourceLoader.exists("res://scenes/TeamName.tscn"):
+		tree.call_deferred("change_scene_to_file", "res://scenes/TeamName.tscn")
 
 
 func _on_btn_match() -> void:
@@ -2798,80 +2873,55 @@ func _force_go_saison() -> void:
 	else:
 		push_warning("[MENU] res://scenes/MenuSaison.tscn introuvable")
 func _stack_menu_debug_labels_under_status() -> void:
-	# Empile les labels 'Journée' / 'OV-OD' sous Status pour éviter la superposition
-	var ui: Node = get_node_or_null("UI")
-	if ui == null:
-		return
+	# Legacy debug/progress text supprimé de Management sur toutes plateformes.
+	_hide_menu_debug_texts()
 
-	var base_y: float = 0.0
-	var base_x: float = 0.0
-	if Status != null:
-		base_x = Status.position.x
-		base_y = Status.position.y + 22.0
-	var y: float = base_y
-
-	var targets: Array[Label] = []
-	# Récup descendants (BFS/DFS)
-	var stack: Array[Node] = [ui]
-	while stack.size() > 0:
-		var n: Node = stack.pop_back()
-		for child in n.get_children():
-			var c: Node = child as Node
-			stack.append(c)
-			if c is Label:
-				var Lc: Label = c as Label
-				var txt: String = Lc.text
-				if txt.find("Journée") != -1 or txt.find("OV-OD") != -1:
-					targets.append(Lc)
-
-	# Empile
-	for L in targets:
-		L.z_index = 990
-		L.visible = true
-		L.add_theme_font_size_override("font_size", 14)
-		L.add_theme_color_override("font_color", Color(1, 1, 1, 1))
-		# Place sous Status (sans toucher anchors)
-		L.position = Vector2(base_x, y)
-		y += 18.0
 func _hide_menu_debug_texts() -> void:
-	# Masque textes debug/progression qui polluent le HUD (toutes langues)
-	# Ex: FR 'Journée', EN 'Matchday', ES 'Jornada', IT 'Giornata', PT 'Rodada', + 'OV-OD'
-	var ui: Node = get_node_or_null("UI")
-	if ui == null:
-		return
-	var keys: Array[String] = [
-		"journée",
-		"matchday",
-		"jornada",
-		"giornata",
-		"rodada",
-		"ov-od",
-	]
-	var stack: Array[Node] = [ui]
-	while stack.size() > 0:
-		var n: Node = stack.pop_back()
-		for child in n.get_children():
-			var c: Node = child as Node
-			stack.append(c)
-			if c is Label:
-				var L: Label = c as Label
-				var txt: String = str(L.text).to_lower()
-				if txt == "":
-					continue
-				for k in keys:
-					if txt.find(k) != -1:
-						L.visible = false
-						break
-	# Cache le label top-left du type "Day1 / 0W-0L"
-	for n in get_tree().get_nodes_in_group(""):
-		pass
-	for child in get_tree().root.find_children("*", "Label", true, false):
-		var lbl := child as Label
-		if lbl == null:
+	# Supprime définitivement les anciens textes debug/progression Management :
+	# ex. "Day 2 | 1W-0L", "Journée ...", "OV-OD", etc.
+	var roots: Array[Node] = [self]
+
+	if get_tree() != null and get_tree().root != null:
+		roots.append(get_tree().root)
+
+	for root_node in roots:
+		if root_node == null:
 			continue
-		var t := str(lbl.text).strip_edges()
-		if "Day" in t and "W-" in t:
-			lbl.visible = false
+
+		for child in root_node.find_children("*", "Label", true, false):
+			var lbl := child as Label
+			if lbl == null:
+				continue
+
+			var txt := str(lbl.text).strip_edges()
+			var low := txt.to_lower()
+
+			var is_day_wl := (
+				(
+					low.contains("day")
+					or low.contains("journée")
+					or low.contains("journee")
+					or low.contains("matchday")
+					or low.contains("jornada")
+					or low.contains("giornata")
+					or low.contains("rodada")
+				)
+				and (
+					low.contains("w-")
+					or low.contains("w ")
+					or low.contains("l")
+				)
+			)
+
+			var is_old_debug := (
+				low.contains("ov-od")
+				or low.contains("1w-")
+				or low.contains("0w-")
+			)
+
+			if is_day_wl or is_old_debug:
+				lbl.visible = false
+				lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func _place_money_hud() -> void:
 	# Disabled for now (HUD money will be added later with dedicated background)
@@ -2899,6 +2949,7 @@ var _bm_wr_btn: Button = null
 var _bm_wr_root: Control = null
 var _bm_wr_grid: GridContainer = null
 var _bm_wr_back_btn: Button = null
+var _bm_wr_close_btn: Button = null
 var _bm_wr_dim: ColorRect = null
 var _bm_wr_card: PanelContainer = null
 
@@ -2948,7 +2999,9 @@ func _bm_set_tab(mode: String) -> void:
 	if LblTokens != null:
 		LblTokens.visible = show_club
 	if LblProgress != null:
-		LblProgress.visible = show_club
+		# Ancien Day / W-L supprimé définitivement de Management.
+		LblProgress.visible = false
+		LblProgress.text = ""
 	if Status != null:
 		Status.visible = show_club
 
@@ -2980,6 +3033,9 @@ func _bm_set_tab(mode: String) -> void:
 		BtnBack.visible = show_club
 	if BtnSave != null:
 		BtnSave.visible = show_club
+
+	if show_club and _bm_menu_is_mobile_layout():
+		call_deferred("_bm_restore_management_mobile_layout")
 func _bm_wr_ensure_ui() -> void:
 	if PanelWinrates == null:
 		return
@@ -3310,11 +3366,27 @@ func _show_management_language_popup() -> void:
 	overlay.name = "ManagementLanguagePopup"
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	overlay.z_index = 9000
+	overlay.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
 	add_child(overlay)
 
+	# Management mobile : toujours au-dessus du HUD, blason,
+	# menu gauche et boutons gameplay qui sont eux-mêmes top-level.
+	if _bm_menu_is_mobile_layout():
+		overlay.set_as_top_level(true)
+		overlay.z_as_relative = false
+		overlay.global_position = Vector2.ZERO
+		overlay.size = get_viewport_rect().size
+		overlay.move_to_front()
+
+	var vp := get_viewport_rect().size
+	var mobile := _bm_menu_is_mobile_layout()
+	var landscape := vp.x > vp.y
+
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(420, 120)
+	if mobile:
+		panel.custom_minimum_size = Vector2(300, 92) if landscape else Vector2(332, 100)
+	else:
+		panel.custom_minimum_size = Vector2(420, 120)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.025, 0.03, 0.055, 0.96)
@@ -3327,15 +3399,25 @@ func _show_management_language_popup() -> void:
 	sb.corner_radius_top_right = 10
 	sb.corner_radius_bottom_left = 10
 	sb.corner_radius_bottom_right = 10
-	sb.content_margin_left = 18
-	sb.content_margin_right = 18
-	sb.content_margin_top = 18
-	sb.content_margin_bottom = 18
+	if mobile:
+		var popup_margin := 12.0 if landscape else 14.0
+		sb.content_margin_left = popup_margin
+		sb.content_margin_right = popup_margin
+		sb.content_margin_top = popup_margin
+		sb.content_margin_bottom = popup_margin
+	else:
+		sb.content_margin_left = 18
+		sb.content_margin_right = 18
+		sb.content_margin_top = 18
+		sb.content_margin_bottom = 18
 	panel.add_theme_stylebox_override("panel", sb)
 	overlay.add_child(panel)
 
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 18)
+	row.add_theme_constant_override(
+		"separation",
+		12 if mobile and landscape else (14 if mobile else 18)
+	)
 	panel.add_child(row)
 
 	for item in [
@@ -3348,7 +3430,11 @@ func _show_management_language_popup() -> void:
 		var code := str(item[0])
 		var btn := TextureButton.new()
 		btn.name = "BtnLang" + code.to_upper()
-		btn.custom_minimum_size = Vector2(52, 36)
+		if mobile:
+			btn.ignore_texture_size = true
+			btn.custom_minimum_size = Vector2(34, 24) if landscape else Vector2(38, 26)
+		else:
+			btn.custom_minimum_size = Vector2(52, 36)
 		btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -3359,10 +3445,10 @@ func _show_management_language_popup() -> void:
 		btn.pressed.connect(func() -> void:
 			_bm_management_apply_language(code)
 			overlay.queue_free()
+			call_deferred("_bm_restore_management_mobile_layout")
 		)
 
 	await get_tree().process_frame
-	var vp := get_viewport_rect().size
 	panel.position = (vp - panel.size) * 0.5
 
 
@@ -3459,36 +3545,72 @@ func _bm_wr_ensure_back_button() -> void:
 	if PanelWinrates == null:
 		return
 
-	# create once
+	var vp := get_viewport_rect().size
+	var mobile_landscape := _bm_menu_is_mobile_layout() and vp.x > vp.y
+
+	if mobile_landscape:
+		# Paysage mobile : jamais de bouton Back.
+		if _bm_wr_back_btn != null and is_instance_valid(_bm_wr_back_btn):
+			_bm_wr_back_btn.visible = false
+
+		if _bm_wr_card == null or not is_instance_valid(_bm_wr_card):
+			_bm_wr_ensure_visual_shell()
+
+		if _bm_wr_close_btn == null or not is_instance_valid(_bm_wr_close_btn):
+			_bm_wr_close_btn = Button.new()
+			_bm_wr_close_btn.name = "BtnRankingCloseLandscape"
+			_bm_wr_close_btn.text = "×"
+			_bm_wr_close_btn.focus_mode = Control.FOCUS_NONE
+			_bm_wr_close_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+			_bm_wr_close_btn.set_as_top_level(true)
+			PanelWinrates.add_child(_bm_wr_close_btn)
+
+			var normal := StyleBoxFlat.new()
+			normal.bg_color = Color(0.76, 0.08, 0.13, 0.98)
+			normal.set_corner_radius_all(9)
+
+			var hover := normal.duplicate() as StyleBoxFlat
+			hover.bg_color = Color(0.92, 0.14, 0.18, 1.0)
+
+			var pressed := normal.duplicate() as StyleBoxFlat
+			pressed.bg_color = Color(0.55, 0.05, 0.08, 1.0)
+
+			_bm_wr_close_btn.add_theme_stylebox_override("normal", normal)
+			_bm_wr_close_btn.add_theme_stylebox_override("hover", hover)
+			_bm_wr_close_btn.add_theme_stylebox_override("pressed", pressed)
+			_bm_wr_close_btn.add_theme_color_override("font_color", Color.WHITE)
+			_bm_wr_close_btn.add_theme_font_size_override("font_size", 23)
+
+			_bm_wr_close_btn.pressed.connect(func() -> void:
+				_bm_set_tab("club")
+			)
+
+		_bm_wr_close_btn.visible = true
+		_bm_wr_close_btn.size = Vector2(38, 38)
+		_bm_wr_close_btn.custom_minimum_size = Vector2(38, 38)
+		_bm_wr_close_btn.z_as_relative = false
+		_bm_wr_close_btn.z_index = 1000
+
+		await get_tree().process_frame
+
+		if _bm_wr_card != null and is_instance_valid(_bm_wr_card):
+			_bm_wr_close_btn.global_position = Vector2(
+				_bm_wr_card.global_position.x + _bm_wr_card.size.x - 46.0,
+				_bm_wr_card.global_position.y + 8.0
+			)
+
+		return
+
+	# Portrait + Desktop : comportement Back historique.
+	if _bm_wr_close_btn != null and is_instance_valid(_bm_wr_close_btn):
+		_bm_wr_close_btn.visible = false
+
 	if _bm_wr_back_btn == null or not is_instance_valid(_bm_wr_back_btn):
 		var btn := Button.new()
 		btn.name = "BtnBackRanking"
 		btn.text = tr("menu.back")
 		btn.mouse_filter = Control.MOUSE_FILTER_STOP
 
-		# ✅ Copier EXACTEMENT le style du bouton Retour global (rouge + effet 3D)
-		if BtnBack != null:
-			btn.theme = BtnBack.theme
-			btn.theme_type_variation = BtnBack.theme_type_variation
-			btn.custom_minimum_size = BtnBack.custom_minimum_size
-
-			# Copie des styleboxes (normal/hover/pressed/disabled) => rouge + relief
-			for sb_name in ["normal", "hover", "pressed", "disabled", "focus"]:
-				var sb := BtnBack.get_theme_stylebox(sb_name)
-				if sb != null:
-					btn.add_theme_stylebox_override(sb_name, sb)
-
-			# Copie couleurs/typo si utilisées par le theme
-			for col_name in ["font_color", "font_hover_color", "font_pressed_color", "font_disabled_color"]:
-				var c := BtnBack.get_theme_color(col_name)
-				if c != null:
-					btn.add_theme_color_override(col_name, c)
-
-			var fs := BtnBack.get_theme_font_size("font_size")
-			if fs > 0:
-				btn.add_theme_font_size_override("font_size", fs)
-
-		# BM_RANKING_BACK_RED_STYLE_V1
 		var sbn := StyleBoxFlat.new()
 		sbn.bg_color = Color(0.78, 0.10, 0.16, 1.0)
 		sbn.set_corner_radius_all(18)
@@ -3503,43 +3625,31 @@ func _bm_wr_ensure_back_button() -> void:
 
 		var sbp := sbn.duplicate() as StyleBoxFlat
 		sbp.bg_color = Color(0.56, 0.10, 0.16, 1.0)
-		sbp.shadow_size = 8
-		sbp.shadow_offset = Vector2(0, 4)
 
 		btn.add_theme_stylebox_override("normal", sbn)
 		btn.add_theme_stylebox_override("hover", sbh)
 		btn.add_theme_stylebox_override("pressed", sbp)
-		btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
-		btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
-		btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
+		btn.add_theme_color_override("font_color", Color.WHITE)
 		btn.add_theme_font_size_override("font_size", 22)
 		btn.custom_minimum_size = Vector2(180, 56)
 
-		# ✅ Placement: bas-gauche (comme les autres boutons Retour)
 		btn.anchor_left = 0.03
 		btn.anchor_top = 0.90
 		btn.anchor_right = 0.23
 		btn.anchor_bottom = 0.98
-		btn.offset_left = 0
-		btn.offset_top = 0
-		btn.offset_right = 0
-		btn.offset_bottom = 0
 
-		btn.pressed.connect(func():
+		btn.pressed.connect(func() -> void:
 			_bm_set_tab("club")
 		)
 
 		PanelWinrates.add_child(btn)
 		btn.z_index = 20
-		btn.move_to_front()
 		_bm_wr_back_btn = btn
 	else:
 		_bm_wr_back_btn.text = tr("menu.back")
 
 	_bm_wr_back_btn.visible = true
 	_bm_wr_back_btn.move_to_front()
-
-
 
 func _bm_wr_make_cell(txt: String, is_header: bool) -> Label:
 	var l := Label.new()
@@ -3597,6 +3707,24 @@ func _bm_wr_render_table(rows: Array) -> void:
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
+	var ranking_scroll: ScrollContainer = null
+	if _bm_menu_is_mobile_layout():
+		# Mobile portrait + paysage :
+		# permettre le scroll vertical naturel au doigt.
+		ranking_scroll = ScrollContainer.new()
+		ranking_scroll.name = "RankingScroll"
+		ranking_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ranking_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		ranking_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		ranking_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		ranking_scroll.scroll_deadzone = 8
+		ranking_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+		_bm_wr_root.add_child(ranking_scroll)
+		ranking_scroll.add_child(grid)
+
+		grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+
 	# Headers
 	grid.add_child(_bm_wr_make_cell(tr("ranking.col.rank"), true))
 	grid.add_child(_bm_wr_make_cell(tr("ranking.col.club"), true))
@@ -3621,7 +3749,9 @@ func _bm_wr_render_table(rows: Array) -> void:
 		grid.add_child(_bm_wr_make_cell(titles, false))
 		grid.add_child(_bm_wr_make_cell(level, false))
 
-	_bm_wr_root.add_child(grid)
+	if ranking_scroll == null:
+		# Desktop : comportement historique inchangé.
+		_bm_wr_root.add_child(grid)
 
 
 # BM_RANKING_FETCH_V1 ---------------------------------------------------
@@ -3837,9 +3967,14 @@ func _save_to_cloud_from_choice() -> void:
 		if f != null:
 			f.store_string("1")
 			f.close()
-		var tree := get_tree()
-		if tree != null:
-			tree.call_deferred("change_scene_to_file", "res://scenes/Login.tscn")
+		# IMPORTANT : conserver Main comme propriétaire de la navigation.
+		# Sinon Login devient une scène autonome et Cancel/Auth n'ont plus
+		# de récepteur pour leurs signaux.
+		var main := get_tree().root.find_child("Main", true, false)
+		if main != null and main.has_method("_show_login"):
+			main.call_deferred("_show_login")
+		else:
+			push_error("[MENU][SAVE CLOUD] Main/_show_login introuvable")
 
 
 func _show_save_choice_popup() -> void:
@@ -3852,6 +3987,20 @@ func _show_save_choice_popup() -> void:
 	popup.mouse_filter = Control.MOUSE_FILTER_STOP
 	popup.z_index = 30000
 	add_child(popup)
+
+	# Management mobile paysage uniquement :
+	# le popup Save doit passer devant tous les éléments top-level
+	# (blason, boutons gameplay, HUD, menu gauche, etc.).
+	var save_popup_vp := get_viewport_rect().size
+	var save_popup_landscape := _bm_menu_is_mobile_layout() and save_popup_vp.x > save_popup_vp.y
+
+	if save_popup_landscape:
+		popup.set_as_top_level(true)
+		popup.z_as_relative = false
+		popup.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+		popup.global_position = Vector2.ZERO
+		popup.size = save_popup_vp
+		popup.move_to_front()
 
 	var dark := ColorRect.new()
 	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -3893,6 +4042,8 @@ func _show_save_choice_popup() -> void:
 	btn_local.pressed.connect(func():
 		popup.queue_free()
 		_save_local_only()
+		call_deferred("_bm_restore_management_mobile_layout")
+		call_deferred("_hide_menu_debug_texts")
 	)
 	card.add_child(btn_local)
 
@@ -3916,6 +4067,8 @@ func _show_save_choice_popup() -> void:
 	btn_cancel.add_theme_font_size_override("font_size", 22)
 	btn_cancel.pressed.connect(func():
 		popup.queue_free()
+		call_deferred("_bm_restore_management_mobile_layout")
+		call_deferred("_hide_menu_debug_texts")
 	)
 	card.add_child(btn_cancel)
 
@@ -4212,145 +4365,413 @@ func _bm_menu_is_mobile_layout() -> bool:
 	return false
 
 
-func _bm_menu_apply_mobile_hud_plus15() -> void:
+func _bm_on_management_mobile_viewport_changed() -> void:
+	if _bm_menu_is_mobile_layout():
+		call_deferred("_bm_restore_management_mobile_layout")
+
+
+func _bm_restore_management_mobile_layout() -> void:
 	if not _bm_menu_is_mobile_layout():
 		return
 
-	var hud: Control = get_node_or_null("UI/HudProgressPanel") as Control
-	if hud == null:
-		return
-
-	if not hud.has_meta("bm_mobile_hud_plus15_done"):
-		hud.set_meta("bm_mobile_hud_plus15_done", true)
-		hud.scale = Vector2(1.15, 1.15)
-		hud.custom_minimum_size = hud.custom_minimum_size * 1.15
-
-	if not hud.has_meta("bm_mobile_hud_text_plus2_done"):
-		hud.set_meta("bm_mobile_hud_text_plus2_done", true)
-		for lbl in [LblHudLevel, LblHudXp, LblHudTokens]:
-			if lbl != null:
-				var fs: int = int(lbl.get_theme_font_size("font_size"))
-				if fs > 0:
-					lbl.add_theme_font_size_override("font_size", fs + 2)
-
-	call_deferred("_bm_menu_apply_mobile_landscape_right_side_positions")
-
-
-func _bm_menu_apply_mobile_landscape_right_side_positions() -> void:
-	if not _bm_menu_is_mobile_layout():
-		return
-
+	# Attendre que visibility / queue_free / containers soient stabilisés.
 	await get_tree().process_frame
 
-	var vp: Vector2 = get_viewport_rect().size
-	if vp.x <= vp.y:
+	_bm_apply_mobile_management_adaptive_layout()
+	_hide_menu_debug_texts()
+
+
+func _bm_apply_mobile_management_adaptive_layout() -> void:
+	if not _bm_menu_is_mobile_layout():
 		return
 
-	var margin_right: float = 40.0
+	# Appliquer immédiatement le layout mobile final.
+	# Evite l'affichage transitoire du layout Desktop lors de
+	# Your Teams -> Management.
+	var vp := get_viewport_rect().size
+	var landscape := vp.x > vp.y
 
-	var hud: Control = get_node_or_null("UI/HudProgressPanel") as Control
+	var edge_left := 20.0 if landscape else 18.0
+	var edge_right := 18.0 if landscape else 14.0
+	var edge_top := 10.0
+
+	# =========================================================
+	# 1. MENU UTILITAIRE GAUCHE
+	# =========================================================
+	var utility_buttons: Array[Button] = []
+
+	for b in [BtnSave, BtnTabWinrates, BtnMusicToggle, BtnLanguage, BtnClubTokens]:
+		if b != null and is_instance_valid(b) and b.visible:
+			utility_buttons.append(b)
+
+	var util_size := Vector2(90, 27) if landscape else Vector2(116, 40)
+	var util_font := 13 if landscape else 16
+	var util_gap := 18.0 if landscape else 16.0
+	var util_start_y := 14.0 if landscape else 112.0
+
+	for i in range(utility_buttons.size()):
+		var b := utility_buttons[i]
+
+		b.set_as_top_level(true)
+		b.scale = Vector2.ONE
+		b.custom_minimum_size = util_size
+		b.size = util_size
+		b.global_position = Vector2(
+			edge_left,
+			util_start_y + float(i) * (util_size.y + util_gap)
+		)
+		b.add_theme_font_size_override("font_size", util_font)
+
+	var left_reserved := edge_left + util_size.x + (22.0 if landscape else 14.0)
+
+	# Back : indépendant de la pile, toujours bas-gauche.
+	if BtnBack != null and BtnBack.visible:
+		var back_size := Vector2(90, 32) if landscape else Vector2(116, 40)
+		BtnBack.set_as_top_level(true)
+		BtnBack.scale = Vector2.ONE
+		BtnBack.custom_minimum_size = back_size
+		BtnBack.size = back_size
+		BtnBack.global_position = Vector2(
+			edge_left,
+			vp.y - back_size.y - (14.0 if landscape else 18.0)
+		)
+		BtnBack.add_theme_font_size_override("font_size", 13 if landscape else 16)
+		BtnBack.text = tr("menu.back")
+
+	# =========================================================
+	# 2. HUD HAUT-DROITE
+	# =========================================================
+	var hud := get_node_or_null("UI/HudProgressPanel") as Control
+
+	var hud_size := Vector2(118, 68) if landscape else Vector2(108, 72)
+	var hud_x := vp.x - hud_size.x - edge_right
+
+	if hud != null and hud.visible:
+		hud.set_as_top_level(true)
+		hud.scale = Vector2.ONE
+		hud.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		hud.custom_minimum_size = hud_size
+		hud.size = hud_size
+		hud.global_position = Vector2(hud_x, edge_top)
+
+		var hud_box := hud.get_node_or_null("HudVBox") as VBoxContainer
+		if hud_box != null:
+			hud_box.position = Vector2(9.0, 5.0)
+			hud_box.size = Vector2(hud_size.x - 18.0, hud_size.y - 10.0)
+			hud_box.add_theme_constant_override("separation", 1)
+
+		for lbl in [LblHudLevel, LblHudXp, LblHudTokens]:
+			if lbl != null:
+				lbl.add_theme_font_size_override(
+					"font_size",
+					11 if landscape else 11
+				)
+
+		var tokens_row := hud.get_node_or_null("HudVBox/TokensRow") as HBoxContainer
+		if tokens_row != null:
+			tokens_row.add_theme_constant_override("separation", 3)
+
+		var token_icon := hud.get_node_or_null("HudVBox/TokensRow/ImgToken") as TextureRect
+		if token_icon != null:
+			token_icon.custom_minimum_size = Vector2(12, 12)
+			token_icon.size = Vector2(12, 12)
+
+	# =========================================================
+	# 3. CAPSULE DIVISION
+	# =========================================================
+	var division_label: Label = null
+
 	if hud != null:
-		var hud_w: float = maxf(hud.size.x, hud.custom_minimum_size.x)
-		hud.anchor_left = 1.0
-		hud.anchor_right = 1.0
-		hud.offset_left = -hud_w - margin_right
-		hud.offset_right = -margin_right
-		hud.position.x = vp.x - (hud_w * hud.scale.x) - margin_right
+		division_label = hud.get_node_or_null("LblDivision") as Label
 
-	if BtnSave != null:
-		_bm_apply_play_game_button_style(BtnSave, Vector2(180, 48))
-		if BtnTabWinrates != null:
-			_bm_place_management_top_left_buttons_stack()
+	if division_label != null:
+		var division_size := Vector2(92, 31) if landscape else Vector2(104, 38)
 
+		division_label.set_as_top_level(true)
+		division_label.scale = Vector2.ONE
+		division_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		division_label.custom_minimum_size = division_size
+		division_label.size = division_size
+		division_label.global_position = Vector2(
+			vp.x - division_size.x - edge_right,
+			edge_top + hud_size.y + 8.0
+		)
+
+		division_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		division_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		division_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		division_label.add_theme_font_size_override(
+			"font_size",
+			10 if landscape else 11
+		)
+
+		var div_style := division_label.get_theme_stylebox("normal")
+		if div_style is StyleBoxFlat:
+			var compact_div_style := (div_style as StyleBoxFlat).duplicate() as StyleBoxFlat
+			compact_div_style.content_margin_left = 20.0
+			compact_div_style.content_margin_right = 5.0
+			compact_div_style.content_margin_top = 2.0
+			compact_div_style.content_margin_bottom = 2.0
+			compact_div_style.set_corner_radius_all(7)
+			division_label.add_theme_stylebox_override("normal", compact_div_style)
+
+		var division_icon := division_label.get_node_or_null("DivisionIcon") as Control
+		if division_icon != null:
+			division_icon.scale = Vector2(0.62, 0.62)
+			division_icon.offset_left = 6.0
+			division_icon.offset_top = -6.0
+
+	# =========================================================
+	# 4. ZONE CENTRALE DISPONIBLE
+	# =========================================================
+	var right_reserved := hud_x - 18.0
+	var lane_width := maxf(220.0, right_reserved - left_reserved)
+	var lane_center_x := left_reserved + lane_width * 0.5
+
+	# =========================================================
+	# 5. TITRE + NOM
+	# =========================================================
+	if Title != null:
+		Title.scale = Vector2.ONE
+		Title.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		Title.position = Vector2(left_reserved, 6.0)
+		Title.size = Vector2(lane_width, 36.0)
+		Title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+		if Title.label_settings != null:
+			var title_ls := Title.label_settings.duplicate() as LabelSettings
+			title_ls.font_size = 27 if landscape else 25
+			Title.label_settings = title_ls
+
+	if LblClubName != null:
+		LblClubName.scale = Vector2.ONE
+		LblClubName.set_anchors_preset(Control.PRESET_TOP_LEFT)
+
+		if landscape:
+			var club_name_box_w := minf(170.0, lane_width - 90.0)
+			var inline_crest_w := 38.0
+			var inline_gap := 8.0
+			var group_w := inline_crest_w + inline_gap + club_name_box_w
+			var group_x := lane_center_x - group_w * 0.5
+
+			LblClubName.position = Vector2(group_x + inline_crest_w + inline_gap, 48.0)
+			LblClubName.size = Vector2(club_name_box_w, 28.0)
+			LblClubName.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		else:
+			LblClubName.position = Vector2(left_reserved, 43.0)
+			LblClubName.size = Vector2(lane_width, 26.0)
+			LblClubName.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+		if LblClubName.label_settings != null:
+			var club_ls := LblClubName.label_settings.duplicate() as LabelSettings
+			club_ls.font_size = 18 if landscape else 18
+			LblClubName.label_settings = club_ls
+
+	# =========================================================
+	# 6. BLASON
+	# =========================================================
+	var crest := get_node_or_null("UI/ClubCrestHeaderIcon") as TextureRect
+
+	var crest_bottom := 124.0 if landscape else 130.0
+
+	if crest != null and crest.visible:
+		var crest_size := Vector2(38, 38) if landscape else Vector2(50, 50)
+
+		crest.set_as_top_level(true)
+		crest.scale = Vector2.ONE
+		crest.custom_minimum_size = crest_size
+		crest.size = crest_size
+		crest.pivot_offset = crest_size * 0.5
+
+		if landscape:
+			var club_name_box_w := minf(170.0, lane_width - 90.0)
+			var inline_gap := 8.0
+			var group_w := crest_size.x + inline_gap + club_name_box_w
+			var group_x := lane_center_x - group_w * 0.5
+			crest.global_position = Vector2(group_x, 43.0)
+		else:
+			crest.global_position = Vector2(
+				lane_center_x - crest_size.x * 0.5,
+				78.0
+			)
+
+		crest_bottom = crest.global_position.y + crest_size.y
+
+	# =========================================================
+	# 7. BOUTONS GAMEPLAY VISIBLES
+	# =========================================================
+	var actions: Array[Button] = []
+
+	for b in [
+		BtnMatch,
+		BtnMyTeam,
+		BtnMercato,
+		BtnFinances,
+		BtnSponsors,
+		BtnStadium,
+		BtnCoachs
+	]:
+		if b != null and is_instance_valid(b) and b.visible:
+			actions.append(b)
+
+	# Le nom interne reste BtnMatch, mais son libellé utilisateur
+	# doit toujours rester celui de la saison en cours.
+	if BtnMatch != null:
+		BtnMatch.text = _bm_menu_play_season_text()
+
+	if actions.is_empty():
+		return
+
+	for b in actions:
+		b.set_as_top_level(true)
+		b.scale = Vector2.ONE
+
+	var actions_top := crest_bottom + (30.0 if landscape else 20.0)
+
+	if actions.size() <= 2:
+		# Etat actuel : Play Season + My team, même taille.
+		var button_w := minf(150.0 if landscape else 260.0, lane_width - 14.0)
+		var button_h := 40.0 if landscape else 46.0
+		var row_gap := 14.0 if landscape else 9.0
+
+		for i in range(actions.size()):
+			var b := actions[i]
+
+			b.custom_minimum_size = Vector2(button_w, button_h)
+			b.size = Vector2(button_w, button_h)
+			var button_x := lane_center_x - button_w * 0.5
+
+			# Reprendre en paysage le décalage horizontal Desktop de My Team.
+			if landscape and b == BtnMyTeam:
+				button_x += 90.0
+
+			b.global_position = Vector2(
+				button_x,
+				actions_top + float(i) * (button_h + row_gap)
+			)
+			b.add_theme_font_size_override(
+				"font_size",
+				16 if landscape else 17
+			)
+
+	else:
+		if landscape:
+			# Play Saison reste la référence centrale permanente.
+			var primary_w := 150.0
+			var primary_h := 40.0
+
+			BtnMatch.custom_minimum_size = Vector2(primary_w, primary_h)
+			BtnMatch.size = Vector2(primary_w, primary_h)
+			BtnMatch.global_position = Vector2(
+				lane_center_x - primary_w * 0.5,
+				actions_top
+			)
+			BtnMatch.add_theme_font_size_override("font_size", 16)
+
+			# Tous les autres boutons se construisent par paires
+			# symétriques autour de l'axe de Play Saison.
+			var secondary_w := 126.0
+			var secondary_h := 38.0
+			var pair_shift := 90.0
+			var pair_row_gap := 10.0
+			var secondary_top := actions_top + primary_h + 14.0
+
+			var secondaries: Array[Button] = []
+			for b in actions:
+				if b != BtnMatch:
+					secondaries.append(b)
+
+			for i in range(secondaries.size()):
+				var b := secondaries[i]
+				var row := i / 2
+
+				# Ordre volontaire :
+				# 0 = droite  (My Team)
+				# 1 = gauche  (bouton suivant)
+				# 2 = droite  ligne suivante
+				# 3 = gauche  ligne suivante, etc.
+				var right_side := (i % 2) == 0
+				var center_x := lane_center_x + pair_shift if right_side else lane_center_x - pair_shift
+
+				b.custom_minimum_size = Vector2(secondary_w, secondary_h)
+				b.size = Vector2(secondary_w, secondary_h)
+				b.global_position = Vector2(
+					center_x - secondary_w * 0.5,
+					secondary_top + float(row) * (secondary_h + pair_row_gap)
+				)
+				b.add_theme_font_size_override("font_size", 14)
+
+		else:
+			# Portrait : comportement existant conservé.
+			var col_gap := 10.0
+			var row_gap := 8.0
+			var button_w := minf(
+				180.0,
+				(lane_width - col_gap) * 0.5
+			)
+			var button_h := 42.0
+			var grid_width := button_w * 2.0 + col_gap
+			var grid_left := lane_center_x - grid_width * 0.5
+
+			for i in range(actions.size()):
+				var b := actions[i]
+				var col := i % 2
+				var row := i / 2
+
+				var x := grid_left + float(col) * (button_w + col_gap)
+
+				if i == actions.size() - 1 and actions.size() % 2 == 1:
+					x = lane_center_x - button_w * 0.5
+
+				b.custom_minimum_size = Vector2(button_w, button_h)
+				b.size = Vector2(button_w, button_h)
+				b.global_position = Vector2(
+					x,
+					actions_top + float(row) * (button_h + row_gap)
+				)
+				b.add_theme_font_size_override("font_size", 16)
+
+func _bm_menu_apply_mobile_hud_plus15() -> void:
+	# Legacy mobile Management neutralisé.
+	# _bm_apply_mobile_management_adaptive_layout() est désormais
+	# l’unique source de vérité du layout mobile.
+	return
+
+func _bm_menu_apply_mobile_landscape_right_side_positions() -> void:
+	# Legacy mobile Management neutralisé.
+	# _bm_apply_mobile_management_adaptive_layout() est désormais
+	# l’unique source de vérité du layout mobile.
+	return
 
 func _bm_menu_apply_mobile_save_plus15_text_plus2() -> void:
-	if not _bm_menu_is_mobile_layout():
-		return
-	if BtnSave == null:
-		return
-	if BtnSave.has_meta("bm_mobile_save_plus15_text_plus2_done"):
-		return
-
-	BtnSave.set_meta("bm_mobile_save_plus15_text_plus2_done", true)
-	BtnSave.scale *= 1.15
-
-	var fs: int = int(BtnSave.get_theme_font_size("font_size"))
-	if fs > 0:
-		BtnSave.add_theme_font_size_override("font_size", fs + 2)
-
-	call_deferred("_bm_menu_apply_mobile_landscape_right_side_positions")
-
+	# Legacy mobile Management neutralisé.
+	# _bm_apply_mobile_management_adaptive_layout() est désormais
+	# l’unique source de vérité du layout mobile.
+	return
 
 func _bm_menu_apply_mobile_top_left_buttons_plus15_text_plus2() -> void:
-	if not _bm_menu_is_mobile_layout():
-		return
-
-	for b in [BtnTabWinrates, BtnMusicToggle, BtnLanguage, BtnClubTokens]:
-		if b == null:
-			continue
-		if b.has_meta("bm_mobile_top_left_plus15_text_plus2_done"):
-			continue
-
-		b.set_meta("bm_mobile_top_left_plus15_text_plus2_done", true)
-		b.scale *= 1.15
-
-		var fs: int = int(b.get_theme_font_size("font_size"))
-		if fs > 0:
-			b.add_theme_font_size_override("font_size", fs + 2)
-
+	# Legacy mobile Management neutralisé.
+	# _bm_apply_mobile_management_adaptive_layout() est désormais
+	# l’unique source de vérité du layout mobile.
+	return
 
 func _bm_menu_apply_mobile_hud_width_minus20() -> void:
-	if not _bm_menu_is_mobile_layout():
-		return
-
-	var hud: Control = get_node_or_null("UI/HudProgressPanel") as Control
-	if hud == null:
-		return
-	if hud.has_meta("bm_mobile_hud_width_minus20_done"):
-		return
-
-	hud.set_meta("bm_mobile_hud_width_minus20_done", true)
-
-	var current_size: Vector2 = hud.size
-	if current_size.x <= 0.0:
-		current_size = hud.custom_minimum_size
-
-	var new_w: float = maxf(1.0, current_size.x * 0.72)
-	hud.size = Vector2(new_w, current_size.y)
-	hud.custom_minimum_size = Vector2(maxf(1.0, hud.custom_minimum_size.x * 0.72), hud.custom_minimum_size.y)
-
-	call_deferred("_bm_menu_apply_mobile_landscape_right_side_positions")
-
+	# Legacy Management neutralisé.
+	# Le HUD est désormais entièrement piloté par
+	# _bm_apply_mobile_management_adaptive_layout().
+	return
 
 func _bm_menu_apply_mobile_top_left_buttons_extra_plus10_text_plus2() -> void:
-	if not _bm_menu_is_mobile_layout():
-		return
-
-	for b in [BtnTabWinrates, BtnMusicToggle, BtnLanguage, BtnClubTokens]:
-		if b == null:
-			continue
-		if b.has_meta("bm_mobile_top_left_extra_plus10_text_plus2_done"):
-			continue
-
-		b.set_meta("bm_mobile_top_left_extra_plus10_text_plus2_done", true)
-		b.scale *= 1.10
-
-		var fs: int = int(b.get_theme_font_size("font_size"))
-		if fs > 0:
-			b.add_theme_font_size_override("font_size", fs + 2)
-
+	# Legacy mobile Management neutralisé.
+	# _bm_apply_mobile_management_adaptive_layout() est désormais
+	# l’unique source de vérité du layout mobile.
+	return
 
 func _bm_menu_apply_mobile_management_buttons_text_plus2() -> void:
-	if not _bm_menu_is_mobile_layout():
-		return
-
-	for btn in [BtnMatch, BtnMyTeam, BtnFinances, BtnSponsors, BtnStadium, BtnMercato, BtnCoachs]:
-		if btn == null:
-			continue
-
-		# Mobile only: taille forcée visible, sans toucher à la taille du bouton.
-		btn.add_theme_font_size_override("font_size", 28)
-
+	# Legacy mobile Management neutralisé.
+	# _bm_apply_mobile_management_adaptive_layout() est désormais
+	# l’unique source de vérité du layout mobile.
+	return
 
 func _bm_mobile_start_by_building_text_plus2() -> void:
 	var vp := get_viewport_rect().size

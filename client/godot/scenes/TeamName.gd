@@ -82,6 +82,10 @@ var _selected_league_id: String = LeagueDataScript.get_default_league_id()
 var _league_inline_row: HBoxContainer = null
 var _league_inline_value: Label = null
 var _league_inline_change_btn: Button = null
+
+# iOS : interdit tout écran League fantôme pendant
+# la transition YOUR TEAMS -> Management.
+var _bm_career_navigation_in_progress := false
 var _career_picker: Control = null
 var _create_new_career_dialog: ConfirmationDialog = null
 var _career_action_popup: PopupMenu = null
@@ -558,6 +562,18 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	btn.pressed.connect(func() -> void:
 		if cid == "":
 			return
+
+		# Transition atomique YOUR TEAMS -> Management.
+		# Empêche un événement/deferred résiduel d'ouvrir
+		# ChooseLeagueOverlay pendant que Main change d'écran.
+		_bm_career_navigation_in_progress = true
+		set_process_input(false)
+		set_process_unhandled_input(false)
+
+		if _league_choice_overlay != null and is_instance_valid(_league_choice_overlay):
+			_league_choice_overlay.visible = false
+			_league_choice_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 		emit_signal("career_selected", cid)
 	)
 	return btn
@@ -1108,7 +1124,7 @@ func _bm_update_keyboard_dismiss_button() -> void:
 	if keyboard_h_vp > 40.0:
 		dismiss_y = maxf(18.0, vp.y - keyboard_h_vp - 52.0)
 	_mobile_keyboard_dismiss_btn.position = Vector2(
-		vp.x - 68.0,
+		vp.x - 104.0,
 		dismiss_y
 	)
 	var show_btn := _bm_is_mobile_layout() and landscape and input_team != null and input_team.has_focus()
@@ -1499,6 +1515,8 @@ func _bm_set_teamname_entry_visible_for_league(v: bool) -> void:
 
 
 func _bm_show_league_choice(team_name: String) -> void:
+	if _bm_career_navigation_in_progress:
+		return
 	_pending_league_team_name = team_name
 	_bm_set_teamname_entry_visible_for_league(false)
 	_league_choices = LeagueDataScript.get_league_choices()
@@ -2171,6 +2189,11 @@ func _on_entry_play_instantly_mouse_entered() -> void:
 
 func _ensure_teamname_center_ball() -> void:
 	var ball := get_node_or_null("ImgBallTeamName") as TextureRect
+
+	# iOS : ne jamais afficher le ballon à sa position par défaut.
+	# Sa position correcte n'est connue qu'après les deux process_frame.
+	if ball != null:
+		ball.visible = false
 	if ball == null:
 		var tex := load("res://assets/images/ballon.png") as Texture2D
 		if tex == null:
@@ -2185,6 +2208,7 @@ func _ensure_teamname_center_ball() -> void:
 		ball.size = Vector2(72, 72)
 		ball.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		ball.z_index = 50
+		ball.visible = false
 		add_child(ball)
 
 	await get_tree().process_frame
@@ -2204,6 +2228,14 @@ func _ensure_teamname_center_ball() -> void:
 		anchor_pos.x + (anchor_size.x - ball.size.x) * 0.5,
 		anchor_pos.y - offset_y
 	)
+
+	# Ne révéler qu'une fois correctement placé.
+	# Si on est déjà en train de quitter YOUR TEAMS, il reste caché.
+	if _bm_career_navigation_in_progress:
+		ball.visible = false
+		return
+
+	ball.visible = true
 
 	if _teamname_ball_tween != null and _teamname_ball_tween.is_valid():
 		_teamname_ball_tween.kill()

@@ -687,18 +687,41 @@ func _show_menu() -> void:
 	_set_bg_visible(false)
 	_clear_screen()
 	_menu_inst = menu_ps.instantiate()
+	# BM_IOS_MENU_NO_FLASH_V1
+	# Ne jamais rendre le layout Menu brut sur mobile/iOS.
+	if _menu_inst != null and _menu_inst is CanvasItem:
+		(_menu_inst as CanvasItem).visible = false
 	# --- ROUTING: Menu signals -> navigation
 	if _menu_inst != null and _menu_inst.has_signal("go_match") and not _menu_inst.go_match.is_connected(_on_menu_go_match):
 		_menu_inst.go_match.connect(_on_menu_go_match)
 	if _menu_inst != null and _menu_inst.has_signal("go_my_team") and not _menu_inst.go_my_team.is_connected(_on_menu_go_my_team):
 		_menu_inst.go_my_team.connect(_on_menu_go_my_team)
+
+	if _menu_inst != null and _menu_inst.has_signal("go_back") and not _menu_inst.go_back.is_connected(_on_menu_go_back):
+		_menu_inst.go_back.connect(_on_menu_go_back)
+
 	screen_root.add_child(_menu_inst)
+
+	# Le node est maintenant ready mais toujours invisible :
+	# appliquer le layout final avant la première frame visible.
+	if _menu_inst != null and _menu_inst.has_method("_bm_apply_mobile_management_adaptive_layout"):
+		_menu_inst.call("_bm_apply_mobile_management_adaptive_layout")
 	
 	
 	I18nSvc.apply_all()
+
+	if _menu_inst != null and _menu_inst is CanvasItem:
+		(_menu_inst as CanvasItem).visible = true
 	if accueil_ps == null:
 		push_error("[MAIN] accueil_ps is null")
 		return
+
+
+func _on_menu_go_back() -> void:
+	# Sortir complètement du callback tactile de Management avant
+	# de détruire/reconstruire l'écran.
+	call_deferred("_show_team_name")
+
 
 func _show_menu_after_selection() -> void:
 	SeasonState.early_flow_post_selection_hide_menu_buttons = true
@@ -794,7 +817,9 @@ func _show_team_name() -> void:
 		print("[TEAMNAME RETURN] auth pending")
 		return
 	_clear_screen()
-	_set_bg_visible(true)
+	# Transition atomique Management -> YOUR TEAMS :
+	# ne jamais exposer BG_LAYER seul entre les deux écrans.
+	_set_bg_visible(false)
 
 
 	_teamname_submitted = false
@@ -809,6 +834,11 @@ func _show_team_name() -> void:
 	print("[BM_GUEST_AUTH_TIMING] event=team_name_displayed time_ms=", Time.get_ticks_msec(), " pending=", _web_guest_auth_pending)
 	print("[TRACE_FLOW] G INSTANTIATE")
 	var t := team_name_ps.instantiate()
+	# BM_TEAMNAME_ATOMIC_REVEAL_V1
+	# TeamName entre dans l'arbre invisible : son _ready construit
+	# YOUR TEAMS avant toute première frame visible.
+	if t is CanvasItem:
+		(t as CanvasItem).visible = false
 	screen_root.add_child(t)
 	_hide_preparing_club_label()
 	print("[TRACE_FLOW] H ADD_CHILD")
@@ -827,6 +857,12 @@ func _show_team_name() -> void:
 		t.connect("career_selected", Callable(self, "_on_teamname_career_selected"))
 	if t.has_signal("action_requested"):
 		t.connect("action_requested", Callable(self, "_on_stadium_action"))
+
+	# TeamName._ready + Career Picker + i18n sont maintenant initialisés.
+	# Révéler fond + YOUR TEAMS dans le même cycle.
+	_set_bg_visible(true)
+	if t is CanvasItem:
+		(t as CanvasItem).visible = true
 
 
 func _on_submit_team_setup(team_name: String, league_id: String) -> void:
@@ -1118,6 +1154,13 @@ func _on_teamname_career_selected(career_id: String) -> void:
 	_pending_create_new_career = false
 	_load_session_local_for_resume()
 	print("[MAIN][CAREER] selected=", cid, " active=", ProfileManager.get_active_career_id())
+	# Ne pas détruire TeamName depuis le callback Button.pressed.
+	# La navigation est faite au prochain cycle idle.
+	call_deferred("_bm_show_menu_after_career_selection")
+
+
+
+func _bm_show_menu_after_career_selection() -> void:
 	_show_menu()
 	if _menu_inst != null and _menu_inst.has_method("_update_club_name_label_from_save"):
 		_menu_inst.call_deferred("_update_club_name_label_from_save")
