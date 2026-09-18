@@ -1,10 +1,5 @@
 extends Node
 
-# BEGIN RUNTIME360 DIAGNOSTICS
-var _bm_debug_360_last_scene := ""
-func _bm_debug_360_zoom(tag: String) -> void:
-	print("[ZOOM360] ms=", Time.get_ticks_msec(), " frame=", Engine.get_process_frames(), " tag=", tag, " zoom=", _zoom, " pan=", _pan, " touch_count=", _touches.size(), " touches=", _touches, " canvas=", get_viewport().get_canvas_transform(), " scene=", get_tree().current_scene)
-# END RUNTIME360 DIAGNOSTICS
 
 const MIN_ZOOM := 1.0
 const MAX_ZOOM := 2.0
@@ -29,11 +24,6 @@ func _ios_enabled() -> bool:
 
 
 func _process(_delta: float) -> void:
-	var debug_scene := str(get_tree().current_scene)
-	if debug_scene != _bm_debug_360_last_scene:
-		_bm_debug_360_last_scene = debug_scene
-		_bm_debug_360_zoom("scene_changed")
-		print("[BACK360] ms=", Time.get_ticks_msec(), " frame=", Engine.get_process_frames(), " current_scene=", get_tree().current_scene, " root_children=", get_tree().root.get_children())
 	if not _ios_enabled():
 		return
 
@@ -45,8 +35,6 @@ func _process(_delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if event is InputEventScreenTouch or event is InputEventScreenDrag:
-		_bm_debug_360_zoom("raw " + str(event))
 	if not _ios_enabled():
 		return
 
@@ -72,7 +60,6 @@ func _input(event: InputEvent) -> void:
 
 		if _touches.size() == 2:
 			_apply_two_finger_gesture()
-			_bm_debug_360_zoom("drag_consumed")
 			get_viewport().set_input_as_handled()
 			return
 
@@ -81,7 +68,6 @@ func _input(event: InputEvent) -> void:
 			_pan += drag.relative
 			_clamp_pan()
 			_apply_transform()
-			_bm_debug_360_zoom("drag_consumed")
 			get_viewport().set_input_as_handled()
 
 
@@ -139,9 +125,7 @@ func _apply_transform() -> void:
 		_pan
 	)
 
-	_bm_debug_360_zoom("before_set_canvas_transform")
 	vp.set_canvas_transform(xform)
-	_bm_debug_360_zoom("after_set_canvas_transform")
 
 
 func _clamp_pan() -> void:
@@ -161,7 +145,6 @@ func _clamp_pan() -> void:
 
 
 func _reset_zoom() -> void:
-	_bm_debug_360_zoom("reset_zoom")
 	_touches.clear()
 
 	_last_distance = 0.0

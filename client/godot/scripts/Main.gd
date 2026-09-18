@@ -1,15 +1,5 @@
 extends Control
 
-# BEGIN RUNTIME360 DIAGNOSTICS
-func _bm_debug_360_main(tag: String) -> void:
-	if not is_inside_tree():
-		return
-	var controls: Array = []
-	for n in [bg_layer, get_node_or_null("UI"), screen_root, _menu_inst]:
-		if is_instance_valid(n) and n is CanvasItem:
-			controls.append({"path": (str(n.get_path()) if n.is_inside_tree() else str(n.name)), "visible": n.visible, "visible_in_tree": n.is_visible_in_tree(), "children": n.get_children()})
-	print("[BACK360] ms=", Time.get_ticks_msec(), " frame=", Engine.get_process_frames(), " id=", get_instance_id(), " tag=", tag, " scene=", get_tree().current_scene, " controls=", controls)
-# END RUNTIME360 DIAGNOSTICS
 
 
 # BM_PLAYERLIFE_PRELOAD_V1 (avoid class_name resolution order)
@@ -301,7 +291,6 @@ func _show_accueil() -> void:
 
 
 func _set_bg_visible(v: bool) -> void:
-	_bm_debug_360_main("set_bg_visible=" + str(v))
 	if bg_layer != null:
 		bg_layer.visible = v
 		if bg_layer is Control:
@@ -712,12 +701,10 @@ func _load_session_local_for_resume() -> void:
 	print("[MAIN][SESSION] loaded resume profile_uuid=", str(Session.profile_uuid), " refresh_len=", str(str(Session.refresh_token).strip_edges().length()))
 
 func _show_menu() -> void:
-	_bm_debug_360_main("_show_menu:before")
 	$UI.visible = false
 	_set_bg_visible(false)
 	_clear_screen()
 	_menu_inst = menu_ps.instantiate()
-	_bm_debug_360_main("menu:after_instantiate")
 	# BM_IOS_MENU_NO_FLASH_V1
 	# Ne jamais rendre le layout Menu brut sur mobile/iOS.
 	if _menu_inst != null and _menu_inst is CanvasItem:
@@ -742,22 +729,16 @@ func _show_menu() -> void:
 	I18nSvc.apply_all()
 
 	if _menu_inst != null and _menu_inst is CanvasItem:
-		_bm_debug_360_main("menu:before_reveal")
 		(_menu_inst as CanvasItem).visible = true
-		_bm_debug_360_main("menu:after_reveal")
 	if accueil_ps == null:
 		push_error("[MAIN] accueil_ps is null")
-		_bm_debug_360_main("_show_menu:return")
 		return
-	_bm_debug_360_main("_show_menu:after")
 
 
 func _on_menu_go_back() -> void:
-	_bm_debug_360_main("_on_menu_go_back:before")
 	# Sortir complètement du callback tactile de Management avant
 	# de détruire/reconstruire l'écran.
 	call_deferred("_show_team_name")
-	_bm_debug_360_main("_on_menu_go_back:after")
 
 
 func _show_menu_after_selection() -> void:
@@ -783,7 +764,6 @@ func _reset_local_savegame() -> void:
 
 
 func _clear_screen() -> void:
-	_bm_debug_360_main("_clear_screen:before")
 
 	if screen_root_parent != null:
 		for c in screen_root_parent.get_children():
@@ -807,7 +787,6 @@ func _clear_screen() -> void:
 				(c3 as CanvasItem).visible = false
 			screen_root.remove_child(c3)
 			c3.queue_free()
-	_bm_debug_360_main("_clear_screen:after")
 
 
 func _show_login() -> void:
@@ -848,14 +827,12 @@ func _on_auth_success() -> void:
 
 
 func _show_team_name() -> void:
-	_bm_debug_360_main("_show_team_name:before")
 	print("[TRACE_FLOW] F SHOW_TEAM_NAME pending=", _web_guest_auth_pending, " requested=", _web_team_name_requested)
 	print("[TEAMNAME ENTRY] pending=", _web_guest_auth_pending, " requested=", _web_team_name_requested)
 	if OS.has_feature("web") and _web_guest_auth_pending:
 		_web_team_name_requested = true
 		print("[BM_GUEST_AUTH_TIMING] event=team_name_blocked time_ms=", Time.get_ticks_msec(), " pending=", _web_guest_auth_pending)
 		print("[TEAMNAME RETURN] auth pending")
-		_bm_debug_360_main("_show_team_name:return")
 		return
 	_clear_screen()
 	# Transition atomique Management -> YOUR TEAMS :
@@ -870,7 +847,6 @@ func _show_team_name() -> void:
 
 	if team_name_ps == null:
 		push_error("[MAIN] team_name_ps is null (missing in export?)")
-		_bm_debug_360_main("_show_team_name:return")
 		return
 
 	print("[BM_GUEST_AUTH_TIMING] event=team_name_displayed time_ms=", Time.get_ticks_msec(), " pending=", _web_guest_auth_pending)
@@ -897,7 +873,6 @@ func _show_team_name() -> void:
 		t.connect("back_requested", Callable(self, "_goto_stadium"))
 	if t.has_signal("career_selected"):
 		t.connect("career_selected", Callable(self, "_on_teamname_career_selected"))
-		print("[CAREER360] receiver_count=", t.get_signal_connection_list("career_selected").size(), " path=", t.get_path())
 	if t.has_signal("action_requested"):
 		t.connect("action_requested", Callable(self, "_on_stadium_action"))
 
@@ -908,7 +883,6 @@ func _show_team_name() -> void:
 		(t as CanvasItem).visible = true
 	if t.has_method("_bm_force_restore_career_picker_after_back"):
 		t.call_deferred("_bm_force_restore_career_picker_after_back")
-	_bm_debug_360_main("_show_team_name:after")
 
 
 func _on_submit_team_setup(team_name: String, league_id: String) -> void:
@@ -1190,17 +1164,13 @@ func _apply_pending_team_name() -> void:
 
 
 func _on_teamname_career_selected(career_id: String) -> void:
-	print("[CAREER360] ms=", Time.get_ticks_msec(), " frame=", Engine.get_process_frames(), " Main.received cid=", career_id)
 	var cid := str(career_id).strip_edges()
 	if cid == "":
 		push_warning("[MAIN][CAREER] empty career selection ignored")
 		return
 	var active_before := str(ProfileManager.get_active_career_id()).strip_edges()
-	print("[CAREER360] ms=", Time.get_ticks_msec(), " cid=", cid, " active_before=", active_before)
 	if active_before != cid:
-		print("[CAREER360] ms=", Time.get_ticks_msec(), " before ProfileManager.set_active_career_id cid=", cid)
 		if not ProfileManager.set_active_career_id(cid):
-			print("[CAREER360] ms=", Time.get_ticks_msec(), " selection_failed cid=", cid)
 			push_warning("[MAIN][CAREER] invalid career selection ignored: " + cid)
 			return
 	else:
@@ -1210,18 +1180,14 @@ func _on_teamname_career_selected(career_id: String) -> void:
 	print("[MAIN][CAREER] selected=", cid, " active=", ProfileManager.get_active_career_id())
 	# Ne pas détruire TeamName depuis le callback Button.pressed.
 	# La navigation est faite au prochain cycle idle.
-	print("[CAREER360] ms=", Time.get_ticks_msec(), " active_after=", ProfileManager.get_active_career_id(), " deferred=_bm_show_menu_after_career_selection")
 	call_deferred("_bm_show_menu_after_career_selection")
 
 
 
 func _bm_show_menu_after_career_selection() -> void:
-	print("[CAREER360] ms=", Time.get_ticks_msec(), " enter _bm_show_menu_after_career_selection")
-	_bm_debug_360_main("_bm_show_menu_after_career_selection:before")
 	_show_menu()
 	if _menu_inst != null and _menu_inst.has_method("_update_club_name_label_from_save"):
 		_menu_inst.call_deferred("_update_club_name_label_from_save")
-	_bm_debug_360_main("_bm_show_menu_after_career_selection:after")
 
 
 func _create_new_career_from_pending_team_name() -> bool:
@@ -1289,7 +1255,6 @@ func _create_new_career_from_pending_team_name() -> bool:
 
 
 func _show_saison() -> void:
-	_bm_debug_360_main("show_saison:before")
 	var season_scene := load("res://scenes/MenuSaison.tscn") as PackedScene
 	if season_scene == null:
 		push_error("[MAIN] Missing MenuSaison.tscn")
@@ -1303,9 +1268,7 @@ func _show_saison() -> void:
 	screen_root.add_child(season)
 	I18nSvc.apply_all()
 	season.call("_bm_saison_apply_mobile_landscape_deterministic_layout")
-	_bm_debug_360_main("show_saison:before_reveal")
 	season.visible = true
-	_bm_debug_360_main("show_saison:after_reveal")
 
 
 func _on_menu_go_match() -> void:
