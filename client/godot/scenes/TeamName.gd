@@ -1,5 +1,21 @@
 extends Control
 
+# BEGIN RUNTIME360 DIAGNOSTICS (temporary, observation only)
+func _bm_debug_360_control(n: Control) -> Dictionary:
+	if not is_instance_valid(n):
+		return {"valid": false}
+	return {"path": str(n.get_path()), "parent": str(n.get_parent().get_path()), "visible": n.visible, "visible_in_tree": n.is_visible_in_tree(), "position": n.position, "global_position": n.global_position, "size": n.size, "minimum": n.custom_minimum_size, "scale": n.scale, "top_level": n.is_set_as_top_level(), "rect": n.get_global_rect(), "canvas": n.get_canvas_transform(), "screen_center": n.get_global_transform_with_canvas() * (n.size * 0.5), "mouse_filter": n.mouse_filter, "z_index": n.z_index, "disabled": n.disabled if n is BaseButton else null}
+
+func _bm_debug_360_career(tag: String) -> void:
+	if not is_inside_tree():
+		return
+	var zoom := get_node_or_null("/root/MobilePinchZoom")
+	print("[CAREER360] ms=", Time.get_ticks_msec(), " frame=", Engine.get_process_frames(), " id=", get_instance_id(), " tag=", tag, " picker=", _bm_debug_360_control(_career_picker), " career_selected_receivers=", get_signal_connection_list("career_selected"), " navigation=", _bm_career_navigation_in_progress, " input=", is_processing_input(), " unhandled=", is_processing_unhandled_input(), " canvas=", get_viewport().get_canvas_transform(), " gui_hovered=", get_viewport().gui_get_hovered_control())
+	if _career_picker is ScrollContainer:
+		print("[CAREER360] ms=", Time.get_ticks_msec(), " scroll_y=", _career_picker.scroll_vertical, " mode=", _career_picker.vertical_scroll_mode, " deadzone=", _career_picker.scroll_deadzone)
+	if zoom != null:
+		print("[ZOOM360] ms=", Time.get_ticks_msec(), " tag=TeamName:", tag, " canvas=", get_viewport().get_canvas_transform(), " zoom=", zoom.get("_zoom"), " touches=", zoom.get("_touches"))
+
 const PlayerLife := preload("res://scripts/PlayerLife.gd")
 const ProfileManager := preload("res://scripts/ProfileManager.gd")
 const LeagueDataScript := preload("res://scripts/LeagueData.gd")
@@ -87,6 +103,8 @@ var _league_inline_change_btn: Button = null
 # la transition YOUR TEAMS -> Management.
 var _bm_career_navigation_in_progress := false
 var _career_picker: Control = null
+
+
 var _create_new_career_dialog: ConfirmationDialog = null
 var _career_action_popup: PopupMenu = null
 var _delete_career_dialog: ConfirmationDialog = null
@@ -544,6 +562,7 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	text_box.add_child(summary_label)
 
 	var cid := str(entry.get("career_id", "")).strip_edges()
+	btn.set_meta("bm_career_id", cid)
 	var action_btn := Button.new()
 	action_btn.name = "CareerActionButton"
 	action_btn.text = "..."
@@ -559,7 +578,14 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	)
 	row.add_child(action_btn)
 
+	btn.button_down.connect(func(): _bm_debug_360_career("Button.DOWN " + cid))
+	btn.button_up.connect(func(): _bm_debug_360_career("Button.UP " + cid))
+	btn.gui_input.connect(func(event: InputEvent):
+		if event is InputEventScreenTouch or event is InputEventScreenDrag or event is InputEventMouseButton:
+			_bm_debug_360_career("card.gui_input " + cid + " " + str(event))
+	)
 	btn.pressed.connect(func() -> void:
+		_bm_debug_360_career("Button.PRESSED " + cid)
 		if cid == "":
 			return
 
@@ -567,16 +593,125 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 		# Empêche un événement/deferred résiduel d'ouvrir
 		# ChooseLeagueOverlay pendant que Main change d'écran.
 		_bm_career_navigation_in_progress = true
-		set_process_input(false)
-		set_process_unhandled_input(false)
 
 		if _league_choice_overlay != null and is_instance_valid(_league_choice_overlay):
 			_league_choice_overlay.visible = false
 			_league_choice_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+		_bm_debug_360_career("Button.EMIT " + cid)
 		emit_signal("career_selected", cid)
+		call_deferred("_bm_restore_career_picker_input_if_still_here")
 	)
 	return btn
+
+
+func _bm_force_restore_career_picker_after_back() -> void:
+	if _bm_single_play_revealed or not is_instance_valid(_career_picker):
+		return
+	_bm_debug_360_career("_bm_force_restore_career_picker_after_back:before")
+	# BM_IOS_CAREER_RESTORE_AFTER_BACK_V3
+	# YOUR TEAMS doit être seul au premier plan.
+	for _i in range(3):
+		await get_tree().process_frame
+
+	if not is_inside_tree() or is_queued_for_deletion():
+		_bm_debug_360_career("_bm_force_restore_career_picker_after_back:return")
+		return
+
+	_bm_career_navigation_in_progress = false
+	set_process_input(true)
+	set_process_unhandled_input(true)
+
+	# Nettoyage complet d'un éventuel écran League résiduel.
+	if _league_choice_overlay != null and is_instance_valid(_league_choice_overlay):
+		_league_choice_overlay.hide()
+		_league_choice_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_league_choice_overlay.queue_free()
+
+	_league_choice_overlay = null
+	_league_card_panel = null
+	_league_image = null
+	_league_title = null
+
+	# IMPORTANT :
+	# Quand YOUR TEAMS est affiché, les contrôles Entry/Form ne doivent
+	# PAS être réaffichés au-dessus des CareerCards.
+	for node in [
+		get_node_or_null("Center"),
+		menu_entry,
+		lang_bar_entry
+	]:
+		if node == null or not (node is Control):
+			continue
+		var ctrl := node as Control
+		ctrl.visible = false
+		ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Le bouton Change League ne doit jamais intercepter un tap ici.
+	if _league_inline_change_btn != null and is_instance_valid(_league_inline_change_btn):
+		_league_inline_change_btn.visible = false
+		_league_inline_change_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Le picker doit être réellement au-dessus de tous les anciens contrôles.
+	if _career_picker == null or not is_instance_valid(_career_picker):
+		_bm_debug_360_career("_bm_force_restore_career_picker_after_back:return")
+		return
+
+	_career_picker.visible = true
+	_career_picker.z_index = 200
+	_career_picker.mouse_filter = Control.MOUSE_FILTER_PASS
+	_career_picker.move_to_front()
+
+	# Réactivation explicite de chaque carte.
+	for node in _career_picker.find_children("CareerCard", "Button", true, false):
+		var card := node as Button
+		if card == null:
+			continue
+
+		card.disabled = false
+		card.visible = true
+		card.mouse_filter = Control.MOUSE_FILTER_STOP
+
+		var action := card.find_child(
+			"CareerActionButton",
+			true,
+			false
+		) as Button
+
+		if action != null:
+			action.disabled = false
+			action.mouse_filter = Control.MOUSE_FILTER_STOP
+
+
+	print(
+		"[IOS_CAREER_RESTORE_V3] cards=",
+		_career_picker.find_children("CareerCard", "Button", true, false).size(),
+		" picker_z=", _career_picker.z_index,
+		" picker_filter=", _career_picker.mouse_filter
+	)
+	_bm_debug_360_career("_bm_force_restore_career_picker_after_back:after")
+
+
+func _bm_restore_career_picker_input_if_still_here() -> void:
+	_bm_debug_360_career("_bm_restore_career_picker_input_if_still_here:before")
+	# Si Main a navigué, ce node sera supprimé.
+	# Sinon on évite que YOUR TEAMS reste bloqué après un clic.
+	if not is_inside_tree():
+		_bm_debug_360_career("_bm_restore_career_picker_input_if_still_here:return")
+		return
+	_bm_career_navigation_in_progress = false
+	set_process_input(true)
+	set_process_unhandled_input(true)
+
+	if _career_picker != null and is_instance_valid(_career_picker):
+		_career_picker.mouse_filter = Control.MOUSE_FILTER_PASS
+
+	for node in find_children("CareerCard", "Button", true, false):
+		var card := node as Button
+		if card != null:
+			card.disabled = false
+			card.mouse_filter = Control.MOUSE_FILTER_STOP
+	_bm_debug_360_career("_bm_restore_career_picker_input_if_still_here:after")
 
 
 func _bm_ensure_career_action_popup() -> void:
@@ -758,9 +893,11 @@ func _bm_show_create_new_career_confirm() -> void:
 
 
 func _bm_build_career_picker() -> void:
+	_bm_debug_360_career("_bm_build_career_picker:before")
 	_bm_clear_career_picker()
 	var careers := _bm_list_unique_careers()
 	if careers.is_empty():
+		_bm_debug_360_career("_bm_build_career_picker:return")
 		return
 	if _bm_is_mobile_layout():
 		var scroll := ScrollContainer.new()
@@ -769,7 +906,14 @@ func _bm_build_career_picker() -> void:
 		scroll.offset_top = 54.0
 		scroll.offset_bottom = -8.0
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		# BM_IOS_CAREER_LANDSCAPE_NO_SCROLL_CAPTURE_V1
+		var _bm_picker_win := DisplayServer.window_get_size()
+		var _bm_picker_landscape := _bm_picker_win.x > _bm_picker_win.y
+		scroll.vertical_scroll_mode = (
+			ScrollContainer.SCROLL_MODE_DISABLED
+			if _bm_picker_landscape
+			else ScrollContainer.SCROLL_MODE_AUTO
+		)
 		scroll.mouse_filter = Control.MOUSE_FILTER_STOP
 		_career_picker = scroll
 		add_child(_career_picker)
@@ -777,6 +921,8 @@ func _bm_build_career_picker() -> void:
 		var mobile_center := CenterContainer.new()
 		mobile_center.name = "YourTeamsMobileCenter"
 		scroll.add_child(mobile_center)
+		scroll.scroll_started.connect(func(): _bm_debug_360_career("ScrollContainer.scroll_started"))
+		scroll.scroll_ended.connect(func(): _bm_debug_360_career("ScrollContainer.scroll_ended"))
 		scroll.resized.connect(_bm_apply_career_picker_orientation_layout)
 
 		var box := VBoxContainer.new()
@@ -788,6 +934,7 @@ func _bm_build_career_picker() -> void:
 		_bm_apply_career_picker_orientation_layout()
 		move_child(_career_picker, get_child_count() - 1)
 		call_deferred("_ensure_teamname_center_ball")
+		_bm_debug_360_career("_bm_build_career_picker:return")
 		return
 
 	_career_picker = CenterContainer.new()
@@ -828,6 +975,7 @@ func _bm_build_career_picker() -> void:
 	box.add_child(create_btn)
 	move_child(_career_picker, get_child_count() - 1)
 	call_deferred("_ensure_teamname_center_ball")
+	_bm_debug_360_career("_bm_build_career_picker:after")
 
 
 func _bm_populate_career_picker_box(box: VBoxContainer, careers: Array) -> void:
@@ -864,6 +1012,17 @@ func _bm_apply_career_picker_orientation_layout() -> void:
 		return
 	var win := DisplayServer.window_get_size()
 	var landscape := win.x > win.y
+
+	# BM_IOS_CAREER_LANDSCAPE_NO_SCROLL_CAPTURE_V1
+	if _career_picker is ScrollContainer:
+		var _bm_scroll := _career_picker as ScrollContainer
+		_bm_scroll.vertical_scroll_mode = (
+			ScrollContainer.SCROLL_MODE_DISABLED
+			if landscape
+			else ScrollContainer.SCROLL_MODE_AUTO
+		)
+		if landscape:
+			_bm_scroll.scroll_vertical = 0
 	var vp := get_viewport_rect().size
 
 	if _career_picker != null and is_instance_valid(_career_picker):
@@ -950,7 +1109,9 @@ func _bm_is_mobile_layout() -> bool:
 
 
 func _bm_apply_mobile_layout() -> void:
+	_bm_debug_360_career("_bm_apply_mobile_layout:before")
 	if not _bm_is_mobile_layout():
+		_bm_debug_360_career("_bm_apply_mobile_layout:return")
 		return
 
 	if input_team != null:
@@ -980,6 +1141,7 @@ func _bm_apply_mobile_layout() -> void:
 	if btn_play_instantly_entry != null:
 		btn_play_instantly_entry.custom_minimum_size = Vector2(413, 85)
 		btn_play_instantly_entry.add_theme_font_size_override("font_size", 33)
+	_bm_debug_360_career("_bm_apply_mobile_layout:after")
 
 
 func _bm_style_teamname_input_focus() -> void:
@@ -1515,7 +1677,7 @@ func _bm_set_teamname_entry_visible_for_league(v: bool) -> void:
 
 
 func _bm_show_league_choice(team_name: String) -> void:
-	if _bm_career_navigation_in_progress:
+	if _bm_career_navigation_in_progress or not _bm_single_play_revealed:
 		return
 	_pending_league_team_name = team_name
 	_bm_set_teamname_entry_visible_for_league(false)
@@ -1700,14 +1862,16 @@ func _ready() -> void:
 		_bm_build_career_picker()
 	else:
 		_bm_set_teamname_form_visible(true)
-
+	_bm_debug_360_career("ready:end")
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		_bm_debug_360_career("raw_input " + str(event))
 	if not _bm_is_mobile_layout():
 		return
 	if _league_inline_change_btn == null or not is_instance_valid(_league_inline_change_btn):
 		return
-	if not _league_inline_change_btn.visible:
+	if not _league_inline_change_btn.is_visible_in_tree():
 		return
 
 	var win := DisplayServer.window_get_size()
@@ -1733,6 +1897,7 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSLATION_CHANGED:
 		_apply_i18n()
 	elif what == NOTIFICATION_RESIZED:
+		_bm_debug_360_career("NOTIFICATION_RESIZED")
 		call_deferred("_bm_update_keyboard_dismiss_button")
 		call_deferred("_bm_apply_career_picker_orientation_layout")
 
@@ -2346,8 +2511,17 @@ func _bm_teamname_input_tap_focus(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 
 func _focus_input() -> void:
+	_bm_debug_360_career("_focus_input:before")
+	# BM_IOS_CAREER_NO_HIDDEN_INPUT_REACTIVATION_V1
+	# _focus_input est lancé en deferred depuis _ready.
+	# Si YOUR TEAMS a été construit entre-temps, il ne doit rien réactiver.
+	if _career_picker != null and is_instance_valid(_career_picker):
+		if _career_picker.is_visible_in_tree():
+			_bm_debug_360_career("_focus_input:return")
+			return
 	if input_team == null:
 		print("[TEAMNAME] InputTeam missing")
+		_bm_debug_360_career("_focus_input:return")
 		return
 
 	# Best effort focus DOM (Web)
@@ -2367,6 +2541,7 @@ func _focus_input() -> void:
 	input_team.virtual_keyboard_enabled = true
 	if not input_team.gui_input.is_connected(_bm_teamname_input_tap_focus):
 		input_team.gui_input.connect(_bm_teamname_input_tap_focus)
+	_bm_debug_360_career("_focus_input:after")
 
 
 func _on_confirm() -> void:

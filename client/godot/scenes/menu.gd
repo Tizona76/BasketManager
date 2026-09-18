@@ -466,6 +466,8 @@ func _bm_refresh_popup_cta_button() -> void:
 
 
 func _bm_apply_mobile_popup_cta_button_size() -> void:
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
 	var is_mobile_popup_cta := _bm_menu_is_mobile_layout()
 	if OS.has_feature("web") and not is_mobile_popup_cta:
 		var js_mobile_popup_cta: Variant = JavaScriptBridge.eval("((navigator.maxTouchPoints || 0) > 0) || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)", true)
@@ -477,12 +479,20 @@ func _bm_apply_mobile_popup_cta_button_size() -> void:
 
 	# Le layout mobile portrait/paysage est la source de vérité.
 	_bm_apply_mobile_club_popup_layout()
-	btn_close_bienvenue_club.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	btn_close_bienvenue_club.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	btn_close_bienvenue_club.alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 func _bm_refresh_popup_cta_button_deferred() -> void:
-	await get_tree().process_frame
-	await get_tree().process_frame
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
+	var tree := get_tree()
+	if tree == null:
+		return
+	await tree.process_frame
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
+	await tree.process_frame
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
 	_bm_refresh_popup_cta_button()
 
 func _on_close_bienvenue_club_pressed() -> void:
@@ -686,6 +696,8 @@ func _bm_show_market_coming_soon_popup() -> void:
 
 
 func _bm_management_ensure_menu_music() -> void:
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
 	var am := get_node_or_null("/root/AudioManager")
 	if am == null:
 		return
@@ -2284,6 +2296,8 @@ func _bm_refresh_division_label(save: Dictionary) -> void:
 
 
 func _update_club_name_label_from_save() -> void:
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
 	print("[MENU] update labels called")
 
 	var local: Variant = PL.load_savegame()
@@ -2455,6 +2469,9 @@ func _on_btn_back() -> void:
 
 
 func _on_btn_match() -> void:
+	if _bm_menu_is_mobile_layout() and get_tree().root.find_child("Main", true, false) != null:
+		emit_signal("go_match")
+		return
 	emit_signal("go_match")
 
 	_force_go_saison()
@@ -2850,6 +2867,8 @@ func _notification(what: int) -> void:
 		if PanelWinrates != null and PanelWinrates.visible:
 			_bm_wr_render_table(_bm_wr_last_rows)
 func _force_go_saison() -> void:
+	if is_inside_tree() and _bm_menu_is_mobile_layout() and get_tree().root.find_child("Main", true, false) != null:
+		return
 	# Fallback robuste: fonctionne même si ce node n'est plus dans l'arbre (get_tree() == null)
 	var tree := get_tree()
 	if tree == null:
@@ -4371,11 +4390,18 @@ func _bm_on_management_mobile_viewport_changed() -> void:
 
 
 func _bm_restore_management_mobile_layout() -> void:
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
+	var tree := get_tree()
+	if tree == null:
+		return
 	if not _bm_menu_is_mobile_layout():
 		return
 
 	# Attendre que visibility / queue_free / containers soient stabilisés.
-	await get_tree().process_frame
+	await tree.process_frame
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
 
 	_bm_apply_mobile_management_adaptive_layout()
 	_hide_menu_debug_texts()
@@ -4774,6 +4800,8 @@ func _bm_menu_apply_mobile_management_buttons_text_plus2() -> void:
 	return
 
 func _bm_mobile_start_by_building_text_plus2() -> void:
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
 	var vp := get_viewport_rect().size
 	var win := DisplayServer.window_get_size()
 	var is_mobile := OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("web") or minf(vp.x, float(win.x)) < 900.0
@@ -4827,9 +4855,18 @@ func _bm_goal_current_rank(save: Dictionary) -> int:
 
 
 func _bm_maybe_show_climb_standings_goal_once() -> void:
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
+	var tree := get_tree()
+	if tree == null:
+		return
 	# Laisser les popups prioritaires de Management se créer d'abord.
-	await get_tree().process_frame
-	await get_tree().process_frame
+	await tree.process_frame
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
+	await tree.process_frame
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
 
 	# Les popups automatiques prioritaires de Management doivent être lus
 	# avant "Next game matters", jamais simultanément.
@@ -4837,7 +4874,9 @@ func _bm_maybe_show_climb_standings_goal_once() -> void:
 		get_node_or_null("StaffIntroPopup") != null
 		or get_node_or_null("Overlays/ClubTokensIntroOverlay") != null
 	):
-		await get_tree().process_frame
+		await tree.process_frame
+		if not is_inside_tree() or is_queued_for_deletion():
+			return
 
 	var save: Dictionary = PL.load_savegame()
 	if typeof(save) != TYPE_DICTIONARY:

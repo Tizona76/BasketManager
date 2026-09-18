@@ -367,6 +367,251 @@ func _bm_myteam_is_mobile_layout() -> bool:
 	return false
 
 
+# BM_IOS_MYTEAM_VIEWPORT_FIT_V2
+func _bm_myteam_apply_viewport_fit() -> void:
+	if not _bm_myteam_is_mobile_layout():
+		return
+
+	var vp := get_viewport_rect().size
+	if vp.x <= 1.0 or vp.y <= 1.0:
+		return
+
+	var landscape := vp.x > vp.y
+
+	# IMPORTANT :
+	# aucune transformation globale.
+	# MobilePinchZoom garde seul le zoom global.
+	scale = Vector2.ONE
+
+	# ---------------------------------------------------------
+	# TITRE
+	# ---------------------------------------------------------
+	var title := get_node_or_null("Title") as Label
+	if title != null:
+		title.set_anchors_preset(Control.PRESET_TOP_WIDE)
+		title.offset_left = 16.0
+		title.offset_right = -320.0 if landscape else -16.0
+		title.offset_top = 6.0 if landscape else 16.0
+		title.offset_bottom = 40.0 if landscape else 60.0
+
+		if title.label_settings != null:
+			var ls := title.label_settings.duplicate() as LabelSettings
+			ls.font_size = 28 if landscape else 34
+			title.label_settings = ls
+
+	# ---------------------------------------------------------
+	# MOYENNES : bloc haut-droite, hors du titre
+	# ---------------------------------------------------------
+	var avg_x := vp.x - 300.0 if landscape else vp.x - 270.0
+	var avg_y := 4.0 if landscape else 68.0
+	var avg_w := 282.0 if landscape else 254.0
+	var avg_h := 15.0 if landscape else 23.0
+	var avg_fs := 11 if landscape else 17
+
+	var avg_labels: Array[Label] = []
+	for lbl in [lbl_avg_age, lbl_avg_perf, lbl_avg_salary]:
+		if lbl != null and is_instance_valid(lbl):
+			avg_labels.append(lbl)
+
+	for i in range(avg_labels.size()):
+		var lbl := avg_labels[i]
+		lbl.anchor_left = 0.0
+		lbl.anchor_right = 0.0
+		lbl.position = Vector2(avg_x, avg_y + float(i) * avg_h)
+		lbl.size = Vector2(avg_w, avg_h)
+		lbl.add_theme_font_size_override("font_size", avg_fs)
+
+	# ---------------------------------------------------------
+	# TABLEAU
+	# ---------------------------------------------------------
+	if scroll != null:
+		scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+		scroll.offset_left = 8.0
+		scroll.offset_right = -8.0
+		scroll.offset_top = 86.0 if landscape else 154.0
+		scroll.offset_bottom = -60.0 if landscape else -86.0
+
+		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+
+		# En paysage, le tableau doit tenir sans déplacement horizontal.
+		# Portrait garde AUTO comme filet de sécurité.
+		scroll.horizontal_scroll_mode = (
+			ScrollContainer.SCROLL_MODE_DISABLED
+			if landscape
+			else ScrollContainer.SCROLL_MODE_AUTO
+		)
+		scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+
+	if rows != null:
+		rows.visible = true
+		rows.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	# ---------------------------------------------------------
+	# HEADER
+	# Même ordre que _ensure_table_header()
+	# ---------------------------------------------------------
+	var widths_landscape := [
+		48.0,  # avatar
+		50.0,  # rank
+		48.0,  # pos
+		42.0,  # age
+		52.0,  # shooting
+		50.0,  # speed
+		54.0,  # defense
+		54.0,  # accuracy
+		54.0,  # motivation
+		72.0,  # salary
+		58.0   # sell/select
+	]
+
+	if myteam_table_header != null and is_instance_valid(myteam_table_header):
+		myteam_table_header.position = Vector2(
+			12.0,
+			(scroll.position.y - 36.0) if scroll != null else 46.0
+		)
+		myteam_table_header.size = Vector2(
+			maxf(0.0, vp.x - 16.0),
+			30.0 if landscape else 46.0
+		)
+		myteam_table_header.custom_minimum_size.y = 30.0 if landscape else 46.0
+		myteam_table_header.add_theme_constant_override(
+			"separation",
+			2 if landscape else 5
+		)
+
+		if landscape:
+			var header_children := myteam_table_header.get_children()
+
+			for i in range(mini(header_children.size(), widths_landscape.size())):
+				var c := header_children[i] as Control
+				if c == null:
+					continue
+
+				c.custom_minimum_size.x = widths_landscape[i]
+				c.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+				c.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+				for n in c.find_children("*", "Button", true, false):
+					var b := n as Button
+					if b != null:
+						b.custom_minimum_size = Vector2(
+							maxf(34.0, widths_landscape[i] - 4.0),
+							28.0
+						)
+						b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+						b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+						b.add_theme_font_size_override("font_size", 10)
+
+						for style_name in ["normal", "hover", "pressed"]:
+							var base_style := b.get_theme_stylebox(style_name)
+							if base_style is StyleBoxFlat:
+								var compact_style := (base_style as StyleBoxFlat).duplicate() as StyleBoxFlat
+								compact_style.content_margin_left = 4.0
+								compact_style.content_margin_right = 4.0
+								compact_style.content_margin_top = 3.0
+								compact_style.content_margin_bottom = 3.0
+								b.add_theme_stylebox_override(style_name, compact_style)
+
+				for n in c.find_children("*", "Label", true, false):
+					var l := n as Label
+					if l != null:
+						l.add_theme_font_size_override("font_size", 10)
+
+	# ---------------------------------------------------------
+	# LIGNES JOUEURS
+	# même largeur de colonnes que le header
+	# ---------------------------------------------------------
+	if landscape and rows != null:
+		for row_node in rows.get_children():
+			var panel := row_node as Control
+			if panel == null:
+				continue
+
+			# Le spacer n'est pas une ligne joueur.
+			if panel.name == "MyTeamMobileRowsTopSpacer":
+				panel.custom_minimum_size = Vector2(0, 2)
+				continue
+
+			panel.custom_minimum_size.y = 48.0
+
+			var hbox: HBoxContainer = null
+			for candidate in panel.get_children():
+				if candidate is HBoxContainer:
+					hbox = candidate as HBoxContainer
+					break
+
+			if hbox == null:
+				continue
+
+			hbox.add_theme_constant_override("separation", 2)
+			hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+
+			var cells := hbox.get_children()
+			for i in range(mini(cells.size(), widths_landscape.size())):
+				var cell := cells[i] as Control
+				if cell == null:
+					continue
+
+				cell.custom_minimum_size.x = widths_landscape[i]
+				cell.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+				cell.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+				for n in cell.find_children("*", "Label", true, false):
+					var lbl := n as Label
+					if lbl != null:
+						lbl.add_theme_font_size_override("font_size", 13)
+
+				for n in cell.find_children("*", "TextureRect", true, false):
+					var img := n as TextureRect
+					if img != null:
+						img.custom_minimum_size = Vector2(36, 36)
+						img.size = Vector2(36, 36)
+
+				for n in cell.find_children("*", "Button", true, false):
+					var btn := n as Button
+					if btn != null:
+						btn.custom_minimum_size = Vector2(34, 34)
+						btn.add_theme_font_size_override("font_size", 12)
+
+	# ---------------------------------------------------------
+	# BOUTONS BAS
+	# ---------------------------------------------------------
+	if btn_back != null:
+		btn_back.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+		btn_back.offset_left = 14.0
+		btn_back.offset_right = 134.0 if landscape else 154.0
+		btn_back.offset_top = -54.0 if landscape else -68.0
+		btn_back.offset_bottom = -10.0
+		btn_back.add_theme_font_size_override(
+			"font_size",
+			18 if landscape else 21
+		)
+
+	if btn_confirm_sell != null:
+		btn_confirm_sell.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+		btn_confirm_sell.offset_left = -184.0 if landscape else -214.0
+		btn_confirm_sell.offset_right = -14.0
+		btn_confirm_sell.offset_top = -54.0 if landscape else -68.0
+		btn_confirm_sell.offset_bottom = -10.0
+		btn_confirm_sell.add_theme_font_size_override(
+			"font_size",
+			16 if landscape else 19
+		)
+
+	if lbl_total_salary != null:
+		lbl_total_salary.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		lbl_total_salary.offset_left = 170.0 if landscape else 160.0
+		lbl_total_salary.offset_right = -210.0 if landscape else -220.0
+		lbl_total_salary.offset_top = -51.0 if landscape else -65.0
+		lbl_total_salary.offset_bottom = -12.0
+		lbl_total_salary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl_total_salary.add_theme_font_size_override(
+			"font_size",
+			16 if landscape else 19
+		)
+
+
 func _bm_myteam_apply_mobile_landscape_scroll() -> void:
 	if not _bm_myteam_is_mobile_landscape():
 		return
@@ -376,7 +621,8 @@ func _bm_myteam_apply_mobile_landscape_scroll() -> void:
 	scroll.visible = true
 	scroll.mouse_filter = Control.MOUSE_FILTER_PASS
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.scroll_horizontal = 0
 
 	if rows != null:
 		rows.visible = true
@@ -408,6 +654,7 @@ func _ready() -> void:
 	_bm_init_screen_identity()
 	_bm_setup_mobile_scroll()
 	call_deferred("_bm_myteam_apply_mobile_landscape_scroll")
+	call_deferred("_bm_myteam_apply_viewport_fit")
 	if btn_back != null and not btn_back.pressed.is_connected(_on_back_pressed):
 		btn_back.pressed.connect(_on_back_pressed)
 	_bm_style_back_button()
@@ -1481,6 +1728,11 @@ func _build_team() -> void:
 	call_deferred("_bm_myteam_apply_mobile_landscape_scroll")
 	call_deferred("_bm_myteam_lock_mobile_layout_positions")
 
+	# BM_IOS_MYTEAM_REAPPLY_AFTER_REBUILD_V1
+	# Après tri / Sell, _build_team reconstruit les lignes.
+	# Réappliquer le layout mobile final sans toucher au tri ni au Sell.
+	call_deferred("_bm_myteam_apply_viewport_fit")
+
 func _make_header_button(title: String, min_w: float, cb: Callable, expand: bool = true) -> Button:
 	var b := Button.new()
 	b.text = title
@@ -1556,7 +1808,11 @@ func _make_header_placeholder(min_w: float) -> Control:
 func _ensure_table_header() -> void:
 	if scroll == null:
 		return
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	if _bm_myteam_is_mobile_landscape():
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.scroll_horizontal = 0
+	else:
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 
 	if myteam_table_header != null and is_instance_valid(myteam_table_header):
 		myteam_table_header.queue_free()
@@ -1565,7 +1821,10 @@ func _ensure_table_header() -> void:
 	myteam_table_header.name = "MyTeamTableHeader"
 	myteam_table_header.custom_minimum_size = Vector2(0, 50)
 	myteam_table_header.size = Vector2(maxf(0.0, scroll.size.x - 12.0), 50.0)
-	myteam_table_header.position = Vector2(scroll.position.x + 6.0, scroll.position.y - 10.0)
+	myteam_table_header.position = Vector2(
+		12.0 if _bm_myteam_is_mobile_landscape() else scroll.position.x + 6.0,
+		scroll.position.y - 10.0
+	)
 	myteam_table_header.alignment = BoxContainer.ALIGNMENT_CENTER
 	myteam_table_header.add_theme_constant_override("separation", 6)
 	myteam_table_header.z_index = 50
@@ -2512,7 +2771,7 @@ func _tr_poste(poste: String) -> String:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
 		call_deferred("_bm_myteam_apply_mobile_landscape_scroll")
-		call_deferred("_bm_myteam_lock_mobile_layout_positions")
+		call_deferred("_bm_myteam_apply_viewport_fit")
 
 
 func _bm_myteam_apply_mobile_row_texts_plus2() -> void:
@@ -2646,26 +2905,7 @@ func _bm_myteam_lock_mobile_layout_positions() -> void:
 	if not _bm_myteam_is_mobile_layout():
 		return
 
-	var vp: Vector2 = get_viewport_rect().size
-
-	if myteam_table_header != null and is_instance_valid(myteam_table_header) and scroll != null:
-		myteam_table_header.position = Vector2(scroll.position.x + 6.0, scroll.position.y - 10.0)
-		myteam_table_header.size = Vector2(maxf(0.0, scroll.size.x - 12.0), 50.0)
-
-	if lbl_avg_age != null:
-		lbl_avg_age.anchor_left = 1.0
-		lbl_avg_age.anchor_right = 1.0
-		lbl_avg_age.position = Vector2(vp.x - 410.0, 24.0)
-		lbl_avg_age.size = Vector2(380.0, 24.0)
-
-	if lbl_avg_perf != null:
-		lbl_avg_perf.anchor_left = 1.0
-		lbl_avg_perf.anchor_right = 1.0
-		lbl_avg_perf.position = Vector2(vp.x - 410.0, 50.0)
-		lbl_avg_perf.size = Vector2(380.0, 24.0)
-
-	if lbl_avg_salary != null:
-		lbl_avg_salary.anchor_left = 1.0
-		lbl_avg_salary.anchor_right = 1.0
-		lbl_avg_salary.position = Vector2(vp.x - 410.0, 76.0)
-		lbl_avg_salary.size = Vector2(380.0, 24.0)
+	# BM_IOS_MYTEAM_LEGACY_LOCK_NEUTRALIZED_V1
+	# Source unique mobile : viewport fit.
+	# Ne plus réécrire ici header / averages après tri ou Sell.
+	call_deferred("_bm_myteam_apply_viewport_fit")

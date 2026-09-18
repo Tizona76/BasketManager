@@ -1,5 +1,59 @@
 extends Control
 
+signal back_to_management_requested
+var _bm_back_to_management_pending := false
+
+# BEGIN RUNTIME360 DIAGNOSTICS (temporary, observation only)
+func _bm_debug_360_control(n: Control) -> Dictionary:
+	if not is_instance_valid(n):
+		return {"valid": false}
+	return {"path": str(n.get_path()), "parent": str(n.get_parent().get_path()), "visible": n.visible, "visible_in_tree": n.is_visible_in_tree(), "position": n.position, "global_position": n.global_position, "size": n.size, "minimum": n.custom_minimum_size, "scale": n.scale, "top_level": n.is_set_as_top_level(), "rect": n.get_global_rect(), "canvas": n.get_canvas_transform(), "screen_center": n.get_global_transform_with_canvas() * (n.size * 0.5), "mouse_filter": n.mouse_filter, "z_index": n.z_index, "disabled": n.disabled if n is BaseButton else null}
+
+var _bm_debug_360_progress: Dictionary = {}
+func _bm_debug_play_geometry(tag: String) -> void:
+	if not is_inside_tree():
+		return
+	var play := _bm_debug_360_control(btn_match)
+	var season := _bm_debug_360_control(lbl_season_day)
+	var delta: Variant = null
+	if is_instance_valid(btn_match) and is_instance_valid(lbl_season_day):
+		delta = btn_match.get_global_rect().get_center().x - lbl_season_day.get_global_rect().get_center().x
+	print("[PLAY360] ms=", Time.get_ticks_msec(), " frame=", Engine.get_process_frames(), " id=", get_instance_id(), " tag=", tag, " vp=", get_viewport_rect().size, " play=", play, " season=", season, " delta_center_x=", delta, " base_pos=", _btn_match_base_pos, " base_scale=", _btn_match_base_scale, " hover_tween=", is_instance_valid(_btn_match_tween), " pulse_tween=", is_instance_valid(_tw_match_pulse))
+
+func _bm_debug_tabs_visibility(tag: String) -> void:
+	if not is_inside_tree():
+		return
+	var states: Array = []
+	for b in [btn_calendrier, btn_classement, btn_statistiques, btn_mercato, btn_missions, btn_tournois]:
+		states.append(_bm_debug_360_control(b))
+	print("[TABS360] ms=", Time.get_ticks_msec(), " frame=", Engine.get_process_frames(), " id=", get_instance_id(), " tag=", tag, " last_observed_save_progress=", _bm_debug_360_progress, " SeasonState.matchs_joues=", SeasonState.matchs_joues, " states=", states)
+
+func _bm_debug_360_progress_from(d: Dictionary, tag: String) -> void:
+	var progress: Variant = d.get("progress", {})
+	_bm_debug_360_progress = {"source": tag, "season_number": d.get("season_number"), "season_round": d.get("season_round"), "progress.journee": progress.get("journee") if progress is Dictionary else null}
+
+func _bm_debug_360_back(tag: String) -> void:
+	if not is_inside_tree():
+		return
+	var main_paths: Array = []
+	for n in get_tree().root.find_children("*", "", true, false):
+		if n.has_method("_show_menu"):
+			main_paths.append(str(n.get_path()))
+	print("[BACK360] ms=", Time.get_ticks_msec(), " frame=", Engine.get_process_frames(), " tag=", tag, " scene=", get_tree().current_scene, " root_children=", get_tree().root.get_children(), " Main_with_show_menu=", main_paths, " season_visible=", is_visible_in_tree())
+
+func _bm_debug_360_observe_play() -> void:
+	# Two seconds maximum; logs only geometry changes, no layout writes.
+	var until_ms := Time.get_ticks_msec() + 2000
+	var previous := ""
+	while is_inside_tree() and Time.get_ticks_msec() < until_ms:
+		var current := str([_bm_debug_360_control(btn_match), _bm_debug_360_control(lbl_season_day)])
+		if current != previous:
+			_bm_debug_play_geometry("frame_observer")
+			previous = current
+		await get_tree().process_frame
+# END RUNTIME360 DIAGNOSTICS
+
+
 const BM_TEST_FORCE_MERCATO_OPEN := false # TEST TEMPORAIRE: remettre à false après tests
 const PL = preload("res://scripts/PlayerLife.gd")
 const Selection := preload("res://scripts/Selection.gd")
@@ -194,7 +248,9 @@ func _bm_make_action_button_style(bg: Color, glow: Color, bottom_w: int, shadow_
 
 
 func _bm_style_btn_match_action() -> void:
+	_bm_debug_play_geometry("_bm_style_btn_match_action:before")
 	if btn_match == null:
+		_bm_debug_play_geometry("_bm_style_btn_match_action:return")
 		return
 
 	var normal := _bm_make_action_button_style(Color(0.03, 0.16, 0.38, 0.98), Color(1.0, 0.05, 0.06, 0.92), 4, 8)
@@ -211,12 +267,22 @@ func _bm_style_btn_match_action() -> void:
 	btn_match.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
 	btn_match.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.55))
 	btn_match.add_theme_font_size_override("font_size", 26)
+	if _bm_saison_is_mobile_landscape():
+		return
 	var match_center := btn_match.position + btn_match.size * 0.5
-	btn_match.custom_minimum_size = Vector2(430, 136)
-	btn_match.size = Vector2(maxf(btn_match.size.x, 430.0), 136.0)
+	var mobile_landscape := _bm_saison_is_mobile_landscape()
+	var match_target := Vector2(340.0, 112.0) if mobile_landscape else Vector2(430.0, 136.0)
+	btn_match.custom_minimum_size = match_target
+	btn_match.size = (
+		match_target
+		if mobile_landscape
+		else Vector2(maxf(btn_match.size.x, 430.0), 136.0)
+	)
 	var vp_size := get_viewport_rect().size
 	btn_match.position = Vector2((vp_size.x - btn_match.size.x) * 0.5, match_center.y - btn_match.size.y * 0.5)
 	btn_match.pivot_offset = btn_match.size * 0.5
+	_bm_debug_play_geometry("_bm_style_btn_match_action:after")
+
 
 func _bm_style_btn_retour() -> void:
 	if btn_retour == null:
@@ -236,10 +302,11 @@ func _bm_style_btn_retour() -> void:
 	btn_retour.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
 	btn_retour.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.5))
 	var _back_fs: int = 22
-	if _bm_saison_is_mobile_landscape():
-		_back_fs = 24
+	var mobile_landscape := _bm_saison_is_mobile_landscape()
+	if mobile_landscape:
+		_back_fs = 16
 	btn_retour.add_theme_font_size_override("font_size", _back_fs)
-	btn_retour.custom_minimum_size = Vector2(180, 56)
+	btn_retour.custom_minimum_size = Vector2(180, 46) if mobile_landscape else Vector2(180, 56)
 
 func _bm_apply_i18n_btn_retour() -> void:
 	if btn_retour != null:
@@ -2781,24 +2848,28 @@ func _maybe_show_match_compo_intro_popup() -> void:
 	return
 
 func _bm_apply_early_tabs_visibility() -> void:
+	_bm_debug_tabs_visibility("_bm_apply_early_tabs_visibility:before")
 	var d_any: Variant = PL.load_savegame()
 	if typeof(d_any) != TYPE_DICTIONARY:
+		_bm_debug_tabs_visibility("_bm_apply_early_tabs_visibility:return")
 		return
 	var d: Dictionary = d_any as Dictionary
+	_bm_debug_360_progress_from(d, "early_tabs")
+	_bm_debug_tabs_visibility("early_tabs:save_loaded")
 
 	var matches_played: int = int(d.get("season_round", 0))
 
-	var btn_calendar = get_node_or_null("UI/Tabs/BtnCalendrier")
-	var btn_standings = get_node_or_null("UI/Tabs/BtnClassement")
-	var btn_market = get_node_or_null("UI/Tabs/BtnMercato")
-	var btn_missions = get_node_or_null("UI/Tabs/BtnMissions")
-	var btn_tournament = get_node_or_null("UI/Tabs/BtnTournois")
+	var btn_calendar = btn_calendrier
+	var btn_standings = btn_classement
+	var btn_market = btn_mercato
+
+	var btn_tournament = btn_tournois
 
 	# Toujours visible
 	if btn_calendar != null:
 		btn_calendar.visible = true
 
-	# Market visible seulement après le match 20 joué
+	# Market : règle existante de saison, seuil inchangé.
 	if btn_market != null:
 		btn_market.visible = BM_TEST_FORCE_MERCATO_OPEN or (int(d.get("season_number", 1)) >= 2)
 		btn_market.disabled = false
@@ -2812,6 +2883,13 @@ func _bm_apply_early_tabs_visibility() -> void:
 	# Classement seulement après le 1er match
 	if btn_standings != null:
 		btn_standings.visible = (matches_played >= 1)
+	# Statistics est masqué dans la scène ; aucun seuil d'unlock n'existe.
+	if btn_statistiques != null:
+		btn_statistiques.visible = false
+	for button in [btn_calendrier, btn_classement, btn_statistiques, btn_mercato, btn_missions, btn_tournois]:
+		if button != null:
+			button.mouse_filter = Control.MOUSE_FILTER_STOP if button.visible else Control.MOUSE_FILTER_IGNORE
+	_bm_debug_tabs_visibility("_bm_apply_early_tabs_visibility:after")
 
 
 func _bm_ensure_season_start_progress_baseline() -> void:
@@ -2844,11 +2922,13 @@ func _bm_play_management_music() -> void:
 		am.call("play_music", "res://audio/music/menu.mp3", true, false)
 
 func _ready() -> void:
+	_bm_debug_play_geometry("ready:entry")
 	_bm_play_management_music()
 	PL._bm_debug_dump_active_save_path()
 	call_deferred("_bm_update_management_crest_header")
 	_bm_ensure_season_start_progress_baseline()
 	var save_boot := PL.load_savegame()
+	_bm_debug_360_progress_from(save_boot, "ready")
 	var boot_level := PL.get_club_level(save_boot)
 	var boot_xp := PL.get_club_xp(save_boot)
 	var seen_level := boot_level
@@ -2974,9 +3054,9 @@ func _ready() -> void:
 	call_deferred("_bm_refresh_league_badge")
 	call_deferred("_bm_saison_apply_mobile_day_and_popularity_texts")
 	call_deferred("_bm_saison_align_mobile_play_and_day")
-
-	# Early flow tabs visibility
+	# La visibilité métier précède le placement mobile.
 	_bm_apply_early_tabs_visibility()
+	_bm_saison_apply_mobile_landscape_deterministic_layout()
 
 	if popup_bienvenue != null:
 		var _sb_popup_bienvenue := StyleBoxFlat.new()
@@ -3105,8 +3185,9 @@ func _ready() -> void:
 			print("[SAISON] BtnCalendrier pressed (raw)")
 			_select_zone("calendrier")
 		)
-		
-
+	_bm_debug_play_geometry("ready:end")
+	_bm_debug_tabs_visibility("ready:end")
+	_bm_debug_360_observe_play()
 
 func _input(event):
 	if event is InputEventMouseButton and event.pressed:
@@ -3116,6 +3197,7 @@ func _input(event):
 			var r := btn_retour.get_global_rect()
 			if r.has_point(get_global_mouse_position()):
 				print("[SAISON] BtnRetour clicked at ROOT -> go Management")
+				_bm_debug_360_back("root_mouse_hit_BtnRetour")
 				_on_btn_retour_pressed()
 				return
 
@@ -3169,6 +3251,7 @@ func _select_zone(zone: String) -> void:
 
 # --- Bouton Retour ---
 func _on_retour_pressed() -> void:
+	_bm_debug_360_back("_on_retour_pressed")
 	if popup_bienvenue.visible:
 		return
 	# IMPORTANT: ne pas clear l'onglet Saison — on conserve l'état tant qu'aucun nouveau match
@@ -3491,8 +3574,10 @@ func _bm_refresh_division_label(save: Dictionary) -> void:
 
 
 func _ensure_season_day_label() -> void:
+	_bm_debug_play_geometry("_ensure_season_day_label:before")
 	_bm_refresh_division_label(PL.load_savegame())
 	if btn_match == null:
+		_bm_debug_play_geometry("_ensure_season_day_label:return")
 		return
 
 	if lbl_season_day == null or not is_instance_valid(lbl_season_day):
@@ -3533,11 +3618,15 @@ func _ensure_season_day_label() -> void:
 
 	lbl_season_day.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	lbl_season_day.text = _get_current_season_day_text()
+	if _bm_saison_is_mobile_landscape():
+		_bm_saison_apply_mobile_landscape_deterministic_layout()
+		return
 	lbl_season_day.size = Vector2(320, 72)
 	lbl_season_day.position = Vector2(
 		btn_match.position.x + (btn_match.size.x - lbl_season_day.size.x) * 0.5 + 24.0,
 		btn_match.position.y - 112
 	)
+	_bm_debug_play_geometry("_ensure_season_day_label:after")
 
 
 func _bm_current_league_name() -> String:
@@ -3697,8 +3786,10 @@ func _bm_ensure_match_button_opponent_line() -> void:
 
 
 func _bm_refresh_match_button_opponent_line() -> void:
+	_bm_debug_play_geometry("_bm_refresh_match_button_opponent_line:before")
 	_bm_ensure_match_button_opponent_line()
 	if btn_match == null or _btn_match_opponent_content == null or not is_instance_valid(_btn_match_opponent_content):
+		_bm_debug_play_geometry("_bm_refresh_match_button_opponent_line:return")
 		return
 	btn_match.text = ""
 	if _btn_match_title_label != null:
@@ -3706,11 +3797,13 @@ func _bm_refresh_match_button_opponent_line() -> void:
 	var save: Dictionary = PL.load_savegame()
 	if typeof(save) != TYPE_DICTIONARY:
 		_btn_match_opponent_content.visible = false
+		_bm_debug_play_geometry("_bm_refresh_match_button_opponent_line:return")
 		return
 	var fx: Dictionary = _bm_match_button_fixture(save)
 	var opponent: String = str(fx.get("opponent", "")).strip_edges()
 	if opponent == "":
 		_btn_match_opponent_content.visible = false
+		_bm_debug_play_geometry("_bm_refresh_match_button_opponent_line:return")
 		return
 
 	var rank: int = _bm_match_button_rank(opponent)
@@ -3726,11 +3819,16 @@ func _bm_refresh_match_button_opponent_line() -> void:
 	if _btn_match_opponent_label != null:
 		_btn_match_opponent_label.text = opponent + "  " + rank_text
 
+	if _bm_saison_is_mobile_landscape():
+		_btn_match_opponent_content.visible = true
+		_bm_saison_apply_mobile_landscape_deterministic_layout()
+		return
 	var bw: float = max(300.0, btn_match.size.x)
 	var bh: float = max(112.0, btn_match.size.y)
 	_btn_match_opponent_content.size = Vector2(bw, bh)
 	_btn_match_opponent_content.position = Vector2(0, 0)
 	_btn_match_opponent_content.visible = true
+	_bm_debug_play_geometry("_bm_refresh_match_button_opponent_line:after")
 
 
 func _close_end_season_popup() -> void:
@@ -4315,13 +4413,19 @@ func _on_btn_classement_show_standings_pressed() -> void:
 
 
 func _start_btn_match_pulse() -> void:
+	_bm_debug_play_geometry("_start_btn_match_pulse:before")
 	if btn_match == null:
+		_bm_debug_play_geometry("_start_btn_match_pulse:return")
 		return
 
 	# Stop tween si déjà en cours
 	if _tw_match_pulse != null and is_instance_valid(_tw_match_pulse):
 		_tw_match_pulse.kill()
 		_tw_match_pulse = null
+
+	if _bm_saison_is_mobile_layout():
+		btn_match.scale = Vector2.ONE
+		return
 
 	# Référence position (si le bouton n'est pas dans un Container, on "bob" en Y)
 	_btn_match_base_pos = btn_match.position
@@ -4337,12 +4441,20 @@ func _start_btn_match_pulse() -> void:
 	_tw_match_pulse.set_ease(Tween.EASE_IN_OUT)
 
 	# 1) pulse scale
-	_tw_match_pulse.tween_property(btn_match, "scale", Vector2(1.06, 1.06), 0.55)
-	_tw_match_pulse.tween_property(btn_match, "scale", Vector2(1.00, 1.00), 0.55)
+	# Desktop uniquement : sur mobile la taille demandée doit rester exacte.
+	if not _bm_saison_is_mobile_layout():
+		_tw_match_pulse.tween_property(btn_match, "scale", Vector2(1.06, 1.06), 0.55)
+		_tw_match_pulse.tween_property(btn_match, "scale", Vector2(1.00, 1.00), 0.55)
+	else:
+		btn_match.scale = Vector2.ONE
 
 	# 2) bob Y (si position existe / pas gérée par container)
-	_tw_match_pulse.parallel().tween_property(btn_match, "position:y", _btn_match_base_pos.y - 6.0, 0.55)
-	_tw_match_pulse.parallel().tween_property(btn_match, "position:y", _btn_match_base_pos.y, 0.55)
+	# BM_IOS_PLAY_NO_POSITION_TWEEN_V1
+	# Sur mobile le bouton reste à la position déterministe.
+	if not _bm_saison_is_mobile_layout():
+		_tw_match_pulse.parallel().tween_property(btn_match, "position:y", _btn_match_base_pos.y - 6.0, 0.55)
+		_tw_match_pulse.parallel().tween_property(btn_match, "position:y", _btn_match_base_pos.y, 0.55)
+	_bm_debug_play_geometry("_start_btn_match_pulse:after")
 
 
 func _on_btn_close_classement_pressed() -> void:
@@ -4512,7 +4624,14 @@ func _update_play_match_halo_position() -> void:
 
 
 func _on_btn_match_mouse_entered() -> void:
+	_bm_debug_play_geometry("_on_btn_match_mouse_entered:before")
 	if btn_match == null:
+		_bm_debug_play_geometry("_on_btn_match_mouse_entered:return")
+		return
+	if _bm_saison_is_mobile_layout():
+		_btn_match_stop_tween()
+		btn_match.scale = Vector2.ONE
+		_bm_debug_play_geometry("mobile_hover_skipped")
 		return
 	_btn_match_stop_tween()
 	# Micro pulse + micro nudge (léger, OK HTML5)
@@ -4523,17 +4642,37 @@ func _on_btn_match_mouse_entered() -> void:
 	_btn_match_tween.set_parallel(false)
 	_btn_match_tween.tween_property(btn_match, "scale", _btn_match_base_scale * 1.02, 0.10).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_btn_match_tween.tween_property(btn_match, "position", _btn_match_base_pos, 0.10).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_bm_debug_play_geometry("_on_btn_match_mouse_entered:after")
+	_btn_match_tween.finished.connect(func(): _bm_debug_play_geometry("_on_btn_match_mouse_entered:tween_finished"))
+
 
 func _on_btn_match_mouse_exited() -> void:
+	_bm_debug_play_geometry("_on_btn_match_mouse_exited:before")
 	if btn_match == null:
+		_bm_debug_play_geometry("_on_btn_match_mouse_exited:return")
+		return
+	if _bm_saison_is_mobile_layout():
+		_btn_match_stop_tween()
+		btn_match.scale = Vector2.ONE
+		_bm_debug_play_geometry("mobile_hover_skipped")
 		return
 	_btn_match_stop_tween()
 	_btn_match_tween = create_tween()
 	_btn_match_tween.set_parallel(true)
 	_btn_match_tween.tween_property(btn_match, "scale", _btn_match_base_scale, 0.10).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	_btn_match_tween.tween_property(btn_match, "position", _btn_match_base_pos, 0.10).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_bm_debug_play_geometry("_on_btn_match_mouse_exited:after")
+	_btn_match_tween.finished.connect(func(): _bm_debug_play_geometry("_on_btn_match_mouse_exited:tween_finished"))
+
 
 func _on_btn_retour_pressed() -> void:
+	if _bm_saison_is_mobile_layout() and get_tree().root.find_child("Main", true, false) != null:
+		if not _bm_back_to_management_pending:
+			_bm_back_to_management_pending = true
+			_bm_debug_360_back("emit_back_to_management")
+			back_to_management_requested.emit()
+		return
+	_bm_debug_360_back("_on_btn_retour_pressed")
 	# Retour vers écran Management (fallbacks)
 	var candidates := [
 		"res://scenes/Management.tscn",
@@ -4543,30 +4682,26 @@ func _on_btn_retour_pressed() -> void:
 		"res://scenes/Main.tscn",
 	]
 	for p in candidates:
+		_bm_debug_360_back("candidate=" + p + " exists=" + str(ResourceLoader.exists(p)))
 		if ResourceLoader.exists(p):
+			_bm_debug_360_back("chosen_before_change_scene=" + p)
 			get_tree().change_scene_to_file(p)
 			return
 	push_warning("[MenuSaison] Aucun écran Management trouvé (candidates).")
 
 func _ensure_saison_buttons_active() -> void:
-	# Force l'interactivité (utile après retour depuis Management)
-	var paths := [
-		"UI/BtnMatch",
-		"UI/Tabs/BtnClassement",
-		"UI/Tabs/BtnStatistiques",
-		"UI/Tabs/BtnCalendrier",
-		"UI/Tabs/BtnMissions",
-		"UI/Tabs/BtnTournois",
-		"UI/BtnRetour",
-	]
-	for npath in paths:
-		var n := get_node_or_null(npath)
-		if n != null and n is Button:
-			var b := n as Button
-			b.disabled = false
-			b.mouse_filter = Control.MOUSE_FILTER_STOP
-			# Focus OK clavier/web
-			b.focus_mode = Control.FOCUS_ALL
+	_bm_debug_tabs_visibility("_ensure_saison_buttons_active:before")
+	for b in [btn_match, btn_classement, btn_statistiques, btn_calendrier, btn_mercato, btn_missions, btn_tournois, btn_retour]:
+		if b == null:
+			continue
+		if not b.visible:
+			b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			continue
+		b.disabled = false
+		b.mouse_filter = Control.MOUSE_FILTER_STOP
+		b.focus_mode = Control.FOCUS_ALL
+	_bm_debug_tabs_visibility("_ensure_saison_buttons_active:after")
+
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSLATION_CHANGED:
@@ -4574,6 +4709,8 @@ func _notification(what: int) -> void:
 		_bm_refresh_division_label(PL.load_savegame())
 		return
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
+		_bm_debug_play_geometry("WM_SIZE_CHANGED")
+		_bm_debug_tabs_visibility("WM_SIZE_CHANGED")
 		call_deferred("_bm_saison_apply_mobile_bg_and_halo_layout")
 		call_deferred("_bm_saison_apply_mobile_hud_layout")
 		call_deferred("_bm_saison_apply_mobile_top_left_buttons_plus20_text_plus2")
@@ -4582,6 +4719,7 @@ func _notification(what: int) -> void:
 		call_deferred("_bm_saison_apply_mobile_day_and_popularity_texts")
 		call_deferred("_bm_saison_align_mobile_play_and_day")
 		return
+		call_deferred("_bm_saison_apply_mobile_landscape_deterministic_layout")
 	if what == NOTIFICATION_WM_WINDOW_FOCUS_IN or what == NOTIFICATION_VISIBILITY_CHANGED:
 		_ensure_saison_buttons_active()
 
@@ -5823,7 +5961,379 @@ func _bm_saison_apply_mobile_bg_and_halo_layout() -> void:
 		_update_play_match_halo_position()
 
 
+
+# BM_IOS_SAISON_LANDSCAPE_DETERMINISTIC_V1
+# Source unique de vérité pour le layout Play Season paysage.
+# Aucun *=, aucun +=, aucune dépendance aux tailles héritées Desktop.
+
+func _bm_saison_restore_mobile_landscape_nav() -> void:
+	_bm_debug_tabs_visibility("_bm_saison_restore_mobile_landscape_nav:before")
+	var tabs := get_node_or_null("UI/Tabs") as HBoxContainer
+	if tabs == null:
+		_bm_debug_tabs_visibility("_bm_saison_restore_mobile_landscape_nav:return")
+		return
+
+	for b in [
+		btn_calendrier,
+		btn_classement,
+		btn_statistiques,
+		btn_mercato,
+		btn_missions,
+		btn_tournois
+	]:
+		if b == null or not is_instance_valid(b):
+			continue
+		if b.get_parent() != tabs:
+			b.reparent(tabs)
+		b.set_as_top_level(false)
+		b.scale = Vector2.ONE
+
+	var old_grid := get_node_or_null("UI/MobileLandscapeNavGrid")
+	if old_grid != null:
+		old_grid.queue_free()
+
+	tabs.visible = true
+
+
+
+# BM_IOS_PLAY_SEASON_FINAL_CENTER_V1
+	_bm_debug_tabs_visibility("_bm_saison_restore_mobile_landscape_nav:after")
+
+
+func _bm_saison_finalize_landscape_centering() -> void:
+	_bm_debug_play_geometry("_bm_saison_finalize_landscape_centering:before")
+	if not _bm_saison_is_mobile_layout():
+		_bm_debug_play_geometry("_bm_saison_finalize_landscape_centering:return")
+		return
+
+	var vp := get_viewport_rect().size
+	if vp.x <= vp.y:
+		_bm_debug_play_geometry("_bm_saison_finalize_landscape_centering:return")
+		return
+
+	if btn_match == null:
+		_bm_debug_play_geometry("_bm_saison_finalize_landscape_centering:return")
+		return
+	if lbl_season_day == null or not is_instance_valid(lbl_season_day):
+		_bm_debug_play_geometry("_bm_saison_finalize_landscape_centering:return")
+		return
+
+	# Laisser absolument tous les deferred/containers terminer.
+	# BM_IOS_SAISON_FINALIZER_IMMEDIATE_V1
+	# Sécurité idempotente uniquement : aucun déplacement retardé.
+
+	vp = get_viewport_rect().size
+	var center_x := vp.x * 0.5
+
+	btn_match.set_as_top_level(true)
+	lbl_season_day.set_as_top_level(true)
+
+	_btn_match_stop_tween()
+	btn_match.scale = Vector2.ONE
+	lbl_season_day.scale = Vector2.ONE
+
+	# Utilise les tailles effectivement rendues, pas les tailles théoriques.
+	var play_w := btn_match.size.x
+	if play_w <= 1.0:
+		play_w = btn_match.get_combined_minimum_size().x
+
+	var season_w := lbl_season_day.size.x
+	if season_w <= 1.0:
+		season_w = lbl_season_day.get_combined_minimum_size().x
+
+	btn_match.global_position.x = center_x - play_w * 0.5
+	lbl_season_day.global_position.x = center_x - season_w * 0.5
+
+	btn_match.pivot_offset = btn_match.size * 0.5
+	lbl_season_day.pivot_offset = lbl_season_day.size * 0.5
+	_btn_match_base_pos = btn_match.position
+	_btn_match_base_scale = Vector2.ONE
+
+	print(
+		"[IOS_PLAY_CENTER] viewport_center=", center_x,
+		" season_center=", lbl_season_day.global_position.x + season_w * 0.5,
+		" play_center=", btn_match.global_position.x + play_w * 0.5
+	)
+	_bm_debug_play_geometry("_bm_saison_finalize_landscape_centering:after")
+
+
+func _bm_saison_apply_mobile_landscape_deterministic_layout() -> void:
+	_bm_debug_play_geometry("_bm_saison_apply_mobile_landscape_deterministic_layout:before")
+	_bm_debug_tabs_visibility("_bm_saison_apply_mobile_landscape_deterministic_layout:before")
+	if not _bm_saison_is_mobile_layout():
+		_bm_debug_play_geometry("_bm_saison_apply_mobile_landscape_deterministic_layout:return")
+		_bm_debug_tabs_visibility("_bm_saison_apply_mobile_landscape_deterministic_layout:return")
+		return
+
+	var vp := get_viewport_rect().size
+	if vp.x <= 1.0 or vp.y <= 1.0:
+		_bm_debug_play_geometry("_bm_saison_apply_mobile_landscape_deterministic_layout:return")
+		_bm_debug_tabs_visibility("_bm_saison_apply_mobile_landscape_deterministic_layout:return")
+		return
+
+	if vp.x <= vp.y:
+		_bm_saison_restore_mobile_landscape_nav()
+		_bm_debug_play_geometry("_bm_saison_apply_mobile_landscape_deterministic_layout:return")
+		_bm_debug_tabs_visibility("_bm_saison_apply_mobile_landscape_deterministic_layout:return")
+		return
+
+	_bm_apply_early_tabs_visibility()
+
+	# BM_IOS_SAISON_LANDSCAPE_DETERMINISTIC_V3
+	# Cible réelle iPhone paysage : 844 x 390.
+	# Zones indépendantes :
+	# gauche = navigation
+	# centre = league / season / play
+	# droite = popularity / HUD / division
+
+	# BM_IOS_SAISON_NO_VISIBLE_LATE_LAYOUT_V1
+	# Layout explicite : aucune attente avant le premier placement.
+
+	var ui := get_node_or_null("UI") as Control
+	var tabs := get_node_or_null("UI/Tabs") as HBoxContainer
+
+	# ========================================================
+	# 1. NAVIGATION : COLONNE DES BOUTONS AUTORISÉS
+	# Ordre des déblocages existants ; les boutons cachés
+	# ne réservent aucun emplacement.
+	# ========================================================
+
+	if ui != null and tabs != null:
+		tabs.visible = false
+
+		var nav_buttons: Array[Button] = [
+			btn_calendrier,
+			btn_classement,
+			btn_tournois,
+			btn_missions,
+			btn_mercato,
+			btn_statistiques
+		]
+
+		var nav_x := 14.0
+		var nav_y := 14.0
+		var nav_w := 88.0
+		var nav_h := 30.0
+		var nav_gap_y := 7.0
+
+		var visible_index := 0
+		for i in range(nav_buttons.size()):
+			var b := nav_buttons[i]
+			if b == null or not is_instance_valid(b):
+				continue
+
+			if b.get_parent() != ui:
+				b.reparent(ui)
+
+			if not b.visible:
+				continue
+
+			b.set_as_top_level(true)
+			b.scale = Vector2.ONE
+			b.custom_minimum_size = Vector2(nav_w, nav_h)
+			b.size = Vector2(nav_w, nav_h)
+			b.global_position = Vector2(
+				nav_x,
+				nav_y + float(visible_index) * (nav_h + nav_gap_y)
+			)
+			b.add_theme_font_size_override("font_size", 11)
+			b.alignment = HORIZONTAL_ALIGNMENT_CENTER
+			visible_index += 1
+
+	# ========================================================
+	# 2. LEAGUE + SEASON : CENTRE HAUT
+	# ========================================================
+
+	var center_x := vp.x * 0.50
+	var season_w := 270.0
+
+	var league_badge := find_child("LblLeagueBadge", true, false) as Label
+
+	if league_badge != null:
+		league_badge.set_as_top_level(true)
+		league_badge.scale = Vector2.ONE
+		league_badge.size = Vector2(season_w, 22.0)
+		league_badge.global_position = Vector2(
+			center_x - season_w * 0.5,
+			10.0
+		)
+		league_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		league_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		league_badge.add_theme_font_size_override("font_size", 14)
+
+	if lbl_season_day != null and is_instance_valid(lbl_season_day):
+		lbl_season_day.set_as_top_level(true)
+		lbl_season_day.scale = Vector2.ONE
+		lbl_season_day.size = Vector2(season_w, 30.0)
+		lbl_season_day.global_position.y = 34.0
+		lbl_season_day.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl_season_day.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl_season_day.add_theme_font_size_override("font_size", 18)
+
+	# ========================================================
+	# 3. PLAY GAME
+	# ========================================================
+
+	if btn_match != null:
+		var match_size := Vector2(256.0, 108.0)
+
+		btn_match.set_as_top_level(true)
+		btn_match.scale = Vector2.ONE
+		btn_match.custom_minimum_size = match_size
+		btn_match.size = match_size
+		btn_match.global_position.y = 132.0
+		btn_match.pivot_offset = btn_match.size * 0.5
+
+		if _btn_match_opponent_content != null and is_instance_valid(_btn_match_opponent_content):
+			_btn_match_opponent_content.set_anchors_preset(Control.PRESET_FULL_RECT)
+			_btn_match_opponent_content.offset_left = 7.0
+			_btn_match_opponent_content.offset_top = 6.0
+			_btn_match_opponent_content.offset_right = -7.0
+			_btn_match_opponent_content.offset_bottom = -6.0
+
+			if _btn_match_opponent_content is VBoxContainer:
+				(_btn_match_opponent_content as VBoxContainer).alignment = BoxContainer.ALIGNMENT_CENTER
+				(_btn_match_opponent_content as VBoxContainer).add_theme_constant_override(
+					"separation", 2
+				)
+
+		if _btn_match_title_label != null:
+			_btn_match_title_label.add_theme_font_size_override("font_size", 18)
+			_btn_match_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			_btn_match_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+		if _btn_match_vs_label != null:
+			_btn_match_vs_label.add_theme_font_size_override("font_size", 12)
+			_btn_match_vs_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			_btn_match_vs_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+		if _btn_match_opponent_line != null:
+			_btn_match_opponent_line.alignment = BoxContainer.ALIGNMENT_CENTER
+			_btn_match_opponent_line.add_theme_constant_override("separation", 5)
+
+		if _btn_match_opponent_crest != null:
+			_btn_match_opponent_crest.custom_minimum_size = Vector2(30.0, 30.0)
+			_btn_match_opponent_crest.size = Vector2(30.0, 30.0)
+
+		if _btn_match_opponent_label != null:
+			_btn_match_opponent_label.add_theme_font_size_override("font_size", 15)
+			_btn_match_opponent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			_btn_match_opponent_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	# ========================================================
+	# 4. POPULARITY
+	# ========================================================
+
+	for node_path in [
+		"PopularityBadge",
+		"PopularityBadge2",
+		"UI/PopularityBadge",
+		"UI/PopularityBadge2"
+	]:
+		var pop := get_node_or_null(node_path) as Label
+		if pop == null or not pop.visible:
+			continue
+
+		pop.set_as_top_level(true)
+		pop.scale = Vector2.ONE
+		pop.size = Vector2(180.0, 28.0)
+		pop.global_position = Vector2(
+			vp.x - 194.0,
+			10.0
+		)
+		pop.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		pop.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		pop.add_theme_font_size_override("font_size", 17)
+
+	# ========================================================
+	# 5. HUD
+	# ========================================================
+
+	var hud := get_node_or_null("UI/HudProgressPanel") as Control
+
+	if hud != null:
+		var hud_size := Vector2(136.0, 76.0)
+
+		hud.set_as_top_level(true)
+		hud.scale = Vector2.ONE
+		hud.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		hud.custom_minimum_size = hud_size
+		hud.size = hud_size
+		hud.global_position = Vector2(
+			vp.x - hud_size.x - 14.0,
+			48.0
+		)
+
+		var hud_box := hud.get_node_or_null("HudVBox") as VBoxContainer
+		if hud_box != null:
+			hud_box.position = Vector2(8.0, 5.0)
+			hud_box.size = Vector2(hud_size.x - 16.0, hud_size.y - 10.0)
+			hud_box.add_theme_constant_override("separation", 1)
+
+		for lbl in [lbl_hud_level, lbl_hud_xp, lbl_hud_tokens]:
+			if lbl != null:
+				lbl.add_theme_font_size_override("font_size", 13)
+
+		var token_icon := hud.get_node_or_null("HudVBox/TokensRow/ImgToken") as TextureRect
+		if token_icon != null:
+			token_icon.custom_minimum_size = Vector2(13.0, 13.0)
+			token_icon.size = Vector2(13.0, 13.0)
+
+		# ====================================================
+		# 6. DIVISION
+		# ====================================================
+
+		var division := hud.get_node_or_null("LblDivision") as Label
+
+		if division != null:
+			var div_size := Vector2(120.0, 28.0)
+
+			division.set_as_top_level(true)
+			division.scale = Vector2.ONE
+			division.custom_minimum_size = div_size
+			division.size = div_size
+			division.global_position = Vector2(
+				vp.x - div_size.x - 14.0,
+				132.0
+			)
+			division.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			division.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			division.add_theme_font_size_override("font_size", 11)
+
+	# ========================================================
+	# 7. BACK
+	# ========================================================
+
+	if btn_retour != null:
+		var back_size := Vector2(180.0, 40.0)
+
+		btn_retour.set_as_top_level(true)
+		btn_retour.scale = Vector2.ONE
+		btn_retour.custom_minimum_size = back_size
+		btn_retour.size = back_size
+		btn_retour.global_position = Vector2(
+			14.0,
+			vp.y - back_size.y - 14.0
+		)
+		btn_retour.add_theme_font_size_override("font_size", 14)
+		btn_retour.alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	if btn_match != null:
+		btn_match.scale = Vector2.ONE
+		btn_match.pivot_offset = btn_match.size * 0.5
+
+	# Un seul écrivain de X, avant révélation.
+	_bm_saison_finalize_landscape_centering()
+	_bm_debug_play_geometry("_bm_saison_apply_mobile_landscape_deterministic_layout:after")
+	_bm_debug_tabs_visibility("_bm_saison_apply_mobile_landscape_deterministic_layout:after")
+
+
 func _bm_saison_apply_mobile_hud_layout() -> void:
+	if _bm_saison_is_mobile_layout():
+		var _bm_vp_landscape := get_viewport_rect().size
+		if _bm_vp_landscape.x > _bm_vp_landscape.y:
+			call_deferred("_bm_saison_apply_mobile_landscape_deterministic_layout")
+			return
 	if not _bm_saison_is_mobile_layout():
 		return
 
@@ -5831,97 +6341,248 @@ func _bm_saison_apply_mobile_hud_layout() -> void:
 	if hud == null:
 		return
 
-	if not hud.has_meta("bm_saison_mobile_hud_scaled_done"):
-		hud.set_meta("bm_saison_mobile_hud_scaled_done", true)
-		hud.scale = Vector2(1.15, 1.15)
-		hud.custom_minimum_size = Vector2(maxf(1.0, hud.custom_minimum_size.x * 0.72), hud.custom_minimum_size.y * 1.15)
+	var vp := get_viewport_rect().size
+	var landscape := vp.x > vp.y
 
-	if not hud.has_meta("bm_saison_mobile_hud_text_plus2_done"):
-		hud.set_meta("bm_saison_mobile_hud_text_plus2_done", true)
-		for lbl in [lbl_hud_level, lbl_hud_xp, lbl_hud_tokens]:
-			if lbl != null:
-				var fs: int = int(lbl.get_theme_font_size("font_size"))
-				if fs > 0:
-					lbl.add_theme_font_size_override("font_size", fs + 2)
+	# Layout déterministe : aucune multiplication cumulative.
+	hud.scale = Vector2(0.675, 0.675) if landscape else Vector2.ONE
+	hud.set_as_top_level(true)
 
-	var vp: Vector2 = get_viewport_rect().size
-	var margin_right: float = 40.0
-	var hud_w: float = maxf(hud.size.x, hud.custom_minimum_size.x)
-	hud.anchor_left = 1.0
-	hud.anchor_right = 1.0
-	hud.offset_left = -hud_w - margin_right
-	hud.offset_right = -margin_right
-	hud.position.x = vp.x - (hud_w * hud.scale.x) - margin_right
+	var hud_size := Vector2(190.0, 112.0) if landscape else Vector2(200.0, 120.0)
+	hud.custom_minimum_size = hud_size
+	hud.size = hud_size
+	hud.global_position = Vector2(
+		vp.x - (hud_size.x * 0.675) - 8.0 if landscape else vp.x - hud_size.x - 22.0,
+		58.0 if landscape else 72.0
+	)
+
+	for lbl in [lbl_hud_level, lbl_hud_xp, lbl_hud_tokens]:
+		if lbl != null:
+			lbl.add_theme_font_size_override("font_size", 19 if landscape else 21)
+
+	var division := hud.get_node_or_null("LblDivision") as Label
+	if division != null:
+		division.set_as_top_level(true)
+		division.scale = Vector2(0.63, 0.63) if landscape else Vector2.ONE
+		division.add_theme_font_size_override("font_size", 19 if landscape else 21)
+		if landscape:
+			var division_w := maxf(division.size.x, division.custom_minimum_size.x)
+			division.global_position = Vector2(
+				vp.x - (division_w * 0.63) - 8.0,
+				58.0 + (hud_size.y * 0.675) + 8.0
+			)
 
 
 func _bm_saison_apply_mobile_top_left_buttons_plus20_text_plus2() -> void:
-	if not _bm_saison_is_mobile_landscape():
+	if _bm_saison_is_mobile_layout():
+		var _bm_vp_landscape := get_viewport_rect().size
+		if _bm_vp_landscape.x > _bm_vp_landscape.y:
+			call_deferred("_bm_saison_apply_mobile_landscape_deterministic_layout")
+			return
+	if not _bm_saison_is_mobile_layout():
 		return
+
+	var vp := get_viewport_rect().size
+	var landscape := vp.x > vp.y
 
 	var tabs := get_node_or_null("UI/Tabs") as HBoxContainer
 	if tabs != null:
-		tabs.offset_top = 10.0
-		tabs.offset_bottom = 88.0
-		tabs.custom_minimum_size.y = maxf(tabs.custom_minimum_size.y, 78.0)
-		tabs.add_theme_constant_override("separation", 34)
+		tabs.set_as_top_level(true)
+		tabs.scale = Vector2.ONE
+		tabs.global_position = Vector2(18.0, 14.0 if landscape else 18.0)
+		tabs.custom_minimum_size.y = 52.0 if landscape else 58.0
+		tabs.add_theme_constant_override("separation", 10)
 
-	for btn in [btn_classement, btn_statistiques, btn_calendrier, btn_mercato, btn_missions, btn_tournois]:
+	for btn in [
+		btn_classement,
+		btn_statistiques,
+		btn_calendrier,
+		btn_mercato,
+		btn_missions,
+		btn_tournois
+	]:
 		if btn == null:
 			continue
 
 		btn.scale = Vector2.ONE
-		btn.add_theme_font_size_override("font_size", 28)
-		btn.custom_minimum_size = Vector2(maxf(btn.custom_minimum_size.x, 170.0), 78.0)
-		btn.size = btn.custom_minimum_size
+		btn.custom_minimum_size = Vector2(
+			118.0 if landscape else 136.0,
+			52.0 if landscape else 58.0
+		)
+		btn.add_theme_font_size_override(
+			"font_size",
+			18 if landscape else 20
+		)
 		btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		btn.min_size_changed()
 
+	# Back to Management : proportions Desktop.
+	if btn_retour != null:
+		btn_retour.set_as_top_level(true)
+		btn_retour.scale = Vector2.ONE
 
+		var back_size := Vector2(
+			220.0 if landscape else 250.0,
+			54.0 if landscape else 60.0
+		)
+
+		btn_retour.custom_minimum_size = back_size
+		btn_retour.size = back_size
+		btn_retour.global_position = Vector2(
+			20.0,
+			vp.y - back_size.y - 18.0
+		)
+		btn_retour.add_theme_font_size_override(
+			"font_size",
+			18 if landscape else 20
+		)
+
+
+
+	if landscape and btn_calendrier != null:
+		btn_calendrier.scale = Vector2.ONE
+		btn_calendrier.custom_minimum_size = Vector2(85.0, 37.0)
+		btn_calendrier.size = Vector2(85.0, 37.0)
+		btn_calendrier.add_theme_font_size_override("font_size", 12)
+		btn_calendrier.alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	if landscape and btn_retour != null:
+		btn_retour.scale = Vector2.ONE
+		btn_retour.custom_minimum_size = Vector2(138.0, 35.0)
+		btn_retour.size = Vector2(138.0, 35.0)
+		btn_retour.add_theme_font_size_override("font_size", 13)
+		btn_retour.alignment = HORIZONTAL_ALIGNMENT_CENTER
 func _bm_saison_apply_mobile_play_button_plus20_text_plus2() -> void:
-	if not _bm_saison_is_mobile_landscape():
+	_bm_debug_play_geometry("_bm_saison_apply_mobile_play_button_plus20_text_plus2:before")
+	if _bm_saison_is_mobile_layout():
+		var _bm_vp_landscape := get_viewport_rect().size
+		if _bm_vp_landscape.x > _bm_vp_landscape.y:
+			call_deferred("_bm_saison_apply_mobile_landscape_deterministic_layout")
+			_bm_debug_play_geometry("_bm_saison_apply_mobile_play_button_plus20_text_plus2:return")
+			return
+	if not _bm_saison_is_mobile_layout():
+		_bm_debug_play_geometry("_bm_saison_apply_mobile_play_button_plus20_text_plus2:return")
 		return
 	if btn_match == null:
+		_bm_debug_play_geometry("_bm_saison_apply_mobile_play_button_plus20_text_plus2:return")
 		return
 
-	if not btn_match.has_meta("bm_saison_mobile_play_plus20_done"):
-		btn_match.set_meta("bm_saison_mobile_play_plus20_done", true)
-		btn_match.scale *= 1.20
+	var vp := get_viewport_rect().size
+	var landscape := vp.x > vp.y
 
-	btn_match.add_theme_font_size_override("font_size", 28)
+
+	if landscape:
+		var match_size := Vector2(231.0, 77.0)
+		btn_match.custom_minimum_size = match_size
+		btn_match.size = match_size
+	# Aucune inflation mobile.
+	btn_match.scale = Vector2.ONE
+	btn_match.add_theme_font_size_override(
+		"font_size",
+		16 if landscape else 25
+	)
+
+	# Contenu interne créé dynamiquement : proportions Desktop.
+	if _btn_match_title_label != null and is_instance_valid(_btn_match_title_label):
+		_btn_match_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_btn_match_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_btn_match_title_label.add_theme_font_size_override(
+			"font_size",
+			18 if landscape else 28
+		)
+
+	if _btn_match_vs_label != null and is_instance_valid(_btn_match_vs_label):
+		_btn_match_vs_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_btn_match_vs_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_btn_match_vs_label.add_theme_font_size_override(
+			"font_size",
+			12 if landscape else 19
+		)
+
+	if _btn_match_opponent_label != null and is_instance_valid(_btn_match_opponent_label):
+		_btn_match_opponent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_btn_match_opponent_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_btn_match_opponent_label.add_theme_font_size_override(
+			"font_size",
+			15 if landscape else 25
+		)
+
+	if _btn_match_opponent_crest != null and is_instance_valid(_btn_match_opponent_crest):
+		var crest_size := Vector2(29.0, 29.0) if landscape else Vector2(48.0, 48.0)
+		_btn_match_opponent_crest.custom_minimum_size = crest_size
+		_btn_match_opponent_crest.size = crest_size
+	_bm_debug_play_geometry("_bm_saison_apply_mobile_play_button_plus20_text_plus2:after")
 
 
 func _bm_saison_apply_mobile_day_and_popularity_texts() -> void:
+	_bm_debug_play_geometry("_bm_saison_apply_mobile_day_and_popularity_texts:before")
+	if _bm_saison_is_mobile_layout():
+		var _bm_vp_landscape := get_viewport_rect().size
+		if _bm_vp_landscape.x > _bm_vp_landscape.y:
+			call_deferred("_bm_saison_apply_mobile_landscape_deterministic_layout")
+			_bm_debug_play_geometry("_bm_saison_apply_mobile_day_and_popularity_texts:return")
+			return
 	if not _bm_saison_is_mobile_layout():
+		_bm_debug_play_geometry("_bm_saison_apply_mobile_day_and_popularity_texts:return")
 		return
 
+	var vp := get_viewport_rect().size
+	var landscape := vp.x > vp.y
+
 	if lbl_season_day != null and is_instance_valid(lbl_season_day):
-		if not lbl_season_day.has_meta("bm_saison_mobile_day_plus20_done"):
-			lbl_season_day.set_meta("bm_saison_mobile_day_plus20_done", true)
-			lbl_season_day.scale = Vector2(1.20, 1.20)
-		if not lbl_season_day.has_meta("bm_saison_mobile_day_text_plus2_done"):
-			lbl_season_day.set_meta("bm_saison_mobile_day_text_plus2_done", true)
-			var day_fs: int = int(lbl_season_day.get_theme_font_size("font_size"))
-			if day_fs > 0:
-				lbl_season_day.add_theme_font_size_override("font_size", day_fs + 2)
+		lbl_season_day.scale = Vector2(0.80, 0.80) if landscape else Vector2.ONE
+		lbl_season_day.add_theme_font_size_override(
+			"font_size",
+			20 if landscape else 21
+		)
 		_bm_saison_align_mobile_play_and_day()
 
-	for node_path in ["PopularityBadge", "PopularityBadge2", "UI/PopularityBadge", "UI/PopularityBadge2"]:
+	for node_path in [
+		"PopularityBadge",
+		"PopularityBadge2",
+		"UI/PopularityBadge",
+		"UI/PopularityBadge2"
+	]:
 		var lbl := get_node_or_null(node_path) as Label
 		if lbl == null:
 			continue
-		if lbl.has_meta("bm_saison_mobile_popularity_text_plus2_done"):
-			continue
-		lbl.set_meta("bm_saison_mobile_popularity_text_plus2_done", true)
-		var fs: int = int(lbl.get_theme_font_size("font_size"))
-		if fs > 0:
-			lbl.add_theme_font_size_override("font_size", fs + 2)
+
+		lbl.scale = Vector2.ONE
+		lbl.add_theme_font_size_override(
+			"font_size",
+			20 if landscape else 21
+		)
+
+		lbl.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		lbl.offset_left = -250.0 if landscape else -270.0
+		lbl.offset_right = -18.0
+		lbl.offset_top = 16.0
+		lbl.offset_bottom = 50.0
+	_bm_debug_play_geometry("_bm_saison_apply_mobile_day_and_popularity_texts:after")
+
 
 func _bm_saison_align_mobile_play_and_day() -> void:
+	_bm_debug_play_geometry("_bm_saison_align_mobile_play_and_day:before")
+	if _bm_saison_is_mobile_layout():
+		var _bm_center_vp := get_viewport_rect().size
+		if _bm_center_vp.x > _bm_center_vp.y:
+			call_deferred("_bm_saison_finalize_landscape_centering")
+			_bm_debug_play_geometry("_bm_saison_align_mobile_play_and_day:return")
+			return
+	if _bm_saison_is_mobile_layout():
+		var _bm_vp_landscape := get_viewport_rect().size
+		if _bm_vp_landscape.x > _bm_vp_landscape.y:
+			call_deferred("_bm_saison_apply_mobile_landscape_deterministic_layout")
+			_bm_debug_play_geometry("_bm_saison_align_mobile_play_and_day:return")
+			return
 	if not _bm_saison_is_mobile_layout():
+		_bm_debug_play_geometry("_bm_saison_align_mobile_play_and_day:return")
 		return
 	if btn_match == null:
+		_bm_debug_play_geometry("_bm_saison_align_mobile_play_and_day:return")
 		return
 	if lbl_season_day == null or not is_instance_valid(lbl_season_day):
+		_bm_debug_play_geometry("_bm_saison_align_mobile_play_and_day:return")
 		return
 
 	await get_tree().process_frame
@@ -5938,3 +6599,4 @@ func _bm_saison_align_mobile_play_and_day() -> void:
 	lbl_season_day.pivot_offset = lbl_season_day.size * 0.5
 	_bm_refresh_league_badge()
 	btn_match.pivot_offset = btn_match.size * 0.5
+	_bm_debug_play_geometry("_bm_saison_align_mobile_play_and_day:after")
