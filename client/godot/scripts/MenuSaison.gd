@@ -4110,6 +4110,9 @@ func _open_calendrier_modal() -> void:
 	calendrier_modal.z_index = 700
 	get_node("Overlays").add_child(calendrier_modal)
 	calendrier_modal.move_to_front()
+	var calendar_title := calendrier_modal.get_node_or_null("Panel/Title") as Label
+	if calendar_title != null:
+		calendar_title.text = btn_calendrier.text if btn_calendrier != null else tr("saison.tab.calendar")
 
 	# Connect fermeture
 	if calendrier_modal.has_signal("closed"):
