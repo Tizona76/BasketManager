@@ -43,6 +43,71 @@ func _bm_calendar_is_mobile_layout() -> bool:
 		return true
 	return false
 
+func _bm_calendar_apply_mobile_landscape_layout() -> void:
+	if not _bm_calendar_is_mobile_layout():
+		return
+
+	var vp := get_viewport_rect().size
+	if vp.x <= vp.y:
+		return
+
+	var panel := get_node_or_null("Panel") as Control
+	var close_btn := get_node_or_null("Panel/BtnClose") as Button
+	var title_lbl := get_node_or_null("Panel/Title") as Label
+	var scroll_box := get_node_or_null("Panel/Scroll") as ScrollContainer
+	var footer := get_node_or_null("Panel/Footer") as Label
+
+	if panel == null or close_btn == null or title_lbl == null or scroll_box == null:
+		return
+
+	var margin_x := 18.0
+	var margin_y := 14.0
+
+	var panel_size := Vector2(
+		maxf(320.0, vp.x - margin_x * 2.0),
+		maxf(220.0, vp.y - margin_y * 2.0)
+	)
+
+	panel.position = Vector2(margin_x, margin_y)
+	panel.size = panel_size
+	panel.custom_minimum_size = panel_size
+
+	# Header
+	title_lbl.position = Vector2(14.0, 7.0)
+	title_lbl.size = Vector2(
+		maxf(120.0, panel_size.x - 86.0),
+		44.0
+	)
+	title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_font_size_override("font_size", 24)
+
+	# Croix
+	close_btn.custom_minimum_size = Vector2(51.0, 51.0)
+	close_btn.size = Vector2(51.0, 51.0)
+	close_btn.position = Vector2(
+		panel_size.x - close_btn.size.x - 8.0,
+		4.0
+	)
+	close_btn.add_theme_font_size_override("font_size", 27)
+	close_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	close_btn.disabled = false
+	close_btn.z_index = 50
+	close_btn.move_to_front()
+
+	# Scroll entièrement contenu dans le panel
+	var scroll_margin := 12.0
+	var scroll_top := 58.0
+
+	scroll_box.position = Vector2(scroll_margin, scroll_top)
+	scroll_box.size = Vector2(
+		maxf(200.0, panel_size.x - scroll_margin * 2.0),
+		maxf(120.0, panel_size.y - scroll_top - 12.0)
+	)
+
+	if footer != null:
+		footer.visible = false
+
+
 func _ready() -> void:
 	if _bm_calendar_is_mobile_layout():
 		_bm_calendar_apply_mobile_text_plus2()
@@ -50,10 +115,22 @@ func _ready() -> void:
 		if close_btn == null:
 			close_btn = find_child("BtnClose", true, false) as Button
 		if close_btn != null:
-			close_btn.custom_minimum_size = Vector2(64, 64)
-			close_btn.size = Vector2(64, 64)
-			close_btn.add_theme_font_size_override("font_size", 34)
-			close_btn.min_size_changed()
+			close_btn.custom_minimum_size = Vector2(51, 51)
+			close_btn.size = Vector2(51, 51)
+			close_btn.add_theme_font_size_override("font_size", 27)
+			close_btn.z_index = 20
+
+			# Le TSCN place la croix à x=940 dans un panel de 1000 px.
+			# Sur iPhone paysage elle sort du viewport : la ramener
+			# explicitement dans le coin supérieur droit visible.
+			var panel := get_node_or_null("Panel") as Control
+			var vp := get_viewport_rect().size
+			if panel != null and vp.x > vp.y:
+				close_btn.position = Vector2(
+					maxf(12.0, vp.x - panel.position.x - close_btn.size.x - 12.0),
+					8.0
+				)
+
 	# Sécurité : si le node n'existe pas, on le voit tout de suite
 	assert(btn_close != null)
 	assert(title != null)
@@ -65,7 +142,15 @@ func _ready() -> void:
 		var title_font_size := int(title.get_theme_font_size("font_size"))
 		title.add_theme_font_size_override("font_size", title_font_size + 4)
 
+	_bm_calendar_apply_mobile_landscape_layout()
+
 	btn_close.pressed.connect(_on_close_pressed)
+	btn_close.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn_close.focus_mode = Control.FOCUS_ALL
+	btn_close.disabled = false
+	btn_close.z_index = 50
+	btn_close.move_to_front()
+
 
 	_populate_placeholder_calendar()
 
@@ -77,6 +162,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	SeasonState.decalage_scroll_calendrier = scroll.scroll_vertical
+
 
 
 func _on_close_pressed() -> void:
@@ -161,7 +247,8 @@ func _populate_placeholder_calendar() -> void:
 				l.modulate = Color(0.45, 1.00, 0.45, 1.0)
 			elif user_score < opp_score:
 				l.modulate = Color(1.00, 0.45, 0.45, 1.0)
-		l.add_theme_font_size_override("font_size", 32 if _bm_is_mobile_layout() else 28)
+		var calendar_landscape := _bm_calendar_is_mobile_layout() and get_viewport_rect().size.x > get_viewport_rect().size.y
+		l.add_theme_font_size_override("font_size", 22 if calendar_landscape else (32 if _bm_is_mobile_layout() else 28))
 		if i == start_round:
 			l.modulate = Color(0.25, 0.78, 1.00, 1.0)
 		l.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -182,10 +269,10 @@ func _populate_placeholder_calendar() -> void:
 		opp_label.text = opp_name
 		if typeof(fx) == TYPE_DICTIONARY and fx.has("home_score") and fx.has("away_score"):
 			opp_label.text += " (%d - %d)" % [int(fx.get("home_score", 0)), int(fx.get("away_score", 0))]
-		opp_label.add_theme_font_size_override("font_size", 32 if _bm_is_mobile_layout() else 28)
+		opp_label.add_theme_font_size_override("font_size", 22 if calendar_landscape else (32 if _bm_is_mobile_layout() else 28))
 		opp_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 		opp_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		opp_label.custom_minimum_size = Vector2(760, 0)
+		opp_label.custom_minimum_size = Vector2(360, 0) if calendar_landscape else Vector2(760, 0)
 		opp_label.modulate = l.modulate
 		row.add_child(opp_label)
 

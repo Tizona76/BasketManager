@@ -4106,6 +4106,14 @@ func _on_match_pressed() -> void:
 		else:
 			SeasonState.opponent_name = SeasonState.compute_next_opponent_name(my_name)
 	print("[SAISON] opponent_name =", SeasonState.opponent_name)
+
+	# iOS/mobile : Main reste propriétaire du graphe de navigation.
+	var main := get_tree().root.find_child("Main", true, false)
+	if _bm_saison_is_mobile_layout() and main != null and main.has_method("_show_match_sim"):
+		main.call_deferred("_show_match_sim")
+		return
+
+	# Desktop / fallback autonome inchangé.
 	get_tree().change_scene_to_file("res://scenes/MatchSim.tscn")
 
 # --- Fermeture popup bienvenue ---
@@ -4136,6 +4144,12 @@ func _open_calendrier_modal() -> void:
 	calendrier_modal.z_index = 700
 	get_node("Overlays").add_child(calendrier_modal)
 	calendrier_modal.move_to_front()
+
+	# Le bouton Saison porte déjà le texte dans la langue active.
+	# Le modal reprend exactement ce texte pour éviter tout décalage i18n.
+	var calendar_title := calendrier_modal.get_node_or_null("Panel/Title") as Label
+	if calendar_title != null:
+		calendar_title.text = btn_calendrier.text if btn_calendrier != null else tr("saison.tab.calendar")
 
 	# Connect fermeture
 	if calendrier_modal.has_signal("closed"):
@@ -5997,9 +6011,9 @@ func _bm_saison_apply_mobile_landscape_deterministic_layout() -> void:
 
 		var nav_x := 14.0
 		var nav_y := 14.0
-		var nav_w := 88.0
-		var nav_h := 30.0
-		var nav_gap_y := 7.0
+		var nav_w := 118.0
+		var nav_h := 36.0
+		var nav_gap_y := 6.0
 
 		var visible_index := 0
 		for i in range(nav_buttons.size()):
@@ -6021,7 +6035,7 @@ func _bm_saison_apply_mobile_landscape_deterministic_layout() -> void:
 				nav_x,
 				nav_y + float(visible_index) * (nav_h + nav_gap_y)
 			)
-			b.add_theme_font_size_override("font_size", 11)
+			b.add_theme_font_size_override("font_size", 13)
 			b.alignment = HORIZONTAL_ALIGNMENT_CENTER
 			visible_index += 1
 

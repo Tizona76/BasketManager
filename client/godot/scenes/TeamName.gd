@@ -93,7 +93,6 @@ var _create_new_career_dialog: ConfirmationDialog = null
 var _career_action_popup: PopupMenu = null
 var _delete_career_dialog: ConfirmationDialog = null
 var _pending_delete_career_id: String = ""
-var _teamname_ball_tween: Tween = null
 var _mobile_keyboard_dismiss_btn: Button = null
 
 
@@ -563,22 +562,47 @@ func _bm_make_career_button(entry: Dictionary) -> Button:
 	row.add_child(action_btn)
 
 	btn.pressed.connect(func() -> void:
-		if cid == "":
-			return
-
-		# Transition atomique YOUR TEAMS -> Management.
-		# Empêche un événement/deferred résiduel d'ouvrir
-		# ChooseLeagueOverlay pendant que Main change d'écran.
-		_bm_career_navigation_in_progress = true
-
-		if _league_choice_overlay != null and is_instance_valid(_league_choice_overlay):
-			_league_choice_overlay.visible = false
-			_league_choice_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-		emit_signal("career_selected", cid)
-		call_deferred("_bm_restore_career_picker_input_if_still_here")
+		_bm_activate_career(cid)
 	)
 	return btn
+
+
+func _bm_activate_career(cid: String) -> void:
+	var clean_cid := str(cid).strip_edges()
+	if clean_cid == "":
+		return
+
+	if _bm_career_navigation_in_progress:
+		return
+
+	_bm_career_navigation_in_progress = true
+
+	if _league_choice_overlay != null and is_instance_valid(_league_choice_overlay):
+		_league_choice_overlay.visible = false
+		_league_choice_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var tree := get_tree()
+	var main := tree.root.find_child("Main", true, false) if tree != null else null
+
+	# Chemin normal : Main possède TeamName et reçoit career_selected.
+	if main != null and main.has_method("_on_teamname_career_selected"):
+		emit_signal("career_selected", clean_cid)
+		call_deferred("_bm_restore_career_picker_input_if_still_here")
+		return
+
+	# Recovery universel :
+	# même si TeamName est devenu autonome, la CareerCard reste fonctionnelle.
+	if not ProfileManager.set_active_career_id(clean_cid):
+		_bm_career_navigation_in_progress = false
+		push_warning("[TEAMNAME][CAREER] recovery rejected career_id=" + clean_cid)
+		return
+
+	if tree == null:
+		_bm_career_navigation_in_progress = false
+		return
+
+	tree.set_meta("bm_open_management_after_main_boot", true)
+	tree.call_deferred("change_scene_to_file", "res://main.tscn")
 
 
 func _bm_force_restore_career_picker_after_back() -> void:
@@ -636,7 +660,7 @@ func _bm_force_restore_career_picker_after_back() -> void:
 	_career_picker.move_to_front()
 
 	# Réactivation explicite de chaque carte.
-	for node in _career_picker.find_children("CareerCard", "Button", true, false):
+	for node in _bm_get_career_cards():
 		var card := node as Button
 		if card == null:
 			continue
@@ -658,7 +682,7 @@ func _bm_force_restore_career_picker_after_back() -> void:
 
 	print(
 		"[IOS_CAREER_RESTORE_V3] cards=",
-		_career_picker.find_children("CareerCard", "Button", true, false).size(),
+		_bm_get_career_cards().size(),
 		" picker_z=", _career_picker.z_index,
 		" picker_filter=", _career_picker.mouse_filter
 	)
@@ -676,7 +700,7 @@ func _bm_restore_career_picker_input_if_still_here() -> void:
 	if _career_picker != null and is_instance_valid(_career_picker):
 		_career_picker.mouse_filter = Control.MOUSE_FILTER_PASS
 
-	for node in find_children("CareerCard", "Button", true, false):
+	for node in _bm_get_career_cards():
 		var card := node as Button
 		if card != null:
 			card.disabled = false
@@ -898,7 +922,6 @@ func _bm_build_career_picker() -> void:
 		_bm_populate_career_picker_box(box, careers)
 		_bm_apply_career_picker_orientation_layout()
 		move_child(_career_picker, get_child_count() - 1)
-		call_deferred("_ensure_teamname_center_ball")
 		return
 
 	_career_picker = CenterContainer.new()
@@ -938,7 +961,6 @@ func _bm_build_career_picker() -> void:
 	create_btn.pressed.connect(_on_create_new_team_pressed)
 	box.add_child(create_btn)
 	move_child(_career_picker, get_child_count() - 1)
-	call_deferred("_ensure_teamname_center_ball")
 
 
 func _bm_populate_career_picker_box(box: VBoxContainer, careers: Array) -> void:
@@ -968,6 +990,26 @@ func _bm_populate_career_picker_box(box: VBoxContainer, careers: Array) -> void:
 	_bm_style_entry_duplicate_button(create_btn, false)
 	create_btn.pressed.connect(_on_create_new_team_pressed)
 	box.add_child(create_btn)
+
+
+func _bm_get_career_cards() -> Array[Button]:
+	var cards: Array[Button] = []
+
+	if _career_picker == null or not is_instance_valid(_career_picker):
+		return cards
+
+	for node in _career_picker.find_children("*", "Button", true, false):
+		var card := node as Button
+		if card == null:
+			continue
+
+		var cid := str(card.get_meta("bm_career_id", "")).strip_edges()
+		if cid == "":
+			continue
+
+		cards.append(card)
+
+	return cards
 
 
 func _bm_apply_career_picker_orientation_layout() -> void:
@@ -1008,7 +1050,7 @@ func _bm_apply_career_picker_orientation_layout() -> void:
 		if title != null:
 			title.add_theme_font_size_override("font_size", 23 if landscape else 31)
 
-		for node in _career_picker.find_children("CareerCard", "Button", true, false):
+		for node in _bm_get_career_cards():
 			var card := node as Button
 			card.custom_minimum_size = Vector2(490, 60) if landscape else Vector2(430, 121)
 
@@ -1048,7 +1090,6 @@ func _bm_apply_career_picker_orientation_layout() -> void:
 			(_career_picker as ScrollContainer).scroll_vertical = 0
 
 	_apply_entry_flags_size()
-	call_deferred("_ensure_teamname_center_ball")
 
 
 func _bm_refresh_career_picker_i18n() -> void:
@@ -1792,7 +1833,6 @@ func _ready() -> void:
 	_setup_fallback_dialog()
 	call_deferred("_focus_input")
 	call_deferred("_bm_apply_mobile_layout")
-	call_deferred("_ensure_teamname_center_ball")
 
 	if btn_confirm != null:
 		btn_confirm.pressed.connect(_bm_single_play_pressed)
@@ -1826,8 +1866,66 @@ func _ready() -> void:
 func _input(event: InputEvent) -> void:
 	if not _bm_is_mobile_layout():
 		return
-	if _league_inline_change_btn == null or not is_instance_valid(_league_inline_change_btn):
+
+	if not (event is InputEventScreenTouch):
 		return
+
+	var touch := event as InputEventScreenTouch
+	if not touch.pressed:
+		return
+
+	# Invariant YOUR TEAMS :
+	# si une CareerCard est réellement visible sous le doigt,
+	# son activation ne dépend d'aucun parcours précédent.
+	if (
+		_career_picker != null
+		and is_instance_valid(_career_picker)
+		and _career_picker.is_visible_in_tree()
+		and not _bm_career_navigation_in_progress
+	):
+		for node in _career_picker.find_children(
+			"CareerCard",
+			"Button",
+			true,
+			false
+		):
+			var card := node as Button
+			if card == null:
+				continue
+			if not card.is_visible_in_tree() or card.disabled:
+				continue
+
+			var action := card.find_child(
+				"CareerActionButton",
+				true,
+				false
+			) as Button
+
+			if (
+				action != null
+				and action.is_visible_in_tree()
+				and action.get_global_rect().has_point(touch.position)
+			):
+				return
+
+			if card.get_global_rect().has_point(touch.position):
+				var cid := str(
+					card.get_meta("bm_career_id", "")
+				).strip_edges()
+
+				if cid != "":
+					_bm_activate_career(cid)
+					get_viewport().set_input_as_handled()
+				return
+
+	# Fonction historique Change League conservée telle quelle,
+	# mais seulement si YOUR TEAMS n'a pas consommé le geste.
+	if (
+		_league_inline_change_btn == null
+		or not is_instance_valid(_league_inline_change_btn)
+	):
+		return
+
 	if not _league_inline_change_btn.is_visible_in_tree():
 		return
 
@@ -1835,19 +1933,14 @@ func _input(event: InputEvent) -> void:
 	if win.x <= win.y:
 		return
 
-	if event is InputEventScreenTouch:
-		var touch := event as InputEventScreenTouch
-		if not touch.pressed:
-			return
+	var button_rect := Rect2(
+		_league_inline_change_btn.global_position,
+		_league_inline_change_btn.size
+	)
 
-		var button_rect := Rect2(
-			_league_inline_change_btn.global_position,
-			_league_inline_change_btn.size
-		)
-
-		if button_rect.has_point(touch.position):
-			_bm_on_change_league_pressed()
-			get_viewport().set_input_as_handled()
+	if button_rect.has_point(touch.position):
+		_bm_on_change_league_pressed()
+		get_viewport().set_input_as_handled()
 
 
 func _notification(what: int) -> void:
@@ -2307,66 +2400,6 @@ func _on_entry_play_instantly_mouse_entered() -> void:
 		_show_entry_button_hover_tooltip(btn_play_instantly_entry, tr("teamname.create_new_team.tooltip"), "right_play_instantly")
 	else:
 		_show_entry_button_hover_tooltip(btn_play_instantly_entry, tr("menu.play_instantly.tooltip"), "right_play_instantly")
-
-
-func _ensure_teamname_center_ball() -> void:
-	var ball := get_node_or_null("ImgBallTeamName") as TextureRect
-
-	# iOS : ne jamais afficher le ballon à sa position par défaut.
-	# Sa position correcte n'est connue qu'après les deux process_frame.
-	if ball != null:
-		ball.visible = false
-	if ball == null:
-		var tex := load("res://assets/images/ballon.png") as Texture2D
-		if tex == null:
-			push_error("[TEAMNAME] missing ball: res://assets/images/ballon.png")
-			return
-		ball = TextureRect.new()
-		ball.name = "ImgBallTeamName"
-		ball.texture = tex
-		ball.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		ball.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		ball.custom_minimum_size = Vector2(72, 72)
-		ball.size = Vector2(72, 72)
-		ball.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		ball.z_index = 50
-		ball.visible = false
-		add_child(ball)
-
-	await get_tree().process_frame
-	await get_tree().process_frame
-
-	var anchor := find_child("YourTeamsTitle", true, false) as Control
-	var offset_y := 90.0
-	if anchor == null:
-		anchor = input_team
-		offset_y = 118.0
-	if anchor == null:
-		return
-
-	var anchor_pos := anchor.global_position
-	var anchor_size := anchor.size
-	ball.position = Vector2(
-		anchor_pos.x + (anchor_size.x - ball.size.x) * 0.5,
-		anchor_pos.y - offset_y
-	)
-
-	# Ne révéler qu'une fois correctement placé.
-	# Si on est déjà en train de quitter YOUR TEAMS, il reste caché.
-	if _bm_career_navigation_in_progress:
-		ball.visible = false
-		return
-
-	ball.visible = true
-
-	if _teamname_ball_tween != null and _teamname_ball_tween.is_valid():
-		_teamname_ball_tween.kill()
-	var base_y := ball.position.y
-	_teamname_ball_tween = create_tween()
-	_teamname_ball_tween.set_loops()
-	_teamname_ball_tween.tween_property(ball, "position:y", base_y - 18.0, 0.34).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	_teamname_ball_tween.tween_property(ball, "position:y", base_y, 0.34).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_IN)
-	_teamname_ball_tween.tween_interval(0.10)
 
 
 func _setup_fallback_dialog() -> void:

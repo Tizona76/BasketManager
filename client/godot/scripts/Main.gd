@@ -228,6 +228,20 @@ func _ready() -> void:
 	# ✅ IMPORTANT: on instancie Accueil dès le boot
 	_show_accueil()
 
+	# Recovery exceptionnel depuis un TeamName devenu autonome.
+	# Le SceneTree survit aux changements de scène ; le marqueur est one-shot.
+	var tree := get_tree()
+	if tree != null and bool(tree.get_meta("bm_open_management_after_main_boot", false)):
+		tree.remove_meta("bm_open_management_after_main_boot")
+		call_deferred("_bm_recover_management_after_main_boot")
+
+
+func _bm_recover_management_after_main_boot() -> void:
+	if not is_inside_tree():
+		return
+	_load_session_local_for_resume()
+	_show_menu()
+
 
 func _resolve_screen_root() -> Node:
 	var sr := get_node_or_null("ScreenRoot")
@@ -374,7 +388,6 @@ func _on_click() -> void:
 		_intro_transition_started = true
 		print("[MAIN] intro transition started")
 
-	_show_preparing_club_label()
 
 	if _accueil_inst != null and _accueil_inst.has_method("start_intro"):
 		if _accueil_inst.has_signal("intro_zoom_finished"):
@@ -387,170 +400,8 @@ func _on_click() -> void:
 
 
 # BM_SINGLE_PLAY_INSTANTLY_GATE_V1
-func _show_preparing_club_label() -> void:
-	if get_node_or_null("PreparingClubLayer") != null:
-		return
-	var preparing_layer := CanvasLayer.new()
-	preparing_layer.name = "PreparingClubLayer"
-	preparing_layer.layer = 4096
-	add_child(preparing_layer)
-
-	var overlay := Control.new()
-	overlay.name = "PreparingClubOverlay"
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay.size = get_viewport_rect().size
-	overlay.visible = true
-	preparing_layer.add_child(overlay)
-
-	var card := Panel.new()
-	card.name = "PreparingClubCard"
-	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.visible = true
-	card.z_index = 0
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.025, 0.03, 0.055, 0.94)
-	sb.border_width_left = 3
-	sb.border_width_top = 3
-	sb.border_width_right = 3
-	sb.border_width_bottom = 3
-	sb.border_color = Color(1.0, 0.78, 0.22, 0.88)
-	sb.corner_radius_top_left = 22
-	sb.corner_radius_top_right = 22
-	sb.corner_radius_bottom_left = 22
-	sb.corner_radius_bottom_right = 22
-	sb.shadow_color = Color(0, 0, 0, 0.45)
-	sb.shadow_size = 22
-	sb.shadow_offset = Vector2(0, 8)
-	card.add_theme_stylebox_override("panel", sb)
-	overlay.add_child(card)
-
-	var preparing_label := Label.new()
-	preparing_label.name = "PreparingClubLabel"
-	preparing_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	preparing_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	preparing_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	preparing_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	preparing_label.z_index = 10
-	preparing_label.add_theme_font_size_override("font_size", 34)
-	preparing_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.28, 1.0))
-	preparing_label.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 1.0))
-	preparing_label.add_theme_constant_override("outline_size", 8)
-	preparing_label.visible = true
-	overlay.add_child(preparing_label)
-	_bm_set_preparing_club_text(tr("startup.preparing_club"), true)
-	call_deferred("_bm_refresh_preparing_club_initial_text")
-	call_deferred("_bm_update_preparing_club_label_after_delay")
-
-
-func _bm_refresh_preparing_club_initial_text() -> void:
-	if get_node_or_null("PreparingClubLayer") == null:
-		return
-	_bm_set_preparing_club_text(tr("startup.preparing_club"), true)
-
-
-func _bm_set_preparing_club_text(text_value: String, show_ball: bool = false, align_left: bool = false, font_delta: int = 0) -> void:
-	var preparing_layer := get_node_or_null("PreparingClubLayer")
-	if preparing_layer == null:
-		return
-	var overlay := preparing_layer.get_node_or_null("PreparingClubOverlay") as Control
-	if overlay == null:
-		return
-	overlay.size = get_viewport_rect().size
-	overlay.visible = true
-	var card := overlay.get_node_or_null("PreparingClubCard") as Panel
-	var preparing_label := overlay.get_node_or_null("PreparingClubLabel") as Label
-	if preparing_label == null:
-		return
-	preparing_label.text = text_value
-	preparing_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if align_left else HORIZONTAL_ALIGNMENT_CENTER
-	preparing_label.visible = true
-	var vp := get_viewport_rect().size
-	if vp.x <= 1.0 or vp.y <= 1.0:
-		var win_size := DisplayServer.window_get_size()
-		vp = Vector2(maxf(vp.x, float(win_size.x)), maxf(vp.y, float(win_size.y)))	
-	var char_count := text_value.length()
-	var font_size := 32.0
-	if char_count > 260:
-		font_size = 17.0
-	elif char_count > 150:
-		font_size = 20.0
-	elif char_count > 70:
-		font_size = 24.0
-	var display_font_size := font_size + float(font_delta)
-	preparing_label.scale = Vector2.ONE
-	preparing_label.add_theme_font_size_override("font_size", int(display_font_size))
-	var max_w := minf(1320.0, vp.x * 0.86)
-	var min_w := 520.0 if char_count > 70 else 430.0
-	if vp.x < 600.0:
-		max_w = maxf(220.0, vp.x - 108.0)
-		min_w = minf(min_w, max_w)
-	var estimated_w := float(char_count) * display_font_size * 0.42 + 120.0
-	var label_w := clampf(estimated_w, min_w, max_w)
-	var usable_chars_per_line := maxf(20.0, (label_w - 80.0) / (display_font_size * 0.44))
-	var visual_lines := maxi(1, int(ceil(float(char_count) / usable_chars_per_line)))
-	var label_h := float(visual_lines) * display_font_size * 1.62 + 48.0
-	label_h = clampf(label_h, 96.0, minf(vp.y * 0.72, 620.0))
-	var label_size := Vector2(label_w, label_h)
-	var label_pos := (vp - label_size) * 0.5
-	preparing_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	preparing_label.position = label_pos
-	preparing_label.size = label_size
-	preparing_label.custom_minimum_size = label_size
-	preparing_label.offset_left = label_pos.x
-	preparing_label.offset_top = label_pos.y
-	preparing_label.offset_right = label_pos.x + label_size.x
-	preparing_label.offset_bottom = label_pos.y + label_size.y
-	if card != null:
-		card.scale = Vector2.ONE
-		var card_pos := label_pos - Vector2(34.0, 24.0)
-		var card_size := label_size + Vector2(68.0, 48.0)
-		card.visible = true
-		card.set_anchors_preset(Control.PRESET_TOP_LEFT)
-		card.position = card_pos
-		card.size = card_size
-		card.custom_minimum_size = card_size
-		card.offset_left = card_pos.x
-		card.offset_top = card_pos.y
-		card.offset_right = card_pos.x + card_size.x
-		card.offset_bottom = card_pos.y + card_size.y
-
-	# BM_IOS_PREPARING_CLUB_SCALE_80_V1
-	# Réduction visuelle absolue de 20 % sur mobile.
-	if _bm_is_mobile_layout():
-		if preparing_label != null:
-			preparing_label.pivot_offset = preparing_label.size * 0.5
-			preparing_label.scale = Vector2(0.80, 0.80)
-		if card != null:
-			card.pivot_offset = card.size * 0.5
-			card.scale = Vector2(0.80, 0.80)
-
-func _bm_update_preparing_club_label_after_delay() -> void:
-	await get_tree().create_timer(8.0).timeout
-	var preparing_layer := get_node_or_null("PreparingClubLayer")
-	if preparing_layer == null:
-		return
-	_bm_set_preparing_club_text(tr("startup.just_seconds_more"), false)
-	await get_tree().create_timer(12.0).timeout
-	preparing_layer = get_node_or_null("PreparingClubLayer")
-	if preparing_layer == null:
-		return
-	_bm_set_preparing_club_text(tr("startup.ready_to_manage_full_team"), false, true, 2)
-
-
-func _hide_preparing_club_label() -> void:
-	var preparing_layer := get_node_or_null("PreparingClubLayer")
-	if preparing_layer != null:
-		preparing_layer.queue_free()
-		return
-	var preparing_lbl := get_node_or_null("PreparingClubLabel")
-	if preparing_lbl != null:
-		preparing_lbl.queue_free()
-
-
 func _on_intro_zoom_finished() -> void:
 	print("[BM_GUEST_AUTH_TIMING] event=zoom_finished time_ms=", Time.get_ticks_msec(), " pending=", _web_guest_auth_pending)
-	_show_preparing_club_label()
 	await get_tree().process_frame
 	_show_team_name()
 
@@ -858,7 +709,6 @@ func _show_team_name() -> void:
 	if t is CanvasItem:
 		(t as CanvasItem).visible = false
 	screen_root.add_child(t)
-	_hide_preparing_club_label()
 	print("[TRACE_FLOW] H ADD_CHILD")
 	print("[TEAMNAME ADD_CHILD]")
 	print("[MAIN] TeamName has submit_team_name signal? ", t.has_signal("submit_team_name"))
@@ -1269,6 +1119,28 @@ func _show_saison() -> void:
 	I18nSvc.apply_all()
 	season.call("_bm_saison_apply_mobile_landscape_deterministic_layout")
 	season.visible = true
+
+
+func _show_match_sim() -> void:
+	var match_scene := load("res://scenes/MatchSim.tscn") as PackedScene
+	if match_scene == null:
+		push_error("[MAIN] Missing MatchSim.tscn")
+		return
+
+	$UI.visible = false
+	_set_bg_visible(false)
+	_clear_screen()
+
+	var match_view := match_scene.instantiate() as Control
+	if match_view == null:
+		push_error("[MAIN] MatchSim instantiate failed")
+		return
+
+	# Entrée atomique : ne jamais afficher une frame brute.
+	match_view.visible = false
+	screen_root.add_child(match_view)
+	I18nSvc.apply_all()
+	match_view.visible = true
 
 
 func _on_menu_go_match() -> void:

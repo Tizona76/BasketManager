@@ -4673,6 +4673,15 @@ func _on_btn_skip_pressed() -> void:
 
 
 func _on_btn_retour_pressed() -> void:
+	# iOS/mobile : revenir dans le graphe contrôlé par Main.
+	var main := get_tree().root.find_child("Main", true, false)
+	if _bm_matchsim_is_mobile_layout() and main != null and main.has_method("_show_saison"):
+		if btn_retour != null:
+			btn_retour.disabled = true
+		main.call_deferred("_show_saison")
+		return
+
+	# Desktop / fallback autonome inchangé.
 	get_tree().change_scene_to_file("res://scenes/MenuSaison.tscn")
 
 
