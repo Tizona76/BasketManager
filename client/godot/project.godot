@@ -25,6 +25,7 @@ I18nSvc="*res://scripts/I18n.gd"
 SaveSingleton="*res://scripts/Save.gd"
 SeasonState="*res://scripts/SeasonState.gd"
 MobilePinchZoom="*res://scripts/MobilePinchZoom.gd"
+SceneTransitionGuard="*res://scripts/SceneTransitionGuard.gd"
 
 [display]
 
