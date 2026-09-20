@@ -166,6 +166,7 @@ const GRAPH_LINE_WIDTH := 2.0
 class RevenueDonutChart:
 	extends Control
 
+	var mobile_title_gap: float = -1.0
 	var title: String = ""
 	var percent: float = 0.0
 	var accent: Color = Color(0.20, 0.85, 0.35, 1)
@@ -188,7 +189,11 @@ class RevenueDonutChart:
 		var percent_size := font.get_string_size(percent_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20)
 		draw_string(font, center - Vector2(percent_size.x * 0.5, -7.0), percent_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1, 1, 1, 1))
 		var title_size := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 15)
-		draw_string(font, Vector2((size.x - title_size.x) * 0.5, size.y - 8.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(1, 1, 1, 0.92))
+		var title_baseline := size.y - 8.0
+		if mobile_title_gap >= 0.0:
+			# Include the full stroke and one pixel of antialiasing.
+			title_baseline = center.y + radius + width * 0.5 + 1.0 + mobile_title_gap + font.get_ascent(15)
+		draw_string(font, Vector2((size.x - title_size.x) * 0.5, title_baseline), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(1, 1, 1, 0.92))
 
 @onready var lbl_title: Label = $LblTitle
 @onready var btn_retour: Button = $BtnRetour
@@ -392,6 +397,10 @@ func _bm_finances_apply_mobile_landscape_hud_layout() -> void:
 	hud.offset_right = -margin_right
 	hud.position.x = vp.x - (hud_w * hud.scale.x) - margin_right
 
+	# Le HUD fait partie du canevas Finance mobile final.
+	# Réappliquer le transform commun après ses anciens réglages locaux.
+	_bm_finances_apply_mobile_screen_layout()
+
 
 func _bm_apply_back_button_style(btn: Button) -> void:
 	if btn == null:
@@ -509,12 +518,184 @@ func _ready() -> void:
 	call_deferred("_bm_finance_apply_text_plus2_guard")
 
 
+func _bm_finances_apply_design_rect(
+	ctrl: Control,
+	design_rect: Rect2,
+	origin: Vector2,
+	scale_factor: float
+) -> void:
+	if ctrl == null:
+		return
+
+	ctrl.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
+	ctrl.pivot_offset = Vector2.ZERO
+	ctrl.scale = Vector2.ONE
+	ctrl.position = origin + design_rect.position * scale_factor
+	ctrl.size = design_rect.size
+	ctrl.scale = Vector2(scale_factor, scale_factor)
+
+
+func _bm_finances_apply_mobile_screen_layout() -> void:
+	if not _bm_finances_is_mobile_landscape():
+		return
+
+	var vp := get_viewport_rect().size
+	if vp.x <= 0.0 or vp.y <= 0.0:
+		return
+
+	# Le layout Finance historique est dessiné sur une base 1440 x 720.
+	# Sur mobile paysage on conserve exactement ses proportions,
+	# dans le même gabarit horizontal que Calendar : 76,5 %.
+	var design_size := Vector2(1440.0, 720.0)
+	var target_width := vp.x * 0.80325
+
+	# Popularity reste un élément racine indépendant du canevas.
+	# Mobile paysage uniquement : blanc et -2 px, sans décrément cumulatif.
+	var popularity := get_node_or_null("PopularityBadge") as Label
+	if popularity != null:
+		# Une seule ligne blanche : supprimer toute trace noire
+		# provenant de l'outline ou de l'ombre du Label.
+		popularity.add_theme_color_override("font_color", Color.WHITE)
+		popularity.add_theme_color_override(
+			"font_outline_color",
+			Color(0.0, 0.0, 0.0, 0.0)
+		)
+		popularity.add_theme_color_override(
+			"font_shadow_color",
+			Color(0.0, 0.0, 0.0, 0.0)
+		)
+		popularity.add_theme_constant_override("outline_size", 0)
+		popularity.add_theme_constant_override("shadow_offset_x", 0)
+		popularity.add_theme_constant_override("shadow_offset_y", 0)
+
+		# Ancien rendu = taille d'origine -2.
+		# Popularity mobile : taille d'origine -8.
+		if not popularity.has_meta("bm_finance_popularity_minus8_done"):
+			popularity.set_meta("bm_finance_popularity_minus8_done", true)
+			var popularity_fs := int(
+				popularity.get_theme_font_size("font_size")
+			)
+			if popularity_fs > 8:
+				popularity.add_theme_font_size_override(
+					"font_size",
+					popularity_fs - 10
+				)
+	var target_height := maxf(220.0, vp.y - 28.0)
+
+	var scale_factor := minf(
+		target_width / design_size.x,
+		target_height / design_size.y
+	) * 1.10
+
+	var displayed_size := design_size * scale_factor
+	var origin := Vector2(
+		(vp.x - displayed_size.x) * 0.5,
+		(vp.y - displayed_size.y) * 0.5
+	)
+
+	_bm_finances_apply_design_rect(
+		lbl_title,
+		Rect2(480.0, 22.0, 480.0, 56.0),
+		origin,
+		scale_factor
+	)
+
+	_bm_finances_apply_design_rect(
+		get_node_or_null("IncomePanel") as Control,
+		Rect2(-30.0, 110.0, 684.0, 215.0),
+		origin,
+		scale_factor
+	)
+
+	_bm_finances_apply_design_rect(
+		get_node_or_null("ExpensesPanel") as Control,
+		Rect2(-30.0, 370.0, 684.0, 220.0),
+		origin,
+		scale_factor
+	)
+
+	_bm_finances_apply_design_rect(
+		get_node_or_null("BalancePanel") as Control,
+		Rect2(326.0, 633.0, 489.0, 75.6),
+		origin,
+		scale_factor
+	)
+
+	_bm_finances_apply_design_rect(
+		finance_graph_panel,
+		Rect2(1118.0, 259.2, 388.8, 237.6),
+		origin,
+		scale_factor
+	)
+
+	_bm_finances_apply_design_rect(
+		btn_retour,
+		Rect2(34.0, 628.0, 206.0, 62.0),
+		origin,
+		scale_factor
+	)
+
+	var hud := get_node_or_null("HudProgressPanel") as Control
+	if hud != null:
+		hud.custom_minimum_size = Vector2(220.0, 136.0)
+		_bm_finances_apply_design_rect(
+			hud,
+			Rect2(1220.0, 96.0, 220.0, 136.0),
+			origin,
+			scale_factor
+		)
+
+	_ensure_revenue_donut_charts()
+	_ensure_expense_donut_charts()
+
+	var revenue_charts := [
+		_donut_tickets,
+		_donut_shop,
+		_donut_sponsors,
+		_donut_tournaments
+	]
+	var mobile_donut_size := Vector2(171.661, 171.661)
+	# Visual blocks: full active ring + title + clearance to the next ring.
+	var visual_radius := mobile_donut_size.x * 0.28 + 6.0 + 1.0
+	var title_gap := 2.0
+	var title_height := get_theme_default_font().get_height(15)
+	var row_step := visual_radius * 2.0 + title_gap + title_height + 6.0
+	var column_centers := [736.0, 944.0]
+	var visual_top := 78.0
+	var charts := revenue_charts + [
+		_expense_donut_salaries,
+		_expense_donut_staff,
+		_expense_donut_maintenance,
+		_expense_donut_stadium_works
+	]
+	for i in range(charts.size()):
+		var chart := charts[i] as RevenueDonutChart
+		if chart != null:
+			chart.mobile_title_gap = title_gap
+			var chart_position := Vector2(
+				column_centers[i % 2] - mobile_donut_size.x * 0.5,
+				visual_top + floori(i / 2.0) * row_step
+					+ visual_radius - mobile_donut_size.y * 0.44
+			)
+			_bm_finances_apply_design_rect(
+				chart,
+				Rect2(chart_position, mobile_donut_size),
+				origin,
+				scale_factor
+			)
+			chart.queue_redraw()
+
+
 func _apply_graph_layout() -> void:
 	if finance_graph_panel == null:
 		return
 
 	var vp := get_viewport_rect().size
 	if vp.x <= 0.0 or vp.y <= 0.0:
+		return
+
+	if _bm_finances_is_mobile_landscape():
+		_bm_finances_apply_mobile_screen_layout()
 		return
 
 	var graph_w := vp.x * GRAPH_WIDTH_RATIO
@@ -579,6 +760,7 @@ func _place_revenue_donut_charts() -> void:
 	]
 	for i in range(charts.size()):
 		var chart = charts[i]
+		chart.mobile_title_gap = -1.0
 		chart.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		chart.position = positions[i]
 		chart.size = chart_size
@@ -622,6 +804,7 @@ func _place_expense_donut_charts() -> void:
 	]
 	for i in range(charts.size()):
 		var chart = charts[i]
+		chart.mobile_title_gap = -1.0
 		chart.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		chart.position = positions[i]
 		chart.size = chart_size
@@ -1047,7 +1230,7 @@ func _bm_update_finance_trend_text(income: int, expenses: int, tickets: int = -1
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lbl.add_theme_font_size_override("font_size", 24)
+	lbl.add_theme_font_size_override("font_size", 27 if _bm_finances_is_mobile_landscape() else 24)
 	lbl.add_theme_constant_override("outline_size", 1)
 	lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.55))
 	lbl.modulate = Color(1, 1, 1, 0.95)

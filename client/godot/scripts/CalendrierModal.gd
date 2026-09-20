@@ -63,12 +63,16 @@ func _bm_calendar_apply_mobile_landscape_layout() -> void:
 	var margin_x := 18.0
 	var margin_y := 14.0
 
+	var current_panel_width := maxf(320.0, vp.x - margin_x * 2.0)
 	var panel_size := Vector2(
-		maxf(320.0, vp.x - margin_x * 2.0),
+		maxf(320.0, current_panel_width * 0.765),
 		maxf(220.0, vp.y - margin_y * 2.0)
 	)
 
-	panel.position = Vector2(margin_x, margin_y)
+	panel.position = Vector2(
+		(vp.x - panel_size.x) * 0.5,
+		margin_y
+	)
 	panel.size = panel_size
 	panel.custom_minimum_size = panel_size
 
