@@ -4202,6 +4202,8 @@ func _refresh_standings_rows() -> void:
 		var row_bg := "#173449" if is_player else ("#122034" if pos % 2 == 0 else "#101C2E")
 		if pos <= 2:
 			row_bg = "#174A34"
+		elif pos >= maxi(1, st.size() - 1):
+			row_bg = "#5A242A"
 		_add_standings_row(cells, row_bg, is_player, false)
 		pos += 1
 
