@@ -429,6 +429,10 @@ func _ready() -> void:
 	call_deferred("_bm_refresh_ticketing_advisor")
 	call_deferred("_stadium_hide_title_and_fix_popularity")
 	call_deferred("_stadium_fix_popularity_badges_visual")
+	if _bm_stadium_is_mobile_layout():
+		get_tree().tree_changed.connect(_bm_stadium_queue_mobile_layout)
+		get_viewport().size_changed.connect(_bm_stadium_queue_mobile_layout)
+		_bm_stadium_queue_mobile_layout()
 
 func _bm_has_confirmed_stadium_setup() -> bool:
 	var d: Dictionary = PlayerLife.load_savegame()
@@ -504,6 +508,9 @@ func _bm_apply_back_button_style(btn: Button) -> void:
 	btn.add_theme_font_size_override("font_size", 24 if _bm_stadium_is_mobile_layout() else 22)
 
 func _bm_stadium_mobile_entry_buttons_plus20_textplus2() -> void:
+	if _bm_stadium_mobile_landscape():
+		_bm_stadium_queue_mobile_layout()
+		return
 	if not _bm_stadium_is_mobile_layout():
 		return
 	for path in ["Tabs/BtnTabShop", "Tabs/BtnTabTicketing", "Tabs/BtnTabUpgrade", "UI/BtnBoutique", "UI/BtnShop", "BtnBoutique", "BtnShop", "UI/BtnBilletterie", "UI/BtnTicketing", "BtnBilletterie", "BtnTicketing", "UI/BtnEvolutionStade", "UI/BtnUpgrade", "BtnEvolutionStade", "BtnUpgrade"]:
@@ -3894,6 +3901,9 @@ func _on_close_upgrade_pressed() -> void:
 
 
 func _bm_stadium_mobile_apply_shop_visual_sizes_v1() -> void:
+	if _bm_stadium_mobile_landscape():
+		_bm_stadium_queue_mobile_layout()
+		return
 	if not _bm_stadium_is_mobile_layout():
 		return
 
@@ -6728,3 +6738,460 @@ func _bm_compute_last_game_sales(stock: int, popularite: float, victoire: bool, 
 	var coef_final := coef * randf_range(0.85, 1.15)
 	var sales := int(round(float(stock) * coef_final))
 	return maxi(0, mini(stock, sales))
+
+
+# Mobile landscape presentation only. Existing business handlers stay authoritative.
+var _bm_stadium_layout_pending := false
+
+
+func _bm_stadium_mobile_landscape() -> bool:
+	return (OS.has_feature("ios") or OS.has_feature("android")) and get_viewport_rect().size.x > get_viewport_rect().size.y
+
+
+func _bm_stadium_queue_mobile_layout() -> void:
+	if not is_inside_tree() or get_viewport() == null or not _bm_stadium_mobile_landscape() or _bm_stadium_layout_pending:
+		return
+	_bm_stadium_layout_pending = true
+	# Two deferred stages run after the existing deferred visual helpers.
+	call_deferred("_bm_stadium_defer_mobile_layout")
+
+
+func _bm_stadium_defer_mobile_layout() -> void:
+	call_deferred("_bm_stadium_apply_mobile_landscape_layout")
+
+
+func _bm_stadium_mobile_rect(c: Control, rect: Rect2) -> void:
+	if c == null:
+		return
+	c.set_as_top_level(true)
+	c.z_as_relative = false
+	c.z_index = 40
+	c.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	c.scale = Vector2.ONE
+	c.pivot_offset = Vector2.ZERO
+	c.custom_minimum_size = Vector2.ZERO
+	c.global_position = rect.position
+	c.size = rect.size
+	# Wrapping minimum heights settle after the final width is assigned.
+	c.set_deferred("size", rect.size)
+
+
+func _bm_stadium_mobile_style(c: Control, key: String, margin: int = 4) -> void:
+	var source := c.get_theme_stylebox(key)
+	if source == null:
+		return
+	var style := source.duplicate() as StyleBox
+	style.content_margin_left = margin
+	style.content_margin_right = margin
+	style.content_margin_top = 2
+	style.content_margin_bottom = 2
+	c.add_theme_stylebox_override(key, style)
+
+
+func _bm_stadium_mobile_compact(root: Node) -> void:
+	for child in root.get_children():
+		_bm_stadium_mobile_compact(child)
+	if not root is Control:
+		return
+	var c := root as Control
+	c.scale = Vector2.ONE
+	c.pivot_offset = Vector2.ZERO
+	c.custom_minimum_size = Vector2.ZERO
+	if c is Label or c is Button or c is LineEdit:
+		c.add_theme_font_size_override("font_size", 13)
+		c.add_theme_constant_override("outline_size", 0)
+	if c is Button or c is LineEdit:
+		c.custom_minimum_size = Vector2(32, 34)
+		for key in ["normal", "hover", "pressed", "disabled", "focus", "read_only"]:
+			_bm_stadium_mobile_style(c, key)
+	if c is Button:
+		(c as Button).expand_icon = true
+		c.add_theme_constant_override("icon_max_width", 20)
+	if c is LineEdit:
+		(c as LineEdit).expand_to_text_length = false
+	if c is RichTextLabel:
+		for key in ["normal_font_size", "bold_font_size", "italics_font_size"]:
+			c.add_theme_font_size_override(key, 14)
+	if c is BoxContainer:
+		c.add_theme_constant_override("separation", 4)
+	if c is GridContainer:
+		c.add_theme_constant_override("h_separation", 6)
+		c.add_theme_constant_override("v_separation", 4)
+	if c is MarginContainer:
+		for key in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+			c.add_theme_constant_override(key, 0)
+	if c is PanelContainer:
+		_bm_stadium_mobile_style(c, "panel")
+	if c is Label:
+		_bm_stadium_mobile_style(c, "normal")
+	if c is TextureRect and not String(c.name).ends_with("BG"):
+		(c as TextureRect).expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		c.custom_minimum_size = Vector2(32, 24)
+
+
+func _bm_stadium_mobile_rail_text(source: Label) -> void:
+	var display := source.get_node_or_null("MobileRailText") as RichTextLabel
+	if display == null:
+		display = RichTextLabel.new()
+		display.name = "MobileRailText"
+		display.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		display.scroll_active = false
+		display.add_theme_font_size_override("normal_font_size", 13)
+		display.add_theme_font_size_override("bold_font_size", 13)
+		display.add_theme_color_override("default_color", Color.WHITE)
+		source.add_child(display)
+		display.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		# Redraw follows the existing labels' text updates, including Popularity.
+		source.draw.connect(_bm_stadium_mobile_rail_text.bind(source))
+	source.self_modulate = Color(1, 1, 1, 0)
+	if display.get_meta("source_text", "") == source.text:
+		return
+	display.set_meta("source_text", source.text)
+	var parts := source.text.split(":", true, 1)
+	display.clear()
+	display.push_paragraph(HORIZONTAL_ALIGNMENT_CENTER)
+	display.add_text(parts[0].strip_edges() + " :\n")
+	display.push_bold()
+	display.add_text(parts[1].strip_edges() if parts.size() > 1 else "")
+	display.pop()
+	display.pop()
+
+
+func _bm_stadium_apply_mobile_landscape_layout() -> void:
+	if not is_inside_tree() or get_viewport() == null or not _bm_stadium_mobile_landscape():
+		_bm_stadium_layout_pending = false
+		return
+	var vp := get_viewport_rect().size
+	# At 844x390 / stretch 1.15, usable canvas is 733.91x339.13.
+	var area := Rect2(104, 54, vp.x - 116, vp.y - 66)
+	var rail := get_node_or_null("MobileStadiumRail") as ColorRect
+	if rail == null:
+		rail = ColorRect.new()
+		rail.name = "MobileStadiumRail"
+		rail.color = Color(0.02, 0.035, 0.06, 0.78)
+		rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(rail)
+	_bm_stadium_mobile_rect(rail, Rect2(0, 0, 100, vp.y))
+	rail.z_index = 10
+	for path in ["Content/CenterTicketing/PanelTicketing", "Content/CenterShop/PanelShop", "Content/CenterUpgrade/PanelUpgrade", "Overlays/PopupStadiumIntro"]:
+		var panel := get_node_or_null(path) as Control
+		if panel == null:
+			continue
+		if not panel.visibility_changed.is_connected(_bm_stadium_queue_mobile_layout):
+			panel.visibility_changed.connect(_bm_stadium_queue_mobile_layout)
+		if String(panel.name) == "PopupStadiumIntro":
+			continue
+		_bm_stadium_mobile_compact(panel)
+		_bm_stadium_mobile_rect(panel, area)
+		panel.z_as_relative = false
+		panel.z_index = 20
+		if panel.name != "PanelUpgrade":
+			panel.self_modulate = Color.WHITE
+			var surface := StyleBoxFlat.new()
+			surface.bg_color = Color(0.025, 0.045, 0.075, 0.94)
+			surface.set_corner_radius_all(10)
+			panel.add_theme_stylebox_override("panel", surface)
+		for bg_name in ["UpgradeBG", "ShopBG", "ShopOverlayFrame", "UpgradeOverlay"]:
+			var bg := panel.get_node_or_null(bg_name) as Control
+			if bg != null:
+				_bm_stadium_mobile_rect(bg, area)
+				bg.z_index = 21
+		var box := panel.get_node_or_null("VBox") as Control
+		if box == null:
+			box = panel.get_node_or_null("VBoxUpgrade") as Control
+		_bm_stadium_mobile_rect(box, Rect2(area.position + Vector2(10, 8), area.size - Vector2(20, 16)))
+
+	var tabs := get_node_or_null("Tabs") as HBoxContainer
+	if tabs != null:
+		_bm_stadium_mobile_compact(tabs)
+		_bm_stadium_mobile_rect(tabs, Rect2(104, 12, vp.x - 116, 34))
+		tabs.add_theme_constant_override("separation", 8)
+		tabs.z_as_relative = false
+		tabs.z_index = 30
+		for tab in tabs.get_children():
+			if tab is Button:
+				tab.custom_minimum_size = Vector2(0, 34)
+				tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				tab.add_theme_font_size_override("font_size", 14)
+
+	if BtnRetour != null:
+		_bm_stadium_mobile_compact(BtnRetour)
+		BtnRetour.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		BtnRetour.add_theme_font_size_override("font_size", 11)
+		_bm_stadium_mobile_rect(BtnRetour, Rect2(10, vp.y - 52, 84, 40))
+		BtnRetour.z_as_relative = false
+		BtnRetour.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	for pair in [[LblStadiumLevel, 62.0], [LblCapacity, 104.0]]:
+		var label := pair[0] as Label
+		if label != null:
+			label.add_theme_font_size_override("font_size", 13)
+			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			label.modulate = Color.WHITE
+			label.add_theme_color_override("font_color", Color.WHITE)
+			label.add_theme_color_override("font_outline_color", Color(0.02, 0.04, 0.08))
+			label.add_theme_constant_override("outline_size", 3)
+			_bm_stadium_mobile_rect(label, Rect2(8, pair[1], 88, 42))
+			_bm_stadium_mobile_rail_text(label)
+	for name in ["PopularityBadge", "PopularityBadge2"]:
+		var badge := get_node_or_null(name) as Label
+		if badge != null:
+			badge.add_theme_font_size_override("font_size", 12)
+			badge.modulate = Color.WHITE
+			badge.self_modulate = Color.WHITE
+			badge.add_theme_color_override("font_color", Color.WHITE)
+			badge.add_theme_color_override("font_outline_color", Color.BLACK)
+			badge.add_theme_constant_override("outline_size", 2)
+			badge.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			_bm_stadium_mobile_rect(badge, Rect2(8, 12, 88, 42))
+			_bm_stadium_mobile_rail_text(badge)
+
+	var ticket := get_node_or_null("Content/CenterTicketing/PanelTicketing") as Control
+	if ticket != null:
+		var title := ticket.get_node_or_null("VBox/LblTicketingTitle") as Label
+		if title != null:
+			title.add_theme_font_size_override("font_size", 18)
+			_bm_stadium_mobile_rect(title, Rect2(area.position + Vector2(12, 6), Vector2(area.size.x - 24, 24)))
+		var grid := ticket.get_node_or_null("VBox/Grid") as GridContainer
+		if grid != null:
+			_bm_stadium_mobile_rect(grid, Rect2(area.position + Vector2(12, 38), Vector2(area.size.x - 24, 174)))
+			for box in grid.find_children("*", "BoxContainer", true, false):
+				box.add_theme_constant_override("separation", 1)
+			for label in grid.find_children("*", "Label", true, false):
+				label.modulate = Color.WHITE
+				label.add_theme_color_override("font_color", Color.WHITE)
+			for gap in grid.find_children("*BottomGap", "Control", true, false):
+				gap.custom_minimum_size = Vector2.ZERO
+			for child in grid.get_children():
+				if child is Control:
+					child.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			for input in grid.find_children("*", "LineEdit", true, false):
+				input.custom_minimum_size = Vector2(48, 34)
+			for label in grid.find_children("LblCat*Capacity", "Label", true, false):
+				label.add_theme_font_size_override("font_size", 11)
+				label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				label.custom_minimum_size = Vector2(184, 0)
+		var total := ticket.get_node_or_null("VBox/LblTicketingTotal") as Label
+		_bm_stadium_mobile_rect(total, Rect2(area.position + Vector2(12, area.size.y - 40), Vector2(area.size.x - 160, 32)))
+
+	var shop := get_node_or_null("Content/CenterShop/PanelShop") as Control
+	if shop != null:
+		var title := shop.get_node_or_null("VBox/LblShopTitle") as Label
+		if title != null:
+			title.add_theme_font_size_override("font_size", 18)
+			_bm_stadium_mobile_rect(title, Rect2(area.position + Vector2(12, 6), Vector2(170, 24)))
+		var col := shop.find_child("ShopColLeft", true, false) as Control
+		if col != null:
+			_bm_stadium_mobile_rect(col, Rect2(area.position + Vector2(10, 36), Vector2(area.size.x - 20, area.size.y - 86)))
+			var grid := col.find_child("GridShopLeft", true, false) as Control
+			var scroll := col.get_node_or_null("MobileShopRows") as ScrollContainer
+			if scroll == null and grid != null:
+				# Only the visual rows wrapper changes; controls/signals are retained.
+				scroll = ScrollContainer.new()
+				scroll.name = "MobileShopRows"
+				scroll.follow_focus = true
+				scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+				col.add_child(scroll)
+				grid.reparent(scroll)
+			if scroll != null:
+				scroll.custom_minimum_size = Vector2.ZERO
+				_bm_stadium_mobile_rect(scroll, Rect2(area.position + Vector2(10, 74), Vector2(area.size.x - 20, area.size.y - 120)))
+				scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+				grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var widths := [66, 50, 110, 116, 110, 80]
+			var row_widths := [66, 0, 50, 110, 116, 110, 80]
+			var header := col.find_child("HdrShopLeft", true, false) as HBoxContainer
+			if header != null:
+				header.add_theme_constant_override("separation", 6)
+				_bm_stadium_mobile_rect(header, Rect2(area.position + Vector2(10, 34), Vector2(area.size.x - 20, 42)))
+				for i in range(mini(header.get_child_count(), widths.size())):
+					var cell := header.get_child(i) as Control
+					cell.custom_minimum_size = Vector2(widths[i], 26)
+					if cell is Label:
+						cell.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+						cell.add_theme_font_size_override("font_size", 12)
+			for row in col.find_children("Row_*", "HBoxContainer", true, false):
+				row.add_theme_constant_override("separation", 6)
+				row.custom_minimum_size = Vector2(0, 34)
+				for i in range(mini(row.get_child_count(), row_widths.size())):
+					var cell := row.get_child(i) as Control
+					cell.custom_minimum_size = Vector2(row_widths[i], 34)
+					if i == 1:
+						cell.visible = false
+			var frame := shop.find_child("TotalFrame", true, false) as Control
+			_bm_stadium_mobile_rect(frame, Rect2(area.position + Vector2(12, area.size.y - 40), Vector2(area.size.x - 170, 32)))
+		var decoration := shop.get_node_or_null("ShopOverlayFrame") as Control
+		if decoration != null:
+			decoration.self_modulate = Color(1, 1, 1, 0)
+			for image in decoration.get_children():
+				if image is CanvasItem:
+					image.self_modulate = Color(1, 1, 1, 0)
+
+	var upgrade := get_node_or_null("Content/CenterUpgrade/PanelUpgrade") as Control
+	if upgrade != null:
+		var frame := upgrade.find_child("UpgradeInfoFrame", true, false) as Control
+		_bm_stadium_mobile_rect(frame, Rect2(area.position + Vector2(8, 6), area.size - Vector2(16, 12)))
+		if frame is PanelContainer:
+			var surface := StyleBoxFlat.new()
+			surface.bg_color = Color(0.95, 0.97, 1, 0.94)
+			surface.set_corner_radius_all(10)
+			frame.add_theme_stylebox_override("panel", surface)
+		var title := upgrade.find_child("LblUpgradeTargetTitle", true, false) as Label
+		if title != null:
+			title.add_theme_font_size_override("font_size", 18)
+			_bm_stadium_mobile_rect(title, Rect2(area.position + Vector2(16, 10), Vector2(area.size.x - 64, 28)))
+		var picture := upgrade.find_child("UpgradeNextImageFrame", true, false) as Control
+		if picture == null:
+			picture = upgrade.find_child("UpgradeNextImage", true, false) as Control
+		_bm_stadium_mobile_rect(picture, Rect2(area.position + Vector2(16, 50), Vector2(area.size.x * 0.48, minf(170.0, area.size.y - 102.0))))
+		var image := upgrade.find_child("UpgradeNextImage", true, false) as TextureRect
+		if image != null:
+			image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			if _upgrade_accel_mode:
+				var target_path := _stadium_image_path_for_level(_upgrade_target_ng, _upgrade_target_ns)
+				if ResourceLoader.exists(target_path):
+					image.texture = load(target_path) as Texture2D
+					image.visible = true
+			image.set_as_top_level(image == picture)
+			image.scale = Vector2.ONE
+			image.custom_minimum_size = Vector2.ZERO
+			image.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			image.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			if image != picture:
+				image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var rows := upgrade.find_child("UpgradeInfoRows", true, false) as Control
+		_bm_stadium_mobile_rect(rows, Rect2(area.position + Vector2(area.size.x * 0.52, 48), Vector2(area.size.x * 0.44, 156)))
+		if rows != null:
+			for card in rows.get_children():
+				if card is Control:
+					card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				for label in card.find_children("*", "Label", true, false):
+					label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+					label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var info := upgrade.find_child("LblUpgradeInfo", true, false) as RichTextLabel
+		if info != null:
+			info.fit_content = false
+			info.scroll_active = true
+			_bm_stadium_mobile_rect(info, Rect2(area.position + Vector2(area.size.x * 0.52, 48), Vector2(area.size.x * 0.44, 150)))
+		var buttons := upgrade.find_child("UpgradeButtonsRow", true, false) as Control
+		_bm_stadium_mobile_rect(buttons, Rect2(area.position + Vector2(16, area.size.y - 46), Vector2(area.size.x - 32, 38)))
+		var close := upgrade.find_child("BtnCloseUpgrade", true, false) as Control
+		_bm_stadium_mobile_rect(close, Rect2(area.end - Vector2(44, area.size.y - 8), Vector2(34, 34)))
+	var timeline := get_node_or_null("UpgradeProgressTimeline") as Control
+	if timeline != null:
+		_bm_stadium_mobile_compact(timeline)
+		for dot in timeline.find_children("*", "ColorRect", true, false):
+			dot.custom_minimum_size = Vector2(2, 1)
+		for box in timeline.find_children("*", "BoxContainer", true, false):
+			box.add_theme_constant_override("separation", 0)
+			box.alignment = BoxContainer.ALIGNMENT_BEGIN
+		for label in timeline.find_children("*", "Label", true, false):
+			label.add_theme_font_size_override("font_size", 11)
+			label.add_theme_color_override("font_color", Color.WHITE)
+			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			label.custom_minimum_size = Vector2(64, 60)
+		var scroll := timeline.get_node_or_null("MobileTimelineRows") as ScrollContainer
+		if scroll == null and timeline.get_child_count() > 0:
+			var rows := timeline.get_child(0)
+			scroll = ScrollContainer.new()
+			scroll.name = "MobileTimelineRows"
+			scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+			timeline.add_child(scroll)
+			rows.reparent(scroll)
+			(rows as Control).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		timeline.mouse_filter = Control.MOUSE_FILTER_PASS
+		timeline.clip_contents = true
+		_bm_stadium_mobile_rect(timeline, Rect2(8, 58, 88, vp.y - 124))
+
+	for name in ["BtnBackShop", "BtnBackTicketing", "BtnConfirmShop", "BtnConfirmTicketing"]:
+		var button := find_child(name, true, false) as Button
+		if button != null:
+			var pos := Vector2(10, vp.y - 102) if name.begins_with("BtnBack") else area.end - Vector2(142, 42)
+			_bm_stadium_mobile_rect(button, Rect2(pos, Vector2(84 if name.begins_with("BtnBack") else 130, 36)))
+
+	# Existing overlays keep visibility, content, input and functional signals.
+	if popup_stadium_intro != null:
+		_bm_stadium_mobile_compact(popup_stadium_intro)
+		_bm_stadium_mobile_rect(popup_stadium_intro, Rect2(108, 58, vp.x - 128, vp.y - 76))
+		popup_stadium_intro.z_index = RenderingServer.CANVAS_ITEM_Z_MAX - 1
+		var intro_style := popup_stadium_intro.get_theme_stylebox("panel").duplicate() as StyleBoxFlat
+		intro_style.bg_color = Color(0.025, 0.045, 0.075, 1)
+		popup_stadium_intro.add_theme_stylebox_override("panel", intro_style)
+		if lbl_stadium_intro != null:
+			lbl_stadium_intro.text = lbl_stadium_intro.text.replace("[font_size=28]", "[font_size=16]")
+			lbl_stadium_intro.scroll_active = true
+			_bm_stadium_mobile_rect(lbl_stadium_intro, Rect2(122, 70, vp.x - 156, vp.y - 140))
+		_bm_stadium_mobile_rect(btn_close_stadium_intro, Rect2(vp.x - 154, vp.y - 62, 120, 36))
+		btn_close_stadium_intro.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+		lbl_stadium_intro.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	for name in ["UpgradeNoticeCard", "ShopFirstOpenInfoCard", "UpgradeAccelerationCard", "UpgradeInsufficientFundsCard"]:
+		var card := find_child(name, true, false) as Control
+		if card == null:
+			continue
+		_bm_stadium_mobile_compact(card)
+		_bm_stadium_mobile_rect(card, Rect2(108, 58, vp.x - 128, vp.y - 76))
+		card.z_index = RenderingServer.CANVAS_ITEM_Z_MAX - 1
+	var funds := find_child("UpgradeInsufficientFundsCard", true, false) as Control
+	if funds != null:
+		var labels := funds.find_children("*", "Label", false, false)
+		for i in range(labels.size()):
+			var label := labels[i] as Label
+			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			_bm_stadium_mobile_rect(label, Rect2(124, 70 + i * 60, vp.x - 160, 54))
+			label.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+		var ok := funds.get_node_or_null("BtnUpgradeInsufficientFundsOK") as Control
+		_bm_stadium_mobile_rect(ok, Rect2(vp.x - 170, vp.y - 64, 130, 36))
+		if ok != null:
+			ok.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	var restock := get_node_or_null("ShopRestockPopup")
+	if restock != null:
+		for child in restock.get_children():
+			if not child is Panel:
+				continue
+			var card := child as Panel
+			_bm_stadium_mobile_compact(card)
+			var card_rect := Rect2(108, 58, vp.x - 128, vp.y - 76)
+			_bm_stadium_mobile_rect(card, card_rect)
+			card.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+			var surface := StyleBoxFlat.new()
+			surface.bg_color = Color(0.025, 0.045, 0.075, 1)
+			surface.set_corner_radius_all(10)
+			card.add_theme_stylebox_override("panel", surface)
+			var labels := card.find_children("*", "Label", false, false)
+			for i in range(labels.size()):
+				var label := labels[i] as Label
+				var rect := Rect2(14, 12, card_rect.size.x - 70, 26)
+				if i > 0:
+					var column := (i - 1) % 5
+					var row := (i - 1) / 5
+					rect = Rect2(12 + column * (card_rect.size.x - 24) / 5, 54 + row * 42, (card_rect.size.x - 24) / 5, 38)
+				label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				label.position = rect.position
+				label.size = rect.size
+			var buttons := card.find_children("*", "Button", false, false)
+			for i in range(buttons.size()):
+				var button := buttons[i] as Button
+				button.position = Vector2(card_rect.size.x - 46, 8) if i == 0 else Vector2(18 + (i - 1) * 158, card_rect.size.y - 44)
+				button.size = Vector2(34, 34) if i == 0 else Vector2(148, 36)
+			for image in card.find_children("*", "TextureRect", false, false):
+				image.position = Vector2(card_rect.size.x - 86, 10)
+				image.size = Vector2(30, 26)
+	if is_instance_valid(_bm_limits_tip):
+		_bm_stadium_mobile_compact(_bm_limits_tip)
+		_bm_stadium_mobile_rect(_bm_limits_tip, Rect2(120, 96, vp.x - 150, 162))
+		_bm_limits_tip.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	var advisor := get_node_or_null("CapacityOverlayLayer/LblTicketingAdvisor") as RichTextLabel
+	if advisor != null:
+		_bm_stadium_mobile_compact(advisor)
+		_bm_stadium_mobile_style(advisor, "normal", 12)
+		advisor.scroll_active = true
+		_bm_stadium_mobile_rect(advisor, Rect2(area.position + Vector2(8, 42), Vector2(area.size.x - 16, 144)))
+	var ack := get_node_or_null("CapacityOverlayLayer/BtnStadiumAdvisorAck") as Button
+	if ack != null:
+		_bm_stadium_mobile_compact(ack)
+		_bm_stadium_mobile_rect(ack, Rect2(area.end - Vector2(142, 76), Vector2(130, 36)))
+	_bm_stadium_layout_pending = false
+
+
+func _exit_tree() -> void:
+	if get_tree().tree_changed.is_connected(_bm_stadium_queue_mobile_layout):
+		get_tree().tree_changed.disconnect(_bm_stadium_queue_mobile_layout)

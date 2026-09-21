@@ -4653,6 +4653,9 @@ func _bm_apply_mobile_management_adaptive_layout() -> void:
 		b.scale = Vector2.ONE
 
 	var actions_top := crest_bottom + (30.0 if landscape else 20.0)
+	if landscape and (OS.has_feature("ios") or OS.has_feature("android")):
+		actions_top += 67.0 # Previous 34 + 33 additional Godot units on mobile landscape.
+		lane_center_x += 20.0 # Shift only the buttons; header and crest are already positioned.
 
 	if actions.size() <= 2:
 		# Etat actuel : Play Season + My team, même taille.
@@ -4703,8 +4706,21 @@ func _bm_apply_mobile_management_adaptive_layout() -> void:
 			var secondary_top := actions_top + primary_h + 14.0
 
 			var secondaries: Array[Button] = []
+
+			# BM_IOS_MANAGEMENT_STADIUM_FIXED_PAIR_V1
+			# Première ligne secondaire stable :
+			# Stadium à gauche / My Team à droite.
+			if BtnMyTeam != null and BtnMyTeam.visible:
+				secondaries.append(BtnMyTeam)
+			if BtnStadium != null and BtnStadium.visible:
+				secondaries.append(BtnStadium)
+
 			for b in actions:
-				if b != BtnMatch:
+				if (
+					b != BtnMatch
+					and b != BtnMyTeam
+					and b != BtnStadium
+				):
 					secondaries.append(b)
 
 			for i in range(secondaries.size()):
@@ -4725,6 +4741,12 @@ func _bm_apply_mobile_management_adaptive_layout() -> void:
 					center_x - secondary_w * 0.5,
 					secondary_top + float(row) * (secondary_h + pair_row_gap)
 				)
+				# Finance mirrors Stadium above Play Season on native mobile.
+				if b == BtnFinances and (OS.has_feature("ios") or OS.has_feature("android")):
+					b.global_position = Vector2(
+						lane_center_x - pair_shift - secondary_w * 0.5,
+						actions_top - 14.0 - secondary_h
+					)
 				b.add_theme_font_size_override("font_size", 14)
 
 		else:

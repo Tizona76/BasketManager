@@ -17,6 +17,7 @@ const TOKEN_ICON := preload("res://assets/images/token.png")
 
 
 var _close_x_lock_until_ms: int = 0
+var _classement_popularity_filters: Dictionary = {}
 var _end_season_summary: Dictionary = {}
 var _pending_division_transition: Dictionary = {}
 var _last_match_finance_popup_shown_this_entry: bool = false
@@ -3140,16 +3141,26 @@ func _input(event):
 
 	# Guard anti-réouverture après fermeture croix
 	if Time.get_ticks_msec() < _close_x_lock_until_ms:
+		if _bm_saison_is_mobile_landscape() and (event is InputEventScreenTouch or event is InputEventMouseButton):
+			get_viewport().set_input_as_handled()
 		return
 
 	# _close_x_intercept_root
 	# Si Classement est affiché et que le clic tombe sur la croix, on ferme immédiatement
 	# + lock anti-réouverture (même frame / même clic) + hide UI fallback.
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and SeasonState.zone_selectionnee_saison == "classement" and btn_close_classement != null and btn_close_classement.visible:
+	if ((event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) or (event is InputEventScreenTouch and event.pressed and _bm_saison_is_mobile_landscape())) and SeasonState.zone_selectionnee_saison == "classement" and btn_close_classement != null and btn_close_classement.visible:
 		# Si on vient juste de fermer, on ignore les clics ROOT le temps que l'UI se mette à jour
 		if Time.get_ticks_msec() < _close_x_lock_until_ms:
 			return
 
+		if _bm_saison_is_mobile_landscape():
+			# Touch coordinates belong to the viewport; test in the button's local space.
+			var local_point: Vector2 = btn_close_classement.get_global_transform_with_canvas().affine_inverse() * event.position
+			if Rect2(Vector2.ZERO, btn_close_classement.size).has_point(local_point):
+				_close_x_lock_until_ms = Time.get_ticks_msec() + 200
+				get_viewport().set_input_as_handled()
+				_on_btn_close_classement_pressed()
+			return
 		var mp: Vector2 = get_viewport().get_mouse_position()
 		if mp.y > 120.0 and btn_close_classement.get_global_rect().has_point(mp):
 			_close_x_lock_until_ms = Time.get_ticks_msec() + 200
@@ -4337,14 +4348,114 @@ func _layout_standings_columns() -> void:
 				label.custom_minimum_size.x = ceilf(widths[column]) + 8.0 + gap
 
 
+func _bm_layout_mobile_standings() -> void:
+	if not _bm_saison_is_mobile_landscape():
+		return
+	if standings_panel == null:
+		return
+
+	var vp := get_viewport_rect().size
+	if vp.x <= 1.0 or vp.y <= 1.0:
+		return
+
+	# BM_IOS_STANDINGS_LAYOUT_V1
+	# Tableau principal + évolution, sans toucher aux données sportives.
+	var margin := 12.0
+	var top := 12.0
+	var bottom := 12.0
+	var gap := 10.0
+
+	var table_w := floorf((vp.x - margin * 2.0 - gap) * 0.62)
+	var graph_w := (vp.x - margin * 2.0 - gap - table_w) * 0.85 * 0.91
+	table_w = vp.x - margin * 2.0 - gap - graph_w
+	var content_h := vp.y - top - bottom
+
+	standings_panel.set_as_top_level(true)
+	standings_panel.scale = Vector2.ONE
+	standings_panel.position = Vector2(margin, top)
+	standings_panel.size = Vector2(table_w, content_h)
+
+	if lbl_standings != null:
+		lbl_standings.position = Vector2(12.0, 8.0)
+		lbl_standings.size = Vector2(table_w - 24.0, 30.0)
+		lbl_standings.add_theme_font_size_override(
+			"normal_font_size",
+			18
+		)
+
+	if standings_scroll != null:
+		standings_scroll.position = Vector2(10.0, 44.0)
+		standings_scroll.size = Vector2(
+			table_w - 20.0,
+			content_h - 54.0
+		)
+
+	if standings_rows != null:
+		standings_rows.add_theme_constant_override(
+			"separation",
+			1
+		)
+
+	if standings_graph_panel != null:
+		standings_graph_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		standings_graph_panel.set_as_top_level(true)
+		standings_graph_panel.scale = Vector2.ONE
+		standings_graph_panel.position = Vector2(
+			margin + table_w + gap,
+			top
+		)
+		standings_graph_panel.size = Vector2(
+			graph_w,
+			content_h
+		)
+
+	if standings_graph_title != null:
+		standings_graph_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		standings_graph_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		standings_graph_title.position = Vector2(10.0, 8.0)
+		standings_graph_title.size = Vector2(
+			graph_w - 64.0,
+			28.0
+		)
+		standings_graph_title.add_theme_font_size_override(
+			"font_size",
+			16
+		)
+		standings_graph_title.horizontal_alignment = (
+			HORIZONTAL_ALIGNMENT_CENTER
+		)
+
+	if standings_graph != null:
+		standings_graph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		standings_graph.position = Vector2(8.0, 40.0)
+		standings_graph.size = Vector2(
+			graph_w - 16.0,
+			content_h - 50.0
+		)
+
+	if btn_close_classement != null:
+		# Symmetric, margin-free content keeps the glyph inside the actual hitbox.
+		for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+			btn_close_classement.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+		btn_close_classement.alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_position_close_classement_on_standings_panel()
+		btn_close_classement.add_theme_font_size_override(
+			"font_size",
+			30
+		)
+
+
 func _on_btn_classement_show_standings_pressed() -> void:
 	if standings_panel == null or lbl_standings == null or standings_scroll == null or standings_rows == null:
 		return
+	_bm_sync_classement_popularity_input()
 	_refresh_standings_rows()
 	standings_panel.z_index = 700
 	standings_panel.visible = true
 	standings_panel.move_to_front()
 	_refresh_standings_graph()
+	_bm_layout_mobile_standings()
+	call_deferred("_bm_layout_mobile_standings")
 	if standings_graph_panel != null:
 		standings_graph_panel.z_index = 701
 		standings_graph_panel.move_to_front()
@@ -4397,6 +4508,9 @@ func _start_btn_match_pulse() -> void:
 
 
 func _on_btn_close_classement_pressed() -> void:
+	if _bm_saison_is_mobile_landscape():
+		_close_x_lock_until_ms = maxi(_close_x_lock_until_ms, Time.get_ticks_msec() + 200)
+		_bm_sync_classement_popularity_input()
 	# Ferme le tableau Classement -> retour menu Saison
 	SeasonState.zone_selectionnee_saison = ""
 	if standings_panel != null:
@@ -4405,6 +4519,26 @@ func _on_btn_close_classement_pressed() -> void:
 		standings_graph_panel.visible = false
 	_force_hide_classement_ui()
 	print("[SAISON] close classement -> zone_selectionnee_saison cleared")
+
+
+func _bm_sync_classement_popularity_input() -> void:
+	var blocked := _bm_saison_is_mobile_landscape() and (
+		SeasonState.zone_selectionnee_saison == "classement"
+		or Time.get_ticks_msec() < _close_x_lock_until_ms
+	)
+	if blocked:
+		for path in ["PopularityBadge", "PopularityBadge2", "UI/PopularityBadge", "UI/PopularityBadge2"]:
+			var control := get_node_or_null(path) as Control
+			if control == null:
+				continue
+			if not _classement_popularity_filters.has(control):
+				_classement_popularity_filters[control] = control.mouse_filter
+			control.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	else:
+		for control in _classement_popularity_filters:
+			if is_instance_valid(control):
+				control.mouse_filter = _classement_popularity_filters[control]
+		_classement_popularity_filters.clear()
 
 
 func _update_close_classement_visibility() -> void:
@@ -4419,6 +4553,19 @@ func _update_close_classement_visibility() -> void:
 func _position_close_classement_on_standings_panel() -> void:
 	if btn_close_classement == null or standings_panel == null:
 		return
+	if _bm_saison_is_mobile_landscape():
+		btn_close_classement.set_as_top_level(true)
+		btn_close_classement.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+		btn_close_classement.scale = Vector2.ONE
+		btn_close_classement.grow_horizontal = Control.GROW_DIRECTION_END
+		btn_close_classement.grow_vertical = Control.GROW_DIRECTION_END
+		btn_close_classement.custom_minimum_size = Vector2(48, 48)
+		btn_close_classement.size = Vector2(48, 48)
+		btn_close_classement.global_position = Vector2(get_viewport_rect().size.x - 60.0, 14.0)
+		btn_close_classement.z_as_relative = false
+		btn_close_classement.z_index = 702
+		btn_close_classement.mouse_filter = Control.MOUSE_FILTER_STOP
+		return
 	var panel_rect := standings_panel.get_global_rect()
 	var btn_size := btn_close_classement.size
 	if btn_size.x <= 0.0 or btn_size.y <= 0.0:
@@ -4429,6 +4576,7 @@ func _position_close_classement_on_standings_panel() -> void:
 	)
 func _process(_delta: float) -> void:
 	_update_close_classement_visibility()
+	_bm_sync_classement_popularity_input()
 
 
 func _on_close_x_gui_input(event: InputEvent) -> void:
@@ -4639,6 +4787,8 @@ func _notification(what: int) -> void:
 		call_deferred("_bm_refresh_match_button_opponent_line")
 		call_deferred("_bm_saison_apply_mobile_day_and_popularity_texts")
 		call_deferred("_bm_saison_align_mobile_play_and_day")
+		if SeasonState.zone_selectionnee_saison == "classement":
+			call_deferred("_bm_layout_mobile_standings")
 		return
 		call_deferred("_bm_saison_apply_mobile_landscape_deterministic_layout")
 	if what == NOTIFICATION_WM_WINDOW_FOCUS_IN or what == NOTIFICATION_VISIBILITY_CHANGED:
