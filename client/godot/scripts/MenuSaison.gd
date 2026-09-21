@@ -4200,6 +4200,8 @@ func _refresh_standings_rows() -> void:
 		var is_player := team_cmp != "" and (raw_cmp == team_cmp or short_cmp == team_cmp)
 		var cells := [str(pos), name, str(pts), str(w), str(l), str(pf), str(pa), "%+d" % diff]
 		var row_bg := "#173449" if is_player else ("#122034" if pos % 2 == 0 else "#101C2E")
+		if pos <= 2:
+			row_bg = "#174A34"
 		_add_standings_row(cells, row_bg, is_player, false)
 		pos += 1
 
