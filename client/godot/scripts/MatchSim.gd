@@ -642,6 +642,110 @@ func _bm_matchsim_apply_mobile_layout() -> void:
 		btn_skip.scale *= 1.20
 
 
+	_bm_matchsim_apply_mobile_landscape_layout()
+
+
+func _bm_matchsim_apply_mobile_landscape_layout() -> void:
+	if not _bm_matchsim_is_mobile_layout():
+		return
+
+	var vp := get_viewport_rect().size
+	if vp.x <= vp.y:
+		return
+
+	var margin := 12.0
+	var bottom_y := vp.y - 58.0
+
+	if scoreboard_panel != null:
+		scoreboard_panel.set_as_top_level(true)
+		scoreboard_panel.z_as_relative = false
+		scoreboard_panel.z_index = 10
+		scoreboard_panel.position = Vector2(margin, 10.0)
+		scoreboard_panel.size = Vector2(vp.x - margin * 2.0, 126.0)
+
+	if lbl_team_dom != null and scoreboard_panel != null:
+		lbl_team_dom.position = Vector2(18.0, 9.0)
+		lbl_team_dom.size = Vector2(280.0, 34.0)
+		lbl_team_dom.add_theme_font_size_override("font_size", 23)
+
+	if lbl_team_ext != null and scoreboard_panel != null:
+		lbl_team_ext.position = Vector2(scoreboard_panel.size.x - 298.0, 9.0)
+		lbl_team_ext.size = Vector2(280.0, 34.0)
+		lbl_team_ext.add_theme_font_size_override("font_size", 23)
+
+	if lbl_temps != null:
+		lbl_temps.set_as_top_level(true)
+		lbl_temps.z_as_relative = false
+		lbl_temps.z_index = 12
+		lbl_temps.position = Vector2((vp.x - 180.0) * 0.5, 18.0)
+		lbl_temps.size = Vector2(180.0, 30.0)
+		lbl_temps.add_theme_font_size_override("font_size", 26)
+
+	if lbl_score != null:
+		lbl_score.set_as_top_level(true)
+		lbl_score.z_as_relative = false
+		lbl_score.z_index = 12
+		lbl_score.position = Vector2((vp.x - 320.0) * 0.5, 43.0)
+		lbl_score.size = Vector2(320.0, 72.0)
+		lbl_score.add_theme_font_size_override("font_size", 56)
+
+	if lbl_info != null:
+		lbl_info.set_as_top_level(true)
+		lbl_info.z_as_relative = false
+		lbl_info.z_index = 20
+		lbl_info.position = Vector2(52.0, 166.0)
+		lbl_info.size = Vector2(vp.x - 104.0, 82.0)
+		lbl_info.add_theme_font_size_override("font_size", 24)
+		lbl_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+		_bm_lbl_info_base_position = lbl_info.position
+		_bm_lbl_info_base_size = lbl_info.size
+		_bm_lbl_info_base_font_size = 24
+
+	if info_panel != null:
+		info_panel.set_as_top_level(true)
+		info_panel.z_as_relative = false
+		info_panel.z_index = 19
+		info_panel.position = Vector2(28.0, 148.0)
+		info_panel.size = Vector2(vp.x - 56.0, 118.0)
+
+	if btn_retour != null:
+		btn_retour.set_as_top_level(true)
+		btn_retour.z_as_relative = false
+		btn_retour.z_index = 40
+		btn_retour.scale = Vector2.ONE
+		btn_retour.custom_minimum_size = Vector2(190.0, 46.0)
+		btn_retour.size = Vector2(190.0, 46.0)
+		btn_retour.position = Vector2(18.0, bottom_y)
+		btn_retour.add_theme_font_size_override("font_size", 18)
+
+	if btn_skip != null:
+		btn_skip.set_as_top_level(true)
+		btn_skip.z_as_relative = false
+		btn_skip.z_index = 40
+		btn_skip.scale = Vector2.ONE
+		btn_skip.custom_minimum_size = Vector2(190.0, 52.0)
+		btn_skip.size = Vector2(190.0, 52.0)
+		btn_skip.position = Vector2((vp.x - 190.0) * 0.5, vp.y - 64.0)
+		btn_skip.add_theme_font_size_override("font_size", 20)
+
+	if btn_current_lineup != null and is_instance_valid(btn_current_lineup):
+		btn_current_lineup.set_as_top_level(true)
+		btn_current_lineup.z_as_relative = false
+		btn_current_lineup.z_index = 40
+		btn_current_lineup.scale = Vector2.ONE
+		btn_current_lineup.custom_minimum_size = Vector2(190.0, 46.0)
+		btn_current_lineup.size = Vector2(190.0, 46.0)
+		btn_current_lineup.position = Vector2(vp.x - 208.0, bottom_y)
+		btn_current_lineup.add_theme_font_size_override("font_size", 18)
+
+	if lbl_match_result != null and is_instance_valid(lbl_match_result):
+		_bm_place_match_result_label(
+			lbl_match_result.text,
+			lbl_match_result.get_theme_color("font_color")
+		)
+
+
 func _bm_place_match_result_label(text_value: String, color_value: Color) -> void:
 	if lbl_info == null:
 		return

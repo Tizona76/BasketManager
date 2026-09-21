@@ -828,6 +828,7 @@ func _on_delete_career_confirmed() -> void:
 		_bm_set_teamname_form_visible(true)
 
 
+
 func _bm_ensure_create_new_career_dialog() -> void:
 	if _create_new_career_dialog != null and is_instance_valid(_create_new_career_dialog):
 		return
@@ -887,6 +888,13 @@ func _bm_show_create_new_career_confirm() -> void:
 
 func _bm_build_career_picker() -> void:
 	_bm_clear_career_picker()
+
+	# BM_YOUR_TEAMS_HIDE_LANGBAR_V1
+	# YOUR TEAMS n'affiche jamais les drapeaux, quel que soit le chemin d'entrée.
+	if lang_bar_entry != null and is_instance_valid(lang_bar_entry):
+		lang_bar_entry.visible = false
+		lang_bar_entry.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	var careers := _bm_list_unique_careers()
 	if careers.is_empty():
 		return
@@ -1254,8 +1262,8 @@ func _bm_ensure_keyboard_dismiss_button() -> void:
 		return
 	_mobile_keyboard_dismiss_btn = Button.new()
 	_mobile_keyboard_dismiss_btn.name = "MobileKeyboardDismiss"
-	_mobile_keyboard_dismiss_btn.text = "Close"
-	_mobile_keyboard_dismiss_btn.custom_minimum_size = Vector2(82, 44)
+	_mobile_keyboard_dismiss_btn.text = "Close Keyboard"
+	_mobile_keyboard_dismiss_btn.custom_minimum_size = Vector2(150, 44)
 	_mobile_keyboard_dismiss_btn.add_theme_font_size_override("font_size", 16)
 	_mobile_keyboard_dismiss_btn.focus_mode = Control.FOCUS_NONE
 	_mobile_keyboard_dismiss_btn.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -1277,19 +1285,14 @@ func _bm_update_keyboard_dismiss_button() -> void:
 	if _mobile_keyboard_dismiss_btn == null:
 		return
 	var win := DisplayServer.window_get_size()
-	var vp := get_viewport_rect().size
 	var landscape := win.x > win.y
-	var keyboard_h := DisplayServer.virtual_keyboard_get_height()
-	var keyboard_h_vp := float(keyboard_h)
-	if win.y > 0:
-		keyboard_h_vp *= vp.y / float(win.y)
-	var dismiss_y := 18.0
-	if keyboard_h_vp > 40.0:
-		dismiss_y = maxf(18.0, vp.y - keyboard_h_vp - 52.0)
-	_mobile_keyboard_dismiss_btn.position = Vector2(
-		vp.x - 104.0,
-		dismiss_y
-	)
+	if input_team != null:
+		var input_pos := input_team.global_position - global_position
+		var button_h := 44.0
+		_mobile_keyboard_dismiss_btn.position = Vector2(
+			input_pos.x + input_team.size.x + 12.0,
+			input_pos.y + (input_team.size.y - button_h) * 0.5
+		)
 	var show_btn := _bm_is_mobile_layout() and landscape and input_team != null and input_team.has_focus()
 	_mobile_keyboard_dismiss_btn.visible = show_btn
 
@@ -1311,6 +1314,18 @@ var _bm_single_play_revealed := false
 
 func _bm_set_teamname_form_visible(v: bool) -> void:
 	_bm_single_play_revealed = v
+
+	# BM_YOUR_TEAMS_NO_LANGBAR_V1
+	# Les langues sont choisies avant d'arriver ici.
+	# YOUR TEAMS ne doit jamais afficher la LangBar.
+	if lang_bar_entry != null and is_instance_valid(lang_bar_entry):
+		lang_bar_entry.visible = v
+		lang_bar_entry.mouse_filter = (
+			Control.MOUSE_FILTER_STOP
+			if v
+			else Control.MOUSE_FILTER_IGNORE
+		)
+
 	for n in [
 		get_node_or_null("Center/Box/LblTitle"),
 		get_node_or_null("Center/Box/LblTeamNameInput"),
@@ -1427,6 +1442,14 @@ func _bm_update_inline_league() -> void:
 		_selected_league_id = LeagueDataScript.get_default_league_id()
 	if _league_inline_value != null:
 		_league_inline_value.text = LeagueDataScript.get_league_name(_selected_league_id)
+	if _league_inline_change_btn != null and is_instance_valid(_league_inline_change_btn):
+		_league_inline_change_btn.visible = _bm_single_play_revealed
+		_league_inline_change_btn.disabled = not _bm_single_play_revealed
+		_league_inline_change_btn.mouse_filter = (
+			Control.MOUSE_FILTER_STOP
+			if _bm_single_play_revealed
+			else Control.MOUSE_FILTER_IGNORE
+		)
 
 
 func _bm_ensure_inline_league_row() -> void:
@@ -2117,6 +2140,9 @@ func _on_entry_signup_pressed() -> void:
 
 
 func _on_create_new_team_pressed() -> void:
+	if not _bm_has_career_picker_data():
+		_on_create_new_team_confirmed()
+		return
 	_bm_show_create_new_career_confirm()
 
 
@@ -2124,8 +2150,25 @@ func _on_create_new_team_confirmed() -> void:
 	emit_signal("action_requested", "create_new_career")
 	_bm_clear_career_picker()
 	_selected_league_id = LeagueDataScript.get_default_league_id()
+	call_deferred("_bm_reveal_create_team_form_after_picker")
+
+
+func _bm_reveal_create_team_form_after_picker() -> void:
+	var center := get_node_or_null("Center") as Control
+	var box := get_node_or_null("Center/Box") as Control
+
+	if center != null:
+		center.visible = true
+		move_child(center, get_child_count() - 1)
+
+	if box != null:
+		box.visible = true
+
 	_bm_set_teamname_form_visible(true)
 	_bm_update_inline_league()
+	_bm_apply_mobile_layout()
+	call_deferred("_bm_update_inline_league")
+
 	if input_team != null:
 		input_team.text = ""
 		if _bm_is_mobile_layout():

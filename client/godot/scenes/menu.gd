@@ -368,6 +368,22 @@ func _bm_set_club_popup_modal_visible(v: bool) -> void:
 	if _bm_club_popup_backdrop != null:
 		_bm_club_popup_backdrop.visible = v
 
+	# BM_IOS_CLUB_POPUP_BLOCK_TOPLEVEL_ACTIONS_V1
+	# Les boutons Management sont top_level sur mobile paysage.
+	# Ils ne doivent jamais intercepter le CTA du popup Build Your Roster.
+	for btn in [BtnMatch, BtnMyTeam, BtnMercato, BtnFinances, BtnSponsors, BtnStadium, BtnCoachs]:
+		if btn == null or not is_instance_valid(btn):
+			continue
+
+		if v:
+			if not btn.has_meta("bm_popup_previous_mouse_filter"):
+				btn.set_meta("bm_popup_previous_mouse_filter", int(btn.mouse_filter))
+			btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		else:
+			if btn.has_meta("bm_popup_previous_mouse_filter"):
+				btn.mouse_filter = int(btn.get_meta("bm_popup_previous_mouse_filter"))
+				btn.remove_meta("bm_popup_previous_mouse_filter")
+
 
 func _bm_apply_mobile_club_popup_layout() -> void:
 	if not _bm_menu_is_mobile_layout():
@@ -3239,7 +3255,7 @@ func _bm_show_management_auto_info_popup(title_key: String, body_key: String, ov
 	overlay.name = overlay_name
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	overlay.z_index = 30000
+	overlay.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
 	overlay.set_as_top_level(true)
 	overlay.z_as_relative = false
 	overlay.global_position = Vector2.ZERO
@@ -4939,9 +4955,15 @@ func _bm_maybe_show_climb_standings_goal_once() -> void:
 	var overlay := Control.new()
 	overlay.name = "GoalClimbStandingsOverlay"
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay.z_index = 9000
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	overlay.set_as_top_level(true)
+	overlay.z_as_relative = false
+	overlay.global_position = Vector2.ZERO
+	overlay.size = get_viewport_rect().size
 	add_child(overlay)
+	overlay.move_to_front()
+	overlay.call_deferred("move_to_front")
 
 	var card := Panel.new()
 	card.name = "GoalClimbStandingsCard"

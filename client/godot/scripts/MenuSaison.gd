@@ -2246,8 +2246,14 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 	popup.name = "MissionTokensRewardPopup"
 	popup.set_anchors_preset(Control.PRESET_FULL_RECT)
 	popup.mouse_filter = Control.MOUSE_FILTER_STOP
-	popup.z_index = 265
+	popup.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	popup.set_as_top_level(true)
+	popup.z_as_relative = false
+	popup.global_position = Vector2.ZERO
+	popup.size = get_viewport_rect().size
 	add_child(popup)
+	popup.move_to_front()
+	popup.call_deferred("move_to_front")
 
 	var dark := ColorRect.new()
 	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2411,8 +2417,14 @@ func _show_pending_season_reward_popup(rank: int, euros_gain: int, tokens_gain: 
 	popup.name = "SeasonRewardPopup"
 	popup.set_anchors_preset(Control.PRESET_FULL_RECT)
 	popup.mouse_filter = Control.MOUSE_FILTER_STOP
-	popup.z_index = 260
+	popup.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	popup.set_as_top_level(true)
+	popup.z_as_relative = false
+	popup.global_position = Vector2.ZERO
+	popup.size = get_viewport_rect().size
 	add_child(popup)
+	popup.move_to_front()
+	popup.call_deferred("move_to_front")
 
 	var dark := ColorRect.new()
 	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2558,8 +2570,14 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	popup.name = "LastMatchFinancePopup"
 	popup.set_anchors_preset(Control.PRESET_FULL_RECT)
 	popup.mouse_filter = Control.MOUSE_FILTER_STOP
-	popup.z_index = 240
+	popup.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+	popup.set_as_top_level(true)
+	popup.z_as_relative = false
+	popup.global_position = Vector2.ZERO
+	popup.size = get_viewport_rect().size
 	add_child(popup)
+	popup.move_to_front()
+	popup.call_deferred("move_to_front")
 
 	var dark := ColorRect.new()
 	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2570,15 +2588,20 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	var card := Panel.new()
 	var card_w: float = 980.0
 	var card_h: float = 360.0
+	var card_scale := Vector2.ONE
 	if _bm_saison_is_mobile_layout():
-		card_w *= 1.15
-		card_h *= 1.15
+		var vp := get_viewport_rect().size
+		var fit_scale := minf(
+			(vp.x - 24.0) / card_w,
+			(vp.y - 24.0) / card_h
+		)
+		card_scale = Vector2(fit_scale, fit_scale)
 	card.custom_minimum_size = Vector2(card_w, card_h)
 	card.size = Vector2(card_w, card_h)
-	card.position = Vector2(
-		(get_viewport_rect().size.x - card_w) * 0.5,
-		(get_viewport_rect().size.y - card_h) * 0.5
-	)
+	card.pivot_offset = Vector2.ZERO
+	card.scale = card_scale
+	var rendered_card_size := Vector2(card_w, card_h) * card_scale
+	card.position = (get_viewport_rect().size - rendered_card_size) * 0.5
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	var last_match_card_sb := StyleBoxFlat.new()
 	last_match_card_sb.bg_color = Color(0.015, 0.018, 0.030, 1.0)
@@ -3854,7 +3877,15 @@ func _open_end_season_popup() -> void:
 	popup_fin_saison.custom_minimum_size = Vector2(620, 520)
 	popup_fin_saison.size = Vector2(620, 520)
 	popup_fin_saison.pivot_offset = Vector2(310, 260)
-	popup_fin_saison.scale = Vector2(0.46, 0.46)
+	var end_target_scale := Vector2.ONE
+	if _bm_saison_is_mobile_layout():
+		var vp_end := get_viewport_rect().size
+		var end_fit := minf(
+			(vp_end.x - 24.0) / 620.0,
+			(vp_end.y - 24.0) / 520.0
+		)
+		end_target_scale = Vector2(end_fit, end_fit)
+	popup_fin_saison.scale = end_target_scale * 0.46
 	popup_fin_saison.rotation = deg_to_rad(-10.0)
 	popup_fin_saison.modulate.a = 0.0
 	popup_fin_saison.position = (get_viewport_rect().size - popup_fin_saison.size) * 0.5
@@ -4008,7 +4039,7 @@ func _open_end_season_popup() -> void:
 	tw_hero.parallel().tween_property(
 		popup_fin_saison,
 		"scale",
-		Vector2.ONE,
+		end_target_scale,
 		2.70
 	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw_hero.parallel().tween_property(
@@ -4023,13 +4054,13 @@ func _open_end_season_popup() -> void:
 	tw_hero_breathe.tween_property(
 		popup_fin_saison,
 		"scale",
-		Vector2(1.015, 1.015),
+		end_target_scale * 1.015,
 		0.52
 	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tw_hero_breathe.tween_property(
 		popup_fin_saison,
 		"scale",
-		Vector2.ONE,
+		end_target_scale,
 		0.60
 	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
