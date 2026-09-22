@@ -4318,7 +4318,7 @@ func _add_standings_row(cells: Array, background: String, is_player: bool, is_he
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if column == 1 else HORIZONTAL_ALIGNMENT_RIGHT
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		label.add_theme_font_override("font", lbl_standings.get_theme_font("normal_font"))
-		label.add_theme_font_size_override("font_size", 24)
+		label.add_theme_font_size_override("font_size", 18)
 		var color := "#B8CADD" if is_header else ("#40C7FF" if is_player and column < 2 else "#E1E8F0")
 		label.add_theme_color_override("font_color", Color(color))
 		var inset := StyleBoxEmpty.new()
@@ -4348,10 +4348,10 @@ func _layout_standings_columns() -> void:
 	# Reserve four digits for PF/PA and a sign for Diff, using the widest digit.
 	var digit_width := 0.0
 	for digit in "0123456789":
-		digit_width = maxf(digit_width, font.get_string_size(digit, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x)
+		digit_width = maxf(digit_width, font.get_string_size(digit, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x)
 	widths[5] = digit_width * 4.0
 	widths[6] = digit_width * 4.0
-	widths[7] = digit_width * 4.0 + maxf(font.get_string_size("+", HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x, font.get_string_size("-", HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x)
+	widths[7] = digit_width * 4.0 + maxf(font.get_string_size("+", HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x, font.get_string_size("-", HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x)
 	for panel in standings_rows.get_children():
 		if not panel is PanelContainer:
 			continue
@@ -4359,7 +4359,7 @@ func _layout_standings_columns() -> void:
 		for column in range(8):
 			if column != 1:
 				var label := line.get_child(column) as Label
-				widths[column] = maxf(widths[column], font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x)
+				widths[column] = maxf(widths[column], font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x)
 	var available := standings_scroll.size.x
 	var scrollbar := standings_scroll.get_v_scroll_bar()
 	if scrollbar.visible:

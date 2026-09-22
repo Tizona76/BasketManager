@@ -252,7 +252,7 @@ func _populate_placeholder_calendar() -> void:
 			elif user_score < opp_score:
 				l.modulate = Color(1.00, 0.45, 0.45, 1.0)
 		var calendar_landscape := _bm_calendar_is_mobile_layout() and get_viewport_rect().size.x > get_viewport_rect().size.y
-		l.add_theme_font_size_override("font_size", 22 if calendar_landscape else (32 if _bm_is_mobile_layout() else 28))
+		l.add_theme_font_size_override("font_size", 20 if calendar_landscape else (32 if _bm_is_mobile_layout() else 28))
 		if i == start_round:
 			l.modulate = Color(0.25, 0.78, 1.00, 1.0)
 		l.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -273,7 +273,7 @@ func _populate_placeholder_calendar() -> void:
 		opp_label.text = opp_name
 		if typeof(fx) == TYPE_DICTIONARY and fx.has("home_score") and fx.has("away_score"):
 			opp_label.text += " (%d - %d)" % [int(fx.get("home_score", 0)), int(fx.get("away_score", 0))]
-		opp_label.add_theme_font_size_override("font_size", 22 if calendar_landscape else (32 if _bm_is_mobile_layout() else 28))
+		opp_label.add_theme_font_size_override("font_size", 20 if calendar_landscape else (32 if _bm_is_mobile_layout() else 28))
 		opp_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 		opp_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		opp_label.custom_minimum_size = Vector2(360, 0) if calendar_landscape else Vector2(760, 0)
