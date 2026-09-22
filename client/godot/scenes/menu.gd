@@ -419,6 +419,7 @@ func _bm_apply_mobile_club_popup_layout() -> void:
 	popup_bienvenue_club.offset_right = popup_w * 0.5
 	popup_bienvenue_club.offset_bottom = popup_h * 0.5
 
+
 	lbl_bienvenue_club.offset_left = 22.0
 	lbl_bienvenue_club.offset_top = 18.0
 	lbl_bienvenue_club.offset_right = -22.0
@@ -981,6 +982,7 @@ func _ready() -> void:
 		var popup_seen := bool(save.get("popup_bienvenue_club_deja_vu", false))
 		popup_bienvenue_club.visible = !popup_seen
 		popup_bienvenue_club.mouse_filter = (Control.MOUSE_FILTER_STOP if popup_bienvenue_club.visible else Control.MOUSE_FILTER_IGNORE)
+
 		if _bm_menu_is_mobile_layout():
 			_bm_set_club_popup_modal_visible(popup_bienvenue_club.visible)
 		if popup_bienvenue_club.visible:
@@ -2480,6 +2482,13 @@ func _on_btn_back() -> void:
 
 	# Fallback uniquement si Menu est devenu une scène autonome.
 	var tree := get_tree()
+	if not OS.has_feature("web") and (OS.has_feature("ios") or OS.has_feature("android")):
+		if tree != null and ResourceLoader.exists("res://main.tscn"):
+			if tree.has_meta("bm_open_management_after_main_boot"):
+				tree.remove_meta("bm_open_management_after_main_boot")
+			tree.set_meta("bm_open_teamname_after_main_boot", true)
+			tree.call_deferred("change_scene_to_file", "res://main.tscn")
+		return
 	if tree != null and ResourceLoader.exists("res://scenes/TeamName.tscn"):
 		tree.call_deferred("change_scene_to_file", "res://scenes/TeamName.tscn")
 

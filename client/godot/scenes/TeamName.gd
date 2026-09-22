@@ -824,8 +824,10 @@ func _on_delete_career_confirmed() -> void:
 		_bm_set_teamname_form_visible(false)
 		_bm_build_career_picker()
 	else:
+		emit_signal("action_requested", "create_new_career")
 		_bm_clear_career_picker()
-		_bm_set_teamname_form_visible(true)
+		_selected_league_id = LeagueDataScript.get_default_league_id()
+		call_deferred("_bm_reveal_create_team_form_after_picker")
 
 
 
@@ -1295,6 +1297,11 @@ func _bm_update_keyboard_dismiss_button() -> void:
 		)
 	var show_btn := _bm_is_mobile_layout() and landscape and input_team != null and input_team.has_focus()
 	_mobile_keyboard_dismiss_btn.visible = show_btn
+	if show_btn:
+		# BM_IOS_KEYBOARD_DISMISS_FRONT_V1
+		# Center / overlays peuvent être remontés dans l'ordre des enfants
+		# après navigation. Le bouton visible doit rester le dernier sibling.
+		move_child(_mobile_keyboard_dismiss_btn, get_child_count() - 1)
 
 
 func _bm_teamname_input_focus_entered() -> void:
@@ -2411,6 +2418,12 @@ func _bind_entry_button_hover_tooltips() -> void:
 
 
 func _on_confirm_play_instantly_mouse_entered() -> void:
+	if (
+		_bm_single_play_revealed
+		and not OS.has_feature("web")
+		and (OS.has_feature("ios") or OS.has_feature("android"))
+	):
+		return
 	var tn := _bm_entry_real_team_name()
 	print("[HOVER BTN] text=", btn_confirm.text, " team=", tn)
 	if tn != "":

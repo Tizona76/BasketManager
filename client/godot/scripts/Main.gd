@@ -136,7 +136,15 @@ var _bm_guest_auth_last_outcome: String = "not_started"
 func _ready() -> void:
 	_bm_guest_auth_main_ready_ms = Time.get_ticks_msec()
 	print("[BM_GUEST_AUTH_TIMING] event=main_ready time_ms=", _bm_guest_auth_main_ready_ms)
-	TranslationServer.set_locale("en")
+	var tree := get_tree()
+	var recover_teamname := bool(tree.get_meta("bm_open_teamname_after_main_boot", false))
+	if recover_teamname:
+		# Consommer la destination avant tout appel différé, sans perdre la langue.
+		tree.remove_meta("bm_open_teamname_after_main_boot")
+		if tree.has_meta("bm_open_management_after_main_boot"):
+			tree.remove_meta("bm_open_management_after_main_boot")
+	else:
+		TranslationServer.set_locale("en")
 
 	# BM_GUEST_AUTO_HOOK (web only, no UI impact)
 	if OS.has_feature("web"):
@@ -230,10 +238,19 @@ func _ready() -> void:
 
 	# Recovery exceptionnel depuis un TeamName devenu autonome.
 	# Le SceneTree survit aux changements de scène ; le marqueur est one-shot.
-	var tree := get_tree()
-	if tree != null and bool(tree.get_meta("bm_open_management_after_main_boot", false)):
+	if recover_teamname:
+		call_deferred("_bm_recover_teamname_after_main_boot")
+	elif tree != null and bool(tree.get_meta("bm_open_management_after_main_boot", false)):
 		tree.remove_meta("bm_open_management_after_main_boot")
 		call_deferred("_bm_recover_management_after_main_boot")
+
+
+func _bm_recover_teamname_after_main_boot() -> void:
+	if not is_inside_tree():
+		return
+	_load_session_local_for_resume()
+	$UI.visible = false
+	_show_team_name()
 
 
 func _bm_recover_management_after_main_boot() -> void:

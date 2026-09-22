@@ -67,7 +67,8 @@ static func _empty_careers_index() -> Dictionary:
 	return {
 		"version": 1,
 		"active_career_id": "",
-		"careers": []
+		"careers": [],
+		"intentional_empty": false
 	}
 
 static func _read_careers_index(profile_id: String) -> Variant:
@@ -180,6 +181,7 @@ static func _career_entry_from_index_entry(entry: Dictionary) -> Dictionary:
 
 static func _normalize_careers_index(index: Dictionary) -> Dictionary:
 	var normalized: Dictionary = _empty_careers_index()
+	normalized["intentional_empty"] = bool(index.get("intentional_empty", false))
 	var active_id: String = str(index.get("active_career_id", "")).strip_edges()
 	normalized["active_career_id"] = "" if active_id == "" else _sanitize_path_id(active_id)
 	if typeof(index.get("careers")) != TYPE_ARRAY:
@@ -279,6 +281,8 @@ static func _ensure_careers_for_profile(profile_id: String) -> void:
 	if typeof(existing_index) == TYPE_DICTIONARY:
 		var index: Dictionary = _normalize_careers_index(existing_index as Dictionary)
 		_write_careers_index(pid, index)
+		if bool(index.get("intentional_empty", false)) and (index.get("careers", []) as Array).is_empty():
+			return
 		var active_id: String = str(index.get("active_career_id", "")).strip_edges()
 		if active_id != "" and _career_exists_in_index(index, active_id) and FileAccess.file_exists(_career_save_path(pid, active_id)):
 			var active_save: Variant = _read_json(_career_save_path(pid, active_id))
@@ -424,6 +428,7 @@ static func create_career(initial_save: Dictionary) -> String:
 	careers.append(_career_entry_from_save(save, career_id, int(Time.get_unix_time_from_system())))
 	index["careers"] = careers
 	index["active_career_id"] = career_id
+	index["intentional_empty"] = false
 	_write_careers_index(pid, index)
 	_hydrate_season_state_from_active_save()
 	return career_id
@@ -500,6 +505,7 @@ static func delete_career(career_id: String) -> bool:
 				continue
 			remaining.append(entry)
 	index["careers"] = remaining
+	index["intentional_empty"] = remaining.is_empty()
 	var active_id: String = str(index.get("active_career_id", "")).strip_edges()
 	if active_id == cid or active_id == "" or not _career_exists_in_index(index, active_id):
 		index["active_career_id"] = "" if remaining.is_empty() else str((remaining[0] as Dictionary).get("career_id", ""))
