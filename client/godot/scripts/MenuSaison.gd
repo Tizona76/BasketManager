@@ -2671,22 +2671,6 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	xp_lbl.add_theme_color_override("font_color", Color(0.20, 0.55, 0.95, 1.0))
 	card.add_child(xp_lbl)
 
-	var ball := TextureRect.new()
-	ball.texture = load("res://assets/images/ball.png") as Texture2D
-	ball.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	ball.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	ball.custom_minimum_size = Vector2(44, 44)
-	ball.size = Vector2(44, 44)
-	ball.position = Vector2(468, 214)
-	ball.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(ball)
-
-	var tw_ball := create_tween()
-	tw_ball.set_loops()
-	tw_ball.tween_property(ball, "position:y", 204.0, 0.34).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tw_ball.tween_property(ball, "position:y", 214.0, 0.34).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_IN)
-	tw_ball.tween_interval(0.10)
-
 	var btn := Button.new()
 	var _save_cta: Dictionary = PL.load_savegame()
 	var _round_cta: int = 0

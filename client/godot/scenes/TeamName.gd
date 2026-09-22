@@ -4,44 +4,6 @@ const PlayerLife := preload("res://scripts/PlayerLife.gd")
 const ProfileManager := preload("res://scripts/ProfileManager.gd")
 const LeagueDataScript := preload("res://scripts/LeagueData.gd")
 
-const _TEAMNAME_BG_NODE := "__BG_JOUEURS__"
-const _TEAMNAME_BG_PATH := "res://assets/images/backgrounds/joueurs.png"
-
-func _ensure_bg_joueurs() -> void:
-	# Ajoute un fond "joueurs.png" derrière tout, sans casser l'UI
-	if get_node_or_null(_TEAMNAME_BG_NODE) != null:
-		return
-
-	var tex := load(_TEAMNAME_BG_PATH)
-	if tex == null:
-		push_error("[TEAMNAME] missing bg: " + _TEAMNAME_BG_PATH)
-		return
-
-	var tr := TextureRect.new()
-	tr.name = _TEAMNAME_BG_NODE
-	tr.texture = tex
-	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	tr.stretch_mode = TextureRect.STRETCH_SCALE
-	tr.anchor_left = 0.0
-	tr.anchor_top = 0.0
-	tr.anchor_right = 1.0
-	tr.anchor_bottom = 1.0
-	tr.offset_left = 0.0
-	tr.offset_top = 0.0
-	tr.offset_right = 0.0
-	tr.offset_bottom = 0.0
-	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	# Mets le fond tout en dessous
-	# ✅ Si un ColorRect/Panel noir existe déjà (fond par défaut), on le neutralise
-	var cr := find_child("ColorRect", true, false)
-	if cr != null and cr is ColorRect:
-		(cr as ColorRect).color.a = 0.0
-
-	add_child(tr)
-	move_child(tr, 0)
-
-
 signal submit_team_name(team_name: String)
 signal submit_team_setup(team_name: String, league_id: String)
 signal back_requested()
@@ -1859,7 +1821,6 @@ func _on_league_confirmed() -> void:
 func _ready() -> void:
 	print("[TEAMNAME] _ready reached")
 	# iOS isolated: ancien agrandissement mobile global +15% neutralisé
-	_ensure_bg_joueurs()
 	_setup_fallback_dialog()
 	call_deferred("_focus_input")
 	call_deferred("_bm_apply_mobile_layout")

@@ -1434,26 +1434,6 @@ func _bm_apply_away_match_identity_overlays() -> void:
 	))
 
 
-func _ensure_translations_loaded() -> void:
-	var key_test := "matchsim.summary_loss_close"
-	var paths := [
-		"res://i18n/translations.fr.tres",
-		"res://i18n/translations.en.tres",
-		"res://i18n/translations.es.tres",
-		"res://i18n/translations.it.tres",
-		"res://i18n/translations.pt.tres",
-	]
-	for path in paths:
-		var t: Translation = load(path) as Translation
-		if t == null:
-			print("[MATCHSIM][I18N] load FAIL ", path)
-			continue
-		# Preuve: ce que contient réellement l'objet Translation
-		var msg := t.get_message(key_test)
-		print("[MATCHSIM][I18N] loaded ", path, " locale=", t.locale, " has_key=", (msg != ""), " sample=", msg)
-		TranslationServer.add_translation(t)
-
-
 func _bm_funnel_profile_uuid() -> String:
 	var profile_uuid: String = str(Session.profile_uuid).strip_edges()
 	if profile_uuid == "":
@@ -1574,7 +1554,6 @@ func _ready() -> void:
 
 	_bm_apply_i18n_btn_retour()
 	randomize()
-	_ensure_translations_loaded()
 	print("[MATCHSIM][I18N] test summary_loss_close=", tr("matchsim.summary_loss_close"))
 	print("[MATCHSIM][I18N] locale=", TranslationServer.get_locale())
 	print("[MATCHSIM][I18N] test end_prefix=", tr("matchsim.end_prefix"))
