@@ -69,6 +69,15 @@ var _club_tokens_active_section: String = "overview"
 var _club_tokens_cards_scroll: ScrollContainer = null
 var _home_arena_show_congratulations: bool = false
 
+func _is_ios_landscape() -> bool:
+	var vp := get_viewport_rect().size
+	return OS.has_feature("ios") and vp.x > vp.y
+
+
+func _is_ios_landscape_overview() -> bool:
+	return _is_ios_landscape() and _club_tokens_active_section == "overview"
+
+
 func _active_career_id() -> String:
 	if ProfileManager == null or not ProfileManager.has_method("get_active_career_id"):
 		return ""
@@ -126,6 +135,10 @@ func _ready() -> void:
 		BtnBack.add_theme_stylebox_override("normal", back_style)
 		BtnBack.add_theme_stylebox_override("hover", back_hover)
 		BtnBack.add_theme_stylebox_override("pressed", back_pressed)
+		if _is_ios_landscape():
+			BtnBack.offset_right = 192.0
+			BtnBack.offset_top = -74.6
+			BtnBack.add_theme_font_size_override("font_size", 17)
 
 	if Title != null:
 		Title.text = tr("club_tokens.title")
@@ -728,9 +741,9 @@ func _make_dashboard_section(title: String, entries: Array[Dictionary]) -> VBoxC
 	return section
 
 
-func _make_club_tokens_category_card(title: String, subtitle: String, button_text: String, badge_texture_path: String, section_id: String) -> PanelContainer:
+func _make_club_tokens_category_card(title: String, subtitle: String, button_text: String, badge_texture_path: String, section_id: String, compact: bool = false) -> PanelContainer:
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(360, 390)
+	card.custom_minimum_size = Vector2(280, 164) if compact else Vector2(360, 390)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var sb := StyleBoxFlat.new()
@@ -744,33 +757,33 @@ func _make_club_tokens_category_card(title: String, subtitle: String, button_tex
 	sb.corner_radius_top_right = 22
 	sb.corner_radius_bottom_left = 22
 	sb.corner_radius_bottom_right = 22
-	sb.content_margin_left = 26
-	sb.content_margin_right = 26
-	sb.content_margin_top = 22
-	sb.content_margin_bottom = 22
+	sb.content_margin_left = 10 if compact else 26
+	sb.content_margin_right = 10 if compact else 26
+	sb.content_margin_top = 6 if compact else 22
+	sb.content_margin_bottom = 6 if compact else 22
 	card.add_theme_stylebox_override("panel", sb)
 
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	box.add_theme_constant_override("separation", 12)
+	box.add_theme_constant_override("separation", 4 if compact else 12)
 	card.add_child(box)
 
 	var badge := TextureRect.new()
-	badge.custom_minimum_size = Vector2(110, 110)
+	badge.custom_minimum_size = Vector2(38, 38) if compact else Vector2(110, 110)
 	badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	if badge_texture_path != "" and ResourceLoader.exists(badge_texture_path):
 		badge.texture = load(badge_texture_path) as Texture2D
 	box.add_child(badge)
 
-	var title_lbl := _make_info_label(title, 28, Color(1.0, 0.86, 0.34, 1.0), 5)
-	title_lbl.custom_minimum_size = Vector2(320, 44)
+	var title_lbl := _make_info_label(title, 18 if compact else 28, Color(1.0, 0.86, 0.34, 1.0), 5)
+	title_lbl.custom_minimum_size = Vector2(260, 24) if compact else Vector2(320, 44)
 	box.add_child(title_lbl)
 
-	var subtitle_lbl := _make_info_label(subtitle, 20, Color(0.88, 0.95, 1.0, 0.98), 3)
-	subtitle_lbl.custom_minimum_size = Vector2(320, 58)
+	var subtitle_lbl := _make_info_label(subtitle, 12 if compact else 20, Color(0.88, 0.95, 1.0, 0.98), 3)
+	subtitle_lbl.custom_minimum_size = Vector2(260, 32) if compact else Vector2(320, 58)
 	subtitle_lbl.add_theme_color_override("font_shadow_color", Color(0.20, 0.55, 1.0, 0.45))
 	subtitle_lbl.add_theme_constant_override("shadow_offset_x", 0)
 	subtitle_lbl.add_theme_constant_override("shadow_offset_y", 0)
@@ -778,8 +791,8 @@ func _make_club_tokens_category_card(title: String, subtitle: String, button_tex
 	box.add_child(subtitle_lbl)
 
 	var cta := _make_hub_nav_button(button_text, section_id, true)
-	cta.custom_minimum_size = Vector2(300, 50)
-	cta.add_theme_font_size_override("font_size", 19)
+	cta.custom_minimum_size = Vector2(250, 36) if compact else Vector2(300, 50)
+	cta.add_theme_font_size_override("font_size", 14 if compact else 19)
 	cta.add_theme_color_override("font_color", Color(0.96, 0.98, 1.0, 1.0))
 	cta.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0, 1.0))
 	cta.add_theme_color_override("font_pressed_color", Color(1.0, 1.0, 1.0, 1.0))
@@ -790,13 +803,13 @@ func _make_club_tokens_category_card(title: String, subtitle: String, button_tex
 	return card
 
 
-func _make_club_tokens_category_cards() -> HBoxContainer:
+func _make_club_tokens_category_cards(compact: bool = false) -> HBoxContainer:
 	var cards := HBoxContainer.new()
 	cards.name = "ClubTokensCategoryCards"
 	cards.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	cards.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	cards.alignment = BoxContainer.ALIGNMENT_CENTER
-	cards.add_theme_constant_override("separation", 16)
+	cards.add_theme_constant_override("separation", 10 if compact else 16)
 	var save := PlayerLife.load_savegame()
 	var equipped_badge_id := PlayerLife.get_equipped_club_badge_id(save)
 	var equipped_badge_path := PlayerLife.get_club_badge_texture_path(save, equipped_badge_id)
@@ -807,14 +820,16 @@ func _make_club_tokens_category_cards() -> HBoxContainer:
 		_club_tokens_tr("club_identity.overview_subtitle", "Customize your club badge and build your identity."),
 		_club_tokens_tr("club_identity.setup_cta", "SET UP CLUB IDENTITY"),
 		equipped_badge_path,
-		"club_identity"
+		"club_identity",
+		compact
 	))
 	cards.add_child(_make_club_tokens_category_card(
 		_club_tokens_tr("home_arena.title", "HOME ARENA"),
 		_club_tokens_tr("home_arena.overview_subtitle", "Transform your home games into a premium arena."),
 		_club_tokens_tr("home_arena.setup_cta", "SET UP HOME ARENA"),
 		"res://assets/images/backgrounds/home_arena.png",
-		"home_arena"
+		"home_arena",
+		compact
 	))
 	return cards
 
@@ -822,7 +837,7 @@ func _make_club_tokens_category_cards() -> HBoxContainer:
 func _make_club_tokens_cards_arrow(text: String, direction: int) -> Button:
 	var btn := Button.new()
 	btn.text = text
-	btn.custom_minimum_size = Vector2(44, 84)
+	btn.custom_minimum_size = Vector2(34, 64) if _is_ios_landscape_overview() else Vector2(44, 84)
 	btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	btn.add_theme_font_size_override("font_size", 30)
 	btn.add_theme_color_override("font_color", Color(1.0, 0.88, 0.42, 1.0))
@@ -1037,6 +1052,7 @@ func _get_token_history_entries(save: Dictionary) -> Array[String]:
 
 
 func _show_token_history_popup() -> void:
+	var compact := _is_ios_landscape()
 	var ui := get_node_or_null("UI") as Control
 	if ui == null:
 		return
@@ -1052,10 +1068,10 @@ func _show_token_history_popup() -> void:
 	var popup := PanelContainer.new()
 	popup.name = "ClubTokensHistoryPopup"
 	popup.set_anchors_preset(Control.PRESET_CENTER)
-	popup.offset_left = -260.0
-	popup.offset_top = -170.0
-	popup.offset_right = 260.0
-	popup.offset_bottom = 170.0
+	popup.offset_left = -300.0 if compact else -260.0
+	popup.offset_top = -140.0 if compact else -170.0
+	popup.offset_right = 300.0 if compact else 260.0
+	popup.offset_bottom = 140.0 if compact else 170.0
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.025, 0.03, 0.055, 0.96)
 	sb.border_width_left = 2
@@ -1067,24 +1083,26 @@ func _show_token_history_popup() -> void:
 	sb.corner_radius_top_right = 18
 	sb.corner_radius_bottom_left = 18
 	sb.corner_radius_bottom_right = 18
-	sb.content_margin_left = 24
-	sb.content_margin_right = 24
-	sb.content_margin_top = 20
-	sb.content_margin_bottom = 20
+	sb.content_margin_left = 14 if compact else 24
+	sb.content_margin_right = 14 if compact else 24
+	sb.content_margin_top = 10 if compact else 20
+	sb.content_margin_bottom = 10 if compact else 20
 	popup.add_theme_stylebox_override("panel", sb)
 	ui.add_child(popup)
 
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 10)
+	box.add_theme_constant_override("separation", 6 if compact else 10)
 	popup.add_child(box)
-	box.add_child(_make_info_label(_club_tokens_tr("club_tokens.history", "History"), 26, Color(1.0, 0.82, 0.28, 1.0), 5))
+	box.add_child(_make_info_label(_club_tokens_tr("club_tokens.history", "History"), 20 if compact else 26, Color(1.0, 0.82, 0.28, 1.0), 5))
 
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(470, 205)
+	scroll.name = "ClubTokensHistoryScroll"
+	scroll.custom_minimum_size = Vector2(540, 170) if compact else Vector2(470, 205)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
 	scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	scroll.scroll_deadzone = 8
 	box.add_child(scroll)
 
 	var history_box := VBoxContainer.new()
@@ -1093,11 +1111,13 @@ func _show_token_history_popup() -> void:
 	scroll.add_child(history_box)
 
 	for line in lines:
-		history_box.add_child(_make_info_label(line, 20, Color(0.96, 0.98, 1.0, 1.0), 3))
+		var line_label := _make_info_label(line, 20, Color(0.96, 0.98, 1.0, 1.0), 3)
+		line_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		history_box.add_child(line_label)
 
 	var close_btn := Button.new()
 	close_btn.text = _club_tokens_tr("club_tokens.history.close", "Close")
-	close_btn.custom_minimum_size = Vector2(170, 44)
+	close_btn.custom_minimum_size = Vector2(150, 36) if compact else Vector2(170, 44)
 	close_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	close_btn.pressed.connect(func():
 		if is_instance_valid(popup):
@@ -1125,6 +1145,13 @@ func _add_history_button(root: Control) -> void:
 	btn.offset_right = -30.0
 	btn.offset_bottom = -26.0
 	btn.add_theme_font_size_override("font_size", 19)
+	if _is_ios_landscape():
+		btn.custom_minimum_size = Vector2(162, 48.6)
+		btn.offset_left = -192.0
+		btn.offset_top = -74.6
+		btn.offset_right = -30.0
+		btn.offset_bottom = -26.0
+		btn.add_theme_font_size_override("font_size", 17)
 	btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
 	btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
@@ -1202,6 +1229,67 @@ func _make_club_identity_button(text: String, color: Color) -> Button:
 	return btn
 
 
+func _show_insufficient_tokens_popup() -> void:
+	var ui := get_node_or_null("UI") as Control
+	if ui == null:
+		return
+	var old := ui.get_node_or_null("InsufficientTokensPopup")
+	if old != null:
+		old.queue_free()
+
+	var compact := _is_ios_landscape()
+	var modal := Control.new()
+	modal.name = "InsufficientTokensPopup"
+	modal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	modal.z_index = 400
+	ui.add_child(modal)
+
+	var backdrop := ColorRect.new()
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.color = Color(0, 0, 0, 0.68)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	modal.add_child(backdrop)
+
+	var card := PanelContainer.new()
+	card.set_anchors_preset(Control.PRESET_CENTER)
+	card.offset_left = -180.0 if compact else -230.0
+	card.offset_top = -75.0 if compact else -100.0
+	card.offset_right = 180.0 if compact else 230.0
+	card.offset_bottom = 75.0 if compact else 100.0
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	var card_style := StyleBoxFlat.new()
+	card_style.bg_color = Color(0.018, 0.024, 0.045, 0.98)
+	card_style.border_color = Color(1.0, 0.72, 0.22, 0.85)
+	card_style.set_border_width_all(2)
+	card_style.set_corner_radius_all(16)
+	card_style.content_margin_left = 20
+	card_style.content_margin_right = 20
+	card_style.content_margin_top = 12 if compact else 18
+	card_style.content_margin_bottom = 12 if compact else 18
+	card.add_theme_stylebox_override("panel", card_style)
+	modal.add_child(card)
+
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 8 if compact else 14)
+	card.add_child(box)
+	var title := _make_info_label(_club_tokens_tr("popup.club_tokens.title", "Club Tokens"), 20 if compact else 26, Color(1.0, 0.82, 0.28, 1.0), 4)
+	title.custom_minimum_size = Vector2(300 if compact else 400, 28 if compact else 38)
+	box.add_child(title)
+	var message := _make_info_label(_club_tokens_tr("club_identity.not_enough_tokens", "Not enough tokens"), 17 if compact else 22, Color(1.0, 0.94, 0.78, 1.0), 3)
+	message.custom_minimum_size = Vector2(300 if compact else 400, 28 if compact else 38)
+	box.add_child(message)
+	var ok_btn := _make_club_identity_button("OK", Color(0.08, 0.62, 0.22, 1.0))
+	ok_btn.custom_minimum_size = Vector2(140, 38 if compact else 44)
+	ok_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	ok_btn.pressed.connect(func():
+		if is_instance_valid(modal):
+			modal.queue_free()
+	)
+	box.add_child(ok_btn)
+
+
 func _make_club_identity_token_icon(size: int = 24) -> TextureRect:
 	var icon := TextureRect.new()
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1231,6 +1319,7 @@ func _make_club_identity_token_cost_row(cost: int, font_size: int = 18) -> HBoxC
 
 
 func _make_club_identity_confirm_cost_row(confirm_txt: String, cost: int) -> VBoxContainer:
+	var compact := _is_ios_landscape()
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 8)
@@ -1243,27 +1332,27 @@ func _make_club_identity_confirm_cost_row(confirm_txt: String, cost: int) -> VBo
 	suffix = suffix.replace("Tokens", "").replace("Token", "").strip_edges()
 	if suffix == "?" or suffix == "¿" or suffix == "؟":
 		suffix = ""
-	var prefix_lbl := _make_info_label(prefix.strip_edges(), 24, Color(1.0, 0.94, 0.74, 1.0), 4)
-	prefix_lbl.custom_minimum_size = Vector2(460, 36)
+	var prefix_lbl := _make_info_label(prefix.strip_edges(), 16 if compact else 24, Color(1.0, 0.94, 0.74, 1.0), 4)
+	prefix_lbl.custom_minimum_size = Vector2(320, 26) if compact else Vector2(460, 36)
 	prefix_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(prefix_lbl)
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.custom_minimum_size = Vector2(180, 34)
+	row.custom_minimum_size = Vector2(140, 26) if compact else Vector2(180, 34)
 	row.add_theme_constant_override("separation", 8)
 	box.add_child(row)
 	var cost_lbl := Label.new()
 	cost_lbl.text = str(cost)
-	cost_lbl.custom_minimum_size = Vector2(56, 34)
+	cost_lbl.custom_minimum_size = Vector2(44, 26) if compact else Vector2(56, 34)
 	cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	cost_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	cost_lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
-	cost_lbl.add_theme_font_size_override("font_size", 24)
+	cost_lbl.add_theme_font_size_override("font_size", 16 if compact else 24)
 	cost_lbl.add_theme_color_override("font_color", Color(1.0, 0.86, 0.32, 1.0))
 	cost_lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.95))
 	cost_lbl.add_theme_constant_override("outline_size", 4)
 	row.add_child(cost_lbl)
-	row.add_child(_make_club_identity_token_icon(28))
+	row.add_child(_make_club_identity_token_icon(18 if compact else 28))
 	if suffix != "":
 		var suffix_lbl := _make_info_label(suffix, 24, Color(1.0, 0.94, 0.74, 1.0), 4)
 		suffix_lbl.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -1310,6 +1399,7 @@ func _club_identity_action_label(action: String) -> String:
 
 
 func _show_club_identity_action_confirm(root: Control, badge_id: String, action: String, cost: int) -> void:
+	var compact := _is_ios_landscape()
 	var old := root.get_node_or_null("ClubIdentityConfirmPopup")
 	if old != null:
 		old.queue_free()
@@ -1318,10 +1408,10 @@ func _show_club_identity_action_confirm(root: Control, badge_id: String, action:
 	popup.z_index = 300
 	popup.mouse_filter = Control.MOUSE_FILTER_STOP
 	popup.set_anchors_preset(Control.PRESET_CENTER)
-	popup.offset_left = -260.0
-	popup.offset_top = -145.0
-	popup.offset_right = 260.0
-	popup.offset_bottom = 145.0
+	popup.offset_left = -220.0 if compact else -260.0
+	popup.offset_top = -85.0 if compact else -145.0
+	popup.offset_right = 220.0 if compact else 260.0
+	popup.offset_bottom = 85.0 if compact else 145.0
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.018, 0.024, 0.045, 0.98)
 	sb.border_color = Color(1.0, 0.72, 0.22, 0.85)
@@ -1335,14 +1425,14 @@ func _show_club_identity_action_confirm(root: Control, badge_id: String, action:
 	sb.corner_radius_bottom_right = 18
 	sb.content_margin_left = 24
 	sb.content_margin_right = 24
-	sb.content_margin_top = 22
-	sb.content_margin_bottom = 22
+	sb.content_margin_top = 10 if compact else 22
+	sb.content_margin_bottom = 10 if compact else 22
 	popup.add_theme_stylebox_override("panel", sb)
 	root.add_child(popup)
 
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 16)
+	box.add_theme_constant_override("separation", 8 if compact else 16)
 	popup.add_child(box)
 	var action_label := _club_identity_action_label(action)
 	var confirm_txt := _club_tokens_tr("club_identity.action_confirm", "{action} for {cost} Tokens?")
@@ -1362,7 +1452,7 @@ func _show_club_identity_action_confirm(root: Control, badge_id: String, action:
 	confirm_btn.pressed.connect(func():
 		var save := PlayerLife.load_savegame()
 		if not PlayerLife.apply_club_badge_action(save, badge_id, action):
-			_show_club_identity_message(root, "club_identity.not_enough_tokens", "Not enough tokens")
+			_show_insufficient_tokens_popup()
 			if is_instance_valid(popup):
 				popup.queue_free()
 			return
@@ -1527,15 +1617,16 @@ func _make_club_identity_owned_card(root: Control, save: Dictionary, badge_id: S
 
 
 func _make_club_identity_action_card(root: Control, save: Dictionary, badge_id: String, target_level: int, action: String, enabled: bool) -> PanelContainer:
+	var compact := _is_ios_landscape()
 	var equipped := PlayerLife.get_equipped_club_badge_id(save)
 	var is_selected := enabled and action == "" and badge_id == equipped
 	var is_previewed := _club_identity_preview_badge_id == "%s:%d" % [badge_id, target_level]
 	var card := PanelContainer.new()
 	card.set_meta("club_identity_badge_id", badge_id)
 	card.set_meta("club_identity_target_level", target_level)
-	card.custom_minimum_size = Vector2(250, 290)
+	card.custom_minimum_size = Vector2(105, 140) if compact else Vector2(250, 290)
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
-	card.pivot_offset = Vector2(125, 145)
+	card.pivot_offset = card.custom_minimum_size * 0.5
 	card.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton:
 			var mb := event as InputEventMouseButton
@@ -1555,42 +1646,42 @@ func _make_club_identity_action_card(root: Control, save: Dictionary, badge_id: 
 	sb.corner_radius_top_right = 14
 	sb.corner_radius_bottom_left = 14
 	sb.corner_radius_bottom_right = 14
-	sb.content_margin_left = 10
-	sb.content_margin_right = 10
-	sb.content_margin_top = 8
-	sb.content_margin_bottom = 8
+	sb.content_margin_left = 4 if compact else 10
+	sb.content_margin_right = 4 if compact else 10
+	sb.content_margin_top = 4 if compact else 8
+	sb.content_margin_bottom = 4 if compact else 8
 	card.add_theme_stylebox_override("panel", sb)
 
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 4)
+	box.add_theme_constant_override("separation", 2 if compact else 4)
 	card.add_child(box)
 
 	var tex_path := PlayerLife.get_club_badge_texture_path_for_level(badge_id, target_level)
 	var icon := TextureRect.new()
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.custom_minimum_size = Vector2(108, 108)
+	icon.custom_minimum_size = Vector2(44, 44) if compact else Vector2(108, 108)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	if tex_path != "" and ResourceLoader.exists(tex_path):
 		icon.texture = load(tex_path) as Texture2D
 	icon.modulate = Color(1.15, 1.15, 1.15, 1.0) if enabled else Color(0.60, 0.60, 0.64, 0.78)
 	box.add_child(icon)
-	box.add_child(_make_info_label(_club_identity_badge_name(badge_id), 18, Color(1, 1, 1, 1), 2))
+	box.add_child(_make_info_label(_club_identity_badge_name(badge_id), 12 if compact else 18, Color(1, 1, 1, 1), 2))
 	if is_selected:
-		box.add_child(_make_info_label(_club_tokens_tr("club_identity.selected", "Selected"), 18, Color(0.25, 1.0, 0.48, 1.0), 2))
+		box.add_child(_make_info_label(_club_tokens_tr("club_identity.selected", "Selected"), 12 if compact else 18, Color(0.25, 1.0, 0.48, 1.0), 2))
 		return card
 	if not enabled:
-		box.add_child(_make_info_label(_club_tokens_tr("club_identity.unavailable", "Next step"), 16, Color(0.70, 0.76, 0.86, 0.70), 2))
+		box.add_child(_make_info_label(_club_tokens_tr("club_identity.unavailable", "Next step"), 11 if compact else 16, Color(0.70, 0.76, 0.86, 0.70), 2))
 		return card
 
 	var action_label := _club_identity_action_label(action)
 	var cost := PlayerLife.get_badge_action_cost(save, badge_id, action)
-	box.add_child(_make_club_identity_token_cost_row(cost, 20))
+	box.add_child(_make_club_identity_token_cost_row(cost, 12 if compact else 20))
 	var btn := _make_club_identity_button(action_label, Color(0.95, 0.45, 0.06, 1.0))
-	btn.custom_minimum_size = Vector2(190, 40)
-	btn.add_theme_font_size_override("font_size", 17)
+	btn.custom_minimum_size = Vector2(90, 28) if compact else Vector2(190, 40)
+	btn.add_theme_font_size_override("font_size", 11 if compact else 17)
 	btn.disabled = cost <= 0
 	btn.pressed.connect(func():
 		_show_club_identity_action_confirm(root, badge_id, action, cost)
@@ -1606,6 +1697,7 @@ func _clear_club_identity_zoom_overlay(root: Control) -> void:
 
 
 func _show_club_identity_zoom_overlay(root: Control, source_card: Control, save: Dictionary, badge_id: String, target_level: int, action: String, enabled: bool) -> void:
+	var compact := _is_ios_landscape()
 	_clear_club_identity_zoom_overlay(root)
 	var equipped := PlayerLife.get_equipped_club_badge_id(save)
 	var is_selected := enabled and action == "" and badge_id == equipped
@@ -1619,7 +1711,7 @@ func _show_club_identity_zoom_overlay(root: Control, source_card: Control, save:
 			if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
 				_clear_club_identity_zoom_overlay(root)
 	)
-	var overlay_size := Vector2(430, 499)
+	var overlay_size := Vector2(300, 190) if compact else Vector2(430, 499)
 	overlay.custom_minimum_size = overlay_size
 	overlay.size = overlay_size
 	var root_rect := root.get_global_rect()
@@ -1639,32 +1731,32 @@ func _show_club_identity_zoom_overlay(root: Control, source_card: Control, save:
 	sb.corner_radius_top_right = 18
 	sb.corner_radius_bottom_left = 18
 	sb.corner_radius_bottom_right = 18
-	sb.content_margin_left = 18
-	sb.content_margin_right = 18
-	sb.content_margin_top = 16
-	sb.content_margin_bottom = 16
+	sb.content_margin_left = 8 if compact else 18
+	sb.content_margin_right = 8 if compact else 18
+	sb.content_margin_top = 6 if compact else 16
+	sb.content_margin_bottom = 6 if compact else 16
 	overlay.add_theme_stylebox_override("panel", sb)
 	root.add_child(overlay)
 
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 8)
+	box.add_theme_constant_override("separation", 4 if compact else 8)
 	overlay.add_child(box)
 
 	var tex_path := PlayerLife.get_club_badge_texture_path_for_level(badge_id, target_level)
 	var icon := TextureRect.new()
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.custom_minimum_size = Vector2(186, 186)
+	icon.custom_minimum_size = Vector2(60, 60) if compact else Vector2(186, 186)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	if tex_path != "" and ResourceLoader.exists(tex_path):
 		icon.texture = load(tex_path) as Texture2D
 	icon.modulate = Color(1.15, 1.15, 1.15, 1.0) if enabled else Color(0.60, 0.60, 0.64, 0.78)
 	box.add_child(icon)
-	box.add_child(_make_info_label(_club_identity_badge_name(badge_id), 31, Color(1, 1, 1, 1), 4))
+	box.add_child(_make_info_label(_club_identity_badge_name(badge_id), 16 if compact else 31, Color(1, 1, 1, 1), 4))
 	if is_selected:
-		box.add_child(_make_info_label(_club_tokens_tr("club_identity.selected", "Selected"), 31, Color(0.25, 1.0, 0.48, 1.0), 4))
+		box.add_child(_make_info_label(_club_tokens_tr("club_identity.selected", "Selected"), 16 if compact else 31, Color(0.25, 1.0, 0.48, 1.0), 4))
 		box.mouse_filter = Control.MOUSE_FILTER_STOP
 		box.gui_input.connect(func(event: InputEvent):
 			if event is InputEventMouseButton:
@@ -1674,15 +1766,15 @@ func _show_club_identity_zoom_overlay(root: Control, source_card: Control, save:
 		)
 		return
 	if not enabled:
-		box.add_child(_make_info_label(_club_tokens_tr("club_identity.unavailable", "Next step"), 27, Color(0.70, 0.76, 0.86, 0.70), 3))
+		box.add_child(_make_info_label(_club_tokens_tr("club_identity.unavailable", "Next step"), 15 if compact else 27, Color(0.70, 0.76, 0.86, 0.70), 3))
 		return
 
 	var action_label := _club_identity_action_label(action)
 	var cost := PlayerLife.get_badge_action_cost(save, badge_id, action)
-	box.add_child(_make_club_identity_token_cost_row(cost, 33))
+	box.add_child(_make_club_identity_token_cost_row(cost, 16 if compact else 33))
 	var btn := _make_club_identity_button(action_label, Color(0.95, 0.45, 0.06, 1.0))
-	btn.custom_minimum_size = Vector2(327, 69)
-	btn.add_theme_font_size_override("font_size", 29)
+	btn.custom_minimum_size = Vector2(180, 34) if compact else Vector2(327, 69)
+	btn.add_theme_font_size_override("font_size", 15 if compact else 29)
 	btn.disabled = cost <= 0
 	btn.pressed.connect(func():
 		_show_club_identity_action_confirm(root, badge_id, action, cost)
@@ -1716,16 +1808,19 @@ func _apply_club_identity_action_selection(root: Control) -> void:
 
 
 func _make_club_identity_level_section(root: Control, save: Dictionary, target_level: int) -> VBoxContainer:
+	var compact := _is_ios_landscape()
 	var equipped := PlayerLife.get_equipped_club_badge_id(save)
 	var current_level := PlayerLife.get_club_badge_level(save, equipped)
 	var section := VBoxContainer.new()
-	section.add_theme_constant_override("separation", 6)
+	section.add_theme_constant_override("separation", 3 if compact else 6)
 	var title_txt := _club_tokens_tr("club_identity.level", "Level {level}").replace("{level}", str(target_level)).to_upper()
-	section.add_child(_make_info_label(title_txt, 23, Color(1.0, 0.82, 0.28, 1.0), 4))
+	section.add_child(_make_info_label(title_txt, 16 if compact else 23, Color(1.0, 0.82, 0.28, 1.0), 4))
 	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 14)
-	grid.add_theme_constant_override("v_separation", 18)
+	grid.columns = 6 if compact else 3
+	if compact:
+		grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	grid.add_theme_constant_override("h_separation", 6 if compact else 14)
+	grid.add_theme_constant_override("v_separation", 8 if compact else 18)
 	section.add_child(grid)
 	for badge_id in PlayerLife.get_club_identity_badge_ids():
 		var action := ""
@@ -1747,11 +1842,25 @@ func _make_club_identity_level_section(root: Control, save: Dictionary, target_l
 
 
 func _show_club_identity_screen() -> void:
+	if _is_ios_landscape_overview() and Title != null:
+		Title.offset_left = 0.0
+		Title.offset_top = 40.0
+		Title.offset_right = 0.0
+		Title.offset_bottom = 92.0
+		Title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		Title.add_theme_font_size_override("font_size", 34)
 	_club_tokens_active_section = "club_identity"
 	_build_club_tokens_info_screen()
 
 
 func _show_home_arena_screen() -> void:
+	if _is_ios_landscape_overview() and Title != null:
+		Title.offset_left = 0.0
+		Title.offset_top = 40.0
+		Title.offset_right = 0.0
+		Title.offset_bottom = 92.0
+		Title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		Title.add_theme_font_size_override("font_size", 34)
 	_club_tokens_active_section = "home_arena"
 	_build_club_tokens_info_screen()
 
@@ -1835,17 +1944,19 @@ func _add_club_tokens_side_nav(root: Control) -> void:
 
 
 func _populate_overview_panel(root: Control, save: Dictionary, balance: int) -> void:
+	var compact := _is_ios_landscape_overview()
+	var panel_size := root.size
 	var box := VBoxContainer.new()
 	box.name = "ClubTokensOverviewBox"
-	box.position = Vector2(-58, 0)
-	box.size = Vector2(970, 580)
+	box.position = Vector2.ZERO if compact else Vector2(-58, 0)
+	box.size = panel_size if compact else Vector2(970, 580)
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 12)
+	box.add_theme_constant_override("separation", 6 if compact else 12)
 	root.add_child(box)
 
-	var progress_message := _make_info_label(_club_tokens_tr(_get_token_progress_message_key(balance), "Congratulations on your first Club Tokens!"), 26, Color(1.0, 0.88, 0.42, 1.0), 4)
-	progress_message.custom_minimum_size = Vector2(960, 42)
+	var progress_message := _make_info_label(_club_tokens_tr(_get_token_progress_message_key(balance), "Congratulations on your first Club Tokens!"), 18 if compact else 26, Color(1.0, 0.88, 0.42, 1.0), 4)
+	progress_message.custom_minimum_size = Vector2(panel_size.x, 28) if compact else Vector2(960, 42)
 	progress_message.add_theme_color_override("font_shadow_color", Color(1.0, 0.66, 0.12, 0.95))
 	progress_message.add_theme_constant_override("shadow_offset_x", 0)
 	progress_message.add_theme_constant_override("shadow_offset_y", 0)
@@ -1854,23 +1965,23 @@ func _populate_overview_panel(root: Control, save: Dictionary, balance: int) -> 
 
 	var cards_nav := HBoxContainer.new()
 	cards_nav.name = "ClubTokensCardsHorizontalNav"
-	cards_nav.custom_minimum_size = Vector2(970, 430)
+	cards_nav.custom_minimum_size = Vector2(panel_size.x, 164) if compact else Vector2(970, 430)
 	cards_nav.alignment = BoxContainer.ALIGNMENT_CENTER
-	cards_nav.add_theme_constant_override("separation", 22)
+	cards_nav.add_theme_constant_override("separation", 8 if compact else 22)
 	box.add_child(cards_nav)
 
 	cards_nav.add_child(_make_club_tokens_cards_arrow("‹", -1))
 
 	_club_tokens_cards_scroll = ScrollContainer.new()
 	_club_tokens_cards_scroll.name = "ClubTokensCardsScroller"
-	_club_tokens_cards_scroll.custom_minimum_size = Vector2(860, 430)
+	_club_tokens_cards_scroll.custom_minimum_size = Vector2(panel_size.x - 84.0, 164) if compact else Vector2(860, 430)
 	_club_tokens_cards_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_club_tokens_cards_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	_club_tokens_cards_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	cards_nav.add_child(_club_tokens_cards_scroll)
 
-	var category_cards := _make_club_tokens_category_cards()
-	category_cards.custom_minimum_size = Vector2(860, 430)
+	var category_cards := _make_club_tokens_category_cards(compact)
+	category_cards.custom_minimum_size = Vector2(panel_size.x - 84.0, 164) if compact else Vector2(860, 430)
 	_club_tokens_cards_scroll.add_child(category_cards)
 
 	cards_nav.add_child(_make_club_tokens_cards_arrow("›", 1))
@@ -1878,30 +1989,86 @@ func _populate_overview_panel(root: Control, save: Dictionary, balance: int) -> 
 
 
 func _populate_home_arena_panel(root: Control) -> void:
+	var compact := _is_ios_landscape()
 	var save := PlayerLife.load_savegame()
 	var selected := _is_home_arena_selected(save)
+	var scroll := ScrollContainer.new()
+	scroll.name = "HomeArenaScroll"
+	scroll.position = Vector2.ZERO
+	scroll.size = root.size
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED if compact else ScrollContainer.SCROLL_MODE_AUTO
+	scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.add_child(scroll)
 	var box := VBoxContainer.new()
 	box.name = "HomeArenaPlaceholderBox"
-	box.position = Vector2(58, 30)
-	box.size = Vector2(730, 500)
+	box.position = Vector2.ZERO if compact else Vector2(58, 30)
+	box.size = root.size if compact else Vector2(730, 500)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 16)
-	root.add_child(box)
+	box.add_theme_constant_override("separation", 5 if compact else 16)
+	scroll.add_child(box)
+	if compact:
+		var compact_title := _make_info_label(_club_tokens_tr("home_arena.title", "HOME ARENA"), 20, Color(1.0, 0.86, 0.34, 1.0), 5)
+		compact_title.custom_minimum_size = Vector2(root.size.x, 26)
+		box.add_child(compact_title)
+
+		var arena_row := HBoxContainer.new()
+		arena_row.custom_minimum_size = Vector2(root.size.x, 165)
+		arena_row.alignment = BoxContainer.ALIGNMENT_CENTER
+		arena_row.add_theme_constant_override("separation", 24)
+		box.add_child(arena_row)
+		var compact_preview := TextureRect.new()
+		compact_preview.custom_minimum_size = Vector2(247.5, 165)
+		compact_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		compact_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		if ResourceLoader.exists("res://assets/images/backgrounds/home_arena.png"):
+			compact_preview.texture = load("res://assets/images/backgrounds/home_arena.png") as Texture2D
+		arena_row.add_child(compact_preview)
+
+		var action_box := VBoxContainer.new()
+		action_box.custom_minimum_size = Vector2(300, 160)
+		action_box.alignment = BoxContainer.ALIGNMENT_CENTER
+		action_box.add_theme_constant_override("separation", 6)
+		arena_row.add_child(action_box)
+		var compact_subtitle := _make_info_label(_club_tokens_tr("home_arena.overview_subtitle", "Transform your home games into a premium arena."), 14, Color(0.88, 0.95, 1.0, 0.98), 3)
+		compact_subtitle.custom_minimum_size = Vector2(280, 40)
+		action_box.add_child(compact_subtitle)
+		if selected:
+			var compact_selected := _make_hub_nav_button(_club_tokens_tr("home_arena.selected", "SELECTED"), "home_arena_selected", false)
+			compact_selected.custom_minimum_size = Vector2(180, 36)
+			action_box.add_child(compact_selected)
+		else:
+			action_box.add_child(_make_club_identity_token_cost_row(HOME_ARENA_COST, 14))
+			var compact_select := _make_club_identity_button(_club_tokens_tr("home_arena.select", "SELECT"), Color(0.95, 0.45, 0.06, 1.0))
+			compact_select.custom_minimum_size = Vector2(180, 36)
+			compact_select.pressed.connect(func():
+				_show_home_arena_confirm(root)
+			)
+			action_box.add_child(compact_select)
+
+		var compact_msg := _make_info_label("", 14, Color(1.0, 0.35, 0.30, 1.0), 3)
+		compact_msg.name = "HomeArenaMessage"
+		compact_msg.custom_minimum_size = Vector2(280, 22)
+		action_box.add_child(compact_msg)
+		if _home_arena_show_congratulations:
+			_home_arena_show_congratulations = false
+			_show_home_arena_message(root, "home_arena.congratulations", "Congratulations!", Color(0.35, 1.0, 0.48, 1.0))
+		return
 
 	var preview := TextureRect.new()
-	preview.custom_minimum_size = Vector2(520, 245)
+	preview.custom_minimum_size = Vector2(220, 90) if compact else Vector2(520, 245)
 	preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	if ResourceLoader.exists("res://assets/images/backgrounds/home_arena.png"):
 		preview.texture = load("res://assets/images/backgrounds/home_arena.png") as Texture2D
 	box.add_child(preview)
 
-	var title_lbl := _make_info_label(_club_tokens_tr("home_arena.title", "HOME ARENA"), 32, Color(1.0, 0.86, 0.34, 1.0), 5)
-	title_lbl.custom_minimum_size = Vector2(700, 48)
+	var title_lbl := _make_info_label(_club_tokens_tr("home_arena.title", "HOME ARENA"), 20 if compact else 32, Color(1.0, 0.86, 0.34, 1.0), 5)
+	title_lbl.custom_minimum_size = Vector2(root.size.x, 26) if compact else Vector2(700, 48)
 	box.add_child(title_lbl)
 
-	var subtitle_lbl := _make_info_label(_club_tokens_tr("home_arena.overview_subtitle", "Transform your home games into a premium arena."), 22, Color(0.88, 0.95, 1.0, 0.98), 3)
-	subtitle_lbl.custom_minimum_size = Vector2(700, 36)
+	var subtitle_lbl := _make_info_label(_club_tokens_tr("home_arena.overview_subtitle", "Transform your home games into a premium arena."), 14 if compact else 22, Color(0.88, 0.95, 1.0, 0.98), 3)
+	subtitle_lbl.custom_minimum_size = Vector2(root.size.x, 22) if compact else Vector2(700, 36)
 	subtitle_lbl.add_theme_color_override("font_shadow_color", Color(0.20, 0.55, 1.0, 0.45))
 	subtitle_lbl.add_theme_constant_override("shadow_offset_x", 0)
 	subtitle_lbl.add_theme_constant_override("shadow_offset_y", 0)
@@ -1910,13 +2077,13 @@ func _populate_home_arena_panel(root: Control) -> void:
 
 	if selected:
 		var selected_btn := _make_hub_nav_button(_club_tokens_tr("home_arena.selected", "SELECTED"), "home_arena_selected", false)
-		selected_btn.custom_minimum_size = Vector2(300, 54)
+		selected_btn.custom_minimum_size = Vector2(180, 36) if compact else Vector2(300, 54)
 		selected_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		box.add_child(selected_btn)
 	else:
-		box.add_child(_make_club_identity_token_cost_row(HOME_ARENA_COST, 22))
+		box.add_child(_make_club_identity_token_cost_row(HOME_ARENA_COST, 14 if compact else 22))
 		var select_btn := _make_club_identity_button(_club_tokens_tr("home_arena.select", "SELECT"), Color(0.95, 0.45, 0.06, 1.0))
-		select_btn.custom_minimum_size = Vector2(300, 54)
+		select_btn.custom_minimum_size = Vector2(180, 36) if compact else Vector2(300, 54)
 		select_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		select_btn.pressed.connect(func():
 			_show_home_arena_confirm(root)
@@ -1925,7 +2092,7 @@ func _populate_home_arena_panel(root: Control) -> void:
 
 	var msg := _make_info_label("", 22, Color(1.0, 0.35, 0.30, 1.0), 3)
 	msg.name = "HomeArenaMessage"
-	msg.custom_minimum_size = Vector2(700, 30)
+	msg.custom_minimum_size = Vector2(root.size.x, 22) if compact else Vector2(700, 30)
 	box.add_child(msg)
 	if _home_arena_show_congratulations:
 		_home_arena_show_congratulations = false
@@ -1933,7 +2100,7 @@ func _populate_home_arena_panel(root: Control) -> void:
 
 
 func _show_home_arena_message(root: Control, key: String, fallback: String, color: Color = Color(1.0, 0.35, 0.30, 1.0)) -> void:
-	var lbl := root.get_node_or_null("HomeArenaPlaceholderBox/HomeArenaMessage") as Label
+	var lbl := root.get_node_or_null("HomeArenaScroll/HomeArenaPlaceholderBox/HomeArenaMessage") as Label
 	if lbl == null:
 		return
 	lbl.text = _club_tokens_tr(key, fallback)
@@ -1941,6 +2108,7 @@ func _show_home_arena_message(root: Control, key: String, fallback: String, colo
 
 
 func _show_home_arena_confirm(root: Control) -> void:
+	var compact := _is_ios_landscape()
 	var old := root.get_node_or_null("HomeArenaConfirmPopup")
 	if old != null:
 		old.queue_free()
@@ -1949,10 +2117,10 @@ func _show_home_arena_confirm(root: Control) -> void:
 	popup.z_index = 300
 	popup.mouse_filter = Control.MOUSE_FILTER_STOP
 	popup.set_anchors_preset(Control.PRESET_CENTER)
-	popup.offset_left = -260.0
-	popup.offset_top = -145.0
-	popup.offset_right = 260.0
-	popup.offset_bottom = 145.0
+	popup.offset_left = -220.0 if compact else -260.0
+	popup.offset_top = -85.0 if compact else -145.0
+	popup.offset_right = 220.0 if compact else 260.0
+	popup.offset_bottom = 85.0 if compact else 145.0
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.018, 0.024, 0.045, 0.98)
 	sb.border_color = Color(1.0, 0.72, 0.22, 0.85)
@@ -1966,14 +2134,14 @@ func _show_home_arena_confirm(root: Control) -> void:
 	sb.corner_radius_bottom_right = 18
 	sb.content_margin_left = 24
 	sb.content_margin_right = 24
-	sb.content_margin_top = 22
-	sb.content_margin_bottom = 22
+	sb.content_margin_top = 10 if compact else 22
+	sb.content_margin_bottom = 10 if compact else 22
 	popup.add_theme_stylebox_override("panel", sb)
 	root.add_child(popup)
 
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 16)
+	box.add_theme_constant_override("separation", 8 if compact else 16)
 	popup.add_child(box)
 
 	var confirm_txt := _club_tokens_tr("home_arena.confirm_select", "Select Home Arena for {cost} Tokens?")
@@ -1993,7 +2161,7 @@ func _show_home_arena_confirm(root: Control) -> void:
 	confirm_btn.pressed.connect(func():
 		var save := PlayerLife.load_savegame()
 		if not PlayerLife.spend_tokens(save, HOME_ARENA_COST, "home_arena_select"):
-			_show_home_arena_message(root, "club_identity.not_enough_tokens", "Not enough tokens")
+			_show_insufficient_tokens_popup()
 			if is_instance_valid(popup):
 				popup.queue_free()
 			return
@@ -2009,7 +2177,7 @@ func _add_hub_main_panel_background(root: Control) -> void:
 	var bg := Panel.new()
 	bg.name = "ClubTokensMainPanelBlackBg"
 	bg.position = Vector2.ZERO
-	bg.size = Vector2(850, root.size.y)
+	bg.size = root.size if _is_ios_landscape() else Vector2(850, root.size.y)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.0, 0.0, 0.0, 0.72)
@@ -2038,21 +2206,23 @@ func _populate_club_identity_panel(root: Control) -> void:
 
 	var scroller := ScrollContainer.new()
 	scroller.name = "ClubIdentityLevelScroller"
-	scroller.position = Vector2(32, 22)
-	scroller.size = Vector2(790, 520)
+	scroller.position = Vector2.ZERO if _is_ios_landscape() else Vector2(32, 22)
+	scroller.size = Vector2(root.size.x, root.size.y - 24.0) if _is_ios_landscape() else Vector2(790, 520)
+	scroller.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroller.mouse_filter = Control.MOUSE_FILTER_STOP
 	root.add_child(scroller)
 	var levels_box := VBoxContainer.new()
 	levels_box.name = "ClubIdentityLevelsBox"
 	levels_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	levels_box.add_theme_constant_override("separation", 18)
+	levels_box.add_theme_constant_override("separation", 8 if _is_ios_landscape() else 18)
 	scroller.add_child(levels_box)
 	for level in range(1, PlayerLife.CLUB_IDENTITY_MAX_BADGE_LEVEL + 1):
 		levels_box.add_child(_make_club_identity_level_section(root, save, level))
 
 	var msg := _make_info_label("", 22, Color(1.0, 0.35, 0.30, 1.0), 3)
 	msg.name = "ClubIdentityMessage"
-	msg.position = Vector2(46, 540)
-	msg.size = Vector2(760, 34)
+	msg.position = Vector2(0, root.size.y - 24.0) if _is_ios_landscape() else Vector2(46, 540)
+	msg.size = Vector2(root.size.x, 24) if _is_ios_landscape() else Vector2(760, 34)
 	root.add_child(msg)
 
 
@@ -2073,10 +2243,21 @@ func _build_club_tokens_info_screen() -> void:
 	if old_history != null:
 		old_history.queue_free()
 
+	var compact_overview := _is_ios_landscape_overview()
+	var compact_landscape := _is_ios_landscape()
+	var vp := get_viewport_rect().size
+	if compact_landscape and Title != null:
+		Title.offset_left = 16.0
+		Title.offset_top = 8.0
+		Title.offset_right = -210.0
+		Title.offset_bottom = 44.0
+		Title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		Title.add_theme_font_size_override("font_size", 28)
+
 	var root := Control.new()
 	root.name = "ClubTokensInfoRoot"
-	root.position = Vector2(70, 110)
-	root.size = Vector2(1090, 580)
+	root.position = Vector2(12, 54) if compact_landscape else Vector2(70, 110)
+	root.size = Vector2(vp.x - 24.0, vp.y - 141.0) if compact_landscape else Vector2(1090, 580)
 	ui.add_child(root)
 
 	var save: Dictionary = PlayerLife.load_savegame()
@@ -2087,13 +2268,13 @@ func _build_club_tokens_info_screen() -> void:
 	var balance_title := _club_tokens_tr("club_tokens.balance", "Balance")
 	var balance_card := PanelContainer.new()
 	balance_card.name = "ClubTokensBalanceCard"
-	balance_card.custom_minimum_size = Vector2(220, 86)
-	balance_card.size = Vector2(220, 86)
+	balance_card.custom_minimum_size = Vector2(123.93, 42.5) if compact_landscape else Vector2(220, 86)
+	balance_card.size = Vector2(123.93, 42.5) if compact_landscape else Vector2(220, 86)
 	balance_card.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	balance_card.offset_left = -252.0
-	balance_card.offset_top = 34.0
-	balance_card.offset_right = -32.0
-	balance_card.offset_bottom = 120.0
+	balance_card.offset_left = -139.93 if compact_landscape else -252.0
+	balance_card.offset_top = 2.0 if compact_landscape else 34.0
+	balance_card.offset_right = -16.0 if compact_landscape else -32.0
+	balance_card.offset_bottom = 44.5 if compact_landscape else 120.0
 	var balance_sb := StyleBoxFlat.new()
 	balance_sb.bg_color = Color(0.03, 0.16, 0.38, 0.92)
 	balance_sb.border_width_left = 2
@@ -2105,31 +2286,31 @@ func _build_club_tokens_info_screen() -> void:
 	balance_sb.corner_radius_top_right = 18
 	balance_sb.corner_radius_bottom_left = 18
 	balance_sb.corner_radius_bottom_right = 18
-	balance_sb.content_margin_left = 14
-	balance_sb.content_margin_right = 14
-	balance_sb.content_margin_top = 7
-	balance_sb.content_margin_bottom = 7
+	balance_sb.content_margin_left = 8 if compact_landscape else 14
+	balance_sb.content_margin_right = 8 if compact_landscape else 14
+	balance_sb.content_margin_top = 2.5 if compact_landscape else 7
+	balance_sb.content_margin_bottom = 2.5 if compact_landscape else 7
 	balance_card.add_theme_stylebox_override("panel", balance_sb)
 	ui.add_child(balance_card)
 
 	var balance_box := VBoxContainer.new()
 	balance_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	balance_box.add_theme_constant_override("separation", 3)
+	balance_box.add_theme_constant_override("separation", 1 if compact_landscape else 3)
 	balance_card.add_child(balance_box)
-	var balance_title_lbl := _make_info_label(balance_title, 21, Color(1.0, 0.82, 0.28, 1.0), 4)
+	var balance_title_lbl := _make_info_label(balance_title, 12 if compact_landscape else 21, Color(1.0, 0.82, 0.28, 1.0), 4)
 	balance_box.add_child(balance_title_lbl)
 	var balance_value_row := HBoxContainer.new()
 	balance_value_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	balance_value_row.custom_minimum_size = Vector2(160, 32)
-	balance_value_row.add_theme_constant_override("separation", 10)
+	balance_value_row.custom_minimum_size = Vector2(95, 18.7) if compact_landscape else Vector2(160, 32)
+	balance_value_row.add_theme_constant_override("separation", 7 if compact_landscape else 10)
 	balance_box.add_child(balance_value_row)
 	var balance_lbl := Label.new()
 	balance_lbl.text = str(balance)
-	balance_lbl.custom_minimum_size = Vector2(86, 32)
+	balance_lbl.custom_minimum_size = Vector2(50, 18.7) if compact_landscape else Vector2(86, 32)
 	balance_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	balance_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	balance_lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
-	balance_lbl.add_theme_font_size_override("font_size", 28)
+	balance_lbl.add_theme_font_size_override("font_size", 17 if compact_landscape else 28)
 	balance_lbl.add_theme_color_override("font_color", Color(1.0, 0.94, 0.72, 1.0))
 	balance_lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.95))
 	balance_lbl.add_theme_constant_override("outline_size", 5)
@@ -2138,8 +2319,8 @@ func _build_club_tokens_info_screen() -> void:
 	balance_value_row.add_child(balance_lbl)
 	var token_icon := TextureRect.new()
 	token_icon.texture = load("res://assets/images/token.png") as Texture2D
-	token_icon.custom_minimum_size = Vector2(28, 28)
-	token_icon.size = Vector2(28, 28)
+	token_icon.custom_minimum_size = Vector2(17, 17) if compact_landscape else Vector2(28, 28)
+	token_icon.size = Vector2(17, 17) if compact_landscape else Vector2(28, 28)
 	token_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	token_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	token_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -2148,8 +2329,8 @@ func _build_club_tokens_info_screen() -> void:
 
 	var main_panel := Control.new()
 	main_panel.name = "ClubTokensMainPanel"
-	main_panel.position = Vector2(225, 0)
-	main_panel.size = Vector2(850, 580)
+	main_panel.position = Vector2.ZERO if compact_landscape else Vector2(225, 0)
+	main_panel.size = root.size if compact_landscape else Vector2(850, 580)
 	root.add_child(main_panel)
 
 	if _club_tokens_active_section == "club_identity":
