@@ -471,6 +471,30 @@ func _bm_mark_intro_popup_seen() -> void:
 	PL.write_savegame(save)
 
 
+func _bm_stadium_popup_native_landscape() -> bool:
+	var vp := get_viewport_rect().size
+	return not OS.has_feature("web") and (OS.has_feature("ios") or OS.has_feature("android")) and vp.x > vp.y
+
+
+func _bm_layout_stadium_intro_popup() -> void:
+	if not _bm_stadium_popup_native_landscape() or popup_bienvenue == null:
+		return
+	var vp := get_viewport_rect().size
+	popup_bienvenue.size = Vector2(vp.x * 0.9, vp.y - 24.0)
+	popup_bienvenue.position = (vp - popup_bienvenue.size) * 0.5
+	lbl_bienvenue.position = Vector2(32, 16)
+	lbl_bienvenue.size = Vector2(popup_bienvenue.size.x - 64.0, popup_bienvenue.size.y - 142.0)
+	# Bottom anchors keep the existing ball tween valid during resize.
+	img_popup_ball_bienvenue.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	img_popup_ball_bienvenue.custom_minimum_size = Vector2(44.8, 44.8)
+	img_popup_ball_bienvenue.offset_left = -22.4
+	img_popup_ball_bienvenue.offset_right = 22.4
+	img_popup_ball_bienvenue.offset_top = -114.8
+	img_popup_ball_bienvenue.offset_bottom = -70.0
+	btn_close_bienvenue.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	btn_close_bienvenue.position = Vector2((popup_bienvenue.size.x - btn_close_bienvenue.size.x) * 0.5, popup_bienvenue.size.y - btn_close_bienvenue.size.y - 12.0)
+
+
 func _bm_play_popup_bienvenue_ball_anim() -> void:
 	if img_popup_ball_bienvenue == null:
 		return
@@ -3052,10 +3076,14 @@ func _ready() -> void:
 		var _lines = _txt.split("\n")
 		if _lines.size() > 0:
 			var _title = _lines[0].replace(">>", "").strip_edges()
-			_lines[0] = "[center][font_size=32][b]" + _title + "[/b][/font_size][/center]"
+			var _mobile_popup := _bm_stadium_popup_native_landscape()
+			_lines[0] = "[center][font_size=%d][b]" % (24 if _mobile_popup else 32) + _title + "[/b][/font_size][/center]"
 			for _i in range(1, _lines.size()):
 				if str(_lines[_i]).strip_edges() != "":
-					_lines[_i] = "[font_size=30]" + str(_lines[_i]) + "[/font_size]"
+					var _body_size := (22 if _i == 2 else 20) if _mobile_popup else 30
+					_lines[_i] = "[font_size=%d]" % _body_size + str(_lines[_i]) + "[/font_size]"
+				elif _mobile_popup:
+					_lines[_i] = "[font_size=8] [/font_size]"
 		_txt = "\n".join(_lines)
 
 		lbl_bienvenue.bbcode_enabled = true
@@ -3063,10 +3091,10 @@ func _ready() -> void:
 		lbl_bienvenue.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		lbl_bienvenue.fit_content = false
 
-		lbl_bienvenue.add_theme_font_size_override("normal_font_size", 30)
-		lbl_bienvenue.add_theme_font_size_override("bold_font_size", 30)
-		lbl_bienvenue.add_theme_font_size_override("italics_font_size", 30)
-		lbl_bienvenue.add_theme_font_size_override("bold_italics_font_size", 30)
+		lbl_bienvenue.add_theme_font_size_override("normal_font_size", 20 if _bm_stadium_popup_native_landscape() else 30)
+		lbl_bienvenue.add_theme_font_size_override("bold_font_size", 20 if _bm_stadium_popup_native_landscape() else 30)
+		lbl_bienvenue.add_theme_font_size_override("italics_font_size", 20 if _bm_stadium_popup_native_landscape() else 30)
+		lbl_bienvenue.add_theme_font_size_override("bold_italics_font_size", 20 if _bm_stadium_popup_native_landscape() else 30)
 
 		lbl_bienvenue.text = _txt
 		lbl_bienvenue.size = lbl_bienvenue.size + Vector2(0.0, 220.0)
@@ -3082,6 +3110,9 @@ func _ready() -> void:
 			var _vp_popup := get_viewport_rect().size
 			popup_bienvenue.position = (_vp_popup - popup_bienvenue.size) * 0.5
 			popup_bienvenue.move_to_front()
+
+	_bm_layout_stadium_intro_popup()
+	get_viewport().size_changed.connect(_bm_layout_stadium_intro_popup)
 
 	popup_bienvenue.visible = _bm_should_show_intro_popup_once()
 	if popup_bienvenue.visible:
@@ -4799,6 +4830,7 @@ func _notification(what: int) -> void:
 		_bm_refresh_division_label(PL.load_savegame())
 		return
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
+		call_deferred("_bm_layout_match_compo_popup")
 		call_deferred("_bm_saison_apply_mobile_bg_and_halo_layout")
 		call_deferred("_bm_saison_apply_mobile_hud_layout")
 		call_deferred("_bm_saison_apply_mobile_top_left_buttons_plus20_text_plus2")
@@ -5807,6 +5839,7 @@ func _bm_show_match_compo_popup_on_play() -> void:
 	var popup_h: float = 520.0
 
 	var card := Panel.new()
+	card.name = "MatchCompoCard"
 	card.custom_minimum_size = Vector2(popup_w, popup_h)
 	card.size = Vector2(popup_w, popup_h)
 	card.position = Vector2(
@@ -5830,6 +5863,7 @@ func _bm_show_match_compo_popup_on_play() -> void:
 	popup.add_child(card)
 
 	var title := Label.new()
+	title.name = "MatchCompoTitle"
 	title.text = _bm_tr_or_fallback("popup.match_compo.title", "Compose ton équipe de joueurs pour le match")
 	title.position = Vector2(28, 26)
 	title.size = Vector2(popup_w - 56, 52)
@@ -5841,6 +5875,7 @@ func _bm_show_match_compo_popup_on_play() -> void:
 	card.add_child(title)
 
 	var body := RichTextLabel.new()
+	body.name = "MatchCompoBody"
 	body.bbcode_enabled = false
 	body.scroll_active = false
 	body.fit_content = false
@@ -5856,6 +5891,7 @@ func _bm_show_match_compo_popup_on_play() -> void:
 	card.add_child(body)
 
 	var btn := Button.new()
+	btn.name = "MatchCompoButton"
 	btn.text = _bm_tr_or_fallback("popup.match_compo.cta", "Faire la compo")
 	btn.custom_minimum_size = Vector2(250, 54)
 	btn.size = Vector2(250, 54)
@@ -5889,6 +5925,7 @@ func _bm_show_match_compo_popup_on_play() -> void:
 	)
 
 	var ball := TextureRect.new()
+	ball.name = "MatchCompoBall"
 	ball.texture = TOKEN_ICON if TOKEN_ICON != null else null
 	var ball_path := "res://assets/images/ballon.png"
 	if ResourceLoader.exists(ball_path):
@@ -5900,14 +5937,74 @@ func _bm_show_match_compo_popup_on_play() -> void:
 	ball.position = Vector2((popup_w - 44.0) * 0.5, btn.position.y - 52.0)
 	ball.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(ball)
-
-	var tw_ball := create_tween()
-	tw_ball.set_loops()
-	tw_ball.tween_property(ball, "position:y", btn.position.y - 62.0, 0.34).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tw_ball.tween_property(ball, "position:y", btn.position.y - 52.0, 0.34).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_IN)
-	tw_ball.tween_interval(0.10)
-
 	card.add_child(btn)
+	_bm_layout_match_compo_popup()
+
+	if not ((OS.has_feature("ios") or OS.has_feature("android")) and get_viewport_rect().size.x > get_viewport_rect().size.y):
+		var tw_ball := create_tween()
+		ball.set_meta("match_compo_ball_tween", tw_ball)
+		tw_ball.set_loops()
+		tw_ball.tween_property(ball, "position:y", btn.position.y - 62.0, 0.34).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tw_ball.tween_property(ball, "position:y", btn.position.y - 52.0, 0.34).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_IN)
+		tw_ball.tween_interval(0.10)
+
+
+func _bm_layout_match_compo_popup() -> void:
+	if not (OS.has_feature("ios") or OS.has_feature("android")):
+		return
+	var vp := get_viewport_rect().size
+	var popup := get_node_or_null("MatchCompoPlayPopup") as Control
+	if popup == null or not popup.is_visible_in_tree():
+		return
+	var card := popup.get_node_or_null("MatchCompoCard") as Panel
+	var title := popup.get_node_or_null("MatchCompoCard/MatchCompoTitle") as Label
+	var body := popup.get_node_or_null("MatchCompoCard/MatchCompoBody") as RichTextLabel
+	var btn := popup.get_node_or_null("MatchCompoCard/MatchCompoButton") as Button
+	var ball := popup.get_node_or_null("MatchCompoCard/MatchCompoBall") as TextureRect
+	if card == null or title == null or body == null or btn == null:
+		return
+	if vp.x <= vp.y:
+		var portrait_width := mini(634.0, vp.x * 0.66)
+		card.custom_minimum_size = Vector2(portrait_width, 520.0)
+		card.size = card.custom_minimum_size
+		card.position = (vp - card.size) * 0.5
+		title.position = Vector2(28.0, 26.0)
+		title.size = Vector2(portrait_width - 56.0, 52.0)
+		title.add_theme_font_size_override("font_size", 36)
+		body.position = Vector2(34.0, 140.0)
+		body.size = Vector2(portrait_width - 68.0, 260.0)
+		body.add_theme_font_size_override("normal_font_size", 22)
+		btn.custom_minimum_size = Vector2(250.0, 54.0)
+		btn.size = btn.custom_minimum_size
+		btn.position = Vector2((portrait_width - btn.size.x) * 0.5, 432.0)
+		btn.add_theme_font_size_override("font_size", 20)
+		if ball != null:
+			ball.custom_minimum_size = Vector2(44.0, 44.0)
+			ball.size = ball.custom_minimum_size
+			ball.position = Vector2((portrait_width - ball.size.x) * 0.5, btn.position.y - 52.0)
+		return
+	var card_size := Vector2(minf(720.0, vp.x - 32.0), vp.y - 24.0)
+	card.custom_minimum_size = card_size
+	card.size = card_size
+	card.position = (vp - card_size) * 0.5
+	title.position = Vector2(24.0, 12.0)
+	title.size = Vector2(card_size.x - 48.0, 44.0)
+	title.add_theme_font_size_override("font_size", 26)
+	body.position = Vector2(28.0, 88.0)
+	btn.custom_minimum_size = Vector2(220.0, 44.0)
+	btn.size = btn.custom_minimum_size
+	btn.position = Vector2((card_size.x - btn.size.x) * 0.5, card_size.y - 56.0)
+	btn.add_theme_font_size_override("font_size", 18)
+	body.size = Vector2(card_size.x - 56.0, maxf(80.0, btn.position.y - 138.0))
+	body.add_theme_font_size_override("normal_font_size", 18)
+	if ball != null:
+		var old_tween: Variant = ball.get_meta("match_compo_ball_tween", null)
+		if old_tween is Tween and old_tween.is_valid():
+			old_tween.kill()
+		ball.remove_meta("match_compo_ball_tween")
+		ball.custom_minimum_size = Vector2(34.0, 34.0)
+		ball.size = ball.custom_minimum_size
+		ball.position = Vector2((card_size.x - ball.size.x) * 0.5, btn.position.y - 42.0)
 
 func _bm_show_mercato_closed_popup() -> void:
 	var title := _bm_tr_or_fallback("mercato.closed.title", "Mercato fermé")

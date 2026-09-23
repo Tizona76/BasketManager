@@ -33,6 +33,29 @@ static var _bm_last_coach_insight_family: String = ""
 static var _bm_last_coach_insight_player: String = ""
 
 
+func _bm_close_probe_control(control: Control, canvas_pos: Vector2) -> Dictionary:
+	if control == null or not is_instance_valid(control):
+		return {"missing": true}
+	var local_pos := control.get_global_transform_with_canvas().affine_inverse() * canvas_pos
+	return {
+		"path": str(control.get_path()),
+		"local": str(local_pos),
+		"inside": Rect2(Vector2.ZERO, control.size).has_point(local_pos),
+		"position": str(control.position),
+		"global_position": str(control.global_position),
+		"global_rect": str(control.get_global_rect()),
+		"size": str(control.size),
+		"custom_minimum": str(control.custom_minimum_size),
+		"minimum": str(control.get_combined_minimum_size()),
+		"anchors": str(Vector4(control.anchor_left, control.anchor_top, control.anchor_right, control.anchor_bottom)),
+		"offsets": str(Vector4(control.offset_left, control.offset_top, control.offset_right, control.offset_bottom)),
+		"mouse_filter": control.mouse_filter,
+		"z_index": control.z_index,
+		"clip_contents": control.clip_contents,
+		"visible": control.is_visible_in_tree()
+	}
+
+
 func _bm_make_back_button_style(bg: Color, glow: Color, bottom_w: int, shadow_size: int) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
@@ -243,9 +266,26 @@ func _bm_place_current_lineup_button() -> void:
 	var vp := get_viewport_rect().size
 	var w := 202.0 if _bm_matchsim_is_mobile_layout() else 184.0
 	var h := 58.0 if _bm_matchsim_is_mobile_layout() else 52.0
+	if _bm_matchsim_is_mobile_layout() and vp.x > vp.y:
+		w *= 0.85
+		h *= 0.85
+	if _bm_context_is_native_landscape():
+		w *= 0.85
+		h = 51.0 * 0.85
+		btn_current_lineup.add_theme_font_size_override("font_size", 18)
+		for state in ["normal", "hover", "pressed"]:
+			var style := btn_current_lineup.get_theme_stylebox(state).duplicate() as StyleBoxFlat
+			style.content_margin_left = 10
+			style.content_margin_right = 10
+			style.content_margin_top = 8
+			style.content_margin_bottom = 8
+			btn_current_lineup.add_theme_stylebox_override(state, style)
 	btn_current_lineup.custom_minimum_size = Vector2(w, h)
 	btn_current_lineup.size = Vector2(w, h)
-	btn_current_lineup.position = Vector2(vp.x - w - 24.0, 24.0)
+	var placed_width := btn_current_lineup.size.x if _bm_matchsim_is_mobile_layout() and vp.x > vp.y else w
+	btn_current_lineup.position = Vector2(vp.x - placed_width - 24.0, 24.0)
+	if _bm_context_is_native_landscape() and btn_retour != null:
+		btn_current_lineup.global_position.y = btn_retour.get_global_rect().position.y
 	btn_current_lineup.z_index = 80
 
 
@@ -347,7 +387,8 @@ func _bm_current_lineup_position_text(poste: String) -> String:
 func _bm_current_lineup_player_avatar(pd: Dictionary, parent: Control, pos: Vector2) -> void:
 	var tex := TextureRect.new()
 	tex.position = pos
-	tex.size = Vector2(38, 38)
+	var compact := _bm_matchsim_is_mobile_layout() and get_viewport_rect().size.x > get_viewport_rect().size.y
+	tex.size = Vector2(33, 33) if compact else Vector2(38, 38)
 	tex.custom_minimum_size = tex.size
 	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -361,27 +402,30 @@ func _bm_current_lineup_player_avatar(pd: Dictionary, parent: Control, pos: Vect
 func _bm_current_lineup_player_row(parent: Control, pd: Dictionary, y: float, row_w: float) -> void:
 	var row := Panel.new()
 	row.position = Vector2(0, y)
-	row.size = Vector2(row_w, 44)
+	var compact := _bm_matchsim_is_mobile_layout() and get_viewport_rect().size.x > get_viewport_rect().size.y
+	row.size = Vector2(row_w, 38 if compact else 44)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_stylebox_override("panel", _bm_current_lineup_style_panel(Color(0.02, 0.04, 0.08, 0.72), Color(1, 1, 1, 0.10)))
 	parent.add_child(row)
 
 	_bm_current_lineup_player_avatar(pd, row, Vector2(8, 3))
-	_bm_current_lineup_label(row, _bm_player_display_name(pd), Vector2(54, 7), Vector2(row_w - 602.0, 30), 17, Color(1, 1, 1, 1))
+	var native_column_shift := 32.0 if _bm_context_is_native_landscape() else 0.0
+	_bm_current_lineup_label(row, _bm_player_display_name(pd), Vector2(54, 4 if compact else 7), Vector2(row_w - 548.0 + native_column_shift, 30), 17, Color(1, 1, 1, 1))
 	var pos_text := _bm_current_lineup_position_text(str(pd.get("poste", pd.get("pos", ""))))
 	var metrics := _bm_current_lineup_player_metrics(pd)
-	_bm_current_lineup_label(row, pos_text, Vector2(row_w - 545.0, 7), Vector2(130, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
-	_bm_current_lineup_label(row, str(int(metrics.get("attack", 0))), Vector2(row_w - 350.0, 7), Vector2(70, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
-	_bm_current_lineup_label(row, str(int(metrics.get("defense", 0))), Vector2(row_w - 235.0, 7), Vector2(76, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
-	_bm_current_lineup_label(row, str(int(metrics.get("energy", 0))), Vector2(row_w - 112.0, 7), Vector2(68, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(row, pos_text, Vector2(row_w - 490.0 + native_column_shift, 4 if compact else 7), Vector2(130, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(row, str(int(metrics.get("attack", 0))), Vector2(row_w - 350.0 + native_column_shift, 4 if compact else 7), Vector2(70, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(row, str(int(metrics.get("defense", 0))), Vector2(row_w - 235.0 + native_column_shift, 4 if compact else 7), Vector2(76, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(row, str(int(metrics.get("energy", 0))), Vector2(row_w - 112.0 + native_column_shift, 4 if compact else 7), Vector2(68, 30), 16, Color(1, 1, 1, 0.94), HORIZONTAL_ALIGNMENT_CENTER)
 
 
 func _bm_current_lineup_header(parent: Control, y: float, row_w: float) -> void:
 	var header_color := Color(0.76, 0.84, 0.96, 0.82)
-	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("mercato.col.position", "Position"), Vector2(row_w - 545.0, y), Vector2(130, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
-	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("player.card.graph.attack", "Attack"), Vector2(row_w - 350.0, y), Vector2(70, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
-	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("player.card.graph.defense", "Defense"), Vector2(row_w - 235.0, y), Vector2(76, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
-	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("matchsim.energy", "Energy"), Vector2(row_w - 112.0, y), Vector2(68, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
+	var native_column_shift := 32.0 if _bm_context_is_native_landscape() else 0.0
+	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("mercato.col.position", "Position"), Vector2(row_w - 490.0 + native_column_shift, y), Vector2(130, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("player.card.graph.attack", "Attack"), Vector2(row_w - 350.0 + native_column_shift, y), Vector2(70, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("player.card.graph.defense", "Defense"), Vector2(row_w - 235.0 + native_column_shift, y), Vector2(76, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(parent, _bm_matchsim_tr_fallback("matchsim.energy", "Energy"), Vector2(row_w - 112.0 + native_column_shift, y), Vector2(68, 20), 15, header_color, HORIZONTAL_ALIGNMENT_CENTER)
 
 
 func _bm_current_lineup_players() -> Array[Dictionary]:
@@ -464,8 +508,9 @@ func _bm_current_lineup_summary(players: Array[Dictionary]) -> Dictionary:
 
 
 func _bm_current_lineup_summary_item(parent: Control, label_text: String, value: int, x: float, metric: String) -> void:
-	_bm_current_lineup_label(parent, label_text, Vector2(x, 0), Vector2(150, 24), 15, Color(0.78, 0.85, 0.95, 0.95), HORIZONTAL_ALIGNMENT_CENTER)
-	_bm_current_lineup_label(parent, str(value), Vector2(x, 24), Vector2(150, 34), 28, _bm_current_lineup_attr_color(metric), HORIZONTAL_ALIGNMENT_CENTER)
+	var native := _bm_context_is_native_landscape()
+	_bm_current_lineup_label(parent, label_text, Vector2(x, 0), Vector2(150, 16 if native else 24), 12 if native else 15, Color(0.78, 0.85, 0.95, 0.95), HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(parent, str(value), Vector2(x, 16 if native else 24), Vector2(150, 28 if native else 34), 22 if native else 28, _bm_current_lineup_attr_color(metric), HORIZONTAL_ALIGNMENT_CENTER)
 
 
 func _bm_show_current_lineup_popup() -> void:
@@ -487,25 +532,38 @@ func _bm_show_current_lineup_popup() -> void:
 	popup.add_child(dark)
 
 	var vp := get_viewport_rect().size
+	var compact := _bm_matchsim_is_mobile_layout() and vp.x > vp.y
+	var native := _bm_context_is_native_landscape()
 	var card_w := minf(820.0, vp.x - 64.0)
-	var card_h := minf(710.0, vp.y - 56.0)
+	var card_h := minf(710.0, vp.y - (24.0 if native else 56.0))
 	var card := Panel.new()
 	card.size = Vector2(card_w, card_h)
 	card.position = Vector2((vp.x - card_w) * 0.5, (vp.y - card_h) * 0.5)
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.add_theme_stylebox_override("panel", _bm_current_lineup_style_panel(Color(0.025, 0.035, 0.075, 0.98), Color(0.95, 0.58, 0.14, 0.72)))
 	popup.add_child(card)
+	if compact:
+		card.set_anchors_preset(Control.PRESET_CENTER)
+		card.offset_left = -card_w * 0.5
+		card.offset_right = card_w * 0.5
+		card.offset_top = -card_h * 0.5
+		card.offset_bottom = card_h * 0.5
 
-	_bm_current_lineup_label(card, _bm_matchsim_tr_fallback("matchsim.game_lineup", "Game Lineup"), Vector2(0, 18), Vector2(card_w, 38), 30, Color(1, 1, 1, 1), HORIZONTAL_ALIGNMENT_CENTER)
-	_bm_current_lineup_label(card, _bm_matchsim_tr_fallback("matchsim.match_in_progress", "Match in progress") + "  |  " + _bm_matchsim_tr_fallback("matchsim.read_only", "Read only"), Vector2(0, 54), Vector2(card_w, 26), 16, Color(0.76, 0.84, 0.96, 0.88), HORIZONTAL_ALIGNMENT_CENTER)
+	if native:
+		card.anchor_top = 0.0
+		card.anchor_bottom = 1.0
+		card.offset_top = 12.0
+		card.offset_bottom = -12.0
+	_bm_current_lineup_label(card, _bm_matchsim_tr_fallback("matchsim.game_lineup", "Game Lineup"), Vector2(0, 4 if native else (8 if compact else 18)), Vector2(card_w, 30 if native else 38), 24 if native else 30, Color(1, 1, 1, 1), HORIZONTAL_ALIGNMENT_CENTER)
+	_bm_current_lineup_label(card, _bm_matchsim_tr_fallback("matchsim.match_in_progress", "Match in progress") + "  |  " + _bm_matchsim_tr_fallback("matchsim.read_only", "Read only"), Vector2(0, 33 if native else (44 if compact else 54)), Vector2(card_w, 20 if native else 26), 13 if native else 16, Color(0.76, 0.84, 0.96, 0.88), HORIZONTAL_ALIGNMENT_CENTER)
 
 	var active_coach_id := _bm_current_lineup_active_coach_id()
 	var coach_note := _bm_current_lineup_coach_note_text(active_coach_id)
 
 	var summary := _bm_current_lineup_summary(players)
 	var summary_row := Control.new()
-	summary_row.position = Vector2((card_w - 510.0) * 0.5, 84.0)
-	summary_row.size = Vector2(510, 58)
+	summary_row.position = Vector2((card_w - 510.0) * 0.5, 54.0 if native else (70.0 if compact else 84.0))
+	summary_row.size = Vector2(510, 44 if native else 58)
 	summary_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(summary_row)
 	_bm_current_lineup_summary_item(summary_row, _bm_matchsim_tr_fallback("player.card.graph.attack", "Attack"), int(summary.get("attack", 0)), 0, "attack")
@@ -518,26 +576,49 @@ func _bm_show_current_lineup_popup() -> void:
 	content.size = Vector2(card_w - 68.0, card_h - content_bottom_reserve)
 	content.add_theme_constant_override("separation", 6)
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(content)
+	if compact:
+		var scroll := ScrollContainer.new()
+		scroll.name = "RosterScroll"
+		scroll.position = Vector2(34, 138)
+		scroll.size = Vector2(card_w - 68.0, card_h - 222.0)
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		card.add_child(scroll)
+		if native:
+			scroll.anchor_bottom = 1.0
+			scroll.offset_top = 102.0
+			scroll.offset_bottom = -66.0
+		content.position = Vector2.ZERO
+		content.size = Vector2(scroll.size.x - 12.0, 0)
+		content.custom_minimum_size.x = content.size.x
+		content.add_theme_constant_override("separation", 4)
+		scroll.add_child(content)
+	else:
+		card.add_child(content)
 
 	var row_w := content.size.x
+	var row_step := 40.0 if compact else 46.0
 	var starting := players.slice(0, mini(5, players.size()))
 	var bench := players.slice(mini(5, players.size()), players.size())
 
 	var start_section := Control.new()
-	start_section.custom_minimum_size = Vector2(row_w, 26.0 + float(starting.size()) * 46.0)
+	start_section.custom_minimum_size = Vector2(row_w, 26.0 + float(starting.size()) * row_step)
+	if native:
+		start_section.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(start_section)
 	_bm_current_lineup_label(start_section, _bm_matchsim_tr_fallback("matchsim.starting_five", "STARTING FIVE"), Vector2(0, 0), Vector2(row_w, 22), 17, Color(1.0, 0.72, 0.20, 1.0))
 	_bm_current_lineup_header(start_section, 0.0, row_w)
 	for i in range(starting.size()):
-		_bm_current_lineup_player_row(start_section, starting[i], 26.0 + float(i) * 46.0, row_w)
+		_bm_current_lineup_player_row(start_section, starting[i], 26.0 + float(i) * row_step, row_w)
 
 	var bench_section := Control.new()
-	bench_section.custom_minimum_size = Vector2(row_w, 26.0 + float(bench.size()) * 46.0)
+	bench_section.custom_minimum_size = Vector2(row_w, 26.0 + float(bench.size()) * row_step)
+	if native:
+		bench_section.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(bench_section)
 	_bm_current_lineup_label(bench_section, _bm_matchsim_tr_fallback("matchsim.bench", "BENCH"), Vector2(0, 0), Vector2(row_w, 22), 17, Color(1.0, 0.72, 0.20, 1.0))
 	for i in range(bench.size()):
-		_bm_current_lineup_player_row(bench_section, bench[i], 26.0 + float(i) * 46.0, row_w)
+		_bm_current_lineup_player_row(bench_section, bench[i], 26.0 + float(i) * row_step, row_w)
 
 	if coach_note != "":
 		var coach_note_panel := Panel.new()
@@ -545,25 +626,61 @@ func _bm_show_current_lineup_popup() -> void:
 		coach_note_panel.size = Vector2(card_w - 266.0, 56)
 		coach_note_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		coach_note_panel.add_theme_stylebox_override("panel", _bm_current_lineup_style_panel(Color(0.035, 0.045, 0.085, 0.90), Color(1.0, 0.72, 0.20, 0.62)))
-		card.add_child(coach_note_panel)
+		if compact:
+			coach_note_panel.custom_minimum_size = Vector2(row_w, 64)
+			coach_note_panel.size = coach_note_panel.custom_minimum_size
+			content.add_child(coach_note_panel)
+		else:
+			card.add_child(coach_note_panel)
 		var coach_note_label := _bm_current_lineup_label(coach_note_panel, coach_note, Vector2(18, 0), Vector2(coach_note_panel.size.x - 36.0, 56), 18, Color(1.0, 0.90, 0.58, 1.0), HORIZONTAL_ALIGNMENT_CENTER)
 		coach_note_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		coach_note_label.clip_text = false
 
 	var btn := Button.new()
+	btn.name = "LineupCloseButton"
 	btn.text = _bm_matchsim_tr_fallback("common.close", "Close")
 	btn.custom_minimum_size = Vector2(170, 56)
 	btn.size = Vector2(170, 56)
 	btn.position = Vector2(card_w - 198.0, card_h - 72.0)
 	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	_bm_apply_game_lineup_close_button_style(btn)
+	if native:
+		btn.add_theme_font_size_override("font_size", 20)
+		for state in ["normal", "hover", "pressed", "disabled"]:
+			var style := btn.get_theme_stylebox(state).duplicate() as StyleBoxFlat
+			style.content_margin_top = 3.0
+			style.content_margin_bottom = 3.0
+			btn.add_theme_stylebox_override(state, style)
+		btn.custom_minimum_size = Vector2(170, 56) * 0.75 * 0.85 * 0.90
+		btn.update_minimum_size()
+		btn.size = btn.custom_minimum_size
+		btn.position.x = card_w - 28.0 - btn.size.x
 	btn.pressed.connect(func():
 		if current_lineup_popup != null and is_instance_valid(current_lineup_popup):
 			current_lineup_popup.queue_free()
 		current_lineup_popup = null
 	)
-	card.add_child(btn)
-
+	if compact:
+		var footer := Control.new()
+		footer.name = "LineupFooter"
+		footer.position = Vector2(0, card_h - 72.0)
+		footer.size = Vector2(card_w, 72)
+		footer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(footer)
+		if native:
+			footer.anchor_top = 1.0
+			footer.anchor_bottom = 1.0
+			footer.offset_top = -58.0
+			footer.offset_bottom = 0.0
+		btn.position.y = 0.0
+		footer.add_child(btn)
+		if native:
+			btn.size = btn.custom_minimum_size
+			btn.position = Vector2(card_w - 28.0 - btn.size.x, footer.size.y - btn.size.y - 16.0)
+	else:
+		card.add_child(btn)
 @onready var btn_skip: Button = get_node_or_null("BtnSkip") as Button
 @onready var lbl_team_dom: Label = get_node_or_null("ScoreBoardPanel/LabelTeamDom") as Label
 @onready var lbl_team_ext: Label = get_node_or_null("ScoreBoardPanel/LabelTeamExt") as Label
@@ -585,7 +702,7 @@ func _bm_matchsim_is_mobile_layout() -> bool:
 	return false
 
 
-func _bm_matchsim_apply_mobile_layout() -> void:
+func _bm_matchsim_apply_mobile_layout(probe_stage: String = "deferred_layout") -> void:
 	if not _bm_matchsim_is_mobile_layout():
 		return
 
@@ -642,10 +759,10 @@ func _bm_matchsim_apply_mobile_layout() -> void:
 		btn_skip.scale *= 1.20
 
 
-	_bm_matchsim_apply_mobile_landscape_layout()
+	_bm_matchsim_apply_mobile_landscape_layout(probe_stage)
 
 
-func _bm_matchsim_apply_mobile_landscape_layout() -> void:
+func _bm_matchsim_apply_mobile_landscape_layout(probe_stage: String = "landscape_layout") -> void:
 	if not _bm_matchsim_is_mobile_layout():
 		return
 
@@ -655,23 +772,36 @@ func _bm_matchsim_apply_mobile_landscape_layout() -> void:
 
 	var margin := 12.0
 	var bottom_y := vp.y - 58.0
+	var native_landscape := _bm_context_is_native_landscape()
 
 	if scoreboard_panel != null:
 		scoreboard_panel.set_as_top_level(true)
 		scoreboard_panel.z_as_relative = false
 		scoreboard_panel.z_index = 10
-		scoreboard_panel.position = Vector2(margin, 10.0)
-		scoreboard_panel.size = Vector2(vp.x - margin * 2.0, 126.0)
+		scoreboard_panel.size = Vector2((vp.x - margin * 2.0) * 0.85, 114.0 if native_landscape else 126.0)
+		scoreboard_panel.position = Vector2((vp.x - scoreboard_panel.size.x) * 0.5, 10.0)
 
 	if lbl_team_dom != null and scoreboard_panel != null:
-		lbl_team_dom.position = Vector2(18.0, 9.0)
-		lbl_team_dom.size = Vector2(280.0, 34.0)
+		if native_landscape:
+			lbl_team_dom.text = lbl_team_dom.text.trim_prefix("       ")
+			lbl_team_dom.position = Vector2(68.6, 9.0)
+			lbl_team_dom.size = Vector2(229.4, 34.0)
+		else:
+			lbl_team_dom.position = Vector2(18.0, 9.0)
+			lbl_team_dom.size = Vector2(280.0, 34.0)
 		lbl_team_dom.add_theme_font_size_override("font_size", 23)
 
 	if lbl_team_ext != null and scoreboard_panel != null:
-		lbl_team_ext.position = Vector2(scoreboard_panel.size.x - 298.0, 9.0)
-		lbl_team_ext.size = Vector2(280.0, 34.0)
+		if native_landscape:
+			_bm_layout_native_visitor_scoreboard()
+		else:
+			lbl_team_ext.position = Vector2(scoreboard_panel.size.x - 298.0, 9.0)
+			lbl_team_ext.size = Vector2(280.0, 34.0)
 		lbl_team_ext.add_theme_font_size_override("font_size", 23)
+
+	if native_landscape:
+		_bm_layout_native_home_scoreboard()
+		_bm_layout_native_visitor_scoreboard()
 
 	if lbl_temps != null:
 		lbl_temps.set_as_top_level(true)
@@ -686,8 +816,9 @@ func _bm_matchsim_apply_mobile_landscape_layout() -> void:
 		lbl_score.z_as_relative = false
 		lbl_score.z_index = 12
 		lbl_score.position = Vector2((vp.x - 320.0) * 0.5, 43.0)
-		lbl_score.size = Vector2(320.0, 72.0)
-		lbl_score.add_theme_font_size_override("font_size", 56)
+		lbl_score.add_theme_font_size_override("font_size", 46 if native_landscape else 56)
+		lbl_score.update_minimum_size()
+		lbl_score.size = Vector2(320.0, 79.0 if native_landscape else 72.0)
 
 	if lbl_info != null:
 		lbl_info.set_as_top_level(true)
@@ -714,10 +845,21 @@ func _bm_matchsim_apply_mobile_landscape_layout() -> void:
 		btn_retour.z_as_relative = false
 		btn_retour.z_index = 40
 		btn_retour.scale = Vector2.ONE
-		btn_retour.custom_minimum_size = Vector2(190.0, 46.0)
-		btn_retour.size = Vector2(190.0, 46.0)
-		btn_retour.position = Vector2(18.0, bottom_y)
-		btn_retour.add_theme_font_size_override("font_size", 18)
+		btn_retour.add_theme_font_size_override("font_size", 17 if native_landscape else 18)
+		var vertical_margin := 5.5 if native_landscape else 9.0
+		for state in ["normal", "hover", "pressed", "disabled"]:
+			var style := btn_retour.get_theme_stylebox(state)
+			if native_landscape or style.content_margin_top != 9.0 or style.content_margin_bottom != 9.0:
+				style = style.duplicate()
+				style.content_margin_top = vertical_margin
+				style.content_margin_bottom = vertical_margin
+				if native_landscape:
+					style.content_margin_left = 4.5
+					style.content_margin_right = 4.5
+				btn_retour.add_theme_stylebox_override(state, style)
+		btn_retour.custom_minimum_size = Vector2(241.0, 53.0) * 0.85 * (0.85 if native_landscape else 1.0)
+		btn_retour.size = btn_retour.custom_minimum_size
+		btn_retour.position = Vector2(18.0, bottom_y + 46.0 - btn_retour.size.y)
 
 	if btn_skip != null:
 		btn_skip.set_as_top_level(true)
@@ -734,16 +876,76 @@ func _bm_matchsim_apply_mobile_landscape_layout() -> void:
 		btn_current_lineup.z_as_relative = false
 		btn_current_lineup.z_index = 40
 		btn_current_lineup.scale = Vector2.ONE
-		btn_current_lineup.custom_minimum_size = Vector2(190.0, 46.0)
-		btn_current_lineup.size = Vector2(190.0, 46.0)
-		btn_current_lineup.position = Vector2(vp.x - 208.0, bottom_y)
 		btn_current_lineup.add_theme_font_size_override("font_size", 18)
+		_bm_place_current_lineup_button()
+
+	var progress_info_lbl := get_node_or_null("MatchProgressInfoAfterStart/ProgressInfoLabel") as Label
+	if progress_info_lbl != null:
+		_bm_place_match_progress_info(progress_info_lbl)
 
 	if lbl_match_result != null and is_instance_valid(lbl_match_result):
 		_bm_place_match_result_label(
 			lbl_match_result.text,
 			lbl_match_result.get_theme_color("font_color")
 		)
+	_bm_layout_match_context()
+	_bm_scoreboard_probe(probe_stage)
+
+
+func _bm_context_is_native_landscape() -> bool:
+	var vp := get_viewport_rect().size
+	return not OS.has_feature("web") and (OS.has_feature("ios") or OS.has_feature("android")) and vp.x > vp.y
+
+
+func _bm_context_safe_rect() -> Rect2:
+	var gap := 8.0 if match_fini else 12.0
+	var top := scoreboard_panel.get_global_rect().end.y + gap
+	var bottom := btn_retour.get_global_rect().position.y - gap
+	if btn_skip != null and btn_skip.visible:
+		bottom = minf(bottom, btn_skip.get_global_rect().position.y - gap)
+	return Rect2(52.0, top, get_viewport_rect().size.x - 104.0, maxf(0.0, bottom - top))
+
+
+func _bm_layout_match_context() -> void:
+	if not _bm_context_is_native_landscape() or lbl_info == null or scoreboard_panel == null or btn_retour == null:
+		return
+	var safe := _bm_context_safe_rect()
+	lbl_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if not match_fini:
+		lbl_info.add_theme_font_size_override("font_size", 26)
+		lbl_info.size = Vector2(safe.size.x - 16.0, 0)
+		if lbl_info.get_minimum_size().y > safe.size.y - 22.0:
+			lbl_info.add_theme_font_size_override("font_size", 24)
+		lbl_info.size = Vector2(safe.size.x - 16.0, lbl_info.get_minimum_size().y)
+		lbl_info.global_position = safe.position + Vector2(8, 8)
+		if info_panel != null:
+			info_panel.global_position = safe.position
+			info_panel.size = lbl_info.size + Vector2(16, 16)
+		return
+
+	lbl_info.add_theme_font_size_override("font_size", 21)
+	lbl_info.add_theme_constant_override("line_spacing", 0)
+	if lbl_match_result != null and is_instance_valid(lbl_match_result):
+		lbl_match_result.global_position = safe.position
+		lbl_match_result.add_theme_font_size_override("font_size", 21)
+		lbl_match_result.size = Vector2(safe.size.x, 40.0)
+		safe.position.y += 44.0
+		safe.size.y = maxf(0.0, safe.size.y - 44.0)
+	lbl_info.set_as_top_level(true)
+	lbl_info.z_as_relative = false
+	lbl_info.z_index = 20
+	lbl_info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lbl_info.size = Vector2(safe.size.x - 16.0, 0.0)
+	var final_font_size := 21
+	while lbl_info.get_minimum_size().y > safe.size.y - 16.0 and final_font_size > 17:
+		final_font_size -= 1
+		lbl_info.add_theme_font_size_override("font_size", final_font_size)
+		lbl_info.size.y = 0.0
+	lbl_info.size.y = lbl_info.get_minimum_size().y
+	lbl_info.global_position = safe.position + Vector2(8.0, maxf(8.0, (safe.size.y - lbl_info.size.y) * 0.5))
+	if info_panel != null:
+		info_panel.global_position = lbl_info.global_position - Vector2(8.0, 8.0)
+		info_panel.size = lbl_info.size + Vector2(16.0, 16.0)
 
 
 func _bm_place_match_result_label(text_value: String, color_value: Color) -> void:
@@ -1596,7 +1798,7 @@ func _ready() -> void:
 		if not btn_skip.pressed.is_connected(_on_btn_skip_gate_pressed):
 			btn_skip.pressed.connect(_on_btn_skip_gate_pressed)
 	_bm_matchsim_apply_mobile_texts_plus2()
-	call_deferred("_bm_matchsim_apply_mobile_layout")
+	call_deferred("_bm_matchsim_apply_mobile_layout", "ready_deferred")
 	call_deferred("_bm_place_current_lineup_button")
 
 
@@ -1647,7 +1849,7 @@ func _bm_play_match_intro_countdown() -> void:
 	overlay.name = "MatchIntroCountdown"
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	overlay.z_index = 5000
+	overlay.z_index = RenderingServer.CANVAS_ITEM_Z_MAX - 2
 	add_child(overlay)
 
 	var dark := ColorRect.new()
@@ -1704,6 +1906,13 @@ func _bm_play_match_intro_countdown() -> void:
 	await get_tree().process_frame
 
 
+func _bm_place_match_progress_info(label: Label) -> void:
+	var vp := get_viewport_rect().size
+	label.position = Vector2((vp.x - label.size.x) * 0.5, vp.y * 0.5 - 111.0)
+	if _bm_matchsim_is_mobile_layout() and vp.x > vp.y and scoreboard_panel != null:
+		label.global_position.y = scoreboard_panel.get_global_rect().end.y + 12.0
+
+
 func _bm_show_match_progress_info_after_start() -> void:
 	var match_progress_info_text := _match_progress_info_after_countdown.strip_edges()
 	_match_progress_info_after_countdown = ""
@@ -1714,22 +1923,23 @@ func _bm_show_match_progress_info_after_start() -> void:
 	overlay.name = "MatchProgressInfoAfterStart"
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay.z_index = 5001
+	overlay.z_index = RenderingServer.CANVAS_ITEM_Z_MAX - 1
 	add_child(overlay)
 
 	var progress_info_lbl := Label.new()
+	progress_info_lbl.name = "ProgressInfoLabel"
 	progress_info_lbl.text = match_progress_info_text
 	progress_info_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	progress_info_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	progress_info_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	progress_info_lbl.size = Vector2(760, 82)
-	progress_info_lbl.position = Vector2((get_viewport_rect().size.x - progress_info_lbl.size.x) * 0.5, get_viewport_rect().size.y * 0.5 - 111.0)
 	progress_info_lbl.add_theme_font_size_override("font_size", 25)
 	progress_info_lbl.add_theme_color_override("font_color", Color(1.0, 0.84, 0.28, 1.0))
 	progress_info_lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.08, 0.20, 1.0))
 	progress_info_lbl.add_theme_constant_override("outline_size", 6)
 	progress_info_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay.add_child(progress_info_lbl)
+	_bm_place_match_progress_info(progress_info_lbl)
 
 	await get_tree().create_timer(4.16).timeout
 	if not is_instance_valid(overlay):
@@ -1809,6 +2019,73 @@ func _bm_apply_scoreboard_crest_to_label(icon_name: String, team_name: String, t
 	var x: float = target_lbl.position.x + 2.0
 	var y: float = target_lbl.position.y + (target_lbl.size.y - icon.size.y) * 0.5
 	icon.position = Vector2(x, y)
+	if is_right_aligned:
+		_bm_layout_native_visitor_scoreboard()
+	else:
+		_bm_layout_native_home_scoreboard()
+
+
+func _bm_layout_native_home_scoreboard() -> void:
+	if not _bm_context_is_native_landscape() or scoreboard_panel == null or lbl_team_dom == null:
+		return
+	lbl_team_dom.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl_team_dom.position.y = (scoreboard_panel.size.y - lbl_team_dom.size.y) * 0.5
+	var dom_crest := scoreboard_panel.get_node_or_null("ScoreboardDomCrestIcon") as TextureRect
+	if dom_crest != null:
+		dom_crest.size = Vector2(51.12, 51.12) * 1.15
+		dom_crest.position = Vector2(lbl_team_dom.position.x - dom_crest.size.x - 6.0, (scoreboard_panel.size.y - dom_crest.size.y) * 0.5)
+
+
+func _bm_layout_native_visitor_scoreboard() -> void:
+	if not _bm_context_is_native_landscape() or scoreboard_panel == null or lbl_team_ext == null:
+		return
+	lbl_team_ext.text = lbl_team_ext.text.trim_prefix("       ")
+	lbl_team_ext.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	lbl_team_ext.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl_team_ext.size = Vector2(192.0, 34.0)
+	lbl_team_ext.position = Vector2(scoreboard_panel.size.x - 210.0, (scoreboard_panel.size.y - lbl_team_ext.size.y) * 0.5)
+	var ext_crest := scoreboard_panel.get_node_or_null("ScoreboardExtCrestIcon") as TextureRect
+	if ext_crest != null:
+		ext_crest.size = Vector2(51.12, 51.12) * 1.15
+		var ext_text_width := lbl_team_ext.get_theme_font("font").get_string_size(lbl_team_ext.text, HORIZONTAL_ALIGNMENT_LEFT, -1, lbl_team_ext.get_theme_font_size("font_size")).x
+		var ext_text_left := lbl_team_ext.position.x + lbl_team_ext.size.x - minf(ext_text_width, lbl_team_ext.size.x)
+		ext_crest.position = Vector2(ext_text_left - ext_crest.size.x - 6.0, (scoreboard_panel.size.y - ext_crest.size.y) * 0.5)
+
+
+func _bm_scoreboard_probe(stage: String) -> void:
+	var data := {
+		"stage": stage,
+		"viewport": str(get_viewport_rect().size),
+		"native_landscape": _bm_context_is_native_landscape(),
+		"user_is_home": _user_is_home,
+		"panel": _bm_close_probe_control(scoreboard_panel, Vector2.ZERO),
+		"dom_label": _bm_close_probe_control(lbl_team_dom, Vector2.ZERO),
+		"ext_label": _bm_close_probe_control(lbl_team_ext, Vector2.ZERO)
+	}
+	if lbl_team_dom != null:
+		data["dom_label"]["text"] = lbl_team_dom.text
+		data["dom_label"]["position"] = str(lbl_team_dom.position)
+		data["dom_label"]["font_size"] = lbl_team_dom.get_theme_font_size("font_size")
+	if lbl_team_ext != null:
+		data["ext_label"]["text"] = lbl_team_ext.text
+		data["ext_label"]["position"] = str(lbl_team_ext.position)
+		data["ext_label"]["font_size"] = lbl_team_ext.get_theme_font_size("font_size")
+	for icon_name in ["ScoreboardDomCrestIcon", "ScoreboardExtCrestIcon"]:
+		var icon: TextureRect = null
+		if scoreboard_panel != null:
+			icon = scoreboard_panel.get_node_or_null(icon_name) as TextureRect
+		data[icon_name] = _bm_close_probe_control(icon, Vector2.ZERO)
+		if icon != null:
+			data[icon_name]["position"] = str(icon.position)
+			data[icon_name]["texture"] = icon.texture.resource_path if icon.texture != null else "<null>"
+			data[icon_name]["expand_mode"] = icon.expand_mode
+			data[icon_name]["stretch_mode"] = icon.stretch_mode
+			if icon.texture != null:
+				var texture_image := icon.texture.get_image()
+				if texture_image != null and not texture_image.is_empty():
+					data[icon_name]["texture_size"] = str(texture_image.get_size())
+					data[icon_name]["opaque_rect"] = str(texture_image.get_used_rect())
+	print("[BM_SCOREBOARD_PROBE] ", JSON.stringify(data))
 
 
 func _bm_update_scoreboard_club_crest(save_override: Dictionary = {}) -> void:
@@ -2195,6 +2472,7 @@ func _init_team_names() -> void:
 			lbl_team_ext.position.x = scoreboard_panel.size.x - right_margin - ext_text_w
 			lbl_team_ext.size.x = ext_text_w
 	_bm_update_scoreboard_club_crest(save)
+	call_deferred("_bm_scoreboard_probe", "prepare_match_deferred")
 func _fade_in_scoreboard() -> void:
 	# Fade-in doux (0.35s) du scoreboard + info panel
 	if scoreboard_panel == null or info_panel == null:
@@ -2319,6 +2597,7 @@ func _bm_show_live_match_comment(trigger_minute: int) -> void:
 	var display_text := "“" + text_value + "”"
 	lbl_info.text = display_text
 	print("[LIVE_PROBE] show after_write lbl_text=", lbl_info.text, " text_matches=", lbl_info.text == display_text, " lbl_visible=", lbl_info.visible, " lbl_visible_tree=", lbl_info.is_visible_in_tree(), " lbl_global_position=", lbl_info.global_position, " lbl_size=", lbl_info.size, " viewport_size=", get_viewport_rect().size)
+	_bm_layout_match_context()
 	var live_info_pos := lbl_info.position
 	lbl_info.visible = true
 	lbl_info.modulate.a = 0.0
@@ -2327,7 +2606,8 @@ func _bm_show_live_match_comment(trigger_minute: int) -> void:
 	lbl_info.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	lbl_info.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
 	lbl_info.add_theme_constant_override("outline_size", 8)
-	lbl_info.add_theme_font_size_override("font_size", 34)
+	if not _bm_context_is_native_landscape():
+		lbl_info.add_theme_font_size_override("font_size", 34)
 	var live_panel_pos := Vector2.ZERO
 	if info_panel != null:
 		info_panel.visible = true
@@ -2335,9 +2615,9 @@ func _bm_show_live_match_comment(trigger_minute: int) -> void:
 		info_panel.z_index = 19
 		lbl_info.z_index = 20
 		info_panel.self_modulate = Color(0, 0, 0, 0.82)
-		live_panel_pos = live_info_pos - Vector2(28.0, 18.0)
+		live_panel_pos = live_info_pos - (Vector2(8, 8) if _bm_context_is_native_landscape() else Vector2(28.0, 18.0))
 		info_panel.position = live_panel_pos + Vector2(0.0, 6.0)
-		info_panel.size = lbl_info.size + Vector2(56.0, 78.0)
+		info_panel.size = lbl_info.size + (Vector2(16, 16) if _bm_context_is_native_landscape() else Vector2(56.0, 78.0))
 	var live_tw := create_tween()
 	live_tw.set_parallel(true)
 	live_tw.tween_property(lbl_info, "modulate:a", 1.0, 0.16)
@@ -3891,9 +4171,10 @@ func _fin_match() -> void:
 			info_panel.position = lbl_info.position - Vector2(28.0, 18.0)
 			info_panel.size = lbl_info.size + Vector2(56.0, 78.0)
 	_bm_place_match_result_label(resultat, result_color)
+	_bm_layout_match_context()
 
 	_bm_matchsim_apply_mobile_texts_plus2()
-	call_deferred("_bm_matchsim_apply_mobile_layout")
+	call_deferred("_bm_matchsim_apply_mobile_layout", "fin_match_deferred")
 	call_deferred("_bm_place_current_lineup_button")
 
 	if stats_end != null:
@@ -4770,4 +5051,4 @@ func _on_btn_retour_pressed() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
-		call_deferred("_bm_matchsim_apply_mobile_layout")
+		call_deferred("_bm_matchsim_apply_mobile_layout", "resize_deferred")

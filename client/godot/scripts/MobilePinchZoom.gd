@@ -65,6 +65,13 @@ func _input(event: InputEvent) -> void:
 
 		# Une fois zoomé : déplacement libre à un doigt.
 		if _touches.size() == 1 and _zoom > MIN_ZOOM + 0.001:
+			var scene := get_tree().current_scene
+			if scene != null:
+				var popup := scene.get_node_or_null("CurrentLineupPopup")
+				if popup != null and scene.get_script() != null and scene.get_script().resource_path == "res://scripts/MatchSim.gd":
+					var roster := popup.find_child("RosterScroll", true, false) as ScrollContainer
+					if roster != null and roster.is_visible_in_tree() and Rect2(Vector2.ZERO, roster.size).has_point(roster.get_global_transform_with_canvas().affine_inverse() * (drag.position - drag.relative)):
+						return
 			_pan += drag.relative
 			_clamp_pan()
 			_apply_transform()

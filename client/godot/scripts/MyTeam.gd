@@ -1053,9 +1053,10 @@ func _bm_add_lineup_preview_header(parent: Control, y: float, row_w: float) -> v
 	_bm_add_lineup_summary_label(parent, _bm_myteam_tr_or_fallback("matchsim.energy", "Energy"), Vector2(row_w - 92.0, y), Vector2(64, 20), 13, header_color, true)
 
 
-func _bm_add_lineup_preview_section(parent: Control, title_text: String, players: Array, y: float, row_w: float, show_header: bool = false) -> float:
+func _bm_add_lineup_preview_section(parent: Control, title_text: String, players: Array, y: float, row_w: float, show_header: bool = false, align_title_with_header: bool = false) -> float:
 	var section_title := title_text + " (" + str(players.size()) + ")"
-	_bm_add_lineup_summary_label(parent, section_title, Vector2(0, y), Vector2(row_w, 24), 17, Color(1.0, 0.72, 0.20, 1.0), false)
+	var title_y := y + 27.0 if show_header and align_title_with_header else y
+	_bm_add_lineup_summary_label(parent, section_title, Vector2(0, title_y), Vector2(row_w, 24), 17, Color(1.0, 0.72, 0.20, 1.0), false)
 	var row_y := y + 30.0
 	if show_header:
 		_bm_add_lineup_preview_header(parent, y + 27.0, row_w)
@@ -1097,6 +1098,11 @@ func _bm_close_lineup_summary_popup() -> void:
 	lineup_summary_card = null
 
 
+func _bm_reset_lineup_summary_scroll(scroll_preview: ScrollContainer) -> void:
+	if scroll_preview != null and is_instance_valid(scroll_preview):
+		scroll_preview.scroll_vertical = 0
+
+
 func _bm_refresh_lineup_summary_popup(ready: bool) -> void:
 	if not ready:
 		_bm_close_lineup_summary_popup()
@@ -1124,13 +1130,15 @@ func _bm_refresh_lineup_summary_popup(ready: bool) -> void:
 	lineup_summary_popup.z_index = 220
 	add_child(lineup_summary_popup)
 
+	var vp := get_viewport_rect().size
+	var native_landscape := (OS.has_feature("ios") or OS.has_feature("android")) and vp.x > vp.y
 	var card_w := 640.0
-	var card_h := 690.0
+	var card_h := vp.y - 24.0 if native_landscape else 690.0
 	lineup_summary_card = Panel.new()
 	lineup_summary_card.name = "LineupSummaryCard"
 	lineup_summary_card.size = Vector2(card_w, card_h)
 	lineup_summary_card.custom_minimum_size = Vector2(card_w, card_h)
-	lineup_summary_card.position = Vector2((get_viewport_rect().size.x - card_w) * 0.5, get_viewport_rect().size.y - card_h - 24.0)
+	lineup_summary_card.position = (vp - lineup_summary_card.size) * 0.5 if native_landscape else Vector2((vp.x - card_w) * 0.5, vp.y - card_h - 24.0)
 	lineup_summary_card.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var sb := StyleBoxFlat.new()
@@ -1150,26 +1158,47 @@ func _bm_refresh_lineup_summary_popup(ready: bool) -> void:
 	lineup_summary_card.add_theme_stylebox_override("panel", sb)
 	lineup_summary_popup.add_child(lineup_summary_card)
 
-	_bm_add_lineup_summary_label(lineup_summary_card, _bm_myteam_tr_or_fallback("matchsim.game_lineup", "Game Lineup"), Vector2(24, 16), Vector2(card_w - 48, 34), 28, Color(1, 1, 1, 1))
-	_bm_add_lineup_summary_label(lineup_summary_card, _bm_myteam_tr_or_fallback("myteam.lineup_summary.subtitle", "Decision impact preview"), Vector2(24, 50), Vector2(card_w - 48, 24), 16, Color(0.76, 0.84, 0.96, 0.88))
+	_bm_add_lineup_summary_label(lineup_summary_card, _bm_myteam_tr_or_fallback("matchsim.game_lineup", "Game Lineup"), Vector2(24, 8 if native_landscape else 16), Vector2(card_w - 48, 28 if native_landscape else 34), 24 if native_landscape else 28, Color(1, 1, 1, 1))
+	_bm_add_lineup_summary_label(lineup_summary_card, _bm_myteam_tr_or_fallback("myteam.lineup_summary.subtitle", "Decision impact preview"), Vector2(24, 34 if native_landscape else 50), Vector2(card_w - 48, 18 if native_landscape else 24), 14 if native_landscape else 16, Color(0.76, 0.84, 0.96, 0.88))
 
 	var col_w := 150.0
 	var start_x := (card_w - 510.0) * 0.5
-	var row_y := 86.0
-	_bm_add_lineup_summary_label(lineup_summary_card, "Attack\n" + str(int(round(attack))), Vector2(start_x, row_y), Vector2(col_w, 58), 20, Color(1.00, 0.72, 0.20, 1.0))
-	_bm_add_lineup_summary_label(lineup_summary_card, "Defense\n" + str(int(round(defense))), Vector2(start_x + 180.0, row_y), Vector2(col_w, 58), 20, Color(0.42, 0.92, 1.00, 1.0))
-	_bm_add_lineup_summary_label(lineup_summary_card, "Energy\n" + str(int(round(energy))), Vector2(start_x + 360.0, row_y), Vector2(col_w, 58), 20, Color(0.35, 1.00, 0.55, 1.0))
+	var row_y := 54.0 if native_landscape else 86.0
+	var stats_h := 44.0 if native_landscape else 58.0
+	var stats_fs := 18 if native_landscape else 20
+	_bm_add_lineup_summary_label(lineup_summary_card, "Attack\n" + str(int(round(attack))), Vector2(start_x, row_y), Vector2(col_w, stats_h), stats_fs, Color(1.00, 0.72, 0.20, 1.0))
+	_bm_add_lineup_summary_label(lineup_summary_card, "Defense\n" + str(int(round(defense))), Vector2(start_x + 180.0, row_y), Vector2(col_w, stats_h), stats_fs, Color(0.42, 0.92, 1.00, 1.0))
+	_bm_add_lineup_summary_label(lineup_summary_card, "Energy\n" + str(int(round(energy))), Vector2(start_x + 360.0, row_y), Vector2(col_w, stats_h), stats_fs, Color(0.35, 1.00, 0.55, 1.0))
 
 	var content := Control.new()
-	content.position = Vector2(38, 158)
-	content.size = Vector2(card_w - 76.0, card_h - 236.0)
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	lineup_summary_card.add_child(content)
+	var scroll_preview: ScrollContainer = null
+	if native_landscape:
+		scroll_preview = ScrollContainer.new()
+		scroll_preview.name = "LineupSummaryScroll"
+		scroll_preview.position = Vector2(38, 78)
+		scroll_preview.size = Vector2(card_w - 76.0, card_h - 156.0)
+		scroll_preview.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll_preview.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		scroll_preview.follow_focus = false
+		scroll_preview.clip_contents = true
+		lineup_summary_card.add_child(scroll_preview)
+		content.size = Vector2(scroll_preview.size.x - 12.0, 0.0)
+		content.custom_minimum_size.x = content.size.x
+		scroll_preview.add_child(content)
+	else:
+		content.position = Vector2(38, 158)
+		content.size = Vector2(card_w - 76.0, card_h - 236.0)
+		lineup_summary_card.add_child(content)
 
 	var section_y := 0.0
-	section_y = _bm_add_lineup_preview_section(content, _bm_myteam_tr_or_fallback("matchsim.starting_five", "STARTING FIVE"), starting, section_y, content.size.x, true)
+	section_y = _bm_add_lineup_preview_section(content, _bm_myteam_tr_or_fallback("matchsim.starting_five", "STARTING FIVE"), starting, section_y, content.size.x, true, native_landscape)
 	section_y += 8.0
-	_bm_add_lineup_preview_section(content, _bm_myteam_tr_or_fallback("matchsim.bench", "BENCH"), bench, section_y, content.size.x)
+	var content_end := _bm_add_lineup_preview_section(content, _bm_myteam_tr_or_fallback("matchsim.bench", "BENCH"), bench, section_y, content.size.x)
+	if scroll_preview != null:
+		content.custom_minimum_size.y = content_end
+		scroll_preview.scroll_vertical = 0
+		call_deferred("_bm_reset_lineup_summary_scroll", scroll_preview)
 
 	var old_parent_auto := btn_auto_save_match_selection.get_parent()
 	if old_parent_auto != null:
@@ -2841,6 +2870,8 @@ func _bm_myteam_apply_scroll_delta(delta: Vector2) -> void:
 
 func _input(event: InputEvent) -> void:
 	if scroll == null:
+		return
+	if lineup_summary_popup != null and is_instance_valid(lineup_summary_popup):
 		return
 
 	if event is InputEventMouseButton:
