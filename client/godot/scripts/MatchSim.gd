@@ -1721,10 +1721,22 @@ func _bm_apply_scoreboard_crest_to_label(icon_name: String, team_name: String, t
 
 	icon.texture = load(crest_path)
 	icon.visible = true
-	icon.size = Vector2(42.6, 42.6)
+	if _bm_matchsim_is_mobile_layout():
+		icon.size = Vector2(42.6, 42.6)
+		var mobile_x: float = target_lbl.position.x + 2.0
+		var mobile_y: float = target_lbl.position.y + (target_lbl.size.y - icon.size.y) * 0.5
+		icon.position = Vector2(mobile_x, mobile_y)
+		return
 
-	var x: float = target_lbl.position.x + 2.0
-	var y: float = target_lbl.position.y + (target_lbl.size.y - icon.size.y) * 0.5
+	icon.size = Vector2(58.8, 58.8)
+	var x: float = target_lbl.position.x - icon.size.x - 6.0
+	if is_right_aligned:
+		var font := target_lbl.get_theme_font("font")
+		var font_size := target_lbl.get_theme_font_size("font_size")
+		var text_width := font.get_string_size(target_lbl.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+		var label_right := target_lbl.position.x + target_lbl.size.x
+		x = label_right - text_width - icon.size.x - 6.0
+	var y: float = (scoreboard_panel.size.y - icon.size.y) * 0.5
 	icon.position = Vector2(x, y)
 
 
@@ -2100,17 +2112,30 @@ func _init_team_names() -> void:
 	_team_ext_name = ext_name
 
 	print("[DBG NAMES] dom_name=", dom_name, " ext_name=", ext_name, " lbl_team_dom=", lbl_team_dom, " lbl_team_ext=", lbl_team_ext)
+	var mobile_scoreboard := _bm_matchsim_is_mobile_layout()
 	if lbl_team_dom != null:
-		lbl_team_dom.text = "       " + dom_name
+		lbl_team_dom.text = ("       " + dom_name) if mobile_scoreboard else dom_name
 		lbl_team_dom.add_theme_font_size_override("font_size", int(lbl_team_dom.get_theme_font_size("font_size")) + 8)
+		if not mobile_scoreboard and scoreboard_panel != null:
+			lbl_team_dom.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			var dom_label_height := lbl_team_dom.get_theme_font("font").get_height(lbl_team_dom.get_theme_font_size("font_size"))
+			lbl_team_dom.size = Vector2(147.2, dom_label_height)
+			lbl_team_dom.position = Vector2(82.8, (scoreboard_panel.size.y - dom_label_height) * 0.5)
 	if lbl_team_ext != null:
-		lbl_team_ext.text = "       " + ext_name
+		lbl_team_ext.text = ("       " + ext_name) if mobile_scoreboard else ext_name
 		lbl_team_ext.add_theme_font_size_override("font_size", int(lbl_team_ext.get_theme_font_size("font_size")) + 8)
 		if scoreboard_panel != null:
 			var right_margin := 20.0
-			var ext_text_w: float = lbl_team_ext.get_combined_minimum_size().x
-			lbl_team_ext.position.x = scoreboard_panel.size.x - right_margin - ext_text_w
-			lbl_team_ext.size.x = ext_text_w
+			if mobile_scoreboard:
+				var ext_text_w: float = lbl_team_ext.get_combined_minimum_size().x
+				lbl_team_ext.position.x = scoreboard_panel.size.x - right_margin - ext_text_w
+				lbl_team_ext.size.x = ext_text_w
+			else:
+				lbl_team_ext.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+				lbl_team_ext.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				var ext_label_height := lbl_team_ext.get_theme_font("font").get_height(lbl_team_ext.get_theme_font_size("font_size"))
+				lbl_team_ext.size = Vector2(scoreboard_panel.size.x - right_margin - 610.0, ext_label_height)
+				lbl_team_ext.position = Vector2(610.0, (scoreboard_panel.size.y - ext_label_height) * 0.5)
 	_bm_update_scoreboard_club_crest(save)
 func _fade_in_scoreboard() -> void:
 	# Fade-in doux (0.35s) du scoreboard + info panel
