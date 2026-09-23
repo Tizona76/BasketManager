@@ -11,11 +11,14 @@ var _last_center := Vector2.ZERO
 var _zoom := 1.0
 var _pan := Vector2.ZERO
 var _last_viewport_size := Vector2.ZERO
+var _scroll_touch_indices: Dictionary = {}
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_last_viewport_size = get_viewport().get_visible_rect().size
+	get_tree().scene_changed.connect(_on_main_screen_changed)
+	get_tree().node_added.connect(_on_node_added)
 	_apply_transform()
 
 
@@ -43,8 +46,11 @@ func _input(event: InputEvent) -> void:
 
 		if touch.pressed:
 			_touches[touch.index] = touch.position
+			if _touch_starts_in_lineup_scroll(touch.position):
+				_scroll_touch_indices[touch.index] = true
 		else:
 			_touches.erase(touch.index)
+			_scroll_touch_indices.erase(touch.index)
 
 			if _touches.size() < 2:
 				_last_distance = 0.0
@@ -65,17 +71,40 @@ func _input(event: InputEvent) -> void:
 
 		# Une fois zoomé : déplacement libre à un doigt.
 		if _touches.size() == 1 and _zoom > MIN_ZOOM + 0.001:
-			var scene := get_tree().current_scene
-			if scene != null:
-				var popup := scene.get_node_or_null("CurrentLineupPopup")
-				if popup != null and scene.get_script() != null and scene.get_script().resource_path == "res://scripts/MatchSim.gd":
-					var roster := popup.find_child("RosterScroll", true, false) as ScrollContainer
-					if roster != null and roster.is_visible_in_tree() and Rect2(Vector2.ZERO, roster.size).has_point(roster.get_global_transform_with_canvas().affine_inverse() * (drag.position - drag.relative)):
-						return
+			if _scroll_touch_indices.has(drag.index):
+				return
 			_pan += drag.relative
 			_clamp_pan()
 			_apply_transform()
 			get_viewport().set_input_as_handled()
+
+
+func _on_main_screen_changed() -> void:
+	_reset_zoom()
+
+
+func _on_node_added(node: Node) -> void:
+	var parent := node.get_parent()
+	if parent == null or parent.name != "ScreenRoot" or node.get_script() == null:
+		return
+	var main := parent.get_parent()
+	if main != null and main.name == "Main":
+		_reset_zoom()
+
+
+func _touch_starts_in_lineup_scroll(point: Vector2) -> bool:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return false
+	for node_name in ["RosterScroll", "LineupSummaryScroll"]:
+		for candidate in scene.find_children(node_name, "ScrollContainer", true, false):
+			var scroll := candidate as ScrollContainer
+			if scroll == null or not scroll.is_visible_in_tree() or scroll.mouse_filter == Control.MOUSE_FILTER_IGNORE:
+				continue
+			var local_point := scroll.get_global_transform_with_canvas().affine_inverse() * point
+			if Rect2(Vector2.ZERO, scroll.size).has_point(local_point):
+				return true
+	return false
 
 
 func _apply_two_finger_gesture() -> void:
@@ -152,7 +181,10 @@ func _clamp_pan() -> void:
 
 
 func _reset_zoom() -> void:
+	if _zoom == MIN_ZOOM and _pan == Vector2.ZERO and _touches.is_empty() and _scroll_touch_indices.is_empty():
+		return
 	_touches.clear()
+	_scroll_touch_indices.clear()
 
 	_last_distance = 0.0
 	_last_center = Vector2.ZERO
