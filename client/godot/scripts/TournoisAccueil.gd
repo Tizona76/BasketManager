@@ -20,6 +20,8 @@ const TOURNOIS_INFOS := {
 	}
 }
 
+var _ios_landscape_original_layout: Dictionary = {}
+
 var tournoi_survole_id: String = ""
 var tournoi_selectionne_popup: String = ""
 
@@ -231,7 +233,130 @@ func _ready() -> void:
 		if not btn_popup_close.pressed.is_connected(_on_popup_close):
 			btn_popup_close.pressed.connect(_on_popup_close)
 
+	if OS.has_feature("ios") and not OS.has_feature("web") and not OS.has_feature("android"):
+		get_viewport().size_changed.connect(_bm_apply_ios_landscape_layout)
+		_bm_apply_ios_landscape_layout()
+
 	print("[TOURNOIS] TournoisAccueil ready")
+
+
+# Save only presentation properties so rotation can restore the original layout.
+func _bm_set_ios_layout_properties(control: Control, properties: Dictionary) -> void:
+	if not _ios_landscape_original_layout.has(control):
+		_ios_landscape_original_layout[control] = {}
+	for property in properties:
+		if not _ios_landscape_original_layout[control].has(property):
+			_ios_landscape_original_layout[control][property] = control.get(property)
+		control.set(property, properties[property])
+
+func _bm_apply_ios_landscape_layout() -> void:
+	if not OS.has_feature("ios") or OS.has_feature("web") or OS.has_feature("android"):
+		return
+	var viewport_size := get_viewport_rect().size
+	if viewport_size.x <= viewport_size.y:
+		for control in _ios_landscape_original_layout:
+			for property in _ios_landscape_original_layout[control]:
+				control.set(property, _ios_landscape_original_layout[control][property])
+		_ios_landscape_original_layout.clear()
+		var close := panel_tournoi_info.get_node_or_null("BtnIosClose") as Button
+		if close != null:
+			close.hide()
+		call_deferred("_bm_place_result_labels")
+		return
+
+	_bm_set_ios_layout_properties(get_node("BG"), {
+		"anchor_left": 0.0, "anchor_top": 0.0, "anchor_right": 1.0, "anchor_bottom": 1.0,
+		"offset_left": 0.0, "offset_top": 0.0, "offset_right": 0.0, "offset_bottom": 0.0,
+		"expand_mode": TextureRect.EXPAND_IGNORE_SIZE,
+		"stretch_mode": TextureRect.STRETCH_KEEP_ASPECT_COVERED,
+		"mouse_filter": Control.MOUSE_FILTER_IGNORE,
+	})
+	_bm_ensure_ios_tournoi_close()
+	# Reposition an already open panel after rotation/resize, after containers settle.
+	if panel_tournoi_info.visible:
+		call_deferred("_bm_refresh_tournoi_info_panel")
+
+	# Work in logical units: the project already scales these by 1.15.
+	var button_width := floorf((viewport_size.x - 2.0 * 24.0 - 2.0 * 16.0) / 3.0)
+	# Reserve the trophy row above Back; Center still owns horizontal centering.
+	_bm_set_ios_layout_properties(get_node("UI/Center"), {"offset_bottom": 126.0 - viewport_size.y})
+	_bm_set_ios_layout_properties(get_node("UI/Center/VBox"), {"theme_override_constants/separation": 14})
+	_bm_set_ios_layout_properties(lbl_info, {"custom_minimum_size": Vector2(0, 44)})
+	_bm_set_ios_layout_properties(get_node("UI/Center/VBox/ButtonsRow"), {
+		"theme_override_constants/separation": 16,
+	})
+	for button in [btn_tournoi_a, btn_intermediaire, btn_elite, btn_retour]:
+		var is_back: bool = button == btn_retour
+		var properties := {
+			"custom_minimum_size": Vector2(164, 44) if is_back else Vector2(button_width, 52),
+			"theme_override_font_sizes/font_size": 18 if is_back else 20,
+		}
+		# Duplicate per-button styles; never mutate shared Desktop resources.
+		for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+			var property: String = "theme_override_styles/" + state
+			var original: StyleBox = button.get(property) as StyleBox
+			if _ios_landscape_original_layout.has(button):
+				original = _ios_landscape_original_layout[button].get(property, original) as StyleBox
+			if original == null:
+				continue
+			var style := original.duplicate() as StyleBox
+			style.content_margin_left = 12.0
+			style.content_margin_right = 12.0
+			style.content_margin_top = 8.0 if is_back else 10.0
+			style.content_margin_bottom = 8.0 if is_back else 10.0
+			properties[property] = style
+		if is_back:
+			# Scale around the bottom-left corner to preserve the screen margins.
+			properties.merge({"offset_left": 24.0, "offset_top": -60.0,
+				"offset_right": 188.0, "offset_bottom": -16.0,
+				"scale": Vector2(0.9, 0.9), "pivot_offset": Vector2(0, 44)})
+		_bm_set_ios_layout_properties(button, properties)
+	call_deferred("_bm_place_result_labels")
+
+
+func _bm_is_ios_landscape() -> bool:
+	var viewport_size := get_viewport_rect().size
+	return OS.has_feature("ios") and not OS.has_feature("web") and not OS.has_feature("android") and viewport_size.x > viewport_size.y
+
+func _bm_ensure_ios_tournoi_close() -> void:
+	if not _bm_is_ios_landscape():
+		return
+	var close := panel_tournoi_info.get_node_or_null("BtnIosClose") as Button
+	if close == null:
+		close = Button.new()
+		close.name = "BtnIosClose"
+		close.text = "×"
+		close.custom_minimum_size = Vector2(44, 44)
+		close.add_theme_font_size_override("font_size", 26)
+		for state in ["normal", "hover", "pressed", "focus"]:
+			var style := btn_retour.get_theme_stylebox(state).duplicate() as StyleBox
+			style.content_margin_left = 4.0
+			style.content_margin_right = 4.0
+			style.content_margin_top = 4.0
+			style.content_margin_bottom = 4.0
+			close.add_theme_stylebox_override(state, style)
+		close.add_theme_color_override("font_color", Color.WHITE)
+		close.add_theme_color_override("font_hover_color", Color.WHITE)
+		close.add_theme_color_override("font_pressed_color", Color.WHITE)
+		panel_tournoi_info.add_child(close)
+		close.pressed.connect(_bm_close_ios_tournoi_info)
+	close.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	close.offset_left = -52.0
+	close.offset_top = 8.0
+	close.offset_right = -8.0
+	close.offset_bottom = 52.0
+	close.mouse_filter = Control.MOUSE_FILTER_STOP
+	close.move_to_front()
+	close.show()
+
+func _bm_close_ios_tournoi_info() -> void:
+	if not _bm_is_ios_landscape():
+		return
+	# These two IDs only drive the displayed panel; no tournament/save is changed.
+	tournoi_survole_id = ""
+	tournoi_selectionne_popup = ""
+	panel_tournoi_info.hide()
+	_on_popup_close()
 
 
 func _bm_load_tournois_save_dict() -> Dictionary:
@@ -294,6 +419,12 @@ func _bm_place_one_result_label(btn: Button, lbl: RichTextLabel, result_y: float
 	var parent_global := parent_ctrl.global_position
 	lbl.position = Vector2(btn_global.position.x - parent_global.x, result_y - parent_global.y)
 	lbl.size = Vector2(btn.size.x, 170)
+	# Reversible on rotation; every result refresh also passes through this path.
+	if _bm_is_ios_landscape():
+		lbl.text = lbl.text.replace("[img=175x175]", "[img=149x149]")
+		lbl.size.y = lbl.get_content_height()
+	elif lbl.text.contains("[img=149x149]"):
+		lbl.text = lbl.text.replace("[img=149x149]", "[img=175x175]")
 
 func _bm_place_result_labels() -> void:
 	var result_y := INF
@@ -499,6 +630,11 @@ func _bm_position_panel_above_button(btn: Control) -> void:
 	x = max(12.0, x)
 	y = max(12.0, y)
 
+	if _bm_is_ios_landscape():
+		_bm_ensure_ios_tournoi_close()
+		var viewport_size := get_viewport_rect().size
+		x = clampf(x, 12.0, maxf(12.0, viewport_size.x - panel_size.x - 12.0))
+		y = clampf(y, 12.0, maxf(12.0, viewport_size.y - panel_size.y - 12.0))
 	panel_tournoi_info.global_position = Vector2(x, y)
 
 func _bm_open_popup(tournoi_id: String) -> void:

@@ -49,7 +49,7 @@ func _line_centered(text: String) -> String:
 	return "[center][bgcolor=#07111FCC][color=#FFFFFF]  " + str(text).strip_edges() + "  [/color][/bgcolor][/center]"
 
 func _vs_centered() -> String:
-	return "[center][font_size=18][color=#FFFFFF]— VS —[/color][/font_size][/center]"
+	return "[center][font_size=%d][color=#FFFFFF]— VS —[/color][/font_size][/center]" % preload("res://scripts/IosTournamentDetailLayout.gd").bracket_font_size(self)
 
 func _bm_force_tournament_text_white(root: Node) -> void:
 	if root == null:
@@ -67,24 +67,30 @@ func _bm_force_tournament_text_white(root: Node) -> void:
 	for child in root.get_children():
 		_bm_force_tournament_text_white(child)
 
+func _bm_bracket_line_root() -> Control:
+	var layout := get_node_or_null("IosTournamentDetailLayout")
+	if layout != null and layout.is_landscape_active():
+		return get_node("UI/TournamentBracketScroll/BracketWrap") as Control
+	return ui_root
+
 func _ensure_bracket_line(name: String) -> ColorRect:
 	if ui_root == null:
 		return null
-	var n := ui_root.get_node_or_null(name) as ColorRect
+	var n := _bm_bracket_line_root().get_node_or_null(name) as ColorRect
 	if n == null:
 		n = ColorRect.new()
 		n.name = name
 		n.color = Color(0.12, 0.16, 0.22, 1.0)
 		n.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		n.z_index = 100
-		ui_root.add_child(n)
+		_bm_bracket_line_root().add_child(n)
 	return n
 
 func _hide_all_bracket_lines() -> void:
 	if ui_root == null:
 		return
 	for n in ["LineR2A", "LineR2B", "LineR2C", "LineR2D", "LineR3A", "LineR3B", "LineW"]:
-		var line := ui_root.get_node_or_null(n) as ColorRect
+		var line := _bm_bracket_line_root().get_node_or_null(n) as ColorRect
 		if line != null:
 			line.visible = false
 
@@ -98,7 +104,7 @@ func _show_bracket_line(name: String, label: RichTextLabel, line_index: int, tot
 	if line == null:
 		return
 
-	var label_pos := label.global_position - ui_root.global_position
+	var label_pos := label.global_position - (line.get_parent() as Control).global_position
 
 	var content_h := float(label.get_content_height())
 	if content_h <= 0.0:
@@ -716,16 +722,20 @@ func _bm_show_tournament_final_cinematic(team_a: String, team_b: String, score_a
 	sparks.position = Vector2(vp.x * 0.5, vp.y * 0.55)
 	layer.add_child(sparks)
 
+	# Presentation only; returns zero outside iOS landscape.
+	var final_side_shift := preload("res://scripts/IosTournamentDetailLayout.gd").prepare_final_cinematic(
+		self, layer, title, left, right, left_crest, right_crest, vs_lbl, score, champion, flash_top, flash_bottom, sparks)
+
 	var t := create_tween()
 	t.set_parallel(true)
 	t.tween_property(overlay, "color:a", 0.72, 0.28)
 	t.tween_property(title, "modulate:a", 1.0, 0.35)
-	t.tween_property(left, "position:x", vp.x * 0.07, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.tween_property(right, "position:x", vp.x * 0.53, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(left, "position:x", (vp.x * 0.5 - left.size.x - 8.0) if final_side_shift > 0.0 else vp.x * 0.07, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(right, "position:x", (vp.x * 0.5 + 8.0) if final_side_shift > 0.0 else vp.x * 0.53, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	if left_crest != null:
-		t.tween_property(left_crest, "position:x", vp.x * 0.07 + (vp.x * 0.40 - crest_size) * 0.5, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		t.tween_property(left_crest, "position:x", vp.x * 0.07 - final_side_shift + (vp.x * 0.40 - crest_size) * 0.5, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	if right_crest != null:
-		t.tween_property(right_crest, "position:x", vp.x * 0.53 + (vp.x * 0.40 - crest_size) * 0.5, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		t.tween_property(right_crest, "position:x", vp.x * 0.53 + final_side_shift + (vp.x * 0.40 - crest_size) * 0.5, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	t.tween_property(vs_lbl, "modulate:a", 1.0, 0.35)
 	t.tween_property(flash_top, "position:x", 0.0, 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	t.tween_property(flash_top, "color:a", 0.75, 0.18)
@@ -763,23 +773,27 @@ func _bm_show_tournament_final_cinematic(team_a: String, team_b: String, score_a
 	var t4 := create_tween()
 	t4.set_parallel(true)
 	t4.tween_property(btn, "modulate:a", 1.0, 0.25)
-	t4.tween_property(btn, "scale", Vector2(1.08, 1.08), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t4.tween_property(btn, "scale", Vector2(1.08, 1.08) * (0.90 if final_side_shift > 0.0 else 1.0), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 	await btn.pressed
 
 	btn.text = "CLOSE"
 
-	var impact_zoom := create_tween()
-	impact_zoom.set_parallel(true)
-	impact_zoom.tween_property(layer, "scale", Vector2(1.05, 1.05), 0.08).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	impact_zoom.tween_property(layer, "position", Vector2(-40, -25), 0.08)
+	# Keep Play fixed and the final content inside its frame on iOS landscape.
+	if final_side_shift == 0.0:
+		var impact_zoom := create_tween()
+		impact_zoom.set_parallel(true)
+		impact_zoom.tween_property(layer, "scale", Vector2(1.05, 1.05), 0.08).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		impact_zoom.tween_property(layer, "position", Vector2(-40, -25), 0.08)
 
 	await get_tree().create_timer(0.08).timeout
 
-	var impact_reset := create_tween()
-	impact_reset.set_parallel(true)
-	impact_reset.tween_property(layer, "scale", Vector2(1.0, 1.0), 0.10)
-	impact_reset.tween_property(layer, "position", Vector2.ZERO, 0.10)
+	# Keep Play fixed and the final content inside its frame on iOS landscape.
+	if final_side_shift == 0.0:
+		var impact_reset := create_tween()
+		impact_reset.set_parallel(true)
+		impact_reset.tween_property(layer, "scale", Vector2(1.0, 1.0), 0.10)
+		impact_reset.tween_property(layer, "position", Vector2.ZERO, 0.10)
 
 	var impact_flash := ColorRect.new()
 	impact_flash.color = Color(1.0, 0.82, 0.28, 0.0)
@@ -1347,6 +1361,9 @@ func _ready() -> void:
 	_init_tournoi()
 	# BM FIX: ne pas bloquer un nouveau tournoi à cause d'un résultat d'une ancienne saison
 	_refresh_ui()
+
+	if OS.has_feature("ios") and not OS.has_feature("web") and not OS.has_feature("android"):
+		add_child(preload("res://scripts/IosTournamentDetailLayout.gd").new())
 
 func _refresh_ui() -> void:
 	if lbl_title != null:

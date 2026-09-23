@@ -96,7 +96,7 @@ func _touch_starts_in_lineup_scroll(point: Vector2) -> bool:
 	var scene := get_tree().current_scene
 	if scene == null:
 		return false
-	for node_name in ["RosterScroll", "LineupSummaryScroll", "ClubTokensHistoryScroll", "ClubIdentityLevelScroller", "HomeArenaScroll"]:
+	for node_name in ["RosterScroll", "LineupSummaryScroll", "ClubTokensHistoryScroll", "ClubIdentityLevelScroller", "HomeArenaScroll", "TournamentBracketScroll"]:
 		for candidate in scene.find_children(node_name, "ScrollContainer", true, false):
 			var scroll := candidate as ScrollContainer
 			if scroll == null or not scroll.is_visible_in_tree() or scroll.mouse_filter == Control.MOUSE_FILTER_IGNORE:

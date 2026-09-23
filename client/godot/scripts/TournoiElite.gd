@@ -50,6 +50,7 @@ var _money_tick_player: AudioStreamPlayer = null
 @onready var btn_simuler_tour: Button = get_node("UI/BtnSimulerTour") as Button
 @onready var btn_retour: Button = get_node("UI/BtnRetour") as Button
 @onready var ui_root: Control = get_node("UI") as Control
+@onready var _detail_bracket: Control = get_node("UI/EliteBracketClean") as Control
 
 
 const ELITE_VIRTUAL_LINES: int = 32
@@ -1162,16 +1163,20 @@ func _bm_show_tournament_final_cinematic(team_a: String, team_b: String, score_a
 	sparks.position = Vector2(vp.x * 0.5, vp.y * 0.55)
 	layer.add_child(sparks)
 
+	# Presentation only; returns zero outside iOS landscape.
+	var final_side_shift := preload("res://scripts/IosTournamentDetailLayout.gd").prepare_final_cinematic(
+		self, layer, title, left, right, left_crest, right_crest, vs_lbl, score, champion, flash_top, flash_bottom, sparks)
+
 	var t := create_tween()
 	t.set_parallel(true)
 	t.tween_property(overlay, "color:a", 0.72, 0.28)
 	t.tween_property(title, "modulate:a", 1.0, 0.35)
-	t.tween_property(left, "position:x", vp.x * 0.07, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.tween_property(right, "position:x", vp.x * 0.53, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(left, "position:x", (vp.x * 0.5 - left.size.x - 8.0) if final_side_shift > 0.0 else vp.x * 0.07, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(right, "position:x", (vp.x * 0.5 + 8.0) if final_side_shift > 0.0 else vp.x * 0.53, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	if left_crest != null:
-		t.tween_property(left_crest, "position:x", vp.x * 0.07 + (vp.x * 0.40 - crest_size) * 0.5, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		t.tween_property(left_crest, "position:x", vp.x * 0.07 - final_side_shift + (vp.x * 0.40 - crest_size) * 0.5, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	if right_crest != null:
-		t.tween_property(right_crest, "position:x", vp.x * 0.53 + (vp.x * 0.40 - crest_size) * 0.5, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		t.tween_property(right_crest, "position:x", vp.x * 0.53 + final_side_shift + (vp.x * 0.40 - crest_size) * 0.5, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	t.tween_property(vs_lbl, "modulate:a", 1.0, 0.35)
 	t.tween_property(flash_top, "position:x", 0.0, 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	t.tween_property(flash_top, "color:a", 0.75, 0.18)
@@ -1209,23 +1214,27 @@ func _bm_show_tournament_final_cinematic(team_a: String, team_b: String, score_a
 	var t4 := create_tween()
 	t4.set_parallel(true)
 	t4.tween_property(btn, "modulate:a", 1.0, 0.25)
-	t4.tween_property(btn, "scale", Vector2(1.08, 1.08), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t4.tween_property(btn, "scale", Vector2(1.08, 1.08) * (0.90 if final_side_shift > 0.0 else 1.0), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 	await btn.pressed
 
 	btn.text = "CLOSE"
 
-	var impact_zoom := create_tween()
-	impact_zoom.set_parallel(true)
-	impact_zoom.tween_property(layer, "scale", Vector2(1.05, 1.05), 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	impact_zoom.tween_property(layer, "position", Vector2(-40, -25), 0.14)
+	# Keep Play fixed and the final content inside its frame on iOS landscape.
+	if final_side_shift == 0.0:
+		var impact_zoom := create_tween()
+		impact_zoom.set_parallel(true)
+		impact_zoom.tween_property(layer, "scale", Vector2(1.05, 1.05), 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		impact_zoom.tween_property(layer, "position", Vector2(-40, -25), 0.14)
 
 	await get_tree().create_timer(0.14).timeout
 
-	var impact_reset := create_tween()
-	impact_reset.set_parallel(true)
-	impact_reset.tween_property(layer, "scale", Vector2(1.0, 1.0), 0.18)
-	impact_reset.tween_property(layer, "position", Vector2.ZERO, 0.18)
+	# Keep Play fixed and the final content inside its frame on iOS landscape.
+	if final_side_shift == 0.0:
+		var impact_reset := create_tween()
+		impact_reset.set_parallel(true)
+		impact_reset.tween_property(layer, "scale", Vector2(1.0, 1.0), 0.18)
+		impact_reset.tween_property(layer, "position", Vector2.ZERO, 0.18)
 
 	var impact_flash := ColorRect.new()
 	impact_flash.color = Color(1.0, 0.82, 0.28, 0.0)
@@ -1385,6 +1394,9 @@ func _ready() -> void:
 	_refresh_bracket()
 	_bm_render_clean_elite_bracket()
 	_bm_render_simple_bracket()
+
+	if OS.has_feature("ios") and not OS.has_feature("web") and not OS.has_feature("android"):
+		add_child(preload("res://scripts/IosTournamentDetailLayout.gd").new())
 
 func _refresh_bracket() -> void:
 	var display_r1: Array[String] = []
@@ -1706,11 +1718,11 @@ func _bm_build_centered_slot_text(entries: Array[String], max_slots: int) -> Str
 	return "\n\n".join(slots)
 
 func _bm_render_clean_elite_bracket() -> void:
-	var body_r1 := get_node_or_null("UI/EliteBracketClean/ColR1/BodyR1") as RichTextLabel
-	var body_r2 := get_node_or_null("UI/EliteBracketClean/ColR2/BodyR2") as RichTextLabel
-	var body_r3 := get_node_or_null("UI/EliteBracketClean/ColR3/BodyR3") as RichTextLabel
-	var body_r4 := get_node_or_null("UI/EliteBracketClean/ColR4/BodyR4") as RichTextLabel
-	var body_w := get_node_or_null("UI/EliteBracketClean/ColW/BodyW") as RichTextLabel
+	var body_r1 := _detail_bracket.get_node_or_null("ColR1/BodyR1") as RichTextLabel
+	var body_r2 := _detail_bracket.get_node_or_null("ColR2/BodyR2") as RichTextLabel
+	var body_r3 := _detail_bracket.get_node_or_null("ColR3/BodyR3") as RichTextLabel
+	var body_r4 := _detail_bracket.get_node_or_null("ColR4/BodyR4") as RichTextLabel
+	var body_w := _detail_bracket.get_node_or_null("ColW/BodyW") as RichTextLabel
 
 	if body_r1 == null:
 		return
