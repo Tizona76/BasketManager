@@ -18,6 +18,8 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+IosKeyboardDismiss="*res://scripts/IosKeyboardDismiss.gd"
+
 ProfileManager="*res://scripts/ProfileManager.gd"
 Session="*res://Session.gd"
 AudioManager="*res://scripts/AudioManager.gd"

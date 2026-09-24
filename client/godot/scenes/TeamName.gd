@@ -1245,6 +1245,10 @@ func _bm_hide_mobile_keyboard() -> void:
 
 
 func _bm_update_keyboard_dismiss_button() -> void:
+	if OS.has_feature("ios") and get_viewport_rect().size.x > get_viewport_rect().size.y:
+		if is_instance_valid(_mobile_keyboard_dismiss_btn):
+			_mobile_keyboard_dismiss_btn.hide()
+		return
 	_bm_ensure_keyboard_dismiss_button()
 	if _mobile_keyboard_dismiss_btn == null:
 		return
