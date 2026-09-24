@@ -874,7 +874,7 @@ static func spend_euros_or_tokens(save: Dictionary, euros_cost: int, tokens_cost
 	var euros_have: int = maxi(0, int(wallet.get("euros", 0)))
 	var tokens_have: int = maxi(0, int(wallet.get("tokens", 0)))
 
-	if euros_have >= euros_needed:
+	if euros_needed > 0 and euros_have >= euros_needed:
 		wallet["euros"] = euros_have - euros_needed
 		if reason != "":
 			print("[ECON][EUROS] -", euros_needed, " reason=", reason, " => euros=", int(wallet["euros"]))

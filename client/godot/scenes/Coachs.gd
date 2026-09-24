@@ -59,6 +59,7 @@ const COACH_UI_CONFIG := {
 
 
 var selected_coach_id: String = ""
+var _ios_staff_original: Dictionary = {}
 
 func _bm_get_contract_duration(coach_id: String) -> int:
 	match coach_id:
@@ -158,6 +159,8 @@ func _bm_refresh_active_coach_visuals() -> void:
 	_bm_ensure_seasons_label(content_root, "LblSeasonsConfirme", 250.0, 506.0, _bm_get_seasons_progress_text("coach_confirme"))
 	_bm_ensure_seasons_label(content_root, "LblSeasonsElite", 250.0, 846.0, _bm_get_seasons_progress_text("coach_elite"))
 
+	_bm_queue_ios_staff_layout()
+
 func _ready() -> void:
 	_bm_apply_coach_quotes_i18n()
 	_bm_setup_title_tooltip()
@@ -227,6 +230,11 @@ func _ready() -> void:
 	_fill_inline_label("coach_junior", LblCoachJunior)
 	_fill_inline_label("coach_confirme", LblCoachConfirme)
 	_fill_inline_label("coach_elite", LblCoachElite)
+
+	if OS.has_feature("ios") and not OS.has_feature("web") and not OS.has_feature("android"):
+		get_viewport().size_changed.connect(_bm_queue_ios_staff_layout)
+		InfoPanel.visibility_changed.connect(_bm_queue_ios_staff_layout)
+		_bm_queue_ios_staff_layout()
 
 
 func _on_btn_back() -> void:
@@ -560,3 +568,121 @@ func _bm_set_capsule_state(node: Node, enabled: bool) -> void:
 		return
 	node.modulate = Color(1,1,1,1) if enabled else Color(0.5,0.5,0.5,1)
 	node.mouse_filter = Control.MOUSE_FILTER_STOP if enabled else Control.MOUSE_FILTER_IGNORE
+
+# Présentation uniquement : mêmes nodes, textes métier, états et callbacks.
+
+func _bm_queue_ios_staff_layout() -> void:
+	if OS.has_feature("ios") and not OS.has_feature("web") and not OS.has_feature("android"):
+		call_deferred("_bm_layout_ios_staff")
+
+func _bm_ios_staff_set(node: Control, values: Dictionary) -> void:
+	if node == null:
+		return
+	if not _ios_staff_original.has(node):
+		var original: Dictionary = {}
+		for property in ["anchor_left", "anchor_top", "anchor_right", "anchor_bottom", "custom_minimum_size", "offset_left", "offset_top", "offset_right", "offset_bottom"]:
+			original[property] = node.get(property)
+		_ios_staff_original[node] = original
+	var saved: Dictionary = _ios_staff_original[node]
+	for property in values:
+		if str(property).begins_with("font:"):
+			var key := str(property).trim_prefix("font:")
+			if not saved.has(property):
+				saved[property] = [node.has_theme_font_size_override(key), node.get_theme_font_size(key)]
+			node.add_theme_font_size_override(key, int(values[property]))
+		else:
+			if not saved.has(property) and property not in ["position", "size"]:
+				saved[property] = node.get(property)
+			node.set(property, values[property])
+
+func _bm_ios_staff_rect(node: Control, rect: Rect2, font_size: int = -1) -> void:
+	if node == null:
+		return
+	if font_size >= 0:
+		_bm_ios_staff_set(node, {"font:font_size": font_size})
+		node.get_minimum_size()
+	_bm_ios_staff_set(node, {"anchor_left": 0.0, "anchor_top": 0.0, "anchor_right": 0.0, "anchor_bottom": 0.0, "custom_minimum_size": Vector2.ZERO, "position": rect.position, "size": rect.size})
+
+func _bm_layout_ios_staff() -> void:
+	if not OS.has_feature("ios") or OS.has_feature("web") or OS.has_feature("android"):
+		return
+	var vp := get_viewport_rect().size
+	if vp.x <= vp.y:
+		for node in _ios_staff_original:
+			if not is_instance_valid(node):
+				continue
+			var saved: Dictionary = _ios_staff_original[node]
+			for property in saved:
+				if str(property).begins_with("font:"):
+					var key := str(property).trim_prefix("font:")
+					if saved[property][0]:
+						node.add_theme_font_size_override(key, saved[property][1])
+					else:
+						node.remove_theme_font_size_override(key)
+			for property in saved:
+				if not str(property).begins_with("font:"):
+					node.set(property, saved[property])
+		_ios_staff_original.clear()
+		return
+
+	for path in ["Bg", "Overlay"]:
+		_bm_ios_staff_set(get_node(path), {"mouse_filter": Control.MOUSE_FILTER_IGNORE})
+	_bm_ios_staff_rect(lbl_title_coachs, Rect2(0, 6, vp.x, 34), 26)
+	_bm_ios_staff_rect(title_hover, Rect2(0, 6, vp.x, 34))
+	_bm_ios_staff_rect(LblIntro, Rect2(0, 48, vp.x, 24), 16)
+	_bm_ios_staff_rect(BtnBack, Rect2(14, vp.y - 58, 120, 46), 18)
+	_bm_ios_staff_rect(title_tooltip_panel, Rect2(90, 44, vp.x - 180, 96))
+	_bm_ios_staff_rect(title_tooltip_label, Rect2(12, 8, vp.x - 204, 80), 16)
+
+	var scroll := get_node("ScrollCoachs") as ScrollContainer
+	var content := scroll.get_node("Content") as Control
+	var width := vp.x - 42.0
+	_bm_ios_staff_set(content, {"custom_minimum_size": Vector2(width, 582), "size": Vector2(width, 582), "mouse_filter": Control.MOUSE_FILTER_PASS})
+	_bm_ios_staff_rect(scroll, Rect2(14, 78, vp.x - 28, vp.y - 142))
+	_bm_ios_staff_set(scroll, {"scroll_deadzone": 8, "horizontal_scroll_mode": ScrollContainer.SCROLL_MODE_DISABLED, "vertical_scroll_mode": ScrollContainer.SCROLL_MODE_AUTO})
+	var suffixes := ["Junior", "Confirme", "Elite"]
+	for i in range(suffixes.size()):
+		var suffix: String = suffixes[i]
+		var y := float(i) * 194.0
+		_bm_ios_staff_rect(content.get_node("LblCoach" + suffix + "Top"), Rect2(4, y + 4, 124, 26), 17)
+		_bm_ios_staff_rect(content.get_node("ImgCoach" + suffix), Rect2(16, y + 34, 100, 134))
+		_bm_ios_staff_rect(content.get_node("BtnCoach" + suffix), Rect2(16, y + 34, 100, 134))
+		_bm_ios_staff_set(content.get_node("BtnCoach" + suffix), {"mouse_filter": Control.MOUSE_FILTER_PASS})
+		_bm_ios_staff_rect(content.get_node("LblCoach" + suffix), Rect2(142, y + 14, 208, 76), 17)
+		var quote := content.get_node("QuoteCoach" + suffix) as RichTextLabel
+		var original_text: String = str(_ios_staff_original.get(quote, {}).get("text", quote.text))
+		_bm_ios_staff_set(quote, {"text": original_text.replace("[font_size=24]", "[font_size=18]"), "mouse_filter": Control.MOUSE_FILTER_IGNORE})
+		_bm_ios_staff_rect(quote, Rect2(364, y + 14, width - 372, 166))
+		var capsule := content.get_node("Unlock" + suffix) as Control
+		_bm_ios_staff_rect(capsule, Rect2(142, y + 98, 176, 44))
+		_bm_ios_staff_rect(capsule.get_node("BtnUnlock"), Rect2(0, 0, 176, 44), 18)
+		_bm_ios_staff_set(capsule, {"mouse_filter": Control.MOUSE_FILTER_PASS})
+		_bm_ios_staff_set(capsule.get_node("BtnUnlock"), {"mouse_filter": Control.MOUSE_FILTER_PASS})
+		_bm_ios_staff_rect(capsule.get_node("LblAmount"), Rect2(90, 0, 40, 44), 18)
+		_bm_ios_staff_rect(capsule.get_node("ImgToken"), Rect2(136, 10, 24, 24))
+		_bm_ios_staff_set(capsule.get_node("LblAmount"), {"mouse_filter": Control.MOUSE_FILTER_IGNORE})
+		_bm_ios_staff_set(capsule.get_node("ImgToken"), {"mouse_filter": Control.MOUSE_FILTER_IGNORE})
+		_bm_ios_staff_rect(content.get_node_or_null("LblSeasons" + suffix), Rect2(142, y + 150, 176, 30), 16)
+		for prefix in ["ImgCoach", "LblCoach", "LblSeasons"]:
+			_bm_ios_staff_set(content.get_node_or_null(prefix + suffix), {"mouse_filter": Control.MOUSE_FILTER_IGNORE})
+
+	var panel_size := Vector2(minf(600.0, vp.x - 40.0), minf(272.0, vp.y - 32.0))
+	_bm_ios_staff_rect(InfoPanel, Rect2((vp - panel_size) * 0.5, panel_size))
+	# Duplicate the panel style once; the existing snapshot restores portrait exactly.
+	if not _ios_staff_original[InfoPanel].has("theme_override_styles/panel"):
+		var popup_style := InfoPanel.get_theme_stylebox("panel").duplicate() as StyleBoxFlat
+		if popup_style != null:
+			popup_style.bg_color.a = 0.75
+			_bm_ios_staff_set(InfoPanel, {"theme_override_styles/panel": popup_style})
+	var w := panel_size.x
+	_bm_ios_staff_rect(LblInfo, Rect2(60, 12, w - 120, 70), 20)
+	_bm_ios_staff_rect(BtnCloseInfoPanel, Rect2(w - 52, 8, 44, 44), 22)
+	_bm_ios_staff_rect(InfoPanel.get_node("LblInfoUnlock"), Rect2(w * 0.5 - 96, 94, 95, 28), 20)
+	_bm_ios_staff_rect(LblInfoTokens, Rect2(w * 0.5 + 4, 94, 50, 28), 20)
+	_bm_ios_staff_rect(InfoPanel.get_node("ImgInfoToken"), Rect2(w * 0.5 + 62, 95, 26, 26))
+	_bm_ios_staff_rect(LblTokensAvailable, Rect2(w * 0.5 - 140, 134, 240, 28), 18)
+	var available_width := LblTokensAvailable.get_theme_font("font").get_string_size(LblTokensAvailable.text, HORIZONTAL_ALIGNMENT_LEFT, -1, LblTokensAvailable.get_theme_font_size("font_size")).x
+	var token_x := LblTokensAvailable.position.x + (LblTokensAvailable.size.x + available_width) * 0.5 + 6.0
+	_bm_ios_staff_rect(InfoPanel.get_node("ImgTokensAvailable"), Rect2(token_x, 135, 24, 24))
+	_bm_ios_staff_rect(LblInfoError, Rect2(20, 174, w - 40, 34), 16)
+	_bm_ios_staff_rect(BtnBuyCoach, Rect2(w * 0.5 - 80, panel_size.y - 54, 160, 44), 18)
