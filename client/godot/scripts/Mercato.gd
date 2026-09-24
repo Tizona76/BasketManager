@@ -161,6 +161,11 @@ func _ready() -> void:
 		btn_confirmer_mercato.add_theme_stylebox_override("focus", sb_confirm)
 		btn_confirmer_mercato.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 
+	if _ios_market_enabled():
+		get_viewport().size_changed.connect(_ios_market_queue_layout)
+		rows.child_order_changed.connect(_ios_market_queue_layout)
+		_ios_market_queue_layout()
+
 func _apply_i18n() -> void:
 	print("[MERCATO][I18N] locale=", TranslationServer.get_locale())
 	print("[MERCATO][I18N] mercato.title=", tr("mercato.title"))
@@ -777,7 +782,17 @@ func _make_avatar_name_cell(p: Dictionary) -> Control:
 	avatar.gui_input.connect(func(event: InputEvent, player_data := p.duplicate(true)) -> void:
 		if event is InputEventMouseButton:
 			var mb := event as InputEventMouseButton
-			if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+			if _ios_market_enabled() and get_viewport_rect().size.x > get_viewport_rect().size.y and mb.button_index == MOUSE_BUTTON_LEFT:
+				if mb.pressed:
+					avatar.set_meta("ios_tap_start", mb.global_position)
+					avatar.set_meta("ios_tap_scroll", Vector2(_ios_market_scroll.scroll_horizontal, _ios_market_scroll.scroll_vertical))
+					return
+				var scroll_position := Vector2(_ios_market_scroll.scroll_horizontal, _ios_market_scroll.scroll_vertical)
+				if not avatar.has_meta("ios_tap_start") or mb.global_position.distance_to(avatar.get_meta("ios_tap_start")) > 8.0 or scroll_position != avatar.get_meta("ios_tap_scroll"):
+					return
+			elif not mb.pressed:
+				return
+			if mb.button_index == MOUSE_BUTTON_LEFT:
 				_bm_show_player_card_popup(player_data)
 				accept_event()
 	)
@@ -1117,6 +1132,7 @@ func _bm_show_player_card_popup(data: Dictionary) -> void:
 	btn_close.add_theme_font_size_override("font_size", 18)
 	btn_close.pressed.connect(_bm_player_card_close)
 	card.add_child(btn_close)
+	_ios_market_queue_layout()
 
 
 func _player_perf(p: Dictionary) -> int:
@@ -1322,6 +1338,7 @@ func _get_current_licensed_count() -> int:
 	return _get_mercato_licensed_id_set(save).size()
 
 func _update_new_salaries_ui() -> void:
+	_ios_market_queue_layout()
 	var total := _get_new_salaries_total()
 	if lbl_new_salaries_total != null:
 		lbl_new_salaries_total.text = _tr_any(["mercato.new_salaries_total"], "New salaries") + " : " + _fmt_int_spaces(total) + " $"
@@ -1348,3 +1365,124 @@ func _update_new_salaries_ui() -> void:
 			btn_confirmer_mercato.add_theme_stylebox_override("pressed", sb)
 			btn_confirmer_mercato.add_theme_stylebox_override("focus", sb)
 			btn_confirmer_mercato.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+
+# Presentation only: one shared scroll keeps all eleven columns aligned.
+var _ios_market_original: Dictionary = {}
+var _ios_market_scroll: ScrollContainer
+var _ios_market_vbox: VBoxContainer
+var _ios_market_header: HBoxContainer
+
+func _ios_market_enabled() -> bool:
+	return OS.has_feature("ios") and not OS.has_feature("web") and not OS.has_feature("android")
+
+func _ios_market_queue_layout() -> void:
+	if _ios_market_enabled():
+		call_deferred("_ios_market_layout")
+
+func _ios_market_set(node: Control, values: Dictionary) -> void:
+	if not _ios_market_original.has(node):
+		_ios_market_original[node] = {}
+	var saved: Dictionary = _ios_market_original[node]
+	for key in values:
+		if not saved.has(key):
+			saved[key] = node.get(key)
+		node.set(key, values[key])
+
+func _ios_market_rect(node: Control, rect: Rect2, font_size: int = -1) -> void:
+	if font_size >= 0:
+		_ios_market_set(node, {"theme_override_font_sizes/font_size": font_size})
+	_ios_market_set(node, {"anchor_left": 0.0, "anchor_top": 0.0, "anchor_right": 0.0, "anchor_bottom": 0.0, "offset_left": rect.position.x, "offset_top": rect.position.y, "offset_right": rect.end.x, "offset_bottom": rect.end.y})
+
+func _ios_market_layout() -> void:
+	if not _ios_market_enabled():
+		return
+	var vp := get_viewport_rect().size
+	if vp.x <= vp.y:
+		if is_instance_valid(_ios_market_scroll) and _ios_market_scroll.name == "MercatoTableScroll":
+			rows.reparent(_ios_market_scroll, false)
+			_ios_market_vbox.reparent($UI/Panel/Margin, false)
+			_ios_market_scroll.reparent(_ios_market_vbox, false)
+			_ios_market_scroll.name = "Scroll"
+		for node in _ios_market_original:
+			if is_instance_valid(node):
+				for key in _ios_market_original[node]:
+					node.set(key, _ios_market_original[node][key])
+		_ios_market_original.clear()
+		return
+	for node in _ios_market_original.keys():
+		if not is_instance_valid(node):
+			_ios_market_original.erase(node)
+	if not is_instance_valid(_ios_market_scroll):
+		_ios_market_scroll = rows.get_parent()
+		_ios_market_vbox = _ios_market_scroll.get_parent()
+		_ios_market_header = _ios_market_vbox.get_node("HeaderRow")
+	if _ios_market_scroll.name != "MercatoTableScroll":
+		_ios_market_scroll.reparent($UI/Panel/Margin, false)
+		_ios_market_vbox.reparent(_ios_market_scroll, false)
+		rows.reparent(_ios_market_vbox, false)
+		_ios_market_scroll.name = "MercatoTableScroll"
+	_ios_market_set($BG, {"stretch_mode": TextureRect.STRETCH_KEEP_ASPECT_COVERED, "mouse_filter": Control.MOUSE_FILTER_IGNORE})
+	_ios_market_set($Veil, {"mouse_filter": Control.MOUSE_FILTER_IGNORE})
+	_ios_market_rect(title_label, Rect2(0, 4, vp.x, 32), 22)
+	_ios_market_set(title_label, {"horizontal_alignment": HORIZONTAL_ALIGNMENT_CENTER})
+	_ios_market_rect(lbl_new_salaries_total, Rect2(vp.x - 214, 8, 200, 26), 14)
+	_ios_market_set($UI/Panel/Margin, {"theme_override_constants/margin_left": 4, "theme_override_constants/margin_right": 4, "theme_override_constants/margin_top": 4, "theme_override_constants/margin_bottom": 4})
+	_ios_market_set(_ios_market_scroll, {"custom_minimum_size": Vector2.ZERO, "horizontal_scroll_mode": ScrollContainer.SCROLL_MODE_DISABLED, "scroll_horizontal": 0, "vertical_scroll_mode": ScrollContainer.SCROLL_MODE_AUTO, "scroll_deadzone": 8})
+	_ios_market_set(_ios_market_vbox, {"size_flags_horizontal": Control.SIZE_EXPAND_FILL, "theme_override_constants/separation": 4})
+	_ios_market_set(rows, {"theme_override_constants/separation": 4})
+	_ios_market_rect($UI/Panel, Rect2(8, 42, vp.x - 16, vp.y - 104))
+	_ios_market_rect(btn_retour, Rect2(14, vp.y - 54, 110, 44), 18)
+	_ios_market_rect(btn_confirmer_mercato, Rect2(vp.x - 170, vp.y - 54, 156, 44), 16)
+	var badge_x := vp.x - 354.0 if lbl_team_full_warning.visible else (vp.x - 180.0) * 0.5
+	_ios_market_rect($UI/BgLicensedPlayers, Rect2(badge_x, vp.y - 51, 180, 36))
+	_ios_market_rect(lbl_licensed_players, Rect2(badge_x + 4, vp.y - 49, 172, 32), 13)
+	_ios_market_rect(lbl_team_full_warning, Rect2(132, vp.y - 59, badge_x - 140, 52), 14)
+	_ios_market_set(lbl_team_full_warning, {"theme_override_constants/line_spacing": -4, "theme_override_constants/outline_size": 1, "theme_override_colors/font_outline_color": Color.BLACK, "theme_override_colors/font_shadow_color": Color.TRANSPARENT})
+	_ios_market_set(lbl_team_full_warning, {"autowrap_mode": TextServer.AUTOWRAP_WORD_SMART, "vertical_alignment": VERTICAL_ALIGNMENT_CENTER, "horizontal_alignment": HORIZONTAL_ALIGNMENT_CENTER})
+	_ios_market_set(_ios_market_header, {"custom_minimum_size": Vector2(0, 26), "theme_override_constants/separation": 1})
+	_ios_market_set(hdr_tir, {"text": "Shoot"})
+	_ios_market_set(hdr_motivation, {"text": "Motiv."})
+	_ios_market_set(hdr_perf, {"text": "DEF."})
+	var widths := [68.0, 36.0, 64.0, 26.0, 38.0, 42.0, 32.0, 60.0, 40.0, 76.0, 76.0]
+	for label in _ios_market_header.get_children():
+		_ios_market_set(label, {"theme_override_font_sizes/font_size": 12, "custom_minimum_size": Vector2.ZERO, "mouse_filter": Control.MOUSE_FILTER_PASS})
+	for wrap in rows.get_children():
+		if wrap.is_queued_for_deletion():
+			continue
+		_ios_market_set(wrap, {"custom_minimum_size": Vector2(0, 60), "mouse_filter": Control.MOUSE_FILTER_PASS})
+		if not _ios_market_original[wrap].has("theme_override_styles/panel"):
+			var style := wrap.get_theme_stylebox("panel").duplicate() as StyleBoxFlat
+			style.content_margin_left = 0
+			style.content_margin_right = 0
+			_ios_market_set(wrap, {"theme_override_styles/panel": style})
+		var row := wrap.get_child(0)
+		_ios_market_set(row, {"theme_override_constants/separation": 1})
+		for i in range(row.get_child_count()):
+			var cell: Control = row.get_child(i)
+			if i == 0:
+				_ios_market_set(cell, {"theme_override_constants/separation": 0})
+			_ios_market_set(cell, {"custom_minimum_size": Vector2.ZERO, "size_flags_horizontal": Control.SIZE_FILL, "mouse_filter": Control.MOUSE_FILTER_PASS})
+			for child in cell.get_children():
+				if child is Label or child is Button:
+					_ios_market_set(child, {"theme_override_font_sizes/font_size": 14, "mouse_filter": Control.MOUSE_FILTER_PASS})
+				if child is Label and i in [0, 2]:
+					_ios_market_set(child, {"autowrap_mode": TextServer.AUTOWRAP_WORD_SMART, "custom_minimum_size": Vector2(widths[i], 0)})
+				if child is Button:
+					_ios_market_set(child, {"custom_minimum_size": Vector2(0, 44)})
+				if child is TextureRect:
+					_ios_market_set(child, {"custom_minimum_size": Vector2(32, 32), "mouse_filter": Control.MOUSE_FILTER_PASS})
+			widths[i] = maxf(widths[i], cell.get_minimum_size().x)
+	for i in range(widths.size()):
+		var label: Label = _ios_market_header.get_child(i)
+		widths[i] = maxf(widths[i], label.get_minimum_size().x)
+		_ios_market_set(label, {"custom_minimum_size": Vector2(widths[i], 26), "size_flags_horizontal": Control.SIZE_FILL})
+		for wrap in rows.get_children():
+			if not wrap.is_queued_for_deletion():
+				_ios_market_set(wrap.get_child(0).get_child(i), {"custom_minimum_size": Vector2(widths[i], 0)})
+
+	var card := get_node_or_null("PlayerCardPopup/PlayerCard") as Control
+	if card != null:
+		var factor := minf(1.0, minf((vp.x - 24.0) / 792.0, (vp.y - 24.0) / 430.0))
+		_ios_market_set(card, {"scale": Vector2.ONE * factor, "position": (vp - card.size * factor) * 0.5})
+		var close := card.get_child(card.get_child_count() - 1) as Button
+		_ios_market_set(close, {"size": Vector2.ONE * (44.0 / factor), "position": Vector2(792.0 - 44.0 / factor - 8.0, 8.0)})
