@@ -12,6 +12,7 @@ var _zoom := 1.0
 var _pan := Vector2.ZERO
 var _last_viewport_size := Vector2.ZERO
 var _scroll_touch_indices: Dictionary = {}
+var _sponsor_touch_indices: Dictionary = {}
 
 
 func _ready() -> void:
@@ -46,11 +47,14 @@ func _input(event: InputEvent) -> void:
 
 		if touch.pressed:
 			_touches[touch.index] = touch.position
+			if _touch_starts_in_sponsors_carousel(touch.position):
+				_sponsor_touch_indices[touch.index] = true
 			if _touch_starts_in_lineup_scroll(touch.position):
 				_scroll_touch_indices[touch.index] = true
 		else:
 			_touches.erase(touch.index)
 			_scroll_touch_indices.erase(touch.index)
+			_sponsor_touch_indices.erase(touch.index)
 
 			if _touches.size() < 2:
 				_last_distance = 0.0
@@ -63,6 +67,12 @@ func _input(event: InputEvent) -> void:
 
 		if _touches.has(drag.index):
 			_touches[drag.index] = drag.position
+
+		# Sponsors owns one-finger gestures; two fingers retain global pinch priority.
+		if not _sponsor_touch_indices.is_empty() and _touches.size() < 2:
+			_last_distance = 0.0
+			_last_center = Vector2.ZERO
+			return
 
 		if _touches.size() == 2:
 			_apply_two_finger_gesture()
@@ -183,10 +193,11 @@ func _clamp_pan() -> void:
 
 
 func _reset_zoom() -> void:
-	if _zoom == MIN_ZOOM and _pan == Vector2.ZERO and _touches.is_empty() and _scroll_touch_indices.is_empty():
+	if _zoom == MIN_ZOOM and _pan == Vector2.ZERO and _touches.is_empty() and _scroll_touch_indices.is_empty() and _sponsor_touch_indices.is_empty():
 		return
 	_touches.clear()
 	_scroll_touch_indices.clear()
+	_sponsor_touch_indices.clear()
 
 	_last_distance = 0.0
 	_last_center = Vector2.ZERO
@@ -195,3 +206,14 @@ func _reset_zoom() -> void:
 	_pan = Vector2.ZERO
 
 	_apply_transform()
+
+
+func _touch_starts_in_sponsors_carousel(point: Vector2) -> bool:
+	var scene := get_tree().current_scene
+	if scene == null or scene.name != "Sponsors" or get_viewport().get_visible_rect().size.x <= get_viewport().get_visible_rect().size.y:
+		return false
+	var zone := scene.get_node_or_null("UI/IosSponsorCarousel") as Control
+	if zone == null or not zone.is_visible_in_tree():
+		return false
+	var local := zone.get_global_transform_with_canvas().affine_inverse() * point
+	return Rect2(Vector2.ZERO, zone.size).has_point(local)

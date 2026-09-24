@@ -222,6 +222,8 @@ func _refresh_sponsor_ui() -> void:
 			PlayerLife.write_savegame(save)
 	if _pending_sponsor_id != "":
 		_show_confirm_popup(SponsorDataRef.get_sponsor_by_id(_pending_sponsor_id))
+	if OS.has_feature("ios") and get_viewport_rect().size.x > get_viewport_rect().size.y:
+		call_deferred("_apply_ios_sponsors_layout")
 
 
 func _make_sponsor_card(sponsor: Dictionary, can_sign: bool) -> PanelContainer:
@@ -558,3 +560,271 @@ func _on_btn_retour() -> void:
 	var tree := get_tree()
 	if tree != null:
 		tree.change_scene_to_file("res://scenes/Menu.tscn")
+
+
+# iOS landscape presentation only; offer/contract state remains in the existing callbacks.
+var _ios_offer_index: int = 1
+var _ios_cards: Array[Control] = []
+var _ios_carousel: Control
+var _ios_previous: Button
+var _ios_next: Button
+var _ios_expanded_card_index: int = -1
+var _ios_fingers: Dictionary = {}
+var _ios_all_touches: Dictionary = {}
+var _ios_pinch_active: bool = false
+var _ios_other_fingers: Dictionary = {}
+var _ios_touch_index: int = -1
+var _ios_touch_start := Vector2.ZERO
+var _ios_touch_card: int = -1
+var _ios_touch_offer: int = -1
+var _ios_touch_pan: bool = false
+var _ios_touch_cancelled: bool = false
+var _ios_touch_button: Button
+var _ios_suppress_mouse: bool = false
+
+
+func _apply_ios_sponsors_layout() -> void:
+	var vp := get_viewport_rect().size
+	if not OS.has_feature("ios") or OS.has_feature("web") or vp.x <= vp.y:
+		return
+	if _offers_grid == null or not is_instance_valid(_offers_grid) or _offers_grid.get_child_count() == 0:
+		return
+	_ios_expanded_card_index = -1
+	var ui := get_node("UI") as Control
+	if is_instance_valid(_ios_carousel):
+		_ios_carousel.free()
+	_ios_cards.clear()
+	_ios_carousel = Control.new()
+	_ios_carousel.name = "IosSponsorCarousel"
+	_ios_carousel.clip_contents = true
+	_ios_carousel.position = Vector2(28, 44)
+	_ios_carousel.size = Vector2(vp.x - 56, vp.y - 110)
+	ui.add_child(_ios_carousel)
+	get_node("UI/Panel").hide()
+	title_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	title_label.add_theme_font_size_override("font_size", 26)
+	title_label.position = Vector2(28, 4)
+	title_label.size = Vector2(vp.x - 56, 36)
+	for card: Control in _offers_grid.get_children():
+		card.reparent(_ios_carousel)
+		card.pivot_offset = Vector2.ZERO
+		card.custom_minimum_size = Vector2(260, 0)
+		var box := card.get_child(0) as VBoxContainer
+		box.add_theme_constant_override("separation", 2)
+		var badge := box.get_child(0) as HBoxContainer
+		for label: Label in badge.get_children():
+			label.add_theme_font_size_override("font_size", 12)
+		var logo_wrap := box.get_child(1) as CenterContainer
+		logo_wrap.custom_minimum_size = Vector2(0, 60)
+		(logo_wrap.get_child(0) as TextureRect).custom_minimum_size = Vector2(220, 60)
+		for child in box.get_children():
+			if child is Label:
+				child.add_theme_font_size_override("font_size", 20 if child.get_index() == 2 else 16)
+			elif child is MarginContainer:
+				child.add_theme_constant_override("margin_top", 4)
+				var button := child.get_child(0) as Button
+				button.custom_minimum_size = Vector2(220, 32)
+				button.add_theme_font_size_override("font_size", 16)
+		card.size = Vector2(260, 0)
+		_ios_cards.append(card)
+	btn_retour.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	btn_retour.size = Vector2(154, 62)
+	btn_retour.scale = Vector2(0.62, 0.62)
+	btn_retour.position = Vector2(18, vp.y - 58)
+	if info_label.get_parent() != ui:
+		info_label.reparent(ui)
+	info_label.add_theme_font_size_override("font_size", 12)
+	info_label.position = Vector2(vp.x - 238, vp.y - 57)
+	info_label.size = Vector2(218, 50)
+	for old_button in [_ios_previous, _ios_next]:
+		if is_instance_valid(old_button):
+			old_button.free()
+	_ios_previous = Button.new()
+	_ios_next = Button.new()
+	for button in [_ios_previous, _ios_next]:
+		button.custom_minimum_size = Vector2(42, 36)
+		button.add_theme_font_size_override("font_size", 24)
+		ui.add_child(button)
+	_ios_previous.text = "‹"
+	_ios_next.text = "›"
+	_ios_previous.position = Vector2(vp.x * 0.5 - 48, vp.y - 53)
+	_ios_next.position = Vector2(vp.x * 0.5 + 6, vp.y - 53)
+	_ios_previous.pressed.connect(_ios_move_sponsor.bind(-1))
+	_ios_next.pressed.connect(_ios_move_sponsor.bind(1))
+	# Let the containers resolve wrapping before fitting the cards into the viewport.
+	await get_tree().process_frame
+	title_label.size.y = 36
+	for card in _ios_cards:
+		card.size = Vector2(260, 0)
+	await get_tree().process_frame
+	_position_ios_sponsor_cards()
+	if is_instance_valid(_confirm_popup):
+		_confirm_popup.move_to_front()
+		var popup_scale := minf(1.0, (vp.y - 24.0) / _confirm_popup.size.y)
+		_confirm_popup.scale = Vector2.ONE * popup_scale
+		_confirm_popup.position = (vp - _confirm_popup.size * popup_scale) * 0.5
+
+
+func _ios_move_sponsor(direction: int) -> void:
+	if _ios_pinch_active or not _ios_fingers.is_empty():
+		return
+	_ios_expanded_card_index = -1
+	_ios_offer_index = clampi(_ios_offer_index + direction, 0, _ios_cards.size() - 1)
+	_position_ios_sponsor_cards()
+
+
+func _position_ios_sponsor_cards() -> void:
+	if _ios_cards.is_empty():
+		return
+	_ios_offer_index = clampi(_ios_offer_index, 0, _ios_cards.size() - 1)
+	var height := 1.0
+	for card in _ios_cards:
+		height = maxf(height, card.size.y)
+	var vp := get_viewport_rect().size
+	var fit := minf(1.0, (vp.y - 120.0) / height)
+	var expanded := _ios_expanded_card_index == _ios_offer_index
+	_ios_carousel.position.y = 26.0 if expanded else 44.0
+	_ios_carousel.size.y = vp.y - (81.0 if expanded else 110.0)
+	for i in range(_ios_cards.size()):
+		var card := _ios_cards[i]
+		var distance := i - _ios_offer_index
+		card.visible = absi(distance) <= 1
+		card.scale = Vector2.ONE * fit * (1.0 if distance == 0 else 0.76)
+		if expanded and distance == 0:
+			var enlargement := minf(1.18, (_ios_carousel.size.y - 2.0) / (card.size.y * fit))
+			enlargement = minf(enlargement, (_ios_carousel.size.x - 12.0) / (card.size.x * fit))
+			card.scale *= maxf(1.0, enlargement)
+		var visual_size := card.size * card.scale
+		var x := (_ios_carousel.size.x - visual_size.x) * 0.5
+		if distance < 0:
+			x = -4.0
+		elif distance > 0:
+			x = _ios_carousel.size.x - visual_size.x + 4.0
+		var y := (_ios_carousel.size.y - visual_size.y) * 0.5
+		if distance != 0:
+			# Keep the side previews at their normal positions while the center expands.
+			y = 44.0 + (vp.y - 110.0 - visual_size.y) * 0.5 - _ios_carousel.position.y
+		card.position = Vector2(x, y)
+	_ios_previous.disabled = _ios_offer_index == 0
+	_ios_next.disabled = _ios_offer_index == _ios_cards.size() - 1
+
+
+func _ios_card_at(point: Vector2) -> int:
+	for i in range(_ios_cards.size()):
+		var card := _ios_cards[i]
+		if card.is_visible_in_tree() and _ios_control_contains(card, point):
+			return i
+	return -1
+
+
+func _ios_control_contains(control: Control, point: Vector2) -> bool:
+	var local := control.get_global_transform_with_canvas().affine_inverse() * point
+	return Rect2(Vector2.ZERO, control.size).has_point(local)
+
+
+func _input(event: InputEvent) -> void:
+	if not OS.has_feature("ios") or OS.has_feature("web") or get_viewport_rect().size.x <= get_viewport_rect().size.y:
+		return
+	if not is_instance_valid(_ios_carousel) or not _ios_carousel.is_visible_in_tree():
+		return
+	# Godot can emit a mouse event for the same touch. Never replay a claimed gesture.
+	if event is InputEventMouse and event.device == -1 and (_ios_suppress_mouse or (not is_instance_valid(_confirm_popup) and _ios_control_contains(_ios_carousel, event.position))):
+		get_viewport().set_input_as_handled()
+		return
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			_ios_all_touches[event.index] = true
+		else:
+			_ios_all_touches.erase(event.index)
+		if _ios_all_touches.size() >= 2:
+			_ios_pinch_active = true
+		if _ios_pinch_active:
+			_ios_touch_cancelled = true
+			_ios_touch_index = -1
+			_ios_fingers.clear()
+			_ios_other_fingers.clear()
+			_ios_suppress_mouse = true
+			if _ios_all_touches.is_empty():
+				_ios_pinch_active = false
+				call_deferred("_ios_release_mouse_suppression")
+			# Leave every pinch touch/release to MobilePinchZoom, including the last finger.
+			return
+		if not event.pressed and _ios_other_fingers.has(event.index):
+			_ios_other_fingers.erase(event.index)
+			return
+		if event.pressed:
+			if _ios_fingers.is_empty():
+				_ios_suppress_mouse = false
+				if is_instance_valid(_confirm_popup) or not _ios_control_contains(_ios_carousel, event.position):
+					_ios_other_fingers[event.index] = true
+					return
+				if not _ios_other_fingers.is_empty():
+					# Do not start a pan while another finger is pressing an arrow or Back.
+					_ios_fingers[event.index] = true
+					_ios_touch_cancelled = true
+					get_viewport().set_input_as_handled()
+					return
+				_ios_touch_index = event.index
+				_ios_touch_start = event.position
+				_ios_touch_card = _ios_card_at(event.position)
+				_ios_touch_offer = _ios_offer_index
+				_ios_touch_pan = false
+				_ios_touch_cancelled = false
+				_ios_touch_button = null
+				if _ios_touch_card >= 0:
+					for button: Button in _ios_cards[_ios_touch_card].find_children("*", "Button", true, false):
+						if not button.disabled and _ios_control_contains(button, event.position):
+							_ios_touch_button = button
+			else:
+				# A second finger cancels this gesture, including taps and arrow touches.
+				_ios_touch_cancelled = true
+			_ios_fingers[event.index] = true
+			_ios_suppress_mouse = true
+			_ios_track_claimed_event(event)
+			get_viewport().set_input_as_handled()
+		elif _ios_fingers.has(event.index):
+			_ios_track_claimed_event(event)
+			_ios_fingers.erase(event.index)
+			if _ios_fingers.is_empty():
+				call_deferred("_ios_release_mouse_suppression")
+			get_viewport().set_input_as_handled()
+			if event.index != _ios_touch_index:
+				return
+			_ios_touch_index = -1
+			var delta := get_viewport().get_screen_transform().basis_xform(event.position - _ios_touch_start)
+			_ios_touch_pan = _ios_touch_pan or delta.length() >= 10.0
+			if event.canceled or _ios_touch_cancelled or _ios_touch_offer != _ios_offer_index:
+				return
+			if _ios_touch_pan:
+				if absf(delta.x) >= 32.0 and absf(delta.x) > absf(delta.y) * 1.25:
+					_ios_move_sponsor(1 if delta.x < 0 else -1)
+				return
+			if _ios_touch_card < 0 or _ios_card_at(event.position) != _ios_touch_card:
+				return
+			if is_instance_valid(_ios_touch_button):
+				if not _ios_touch_button.disabled and _ios_control_contains(_ios_touch_button, event.position):
+					_ios_touch_button.pressed.emit()
+			elif _ios_touch_card != _ios_offer_index:
+				_ios_move_sponsor(_ios_touch_card - _ios_offer_index)
+			else:
+				_ios_expanded_card_index = -1 if _ios_expanded_card_index == _ios_offer_index else _ios_offer_index
+				_position_ios_sponsor_cards()
+	elif event is InputEventScreenDrag and _ios_fingers.has(event.index):
+		_ios_track_claimed_event(event)
+		get_viewport().set_input_as_handled()
+		if event.index == _ios_touch_index:
+			var delta := get_viewport().get_screen_transform().basis_xform(event.position - _ios_touch_start)
+			_ios_touch_pan = _ios_touch_pan or delta.length() >= 10.0
+
+
+func _ios_release_mouse_suppression() -> void:
+	if _ios_all_touches.is_empty():
+		_ios_suppress_mouse = false
+
+
+func _ios_track_claimed_event(event: InputEvent) -> void:
+	# Keep the consumed first contact current so a later second finger can pinch.
+	# MobilePinchZoom excludes these one-finger drags from global pan/zoom.
+	var pinch := get_node_or_null("/root/MobilePinchZoom")
+	if pinch != null:
+		pinch.call("_input", event)
