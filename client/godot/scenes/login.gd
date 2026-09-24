@@ -404,10 +404,11 @@ func _ready() -> void:
 	_play_login_intro()
 	_play_login_ball_float()
 	_apply_login_mobile_landscape_fit()
+	_setup_ios_login_controls()
 	call_deferred("_show_login_explainer_popup")
 	_apply_i18n()
 	print("[LOGIN_READY] script=", get_script().resource_path, " node=", name)
-	status.text = "Status: idle"
+	_set_login_status("login.status.idle", "Status: idle", {})
 	btn_send.pressed.connect(_on_send)
 	btn_val.pressed.connect(_on_validate)
 	btn_cancel.pressed.connect(_on_cancel)
@@ -436,10 +437,10 @@ func _on_send() -> void:
 
 	var e := email.text.strip_edges()
 	if e == "":
-		status.text = "Status: email requis"
+		_set_login_status("login.status.email_required", "Status: email requis", {})
 		return
 
-	status.text = "Status: envoi code..."
+	_set_login_status("login.status.sending", "Status: envoi code...", {})
 	btn_send.disabled = true
 	btn_val.disabled = true
 
@@ -457,13 +458,13 @@ func _on_validate() -> void:
 	var c := code.text.strip_edges()
 
 	if e == "":
-		status.text = "Status: email requis"
+		_set_login_status("login.status.email_required", "Status: email requis", {})
 		return
 	if c == "":
-		status.text = "Status: code requis"
+		_set_login_status("login.status.code_required", "Status: code requis", {})
 		return
 
-	status.text = "Status: validation..."
+	_set_login_status("login.status.validating", "Status: validation...", {})
 	btn_send.disabled = true
 	btn_val.disabled = true
 
@@ -482,7 +483,7 @@ func _http_post_json(url: String, payload: Dictionary) -> void:
 	print("[HTTP] request() err=", err)
 
 	if err != OK:
-		status.text = "Status: HTTP request() error = " + str(err)
+		_set_login_status("login.status.request_error", "Status: HTTP request() error = " + str(err), {"code": err})
 		btn_send.disabled = false
 		btn_val.disabled = false
 		_pending_action = ""
@@ -507,12 +508,12 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 			msg += " (" + str(data["detail"]) + ")"
 		if data.has("error"):
 			msg += " (" + str(data["error"]) + ")"
-		status.text = msg
+		_set_login_status("login.status.request_error" if response_code == 0 else _ios_login_error_key(data), msg, {"code": response_code})
 		_pending_action = ""
 		return
 
 	if _pending_action == "start":
-		status.text = "Status: code envoyé"
+		_set_login_status("login.status.sent", "Status: code envoyé", {})
 		_pending_action = ""
 		return
 
@@ -530,7 +531,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		var tt := "Bearer"  # normalise : l'API renvoie "bearer" mais le backend attend "Bearer"
 
 		if at == "":
-			status.text = "Status: connecté mais token manquant (API)"
+			_set_login_status("login.status.missing_token", "Status: connecté mais token manquant (API)", {})
 			print("[AUTH] ERROR: missing access_token in response:", data)
 			_pending_action = ""
 			return
@@ -549,7 +550,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		# persistance locale
 		_save_session_local()
 
-		status.text = "Status: connecté ✅"
+		_set_login_status("login.status.connected", "Status: connecté ✅", {})
 		_pending_action = ""
 
 		print("[DBG][SESSION_MARK]", Session.SESSION_MARK)
@@ -577,3 +578,80 @@ func _save_session_local() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSLATION_CHANGED:
 		_apply_i18n()
+		call_deferred("_refresh_ios_login_status")
+
+
+var _ios_status_key := ""
+var _ios_status_values: Dictionary = {}
+var _ios_code_eye: TextureButton
+
+func _ios_login_landscape() -> bool:
+	return OS.has_feature("ios") and get_viewport_rect().size.x > get_viewport_rect().size.y
+
+func _set_login_status(key: String, legacy: String, values: Dictionary = {}) -> void:
+	if not _ios_login_landscape():
+		status.text = legacy
+		return
+	_ios_status_key = key
+	_ios_status_values = values
+	status.set_meta("i18n_key", key)
+	_refresh_ios_login_status()
+
+func _refresh_ios_login_status() -> void:
+	if _ios_login_landscape() and is_instance_valid(status) and _ios_status_key != "":
+		status.text = tr(_ios_status_key).format(_ios_status_values)
+
+func _ios_login_error_key(data: Dictionary) -> String:
+	var errors: Variant = data.get("detail", [])
+	if errors is Array:
+		for error in errors:
+			if error is Dictionary and "email" in error.get("loc", []):
+				return "login.status.email_invalid"
+	var detail := str(data.get("detail", data.get("error", "")))
+	match detail:
+		"OTP_NOT_FOUND": return "login.status.code_not_found"
+		"OTP_EXPIRED": return "login.status.code_expired"
+		"OTP_LOCKED": return "login.status.code_locked"
+		"OTP_INVALID": return "login.status.code_invalid"
+	return "login.status.http_error"
+
+func _setup_ios_login_controls() -> void:
+	if not _ios_login_landscape():
+		return
+	var ui := btn_send.get_parent()
+	var send_index := btn_send.get_index()
+	var send_row := HBoxContainer.new()
+	send_row.name = "IosSendCodeRow"
+	send_row.add_theme_constant_override("separation", 12)
+	ui.add_child(send_row)
+	ui.move_child(send_row, send_index)
+	btn_send.reparent(send_row)
+	status.reparent(send_row)
+	btn_send.custom_minimum_size.x = 150
+	status.custom_minimum_size = Vector2(0, 0)
+	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	var code_index := code.get_index()
+	var code_row := HBoxContainer.new()
+	code_row.name = "IosCodeRow"
+	code_row.add_theme_constant_override("separation", 8)
+	ui.add_child(code_row)
+	ui.move_child(code_row, code_index)
+	code.reparent(code_row)
+	code.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ios_code_eye = TextureButton.new()
+	_ios_code_eye.name = "CodeVisibility"
+	_ios_code_eye.custom_minimum_size = Vector2(44, 44)
+	_ios_code_eye.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_ios_code_eye.ignore_texture_size = true
+	_ios_code_eye.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	_ios_code_eye.focus_mode = Control.FOCUS_NONE
+	_ios_code_eye.texture_normal = load("res://assets/icons/eye-visible.svg")
+	_ios_code_eye.pressed.connect(_toggle_ios_code_visibility)
+	code_row.add_child(_ios_code_eye)
+
+func _toggle_ios_code_visibility() -> void:
+	code.secret = not code.secret
+	_ios_code_eye.texture_normal = load("res://assets/icons/eye-visible.svg" if code.secret else "res://assets/icons/eye-hidden.svg")
