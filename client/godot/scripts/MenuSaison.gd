@@ -6322,6 +6322,8 @@ func _bm_layout_match_compo_popup() -> void:
 		ball.position = Vector2((card_size.x - ball.size.x) * 0.5, btn.position.y - 42.0)
 
 func _bm_show_mercato_closed_popup() -> void:
+	var vp := get_viewport_rect().size
+	var ios_landscape := OS.has_feature("ios") and vp.x > vp.y
 	var title := _bm_tr_or_fallback("mercato.closed.title", "Mercato fermé")
 	var body := _bm_tr_or_fallback("mercato.closed.body", "Mercato fermé. Ouverture : avant la saison jusqu'au match 2 inclus, puis pendant les matchs 10, 11 et 12.")
 
@@ -6352,7 +6354,9 @@ func _bm_show_mercato_closed_popup() -> void:
 
 	var panel := Panel.new()
 	var popup_size := Vector2(760, 320)
-	if _bm_saison_is_mobile_layout():
+	if ios_landscape:
+		popup_size = Vector2(minf(620.0, vp.x - 32.0), minf(260.0, vp.y - 24.0))
+	elif _bm_saison_is_mobile_layout():
 		popup_size *= 1.15
 	panel.custom_minimum_size = popup_size
 	panel.size = popup_size
@@ -6380,6 +6384,10 @@ func _bm_show_mercato_closed_popup() -> void:
 	label.position = Vector2(24, 20)
 	label.size = Vector2(popup_size.x - 48.0, popup_size.y - 104.0)
 	label.text = "[center][font_size=24][b]" + title + "[/b][/font_size][/center]\n\n[font_size=24]" + body + "[/font_size]"
+	if ios_landscape:
+		label.fit_content = false
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.text = "[center][font_size=22][b]" + title + "[/b][/font_size][/center]\n\n[font_size=18]" + body + "[/font_size]"
 	panel.add_child(label)
 
 	var btn := Button.new()
@@ -6402,7 +6410,7 @@ func _bm_show_mercato_closed_popup() -> void:
 	btn_hover.bg_color = Color(0.25, 0.62, 1.0, 1.0)
 	btn.add_theme_stylebox_override("hover", btn_hover)
 	btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
-	btn.add_theme_font_size_override("font_size", 22)
+	btn.add_theme_font_size_override("font_size", 18 if ios_landscape else 22)
 	btn.pressed.connect(func():
 		if btn_match != null:
 			btn_match.visible = restore_btn_match_visible

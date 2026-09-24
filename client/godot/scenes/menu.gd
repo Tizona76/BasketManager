@@ -4479,6 +4479,8 @@ func _bm_get_mercato_current_journee() -> int:
 
 
 func _bm_show_mercato_closed_popup() -> void:
+	var vp := get_viewport_rect().size
+	var ios_landscape := OS.has_feature("ios") and vp.x > vp.y
 	var title := tr("mercato.closed.title")
 	var body := tr("mercato.closed.body")
 	if body == "" or body == "mercato.closed.body":
@@ -4492,13 +4494,15 @@ func _bm_show_mercato_closed_popup() -> void:
 	popup.name = "MercatoClosedPopup"
 	popup.set_anchors_preset(Control.PRESET_FULL_RECT)
 	popup.mouse_filter = Control.MOUSE_FILTER_STOP
-	popup.z_index = 9999
+	popup.z_index = RenderingServer.CANVAS_ITEM_Z_MAX if ios_landscape else 9999
 	popup.set_as_top_level(true)
 	add_child(popup)
 
 	var panel := Panel.new()
 	var popup_size := Vector2(760, 320)
-	if _bm_menu_is_mobile_layout():
+	if ios_landscape:
+		popup_size = Vector2(minf(620.0, vp.x - 32.0), minf(260.0, vp.y - 24.0))
+	elif _bm_menu_is_mobile_layout():
 		popup_size *= 1.15
 	panel.custom_minimum_size = popup_size
 	panel.size = popup_size
@@ -4526,6 +4530,10 @@ func _bm_show_mercato_closed_popup() -> void:
 	label.position = Vector2(24, 20)
 	label.size = Vector2(popup_size.x - 48.0, popup_size.y - 104.0)
 	label.text = "[center][font_size=24][b]" + title + "[/b][/font_size][/center]\n\n[font_size=24]" + body + "[/font_size]"
+	if ios_landscape:
+		label.fit_content = false
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.text = "[center][font_size=22][b]" + title + "[/b][/font_size][/center]\n\n[font_size=18]" + body + "[/font_size]"
 	panel.add_child(label)
 
 	var btn := Button.new()
@@ -4548,7 +4556,7 @@ func _bm_show_mercato_closed_popup() -> void:
 	btn_hover.bg_color = Color(0.25, 0.62, 1.0, 1.0)
 	btn.add_theme_stylebox_override("hover", btn_hover)
 	btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
-	btn.add_theme_font_size_override("font_size", 22)
+	btn.add_theme_font_size_override("font_size", 18 if ios_landscape else 22)
 	btn.pressed.connect(func(): popup.queue_free())
 	panel.add_child(btn)
 
