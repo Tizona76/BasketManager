@@ -2691,6 +2691,86 @@ func _bm_show_staff_intro_popup(club_level: int) -> void:
 	)
 	close_wrap.add_child(close_btn)
 
+	if OS.has_feature("ios") and not OS.has_feature("web") and not OS.has_feature("android"):
+		var viewport := get_viewport()
+		var resize_layout := _bm_layout_ios_staff_intro_popup.bind(popup)
+		viewport.size_changed.connect(resize_layout)
+		popup.tree_exiting.connect(func() -> void:
+			viewport.size_changed.disconnect(resize_layout)
+		)
+		_bm_layout_ios_staff_intro_popup(popup)
+
+func _bm_layout_ios_staff_intro_popup(popup: Control, settled: bool = false) -> void:
+	if not is_instance_valid(popup) or popup.is_queued_for_deletion():
+		return
+	if not OS.has_feature("ios") or OS.has_feature("web") or OS.has_feature("android"):
+		return
+	var vp := get_viewport_rect().size
+	var landscape := vp.x > vp.y
+	var card := popup.get_node("StaffIntroCard") as PanelContainer
+	var box := card.get_child(0) as VBoxContainer
+	var title := box.get_node("LblStaffIntroTitle") as Label
+	var body := box.get_node("LblStaffIntroBody") as Label
+	var close_wrap := box.get_child(2) as CenterContainer
+	var close_btn := close_wrap.get_node("BtnStaffIntroClose") as Button
+	if not popup.has_meta("ios_staff_original"):
+		var original: Dictionary = {}
+		for entry in [[card, ["custom_minimum_size", "size", "theme_override_styles/panel"]],
+				[box, ["theme_override_constants/separation"]],
+				[title, ["theme_override_font_sizes/font_size"]],
+				[body, ["custom_minimum_size", "size_flags_vertical", "theme_override_font_sizes/font_size"]],
+				[close_wrap, ["custom_minimum_size"]],
+				[close_btn, ["custom_minimum_size", "theme_override_font_sizes/font_size"]]]:
+			original[entry[0]] = {}
+			for property in entry[1]:
+				original[entry[0]][property] = entry[0].get(property)
+		popup.set_meta("ios_staff_original", original)
+	var original: Dictionary = popup.get_meta("ios_staff_original")
+	if not landscape and not bool(popup.get_meta("ios_staff_active", false)):
+		return
+	var dimmer := popup.get_node_or_null("IosStaffDimmer") as ColorRect
+	popup.global_position = Vector2.ZERO
+	popup.size = vp
+	if not landscape:
+		for control in original:
+			for property in original[control]:
+				control.set(property, original[control][property])
+		card.position = (vp - original[card]["size"]) * 0.5
+		popup.set_meta("ios_staff_active", false)
+		if dimmer != null:
+			dimmer.hide()
+		return
+	popup.set_meta("ios_staff_active", true)
+	if dimmer == null:
+		dimmer = ColorRect.new()
+		dimmer.name = "IosStaffDimmer"
+		dimmer.color = Color(0, 0, 0, 0.60)
+		dimmer.mouse_filter = Control.MOUSE_FILTER_STOP
+		popup.add_child(dimmer)
+		popup.move_child(dimmer, 0)
+		dimmer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dimmer.show()
+	var style := (original[card]["theme_override_styles/panel"] as StyleBoxFlat).duplicate() as StyleBoxFlat
+	style.content_margin_left = 24.0
+	style.content_margin_right = 24.0
+	style.content_margin_top = 16.0
+	style.content_margin_bottom = 16.0
+	card.add_theme_stylebox_override("panel", style)
+	box.add_theme_constant_override("separation", 12)
+	title.add_theme_font_size_override("font_size", 28)
+	body.custom_minimum_size = Vector2.ZERO
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_font_size_override("font_size", 20)
+	close_wrap.custom_minimum_size = Vector2(0, 44)
+	close_btn.custom_minimum_size = Vector2(150, 44)
+	close_btn.add_theme_font_size_override("font_size", 20)
+	card.custom_minimum_size = Vector2(minf(640.0, vp.x - 48.0), minf(260.0, vp.y - 32.0))
+	card.size = card.custom_minimum_size
+	card.position = (vp - card.size) * 0.5
+	# Panel/VBox minimum sizes settle after font and width changes.
+	if not settled:
+		call_deferred("_bm_layout_ios_staff_intro_popup", popup, true)
+
 func _on_btn_coachs() -> void:
 	print("[MENU] Coachs clicked -> go Coachs")
 	call_deferred("_go_coachs")
@@ -4760,6 +4840,10 @@ func _bm_apply_mobile_management_adaptive_layout() -> void:
 				var right_side := (i % 2) == 0
 				var center_x := lane_center_x + pair_shift if right_side else lane_center_x - pair_shift
 
+				if OS.has_feature("ios") and not OS.has_feature("web") and not OS.has_feature("android"):
+					# Resolve the landscape font minimum before sizing, also after portrait.
+					b.add_theme_font_size_override("font_size", 14)
+					b.update_minimum_size()
 				b.custom_minimum_size = Vector2(secondary_w, secondary_h)
 				b.size = Vector2(secondary_w, secondary_h)
 				b.global_position = Vector2(
@@ -4773,6 +4857,17 @@ func _bm_apply_mobile_management_adaptive_layout() -> void:
 						actions_top - 14.0 - secondary_h
 					)
 				b.add_theme_font_size_override("font_size", 14)
+				if OS.has_feature("ios") and not OS.has_feature("web") and not OS.has_feature("android"):
+					# Stable slots independent of unlock order. Style margins make
+					# the actual buttons taller than secondary_h; use that minimum
+					# for equal upper/lower offsets without intersecting hitboxes.
+					var stagger := maxf(secondary_h + pair_row_gap, b.size.y)
+					if b == BtnMercato:
+						b.global_position = Vector2(lane_center_x + pair_shift - b.size.x * 0.5, actions_top - 14.0 - secondary_h)
+					elif b == BtnSponsors:
+						b.global_position = Vector2(lane_center_x - b.size.x * 0.5, actions_top - 14.0 - secondary_h - stagger)
+					elif b == BtnCoachs:
+						b.global_position = Vector2(lane_center_x - b.size.x * 0.5, secondary_top + stagger)
 
 		else:
 			# Portrait : comportement existant conservé.

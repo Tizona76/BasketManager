@@ -2864,6 +2864,8 @@ func _bm_apply_early_tabs_visibility() -> void:
 		btn_statistiques.visible = false
 	for button in [btn_calendrier, btn_classement, btn_statistiques, btn_mercato, btn_missions, btn_tournois]:
 		if button != null:
+			if _bm_ios_missions_landscape() and missions_panel != null and missions_panel.visible:
+				button.visible = false
 			button.mouse_filter = Control.MOUSE_FILTER_STOP if button.visible else Control.MOUSE_FILTER_IGNORE
 
 
@@ -5293,6 +5295,23 @@ func _missions_make_locked_mark(parent: Control, pos: Vector2) -> void:
 
 
 func _missions_make_station(parent: Control, pos: Vector2, mission: Dictionary, state: String, idx: int) -> void:
+	if OS.has_feature("ios") and not OS.has_feature("web") and not OS.has_feature("android"):
+		var stations: Array = parent.get_meta("bm_metro_stations", [])
+		stations.append({"mission": mission, "state": state, "idx": idx})
+		parent.set_meta("bm_metro_stations", stations)
+		parent.set_meta("bm_metro_landscape", _bm_ios_missions_landscape())
+		parent.set_meta("bm_metro_width", get_viewport_rect().size.x)
+	if _bm_ios_missions_landscape():
+		parent.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var station := Control.new()
+		station.set_meta("bm_metro_count", parent.get_meta("bm_metro_count", 2))
+		station.name = "MissionStation" + str(idx)
+		station.position = pos
+		station.scale = Vector2(0.6, 0.6)
+		station.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(station)
+		parent = station
+		pos = Vector2.ZERO
 	match state:
 		"done":
 			_missions_make_circle(parent, pos, 84.0, Color(1.00, 0.78, 0.16, 0.22), Color(0.42, 1.00, 0.38, 0.35), 2)
@@ -5366,9 +5385,17 @@ func _missions_make_station(parent: Control, pos: Vector2, mission: Dictionary, 
 	label.add_theme_constant_override("shadow_offset_y", 2)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(label)
+	if _bm_ios_missions_landscape():
+		label.add_theme_font_size_override("font_size", 25 if int(parent.get_meta("bm_metro_count", 2)) >= 4 else 28)
+		var label_width := minf(150.0, (get_viewport_rect().size.x - 172.0) / float(parent.get_meta("bm_metro_count", 2)) - 10.0)
+		label.size.x = label_width / 0.6
+		label.position.x = -label.size.x * 0.5
+		label.get_line_count()
+		label.size.y = maxf(76.0, label.get_minimum_size().y)
+		label.position.y = -54.0 - label.size.y
 
 	var capsule := Panel.new()
-	capsule.position = pos + Vector2(-52, 44)
+	capsule.position = pos + Vector2(-52, 56 if _bm_ios_missions_landscape() else 44)
 	capsule.size = Vector2(104, 42)
 	capsule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	capsule.add_theme_stylebox_override("panel", _missions_stylebox(Color(0.05, 0.06, 0.10, 0.88), Color(1.00, 0.78, 0.20, 0.98), 2, 18))
@@ -5401,6 +5428,11 @@ func _missions_make_station(parent: Control, pos: Vector2, mission: Dictionary, 
 func _missions_build_points(count: int) -> Array:
 	var pts: Array = []
 	var max_index := maxi(1, count - 1)
+	if _bm_ios_missions_landscape():
+		var width := get_viewport_rect().size.x - 172.0
+		for i in range(count):
+			pts.append(Vector2(width * (float(i) + 0.5) / float(count), 132.0 - 8.0 * float(i) / float(max_index)))
+		return pts
 	var start_y := minf(400.0, 118.0 + float(max_index) * 58.0)
 	for i in range(count):
 		var t := 0.0 if count <= 1 else float(i) / float(max_index)
@@ -5453,11 +5485,18 @@ func _missions_route_color(state: String) -> Color:
 
 
 func _missions_add_route_segment(parent: Control, a: Vector2, b: Vector2, state: String) -> void:
+	if OS.has_feature("ios") and not OS.has_feature("web") and not OS.has_feature("android"):
+		var segments: Array = parent.get_meta("bm_metro_segments", [])
+		segments.append(state)
+		parent.set_meta("bm_metro_segments", segments)
 	var segment_pts := _missions_build_curve_points([a, b])
+	if _bm_ios_missions_landscape():
+		var mid_y := (a.y + b.y) * 0.5
+		segment_pts = PackedVector2Array([a, Vector2(a.x + 50.0, mid_y - 12.0), Vector2(b.x - 50.0, mid_y + 12.0), b])
 	var glow_color := _missions_route_color(state)
 	glow_color.a = 0.24 if state != "locked" else 0.10
 	var glow := Line2D.new()
-	glow.width = 22.0
+	glow.width = 13.2 if _bm_ios_missions_landscape() else 22.0
 	glow.default_color = glow_color
 	glow.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	glow.end_cap_mode = Line2D.LINE_CAP_ROUND
@@ -5469,7 +5508,7 @@ func _missions_add_route_segment(parent: Control, a: Vector2, b: Vector2, state:
 	parent.add_child(glow)
 
 	var line := Line2D.new()
-	line.width = 10.0
+	line.width = 6.0 if _bm_ios_missions_landscape() else 10.0
 	line.default_color = _missions_route_color(state)
 	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	line.end_cap_mode = Line2D.LINE_CAP_ROUND
@@ -5573,6 +5612,10 @@ func _refresh_missions_panel() -> void:
 	_missions_update_tokens_counter(level_missions, save)
 
 	_missions_clear_canvas()
+
+	# BM_IOS_MISSIONS_LANDSCAPE_V1
+	# Recalcule seulement la présentation après chaque reconstruction.
+	call_deferred("_bm_layout_ios_missions_panel")
 	var holder := Control.new()
 	holder.layout_mode = 1
 	holder.anchors_preset = 15
@@ -5584,6 +5627,7 @@ func _refresh_missions_panel() -> void:
 	var preview_missions: Array = _missions_preview_missions(level, level_missions, current_idx)
 	var visual_missions_count := rendered_level_missions_count + preview_missions.size()
 	var pts: Array = _missions_build_points(visual_missions_count)
+	holder.set_meta("bm_metro_count", visual_missions_count)
 	for i in range(maxi(0, pts.size() - 1)):
 		var segment_state := "locked"
 		if current_idx >= level_missions.size() and i < level_missions.size() - 1:
@@ -5624,6 +5668,268 @@ func _refresh_missions_panel() -> void:
 		btn_claim_mission.disabled = true
 		btn_claim_mission.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+
+# BM_IOS_MISSIONS_LANDSCAPE_V1
+# Présentation alternative iOS paysage uniquement.
+# Aucune règle de mission, progression ou récompense n'est modifiée.
+func _bm_ios_missions_landscape() -> bool:
+	if not OS.has_feature("ios"):
+		return false
+	if OS.has_feature("web") or OS.has_feature("android"):
+		return false
+	var vp := get_viewport_rect().size
+	return vp.x > vp.y
+
+
+func _bm_queue_ios_missions_layout() -> void:
+	if missions_panel == null or not is_instance_valid(missions_panel):
+		return
+	if not missions_panel.visible:
+		return
+	call_deferred("_bm_layout_ios_missions_panel")
+
+
+func _bm_apply_ios_missions_back_scale() -> void:
+	if not OS.has_feature("ios") or OS.has_feature("web") or OS.has_feature("android"):
+		return
+	if btn_retour == null:
+		return
+	if _bm_ios_missions_landscape() and missions_panel != null and missions_panel.visible:
+		# Scale fixe : fond, texte et hitbox réduits ensemble, sans cumul.
+		btn_retour.scale = Vector2(0.9, 0.9)
+		btn_retour.set_meta("bm_ios_missions_back_scaled", true)
+	elif btn_retour.has_meta("bm_ios_missions_back_scaled"):
+		btn_retour.scale = Vector2.ONE
+		btn_retour.remove_meta("bm_ios_missions_back_scaled")
+
+
+func _bm_restore_ios_missions_card_style() -> void:
+	if missions_card == null or not missions_card.has_meta("bm_ios_missions_card_style"):
+		return
+	var saved: Dictionary = missions_card.get_meta("bm_ios_missions_card_style")
+	if saved["overridden"]:
+		missions_card.add_theme_stylebox_override("panel", saved["style"])
+	else:
+		missions_card.remove_theme_stylebox_override("panel")
+	missions_card.remove_meta("bm_ios_missions_card_style")
+
+
+func _bm_restore_ios_missions_layout() -> void:
+	_bm_restore_ios_missions_card_style()
+	if missions_panel == null or missions_card == null:
+		return
+
+	if metro_canvas.has_meta("bm_metro_original"):
+		var geometry: Dictionary = metro_canvas.get_meta("bm_metro_original")
+		for property in geometry:
+			metro_canvas.set(property, geometry[property])
+	_bm_rebuild_ios_metro_geometry()
+
+	if metro_canvas != null:
+		metro_canvas.visible = true
+
+	if not missions_panel.has_meta("bm_ios_missions_original"):
+		return
+
+	var original: Dictionary = missions_panel.get_meta("bm_ios_missions_original")
+	var counter := missions_card.get_node_or_null("MissionsTokensCounter") as Control
+	if counter != null and counter.has_meta("bm_ios_missions_counter_original"):
+		var saved: Dictionary = counter.get_meta("bm_ios_missions_counter_original")
+		for property in saved:
+			counter.set(property, saved[property])
+		(counter.get_node("LblMissionsTokensCounter") as Label).add_theme_font_size_override("font_size", 30)
+		var icon := counter.get_node("ImgMissionsTokensCounter") as TextureRect
+		icon.custom_minimum_size = Vector2(41.4, 41.4)
+		icon.size = Vector2(41.4, 41.4)
+
+
+	missions_card.position = original["card_position"]
+	missions_card.size = original["card_size"]
+	missions_card.custom_minimum_size = original["card_minimum"]
+
+	if lbl_missions_title != null:
+		lbl_missions_title.position = original["title_position"]
+		lbl_missions_title.size = original["title_size"]
+		lbl_missions_title.add_theme_font_size_override(
+			"font_size",
+			int(original["title_font"])
+		)
+
+	if lbl_missions_level != null:
+		lbl_missions_level.vertical_alignment = int(original["level_vertical_alignment"])
+		lbl_missions_level.position = original["level_position"]
+		lbl_missions_level.size = original["level_size"]
+		lbl_missions_level.add_theme_font_size_override(
+			"font_size",
+			int(original["level_font"])
+		)
+
+	if btn_close_missions != null:
+		btn_close_missions.visible = bool(original["close_visible"])
+
+
+func _bm_layout_ios_missions_panel() -> void:
+	if missions_panel == null or missions_card == null:
+		return
+
+	if not OS.has_feature("ios") or OS.has_feature("web") or OS.has_feature("android"):
+		return
+
+	if not missions_panel.has_meta("bm_ios_missions_original"):
+		missions_panel.set_meta("bm_ios_missions_original", {
+			"card_position": missions_card.position,
+			"card_size": missions_card.size,
+			"card_minimum": missions_card.custom_minimum_size,
+			"title_position": (
+				lbl_missions_title.position
+				if lbl_missions_title != null
+				else Vector2.ZERO
+			),
+			"title_size": (
+				lbl_missions_title.size
+				if lbl_missions_title != null
+				else Vector2.ZERO
+			),
+			"title_font": (
+				lbl_missions_title.get_theme_font_size("font_size")
+				if lbl_missions_title != null
+				else 40
+			),
+			"level_vertical_alignment": lbl_missions_level.vertical_alignment if lbl_missions_level != null else VERTICAL_ALIGNMENT_TOP,
+			"level_position": (
+				lbl_missions_level.position
+				if lbl_missions_level != null
+				else Vector2.ZERO
+			),
+			"level_size": (
+				lbl_missions_level.size
+				if lbl_missions_level != null
+				else Vector2.ZERO
+			),
+			"level_font": (
+				lbl_missions_level.get_theme_font_size("font_size")
+				if lbl_missions_level != null
+				else 28
+			),
+			"close_visible": (
+				btn_close_missions.visible
+				if btn_close_missions != null
+				else true
+			),
+		})
+
+	_bm_apply_early_tabs_visibility()
+	_bm_apply_ios_missions_back_scale()
+	if not _bm_ios_missions_landscape() or not missions_panel.visible:
+		_bm_restore_ios_missions_layout()
+		return
+
+	if not missions_card.has_meta("bm_ios_missions_card_style"):
+		missions_card.set_meta("bm_ios_missions_card_style", {"overridden": missions_card.has_theme_stylebox_override("panel"), "style": missions_card.get_theme_stylebox("panel")})
+		missions_card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+
+	var vp := get_viewport_rect().size
+
+	# 844x390 :
+	# gauche réservé à la navigation ;
+	# droite réservée au HUD ;
+	# Missions utilise la zone centrale.
+	var card_w := minf(366.0, vp.x - 290.0)
+	var card_h := minf(311.0, vp.y - 16.0)
+
+	card_w = maxf(card_w, 330.0)
+	card_h = maxf(card_h, 270.0)
+
+	var available_left := 150.0
+	var available_right := vp.x - 150.0
+	var card_x := (
+		available_left
+		+ (available_right - available_left - card_w) * 0.5
+	)
+
+	missions_card.custom_minimum_size = Vector2(card_w, card_h)
+	missions_card.size = Vector2(card_w, card_h)
+	missions_card.position = Vector2(card_x, 8.0)
+
+	if lbl_missions_title != null:
+		# Réserve symétrique : marge droite + compteur réduit + espace de 8 unités.
+		var title_side := 12.0 + 138.0 * 0.7225 + 8.0
+		lbl_missions_title.add_theme_font_size_override("font_size", 24)
+		lbl_missions_title.get_minimum_size()
+		lbl_missions_title.position = Vector2(title_side, 8.0)
+		lbl_missions_title.size = Vector2(card_w - 2.0 * title_side, 55.0)
+		lbl_missions_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	if lbl_missions_level != null:
+		lbl_missions_level.add_theme_font_size_override("font_size", 17)
+		lbl_missions_level.get_minimum_size()
+		lbl_missions_level.position = Vector2(8.0, lbl_missions_title.position.y)
+		lbl_missions_level.size = Vector2(90.0, lbl_missions_title.size.y)
+		lbl_missions_level.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		lbl_missions_level.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	var token_counter := missions_card.get_node_or_null(
+		"MissionsTokensCounter"
+	) as Control
+
+	if token_counter != null:
+		if not token_counter.has_meta("bm_ios_missions_counter_original"):
+			var saved: Dictionary = {}
+			for property in ["anchor_left", "anchor_right", "anchor_top", "anchor_bottom", "offset_left", "offset_right", "offset_top", "offset_bottom", "scale", "pivot_offset"]:
+				saved[property] = token_counter.get(property)
+			token_counter.set_meta("bm_ios_missions_counter_original", saved)
+		var counter_label := token_counter.get_node("LblMissionsTokensCounter") as Label
+		counter_label.add_theme_font_size_override("font_size", 28)
+		token_counter.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		token_counter.position = Vector2(card_w - 150.0, 8.0)
+		token_counter.size = Vector2(138.0, lbl_missions_title.size.y)
+		# Réduction exacte, ancrée au bord droit et au centre vertical.
+		token_counter.pivot_offset = Vector2(token_counter.size.x, token_counter.size.y * 0.5)
+		token_counter.scale = Vector2(0.7225, 0.7225)
+		# Même taille affichée que les tokens de cartes, après le scale du compteur.
+		var token_icon := token_counter.get_node("ImgMissionsTokensCounter") as TextureRect
+		var icon_size := Vector2(24.0, 24.0) / token_counter.scale
+		token_icon.custom_minimum_size = icon_size
+		token_icon.size = icon_size
+
+
+	# Parcours complet dans la largeur libre avant le HUD, sans modifier la card.
+	if btn_close_missions != null:
+		btn_close_missions.visible = false
+	if not metro_canvas.has_meta("bm_metro_original"):
+		metro_canvas.set_meta("bm_metro_original", {"position": metro_canvas.position, "size": metro_canvas.size, "custom_minimum_size": metro_canvas.custom_minimum_size})
+	metro_canvas.visible = true
+	metro_canvas.custom_minimum_size = Vector2.ZERO
+	metro_canvas.size = Vector2(vp.x - 172.0, 192.0)
+	metro_canvas.global_position = Vector2(14.0, 90.0 - 20.0 / 1.15)
+	_bm_rebuild_ios_metro_geometry()
+
+
+func _bm_rebuild_ios_metro_geometry() -> void:
+	# Rotation seulement : rejoue les appels de rendu, sans recalculer les états métier.
+	if metro_canvas == null:
+		return
+	for old_holder in metro_canvas.get_children():
+		if old_holder.is_queued_for_deletion() or not old_holder.has_meta("bm_metro_stations"):
+			continue
+		if bool(old_holder.get_meta("bm_metro_landscape")) == _bm_ios_missions_landscape() and is_equal_approx(float(old_holder.get_meta("bm_metro_width")), get_viewport_rect().size.x):
+			continue
+		var stations: Array = old_holder.get_meta("bm_metro_stations")
+		var segments: Array = old_holder.get_meta("bm_metro_segments", [])
+		var holder := Control.new()
+		holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		metro_canvas.add_child(holder)
+		holder.set_meta("bm_metro_count", stations.size())
+		var points := _missions_build_points(stations.size())
+		for i in range(segments.size()):
+			_missions_add_route_segment(holder, points[i], points[i + 1], segments[i])
+		for i in range(stations.size()):
+			var station: Dictionary = stations[i]
+			_missions_make_station(holder, points[i], station["mission"], station["state"], station["idx"])
+		metro_canvas.remove_child(old_holder)
+		old_holder.queue_free()
+
+
 func _show_missions_panel() -> void:
 	if missions_panel != null:
 		# BM_MISSIONS_HIDE_PLAY_BUTTON_V1
@@ -5639,12 +5945,21 @@ func _show_missions_panel() -> void:
 
 		missions_panel.visible = true
 		missions_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		if OS.has_feature("ios") and not OS.has_feature("web") and not OS.has_feature("android"):
+			var viewport := get_viewport()
+			if not viewport.size_changed.is_connected(_bm_queue_ios_missions_layout):
+				viewport.size_changed.connect(_bm_queue_ios_missions_layout)
+
 		_refresh_missions_panel()
 
 func _hide_missions_panel() -> void:
+	_bm_restore_ios_missions_card_style()
 	if missions_panel != null:
 		missions_panel.visible = false
 		missions_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if OS.has_feature("ios") and not OS.has_feature("web") and not OS.has_feature("android"):
+		_bm_apply_early_tabs_visibility()
+		_bm_apply_ios_missions_back_scale()
 
 	# BM_MISSIONS_HIDE_PLAY_BUTTON_V1
 	# Restaure uniquement l'UI Saison masquée par l'écran Missions.
@@ -6489,6 +6804,7 @@ func _bm_saison_apply_mobile_landscape_deterministic_layout() -> void:
 
 	# Un seul écrivain de X, avant révélation.
 	_bm_saison_finalize_landscape_centering()
+	_bm_apply_ios_missions_back_scale()
 
 
 func _bm_saison_apply_mobile_hud_layout() -> void:
