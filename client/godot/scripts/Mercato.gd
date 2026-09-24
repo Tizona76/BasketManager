@@ -983,6 +983,7 @@ func _bm_show_player_graph_tooltip(card: Control, anchor: Control, text_value: S
 	var desired := Vector2(anchor.position.x, -tooltip.size.y - 8.0)
 	var max_x: float = max(0.0, card.size.x - tooltip.size.x - 12.0)
 	tooltip.position = Vector2(clampf(desired.x, 12.0, max_x), desired.y)
+	preload("res://scripts/IosPlayerCardLayout.gd").contain_tooltip(card, tooltip)
 	tooltip.visible = true
 	card.move_child(tooltip, card.get_child_count() - 1)
 
@@ -1071,6 +1072,7 @@ func _bm_show_player_card_popup(data: Dictionary) -> void:
 	card.add_theme_stylebox_override("panel", sb)
 	popup.add_child(card)
 
+	var labels: Dictionary = {}
 	var avatar_path := _mercato_avatar_texture_path(data)
 	var avatar_big := TextureRect.new()
 	avatar_big.position = Vector2(34, 82)
@@ -1083,7 +1085,7 @@ func _bm_show_player_card_popup(data: Dictionary) -> void:
 	card.add_child(avatar_big)
 	_bm_add_player_profile_graph(card, data)
 
-	_bm_player_card_add_label(card, _player_name(data), Vector2(24, 278), Vector2(210, 44), 34, Color(1, 1, 1, 1), true)
+	labels["name"] = _bm_player_card_add_label(card, _player_name(data), Vector2(24, 278), Vector2(210, 44), 34, Color(1, 1, 1, 1), true)
 
 	var badge := Panel.new()
 	badge.position = Vector2(34, 326)
@@ -1098,11 +1100,11 @@ func _bm_show_player_card_popup(data: Dictionary) -> void:
 	card.add_child(badge)
 	_bm_player_card_add_label(badge, _tr_poste(_player_poste(data)), Vector2(12, 2), Vector2(186, 30), 18, Color(1, 1, 1, 1), true)
 
-	_bm_player_card_add_label(card, _tr_any(["player.card.age"], "Age") + " : " + str(int(data.get("age", 0))), Vector2(254, 130), Vector2(210, 28), 20, Color(0.92, 0.95, 1.0, 1.0))
-	_bm_player_card_add_label(card, _tr_any(["player.card.salary"], "Salary") + " : " + _player_salary_text(data), Vector2(254, 160), Vector2(300, 28), 20, Color(0.92, 0.95, 1.0, 1.0))
+	labels["age"] = _bm_player_card_add_label(card, _tr_any(["player.card.age"], "Age") + " : " + str(int(data.get("age", 0))), Vector2(254, 130), Vector2(210, 28), 20, Color(0.92, 0.95, 1.0, 1.0))
+	labels["salary"] = _bm_player_card_add_label(card, _tr_any(["player.card.salary"], "Salary") + " : " + _player_salary_text(data), Vector2(254, 160), Vector2(300, 28), 20, Color(0.92, 0.95, 1.0, 1.0))
 	var rating := _player_perf(data)
 	if rating > 0:
-		_bm_player_card_add_label(card, _tr_any(["player.card.rating"], "Rating") + " : " + str(rating), Vector2(254, 100), Vector2(260, 30), 22, Color(1.0, 0.78, 0.22, 1.0))
+		labels["rating"] = _bm_player_card_add_label(card, _tr_any(["player.card.rating"], "Rating") + " : " + str(rating), Vector2(254, 100), Vector2(260, 30), 22, Color(1.0, 0.78, 0.22, 1.0))
 
 	var stats := VBoxContainer.new()
 	stats.position = Vector2(254, 230)
@@ -1123,7 +1125,7 @@ func _bm_show_player_card_popup(data: Dictionary) -> void:
 		_bm_player_card_add_stat(stats, _tr_any(["player.card.endurance"], "Endurance"), data.get("endurance"))
 
 	if bool(data.get("blessure", false)):
-		_bm_player_card_add_label(card, _tr_any(["player.card.injured"], "Injured"), Vector2(34, 292), Vector2(190, 30), 20, Color(1.0, 0.35, 0.35, 1.0), true)
+		labels["injured"] = _bm_player_card_add_label(card, _tr_any(["player.card.injured"], "Injured"), Vector2(34, 292), Vector2(190, 30), 20, Color(1.0, 0.35, 0.35, 1.0), true)
 
 	var btn_close := Button.new()
 	btn_close.text = "X"
@@ -1132,6 +1134,10 @@ func _bm_show_player_card_popup(data: Dictionary) -> void:
 	btn_close.add_theme_font_size_override("font_size", 18)
 	btn_close.pressed.connect(_bm_player_card_close)
 	card.add_child(btn_close)
+	if OS.has_feature("ios"):
+		var layout := preload("res://scripts/IosPlayerCardLayout.gd").new()
+		layout.configure(card, avatar_big, badge, stats, btn_close, labels)
+		card.add_child(layout)
 	_ios_market_queue_layout()
 
 
@@ -1479,10 +1485,3 @@ func _ios_market_layout() -> void:
 		for wrap in rows.get_children():
 			if not wrap.is_queued_for_deletion():
 				_ios_market_set(wrap.get_child(0).get_child(i), {"custom_minimum_size": Vector2(widths[i], 0)})
-
-	var card := get_node_or_null("PlayerCardPopup/PlayerCard") as Control
-	if card != null:
-		var factor := minf(1.0, minf((vp.x - 24.0) / 792.0, (vp.y - 24.0) / 430.0))
-		_ios_market_set(card, {"scale": Vector2.ONE * factor, "position": (vp - card.size * factor) * 0.5})
-		var close := card.get_child(card.get_child_count() - 1) as Button
-		_ios_market_set(close, {"size": Vector2.ONE * (44.0 / factor), "position": Vector2(792.0 - 44.0 / factor - 8.0, 8.0)})

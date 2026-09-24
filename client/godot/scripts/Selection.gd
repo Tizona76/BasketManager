@@ -1433,6 +1433,7 @@ func _bm_show_player_graph_tooltip(card: Control, anchor: Control, text_value: S
 	var desired := Vector2(anchor.position.x, -tooltip.size.y - 8.0)
 	var max_x: float = max(0.0, card.size.x - tooltip.size.x - 12.0)
 	tooltip.position = Vector2(clampf(desired.x, 12.0, max_x), desired.y)
+	preload("res://scripts/IosPlayerCardLayout.gd").contain_tooltip(card, tooltip)
 	tooltip.visible = true
 	card.move_child(tooltip, card.get_child_count() - 1)
 
@@ -1521,6 +1522,7 @@ func _bm_show_player_card_popup(data: Dictionary) -> void:
 	card.add_theme_stylebox_override("panel", sb)
 	popup.add_child(card)
 
+	var labels: Dictionary = {}
 	var avatar_path := str(data.get("avatar_path", ""))
 	var avatar_big := TextureRect.new()
 	avatar_big.position = Vector2(34, 82)
@@ -1533,7 +1535,7 @@ func _bm_show_player_card_popup(data: Dictionary) -> void:
 	card.add_child(avatar_big)
 	_bm_add_player_profile_graph(card, data)
 
-	_bm_player_card_add_label(card, str(data.get("nom", data.get("name", ""))), Vector2(24, 278), Vector2(210, 44), 34, Color(1, 1, 1, 1), true)
+	labels["name"] = _bm_player_card_add_label(card, str(data.get("nom", data.get("name", ""))), Vector2(24, 278), Vector2(210, 44), 34, Color(1, 1, 1, 1), true)
 
 	var badge := Panel.new()
 	badge.position = Vector2(34, 326)
@@ -1548,11 +1550,11 @@ func _bm_show_player_card_popup(data: Dictionary) -> void:
 	card.add_child(badge)
 	_bm_player_card_add_label(badge, _bm_player_card_position_text(str(data.get("poste", data.get("pos", "")))), Vector2(12, 2), Vector2(186, 30), 18, Color(1, 1, 1, 1), true)
 
-	_bm_player_card_add_label(card, _bm_player_card_tr("player.card.age", "Age") + " : " + str(int(float(data.get("age", 0)))), Vector2(254, 130), Vector2(210, 28), 20, Color(0.92, 0.95, 1.0, 1.0))
-	_bm_player_card_add_label(card, _bm_player_card_tr("player.card.salary", "Salary") + " : " + _bm_player_card_salary(int(data.get("salaire", data.get("salary", 0)))), Vector2(254, 160), Vector2(300, 28), 20, Color(0.92, 0.95, 1.0, 1.0))
+	labels["age"] = _bm_player_card_add_label(card, _bm_player_card_tr("player.card.age", "Age") + " : " + str(int(float(data.get("age", 0)))), Vector2(254, 130), Vector2(210, 28), 20, Color(0.92, 0.95, 1.0, 1.0))
+	labels["salary"] = _bm_player_card_add_label(card, _bm_player_card_tr("player.card.salary", "Salary") + " : " + _bm_player_card_salary(int(data.get("salaire", data.get("salary", 0)))), Vector2(254, 160), Vector2(300, 28), 20, Color(0.92, 0.95, 1.0, 1.0))
 	if data.has("pondération") or data.has("ponderation") or data.has("stars"):
 		var rating := str(data.get("pondération", data.get("ponderation", data.get("stars", ""))))
-		_bm_player_card_add_label(card, _bm_player_card_tr("player.card.rating", "Rating") + " : " + rating, Vector2(254, 100), Vector2(260, 30), 22, Color(1.0, 0.78, 0.22, 1.0))
+		labels["rating"] = _bm_player_card_add_label(card, _bm_player_card_tr("player.card.rating", "Rating") + " : " + rating, Vector2(254, 100), Vector2(260, 30), 22, Color(1.0, 0.78, 0.22, 1.0))
 
 	var stats := VBoxContainer.new()
 	stats.position = Vector2(254, 230)
@@ -1573,7 +1575,7 @@ func _bm_show_player_card_popup(data: Dictionary) -> void:
 		_bm_player_card_add_stat(stats, _bm_player_card_tr("player.card.endurance", "Endurance"), data.get("endurance"))
 
 	if bool(data.get("blessure", false)):
-		_bm_player_card_add_label(card, _bm_player_card_tr("player.card.injured", "Injured"), Vector2(34, 292), Vector2(190, 30), 20, Color(1.0, 0.35, 0.35, 1.0), true)
+		labels["injured"] = _bm_player_card_add_label(card, _bm_player_card_tr("player.card.injured", "Injured"), Vector2(34, 292), Vector2(190, 30), 20, Color(1.0, 0.35, 0.35, 1.0), true)
 
 	var btn_close := Button.new()
 	btn_close.text = "X"
@@ -1585,6 +1587,10 @@ func _bm_show_player_card_popup(data: Dictionary) -> void:
 	btn_close.add_theme_font_size_override("font_size", 18)
 	btn_close.pressed.connect(_bm_player_card_close)
 	card.add_child(btn_close)
+	if OS.has_feature("ios"):
+		var layout := preload("res://scripts/IosPlayerCardLayout.gd").new()
+		layout.configure(card, avatar_big, badge, stats, btn_close, labels)
+		card.add_child(layout)
 
 
 func _update_ui() -> void:
