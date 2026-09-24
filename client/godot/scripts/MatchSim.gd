@@ -177,6 +177,26 @@ func _bm_style_btn_skip_final_result_active() -> void:
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	capsule.add_child(icon)
+	_bm_place_ios_final_result_button()
+
+
+func _bm_place_ios_final_result_button() -> void:
+	var vp := get_viewport_rect().size
+	if not OS.has_feature("ios") or OS.has_feature("web") or vp.x <= vp.y:
+		return
+	if btn_skip == null or btn_skip.get_node_or_null("VisualUnlockCapsule") == null:
+		return
+	# Scale the complete button, including its text, capsule and shadow.
+	btn_skip.add_theme_font_size_override("font_size", 24)
+	btn_skip.custom_minimum_size = Vector2(215.0, 84.0)
+	btn_skip.size = btn_skip.custom_minimum_size
+	btn_skip.scale = Vector2(0.9, 0.9)
+	var visual_size := btn_skip.size * btn_skip.scale
+	# Keep 10 screen pixels below the active shadow (14 + 5 local pixels).
+	var bottom_margin := 10.0 / btn_skip.get_viewport_transform().y.length()
+	var shadow_bottom := (14.0 + 5.0) * btn_skip.scale.y
+	btn_skip.position = Vector2((vp.x - visual_size.x) * 0.5,
+		minf(vp.y - 64.0, vp.y - visual_size.y - shadow_bottom - bottom_margin))
 
 
 func _bm_style_btn_skip_final_result_clicked() -> void:
@@ -890,6 +910,7 @@ func _bm_matchsim_apply_mobile_landscape_layout(probe_stage: String = "landscape
 		)
 	_bm_layout_match_context()
 	_bm_scoreboard_probe(probe_stage)
+	_bm_place_ios_final_result_button()
 
 
 func _bm_context_is_native_landscape() -> bool:
@@ -902,7 +923,11 @@ func _bm_context_safe_rect() -> Rect2:
 	var top := scoreboard_panel.get_global_rect().end.y + gap
 	var bottom := btn_retour.get_global_rect().position.y - gap
 	if btn_skip != null and btn_skip.visible:
-		bottom = minf(bottom, btn_skip.get_global_rect().position.y - gap)
+		var skip_top := btn_skip.get_global_rect().position.y
+		if OS.has_feature("ios") and _bm_context_is_native_landscape():
+			# Preserve the context layout independently of the button's visual lift.
+			skip_top = get_viewport_rect().size.y - 64.0
+		bottom = minf(bottom, skip_top - gap)
 	return Rect2(52.0, top, get_viewport_rect().size.x - 104.0, maxf(0.0, bottom - top))
 
 
@@ -4115,6 +4140,8 @@ func _fin_match() -> void:
 	if match_fini:
 		return
 	match_fini = true
+	if btn_skip != null:
+		btn_skip.visible = false
 	_live_comment_token += 1
 	_live_comment_clear_minute = -1
 	if lbl_info != null:
