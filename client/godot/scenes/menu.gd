@@ -4199,8 +4199,16 @@ func _show_save_choice_popup() -> void:
 	btn_cloud.mouse_entered.connect(func(): save_tip.text = _tr_safe("menu.save_choice.cloud_tip"))
 	btn_cloud.mouse_exited.connect(func(): save_tip.text = "")
 	btn_cloud.pressed.connect(func():
-		popup.queue_free()
-		_save_to_cloud_from_choice()
+		if popup.has_meta("cloud_pending"):
+			return
+		if OS.has_feature("ios") and str(Session.access_token).strip_edges().length() >= 20:
+			if _inflight != "":
+				save_tip.text = "Cloud request in progress…"
+				return
+			_bm_save_choice_wait_for_cloud(popup, btn_cloud, save_tip)
+		else:
+			popup.queue_free()
+			_save_to_cloud_from_choice()
 	)
 	card.add_child(btn_cloud)
 
@@ -4217,6 +4225,52 @@ func _show_save_choice_popup() -> void:
 	card.add_child(btn_cancel)
 
 	_show_save_ok()
+
+
+func _bm_save_choice_wait_for_cloud(popup: Control, button: Button, tip: Label) -> void:
+	popup.set_meta("cloud_pending", true)
+	button.disabled = true
+	# Keep the existing hover tooltip separate from the request feedback.
+	var feedback := tip.get_parent().get_node_or_null("CloudSaveFeedback") as Label
+	if feedback == null:
+		feedback = Label.new()
+		feedback.name = "CloudSaveFeedback"
+		tip.get_parent().add_child(feedback)
+	feedback.position = tip.position
+	feedback.size = tip.size
+	feedback.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	feedback.add_theme_font_size_override("font_size", 18)
+	feedback.text = "Saving to cloud…"
+	tip.hide()
+
+	var completed := func(result: int, code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
+		if not is_instance_valid(popup):
+			return
+		var success := result == OK and code >= 200 and code < 300
+		feedback.text = Status.text if Status != null else ("Cloud synced ✅" if success else "Cloud save failed")
+		if success:
+			get_tree().create_timer(1.6).timeout.connect(func():
+				if is_instance_valid(popup):
+					popup.queue_free()
+			)
+		else:
+			popup.remove_meta("cloud_pending")
+			button.disabled = false
+	Http.request_completed.connect(completed, CONNECT_ONE_SHOT)
+	popup.tree_exiting.connect(func():
+		if Http.request_completed.is_connected(completed):
+			Http.request_completed.disconnect(completed)
+	)
+	_save_to_cloud_from_choice()
+	# The existing deferred upload runs first; detect validation/request() failures.
+	(func():
+		if is_instance_valid(popup) and _inflight != "save" and Http.request_completed.is_connected(completed):
+			Http.request_completed.disconnect(completed)
+			feedback.text = Status.text if Status != null else "Cloud save could not start"
+			popup.remove_meta("cloud_pending")
+			button.disabled = false
+	).call_deferred()
 
 
 func _show_save_ok() -> void:
