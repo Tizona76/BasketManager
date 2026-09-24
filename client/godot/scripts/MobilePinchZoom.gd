@@ -106,8 +106,8 @@ func _touch_starts_in_lineup_scroll(point: Vector2) -> bool:
 	var scene := get_tree().current_scene
 	if scene == null:
 		return false
-	for node_name in ["RosterScroll", "LineupSummaryScroll", "ClubTokensHistoryScroll", "ClubIdentityLevelScroller", "HomeArenaScroll", "TournamentBracketScroll", "ScrollCoachs", "MercatoTableScroll"]:
-		if node_name == "ScrollCoachs" and get_viewport().get_visible_rect().size.x <= get_viewport().get_visible_rect().size.y:
+	for node_name in ["RosterScroll", "LineupSummaryScroll", "ClubTokensHistoryScroll", "ClubIdentityLevelScroller", "HomeArenaScroll", "TournamentBracketScroll", "ScrollCoachs", "MercatoTableScroll", "StandingsScroll"]:
+		if node_name in ["ScrollCoachs", "StandingsScroll"] and get_viewport().get_visible_rect().size.x <= get_viewport().get_visible_rect().size.y:
 			continue
 		for candidate in scene.find_children(node_name, "ScrollContainer", true, false):
 			var scroll := candidate as ScrollContainer

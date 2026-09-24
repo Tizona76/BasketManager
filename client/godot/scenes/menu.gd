@@ -3878,6 +3878,26 @@ func _bm_wr_render_table(rows: Array) -> void:
 		_bm_wr_root.add_child(grid)
 
 
+	if OS.has_feature("ios") and get_viewport_rect().size.x > get_viewport_rect().size.y:
+		grid.resized.connect(_bm_wr_layout_ios_columns.bind(grid))
+		_bm_wr_layout_ios_columns(grid)
+
+
+func _bm_wr_layout_ios_columns(grid: GridContainer) -> void:
+	var available := grid.size.x - grid.get_theme_constant("h_separation") * 4
+	if available <= 0.0:
+		return
+	var weights := [0.08, 0.34, 0.20, 0.19, 0.19]
+	for i in range(grid.get_child_count()):
+		var cell := grid.get_child(i) as Label
+		cell.size_flags_horizontal = Control.SIZE_FILL
+		cell.custom_minimum_size.x = floorf(available * weights[i % 5])
+		cell.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		if i % 5 == 1:
+			cell.clip_text = false
+			cell.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+
 # BM_RANKING_FETCH_V1 ---------------------------------------------------
 const PATH_LB_TOP := "/v1/leaderboard/season/top"
 const PATH_LB_SUBMIT := "/v1/leaderboard/season/submit"
