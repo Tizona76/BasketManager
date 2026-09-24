@@ -132,6 +132,7 @@ func _show_login_explainer_popup() -> void:
 	popup.mouse_filter = Control.MOUSE_FILTER_STOP
 	popup.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
 	add_child(popup)
+	$UI.hide()
 
 	var card := Panel.new()
 	card.name = "LoginExplainerCard"
@@ -202,7 +203,9 @@ func _show_login_explainer_popup() -> void:
 	ok_btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
 	ok_btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
 	ok_btn.pressed.connect(func() -> void:
+		popup.hide()
 		popup.queue_free()
+		$UI.show()
 	)
 	card.add_child(ok_btn)
 
@@ -275,12 +278,13 @@ func _ready() -> void:
 	_apply_login_modern_styles()
 	_apply_login_label_font_sizes()
 	_apply_login_i18n_texts()
+	_setup_login_controls()
 	_play_login_intro()
 	_play_login_ball_float()
 	call_deferred("_show_login_explainer_popup")
 	_apply_i18n()
 	print("[LOGIN_READY] script=", get_script().resource_path, " node=", name)
-	status.text = "Status: idle"
+	_set_login_status("login.status.idle")
 	btn_send.pressed.connect(_on_send)
 	btn_val.pressed.connect(_on_validate)
 	btn_cancel.pressed.connect(_on_cancel)
@@ -312,10 +316,10 @@ func _on_send() -> void:
 
 	var e := email.text.strip_edges()
 	if e == "":
-		status.text = "Status: email requis"
+		_set_login_status("login.status.email_required")
 		return
 
-	status.text = "Status: envoi code..."
+	_set_login_status("login.status.sending")
 	btn_send.disabled = true
 	btn_val.disabled = true
 
@@ -333,13 +337,13 @@ func _on_validate() -> void:
 	var c := code.text.strip_edges()
 
 	if e == "":
-		status.text = "Status: email requis"
+		_set_login_status("login.status.email_required")
 		return
 	if c == "":
-		status.text = "Status: code requis"
+		_set_login_status("login.status.code_required")
 		return
 
-	status.text = "Status: validation..."
+	_set_login_status("login.status.validating")
 	btn_send.disabled = true
 	btn_val.disabled = true
 
@@ -358,7 +362,7 @@ func _http_post_json(url: String, payload: Dictionary) -> void:
 	print("[HTTP] request() err=", err)
 
 	if err != OK:
-		status.text = "Status: HTTP request() error = " + str(err)
+		_set_login_status("login.status.request_error", {"code": err})
 		btn_send.disabled = false
 		btn_val.disabled = false
 		_pending_action = ""
@@ -378,17 +382,12 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 	print("[HTTP] result=", result, " code=", response_code, " body=", txt)
 
 	if response_code < 200 or response_code >= 300:
-		var msg := "Status: erreur HTTP " + str(response_code)
-		if data.has("detail"):
-			msg += " (" + str(data["detail"]) + ")"
-		if data.has("error"):
-			msg += " (" + str(data["error"]) + ")"
-		status.text = msg
+		_set_login_status("login.status.request_error" if response_code == 0 else _login_error_key(data), {"code": response_code})
 		_pending_action = ""
 		return
 
 	if _pending_action == "start":
-		status.text = "Status: code envoyé"
+		_set_login_status("login.status.sent")
 		_pending_action = ""
 		return
 
@@ -406,7 +405,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		var tt := "Bearer"  # normalise : l'API renvoie "bearer" mais le backend attend "Bearer"
 
 		if at == "":
-			status.text = "Status: connecté mais token manquant (API)"
+			_set_login_status("login.status.missing_token")
 			print("[AUTH] ERROR: missing access_token in response:", data)
 			_pending_action = ""
 			return
@@ -425,7 +424,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		# persistance locale
 		_save_session_local()
 
-		status.text = "Status: connecté ✅"
+		_set_login_status("login.status.connected")
 		_pending_action = ""
 
 		print("[DBG][SESSION_MARK]", Session.SESSION_MARK)
@@ -457,3 +456,71 @@ func _save_session_local() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSLATION_CHANGED:
 		_apply_i18n()
+		call_deferred("_refresh_login_status")
+
+
+var _status_key := ""
+var _status_values: Dictionary = {}
+var _code_eye: TextureButton
+
+func _set_login_status(key: String, values: Dictionary = {}) -> void:
+	_status_key = key
+	_status_values = values
+	status.set_meta("i18n_key", key)
+	_refresh_login_status()
+
+func _refresh_login_status() -> void:
+	if is_instance_valid(status) and _status_key != "":
+		status.text = tr(_status_key).format(_status_values)
+
+func _login_error_key(data: Dictionary) -> String:
+	var errors: Variant = data.get("detail", [])
+	if errors is Array:
+		for error in errors:
+			if error is Dictionary and "email" in error.get("loc", []):
+				return "login.status.email_invalid"
+	match str(data.get("detail", data.get("error", ""))):
+		"OTP_NOT_FOUND": return "login.status.code_not_found"
+		"OTP_EXPIRED": return "login.status.code_expired"
+		"OTP_LOCKED": return "login.status.code_locked"
+		"OTP_INVALID": return "login.status.code_invalid"
+	return "login.status.http_error"
+
+func _setup_login_controls() -> void:
+	var ui := btn_send.get_parent()
+	var send_index := btn_send.get_index()
+	var send_row := HBoxContainer.new()
+	send_row.name = "SendCodeRow"
+	send_row.add_theme_constant_override("separation", 12)
+	ui.add_child(send_row)
+	ui.move_child(send_row, send_index)
+	btn_send.reparent(send_row)
+	status.reparent(send_row)
+	status.custom_minimum_size = Vector2(180, 0)
+	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	var code_index := code.get_index()
+	var code_row := HBoxContainer.new()
+	code_row.name = "CodeRow"
+	code_row.add_theme_constant_override("separation", 8)
+	ui.add_child(code_row)
+	ui.move_child(code_row, code_index)
+	code.reparent(code_row)
+	code.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	email.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_code_eye = TextureButton.new()
+	_code_eye.name = "CodeVisibility"
+	_code_eye.custom_minimum_size = Vector2(44, 44)
+	_code_eye.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_code_eye.ignore_texture_size = true
+	_code_eye.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	_code_eye.focus_mode = Control.FOCUS_NONE
+	_code_eye.texture_normal = load("res://assets/icons/eye-visible.svg")
+	_code_eye.pressed.connect(_toggle_code_visibility)
+	code_row.add_child(_code_eye)
+
+func _toggle_code_visibility() -> void:
+	code.secret = not code.secret
+	_code_eye.texture_normal = load("res://assets/icons/eye-visible.svg" if code.secret else "res://assets/icons/eye-hidden.svg")

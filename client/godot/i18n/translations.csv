@@ -770,3 +770,18 @@ missions.lv6.100pts_4,Marquer 100 points dans 4 matchs,Score 100 points in 4 gam
 missions.lv6.season_wins_7,Gagner 7 matchs de championnat cette saison,Win 7 league games this season,Ganar 7 partidos de liga esta temporada,Vincere 7 partite di campionato in questa stagione,Ganhar 7 jogos do campeonato nesta temporada
 missions.lv6.stadium_22,Atteindre le niveau de stade 2.2,Reach stadium level 2.2,Alcanzar el nivel 2.2 del estadio,Raggiungere il livello 2.2 dello stadio,Atingir o nível 2.2 do estádio
 missions.lv6.final_rank_4,Terminer la saison dans le Top 4,Finish the season in the Top 4,Terminar la temporada entre los 4 primeros,Concludere la stagione tra i primi 4,Terminar a temporada entre os 4 primeiros
+login.status.idle,Prêt,Ready,Listo,Pronto,Pronto
+login.status.email_required,Email requis,Email required,Email obligatorio,Email richiesta,E-mail obrigatório
+login.status.sending,Envoi du code…,Sending code…,Enviando código…,Invio del codice…,Enviando código…
+login.status.code_required,Code requis,Code required,Código obligatorio,Codice richiesto,Código obrigatório
+login.status.validating,Validation…,Validating…,Validando…,Verifica…,Validando…
+login.status.request_error,Erreur réseau ({code}),Network error ({code}),Error de red ({code}),Errore di rete ({code}),Erro de rede ({code})
+login.status.sent,Code envoyé,Code sent,Código enviado,Codice inviato,Código enviado
+login.status.missing_token,Jeton de connexion manquant,Login token missing,Falta el token de acceso,Token di accesso mancante,Token de acesso ausente
+login.status.connected,Connecté,Signed in,Sesión iniciada,Accesso effettuato,Sessão iniciada
+login.status.http_error,Échec de la demande ({code}),Request failed ({code}),Solicitud fallida ({code}),Richiesta non riuscita ({code}),Falha na solicitação ({code})
+login.status.code_not_found,Aucun code trouvé,No code found,No se encontró ningún código,Nessun codice trovato,Nenhum código encontrado
+login.status.code_expired,Code expiré,Code expired,Código caducado,Codice scaduto,Código expirado
+login.status.code_locked,Trop de tentatives,Too many attempts,Demasiados intentos,Troppi tentativi,Muitas tentativas
+login.status.code_invalid,Code incorrect,Invalid code,Código incorrecto,Codice non valido,Código inválido
+login.status.email_invalid,Email invalide,Invalid email,Email no válido,Email non valida,E-mail inválido
