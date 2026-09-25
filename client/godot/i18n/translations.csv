@@ -785,3 +785,5 @@ login.status.code_expired,Code expiré,Code expired,Código caducado,Codice scad
 login.status.code_locked,Trop de tentatives,Too many attempts,Demasiados intentos,Troppi tentativi,Muitas tentativas
 login.status.code_invalid,Code incorrect,Invalid code,Código incorrecto,Codice non valido,Código inválido
 login.status.email_invalid,Email invalide,Invalid email,Email no válido,Email non valida,E-mail inválido
+menu.save_choice.cloud_complete,Sauvegarde Cloud terminée.,Cloud save complete.,Guardado en la nube completado.,Salvataggio Cloud completato.,Salvamento na nuvem concluído.
+menu.save_choice.cloud_conflict,Conflit de sauvegarde Cloud. Votre sauvegarde locale est en sécurité.,Cloud save conflict. Your local save is safe.,Conflicto de guardado en la nube. Tu guardado local está a salvo.,Conflitto nel salvataggio Cloud. Il salvataggio locale è al sicuro.,Conflito no salvamento em nuvem. O salvamento local está seguro.
