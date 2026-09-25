@@ -132,6 +132,18 @@ var _bm_guest_auth_last_outcome: String = "not_started"
 
 
 func _ready() -> void:
+	if _return_to_career_picker:
+		# Restore only the navigation owner after a standalone sub-screen return.
+		# Keep the current profile, session, locale and autoloads untouched.
+		accueil_ps = load("res://scenes/Accueil.tscn")
+		menu_ps = load("res://scenes/Menu.tscn")
+		team_name_ps = load("res://scenes/TeamName.tscn")
+		login_ps = load("res://scenes/Login.tscn")
+		selection_ps = load("res://scenes/Selection.tscn")
+		_current_lang = TranslationServer.get_locale()
+		$UI.visible = false
+		_show_team_name()
+		return
 	_bm_guest_auth_main_ready_ms = Time.get_ticks_msec()
 	print("[BM_GUEST_AUTH_TIMING] event=main_ready time_ms=", _bm_guest_auth_main_ready_ms)
 	TranslationServer.set_locale("en")
@@ -635,6 +647,7 @@ func _on_stadium_action(action: String) -> void:
 
 
 var _menu_inst: Node = null
+var _return_to_career_picker := false
 
 
 func _save_session_local_from_main() -> void:
@@ -688,6 +701,8 @@ func _show_menu() -> void:
 		_menu_inst.go_match.connect(_on_menu_go_match)
 	if _menu_inst != null and _menu_inst.has_signal("go_my_team") and not _menu_inst.go_my_team.is_connected(_on_menu_go_my_team):
 		_menu_inst.go_my_team.connect(_on_menu_go_my_team)
+	if _menu_inst != null and _menu_inst.has_signal("go_back") and not _menu_inst.go_back.is_connected(_on_menu_go_back):
+		_menu_inst.go_back.connect(_on_menu_go_back)
 	screen_root.add_child(_menu_inst)
 	
 	
@@ -695,6 +710,27 @@ func _show_menu() -> void:
 	if accueil_ps == null:
 		push_error("[MAIN] accueil_ps is null")
 		return
+
+func _on_menu_go_back() -> void:
+	call_deferred("_show_team_name")
+
+
+static func _open_career_picker_from_menu(menu: Node) -> void:
+	if not is_instance_valid(menu) or not menu.is_inside_tree():
+		return
+	var tree := menu.get_tree()
+	if tree.current_scene != menu:
+		return
+	var main_scene := load("res://main.tscn") as PackedScene
+	if main_scene == null:
+		return
+	var main := main_scene.instantiate()
+	main.set("_return_to_career_picker", true)
+	tree.root.remove_child(menu)
+	menu.queue_free()
+	tree.root.add_child(main)
+	tree.current_scene = main
+
 
 func _show_menu_after_selection() -> void:
 	SeasonState.early_flow_post_selection_hide_menu_buttons = true

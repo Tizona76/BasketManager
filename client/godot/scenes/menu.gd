@@ -637,6 +637,7 @@ func _bm_persist_current_locale_to_active_save() -> void:
 
 
 func _ready() -> void:
+	_bm_ensure_desktop_back_button()
 	_bm_restore_language_from_active_save()
 	_bm_reconcile_club_tokens_unlock_on_menu_load()
 	call_deferred("_bm_maybe_show_club_tokens_intro_popup_on_management")
@@ -2395,7 +2396,27 @@ func _on_btn_shop_tokens_debug() -> void:
 		print("[SHOP][DEBUG] ShopTokens.tscn not created yet")
 
 
+func _bm_ensure_desktop_back_button() -> void:
+	if not OS.has_feature("pc") or BtnBack != null:
+		return
+	BtnBack = Button.new()
+	BtnBack.name = "BtnBack"
+	BtnBack.text = tr("menu.back")
+	BtnBack.focus_mode = Control.FOCUS_NONE
+	_bm_apply_play_game_button_style(BtnBack, Vector2(180, 48))
+	$UI.add_child(BtnBack)
+	BtnBack.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	BtnBack.offset_left = 24.0
+	BtnBack.offset_right = 204.0
+	BtnBack.offset_top = -80.0
+	BtnBack.offset_bottom = -16.0
+
+
 func _on_btn_back() -> void:
+	if OS.has_feature("pc") and get_tree().current_scene == self:
+		var navigation := load("res://scripts/Main.gd")
+		navigation.call_deferred("_open_career_picker_from_menu", self)
+		return
 	emit_signal("go_back")
 
 
@@ -2854,6 +2875,8 @@ func _stack_menu_debug_labels_under_status() -> void:
 		L.position = Vector2(base_x, y)
 		y += 18.0
 func _hide_menu_debug_texts() -> void:
+	if not is_inside_tree():
+		return
 	# Masque textes debug/progression qui polluent le HUD (toutes langues)
 	# Ex: FR 'Journée', EN 'Matchday', ES 'Jornada', IT 'Giornata', PT 'Rodada', + 'OV-OD'
 	var ui: Node = get_node_or_null("UI")
