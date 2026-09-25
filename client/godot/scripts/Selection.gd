@@ -966,7 +966,7 @@ func _show_rating_header_tooltip() -> void:
 	panel.set_as_top_level(true)
 
 	var lbl := Label.new()
-	lbl.text = "Rating based on shooting, speed, defense and motivation."
+	lbl.text = tr("player.card.rating_tooltip")
 	lbl.add_theme_font_size_override("font_size", 22)
 	lbl.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.65))
@@ -1103,15 +1103,15 @@ func _update_sort_header_titles() -> void:
 	var compact_landscape := _selection_is_mobile_layout() and vp.x > vp.y
 
 	var labels := {
-		"HeaderStars": "RANK",
-		"HeaderPos": "POS.",
-		"HeaderAge": "AGE",
-		"HeaderGender": "SHOT" if compact_landscape else tr("player.attr.tir"),
-		"HeaderSpeed": "SPD" if compact_landscape else "SPEED",
-		"HeaderDefense": "DEF" if compact_landscape else "DEFENSE",
-		"HeaderPrecision": "ACC" if compact_landscape else "ACCURACY",
-		"HeaderMotivation": "MOT." if compact_landscape else tr("selection.header.motivation"),
-		"HeaderSalary": "SAL." if compact_landscape else "SALARY",
+		"HeaderStars": tr("mercato.col.rank").to_upper(),
+		"HeaderPos": tr("mercato.col.position_short").to_upper(),
+		"HeaderAge": tr("mercato.col.age").to_upper(),
+		"HeaderGender": tr("player.header.shooting_short") if compact_landscape else tr("player.attr.tir"),
+		"HeaderSpeed": tr("player.header.speed_short") if compact_landscape else tr("player.header.speed"),
+		"HeaderDefense": tr("player.header.defense_short") if compact_landscape else tr("player.card.defense").to_upper(),
+		"HeaderPrecision": tr("player.header.accuracy_short") if compact_landscape else tr("player.header.accuracy"),
+		"HeaderMotivation": tr("player.header.motivation_short") if compact_landscape else tr("selection.header.motivation"),
+		"HeaderSalary": tr("player.header.salary_short") if compact_landscape else tr("mercato.col.salary").to_upper(),
 	}
 	for node_name in labels.keys():
 		var b := get_node_or_null(node_name) as BaseButton
@@ -1610,7 +1610,7 @@ func _update_ui() -> void:
 	_bm_update_selected_crest_header()
 
 	if lbl_count != null:
-		lbl_count.text = "Select 12 players: %d/%d" % [selected_ids.size(), MAX_SEL]
+		lbl_count.text = tr("selection.select_players_count") % [selected_ids.size(), MAX_SEL]
 		lbl_count.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 		lbl_count.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
 		lbl_count.add_theme_constant_override("outline_size", 2)

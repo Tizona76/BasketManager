@@ -889,7 +889,7 @@ func _ready() -> void:
 
 		# --- SAVE button + toast (manual save now) ---
 	if BtnSave != null:
-		BtnSave.text = "Save"
+		BtnSave.text = tr("menu.btn_save")
 		_bm_apply_play_game_button_style(BtnSave, Vector2(180, 48))
 
 		if BtnTabWinrates != null:
@@ -907,7 +907,7 @@ func _ready() -> void:
 
 	if LblSaveToast != null:
 		LblSaveToast.visible = false
-		LblSaveToast.text = "Save OK"
+		LblSaveToast.text = tr("menu.save_ok")
 
 	if SaveToastTimer != null:
 		SaveToastTimer.one_shot = true
@@ -930,7 +930,7 @@ func _ready() -> void:
 
 		pass
 
-	_set_status("Status: Menu")
+	_set_status(tr("login.status.idle"))
 	print("[MENU] has LblClubName? ", LblClubName != null)
 
 	SaveSingleton.ensure_exists(str(Session.profile_uuid))
@@ -1003,15 +1003,15 @@ func _ready() -> void:
 	if BtnMercato != null:
 		BtnMercato.text = tr("menu.mercato")
 		if BtnStadium != null:
-			BtnStadium.text = "Stadium"
+			BtnStadium.text = tr("stadium.title")
 	if BtnFinances != null:
 		BtnFinances.text = tr("menu.finances")
 	if BtnSponsors != null:
 		BtnSponsors.text = tr("menu.sponsors")
 	if BtnMyTeam != null:
-		BtnMyTeam.text = "My team"
+		BtnMyTeam.text = tr("matchsim.team_default")
 	if BtnCoachs != null:
-		BtnCoachs.text = "Staff / Coachs"
+		BtnCoachs.text = tr("menu.staff_coaches")
 
 
 	# ✅ BG gestion: layer + texture
@@ -1032,7 +1032,7 @@ func _ready() -> void:
 
 	if FileAccess.file_exists("user://save_cloud_signup_return_menu.txt"):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path("user://save_cloud_signup_return_menu.txt"))
-		_toast_status("Saving to cloud…", 2.0)
+		_toast_status(tr("menu.save_choice.saving"), 2.0)
 		call_deferred("_try_cloud_save_from_local")
 
 	# connect leaderboard http (ranking)
@@ -1174,7 +1174,7 @@ func _offline_poll_loop() -> void:
 
 		# ✅ Si refresh invalidé -> ne spam pas (attend nouveau login)
 		if _auth_refresh_invalid:
-			_set_status("Status: Session expirée (re-login requis)")
+			_set_status(tr("menu.cloud.session_expired"))
 			print("[AUTH] refresh_invalid latched -> stop auth retries")
 			_offline_poll_loop()
 			return
@@ -1198,7 +1198,7 @@ func _offline_poll_loop() -> void:
 			print("[NET] offline poll -> try cloud load")
 			_try_cloud_load()
 		else:
-			_set_status("Status: Pas connecté")
+			_set_status(tr("menu.cloud.not_connected"))
 			_set_network_state("OFFLINE")
 
 		_offline_poll_loop()
@@ -1209,7 +1209,7 @@ func _schedule_retry(kind: String, delay_s: float) -> void:
 	if delay_s < 0.05:
 		delay_s = 0.05
 	print("[RETRY] schedule kind=", kind, " in ", delay_s, "s")
-	_set_status("Status: Réseau… retry %s (%.1fs)" % [kind, delay_s])
+	_set_status(tr("menu.cloud.retry") % [tr("menu.cloud.operation." + kind), delay_s])
 	var t := get_tree().create_timer(delay_s)
 	t.timeout.connect(func():
 		if _inflight != "":
@@ -1287,7 +1287,7 @@ func _try_auth_refresh(rt: String) -> void:
 	_auth_last_rt = rt
 	_auth_retry_count = 0
 
-	_set_status("Status: Offline → reconnexion…")
+	_set_status(tr("menu.cloud.reconnecting"))
 
 	var url := API_BASE + PATH_AUTH_REFRESH
 	var headers := PackedStringArray(["Content-Type: application/json"])
@@ -1334,7 +1334,7 @@ func _on_auth_completed(result: int, response_code: int, _headers: PackedStringA
 
 		print("[AUTH][REFRESH] retries exhausted (network) -> stay offline")
 		_auth_inflight = false
-		_set_status("Status: Offline (pas connecté)")
+		_set_status(tr("menu.cloud.not_connected"))
 
 		_auth_next_try_ms = Time.get_ticks_msec() + int(_auth_backoff_s * 1000.0)
 		print("[AUTH] next try in ", _auth_backoff_s, "s")
@@ -1355,7 +1355,7 @@ func _on_auth_completed(result: int, response_code: int, _headers: PackedStringA
 			Session.access_token = ""
 			_save_session_local_from_menu()
 			_auth_refresh_invalid = true
-			_set_status("Status: Session expirée (login requis)")
+			_set_status(tr("menu.cloud.session_expired"))
 			_set_network_state("OFFLINE")
 			_start_offline_poll()
 			return
@@ -1364,9 +1364,9 @@ func _on_auth_completed(result: int, response_code: int, _headers: PackedStringA
 		_auth_backoff_s = min(_auth_backoff_s * 2.0, AUTH_BACKOFF_MAX_S)
 
 		if response_code == 400 and txt.find("BAD_REFRESH") != -1:
-			_set_status("Status: Session expirée (login requis)")
+			_set_status(tr("menu.cloud.session_expired"))
 		else:
-			_set_status("Status: Offline (auth KO)")
+			_set_status(tr("menu.cloud.auth_failed"))
 
 		_start_offline_poll()
 		return
@@ -1376,7 +1376,7 @@ func _on_auth_completed(result: int, response_code: int, _headers: PackedStringA
 	if typeof(parsed) != TYPE_DICTIONARY:
 		print("[AUTH][REFRESH] invalid json")
 		_auth_inflight = false
-		_set_status("Status: Offline (auth invalide)")
+		_set_status(tr("menu.cloud.auth_invalid"))
 		_start_offline_poll()
 		return
 
@@ -1391,7 +1391,7 @@ func _on_auth_completed(result: int, response_code: int, _headers: PackedStringA
 	if at.length() < 20:
 		print("[AUTH][REFRESH] missing/short access_token")
 		_auth_inflight = false
-		_set_status("Status: Offline (auth short)")
+		_set_status(tr("menu.cloud.auth_invalid"))
 		_start_offline_poll()
 		return
 
@@ -1412,7 +1412,7 @@ func _on_auth_completed(result: int, response_code: int, _headers: PackedStringA
 
 	_auth_inflight = false
 	_set_network_state("ONLINE")
-	_set_status("Status: Reconnecté ✅")
+	_set_status(tr("login.status.connected"))
 
 	if _inflight == "":
 		_try_cloud_load()
@@ -1476,31 +1476,31 @@ func _try_cloud_load() -> void:
 	var access: String = str(Session.access_token).strip_edges()
 	if access == "":
 		if _is_web_guest_auth_pending():
-			_set_status("Status: Starting online session...")
+			_set_status(tr("menu.cloud.starting_session"))
 			_start_offline_poll()
 			return
-		_set_status("Status: Pas connecté")
+		_set_status(tr("menu.cloud.not_connected"))
 		_set_network_state("OFFLINE")
 		_start_offline_poll()
 		return
 	if access.length() < 20:
-		_set_status("Status: token invalide (len=%s)" % str(access.length()))
+		_set_status(tr("menu.cloud.invalid_token") % str(access.length()))
 		_set_network_state("OFFLINE")
 		_start_offline_poll()
 		return
 
 	var puuid: String = str(Session.profile_uuid).strip_edges()
 	if puuid == "":
-		_set_status("Status: Pas de profile_uuid")
+		_set_status(tr("menu.cloud.load_profile_missing"))
 		return
 
 	var career_id: String = _cloud_active_career_id()
 	if career_id == "":
-		_set_status("Status: Pas de career_id")
+		_set_status(tr("menu.cloud.load_career_missing"))
 		print("[CLOUD_LOAD_SKIP] missing active career_id")
 		return
 
-	_set_status("Status: Chargement cloud…")
+	_set_status(tr("menu.cloud.loading"))
 	_inflight = "load"
 	_cloud_request_career_id = career_id
 
@@ -1516,7 +1516,7 @@ func _try_cloud_load() -> void:
 	if err != OK:
 		_inflight = ""
 		_cloud_request_career_id = ""
-		_set_status("Status: HTTP request() error %s" % str(err))
+		_set_status(tr("menu.cloud.load_error").replace("{code}", str(err)))
 
 
 # ------------------------------------------------------------
@@ -1528,7 +1528,7 @@ func _try_cloud_save_from_local() -> void:
 		return
 	var access: String = str(Session.access_token).strip_edges()
 	if access == "" or access.length() < 20:
-		_set_status("Status: Pas connecté (save)")
+		_set_status(tr("menu.cloud.sign_in_required"))
 		_dirty_local = true
 		_set_network_state("OFFLINE")
 		_start_offline_poll()
@@ -1536,12 +1536,12 @@ func _try_cloud_save_from_local() -> void:
 
 	var puuid: String = str(Session.profile_uuid).strip_edges()
 	if puuid == "":
-		_set_status("Status: Pas de profile_uuid (save)")
+		_set_status(tr("menu.cloud.profile_missing"))
 		return
 
 	var career_id: String = _cloud_active_career_id()
 	if career_id == "":
-		_set_status("Status: Pas de career_id (save)")
+		_set_status(tr("menu.cloud.career_missing"))
 		print("[CLOUD_SAVE_SKIP] missing active career_id")
 		return
 
@@ -1562,7 +1562,7 @@ func _try_cloud_save_from_local() -> void:
 		if raw_txt2.strip_edges() != "":
 			checksum = _sha256_hex(raw_txt2)
 
-	_set_status("Status: Upload cloud…")
+	_set_status(tr("menu.save_choice.saving"))
 	_inflight = "save"
 	_cloud_request_career_id = career_id
 
@@ -1587,7 +1587,7 @@ func _try_cloud_save_from_local() -> void:
 	if err != OK:
 		_inflight = ""
 		_cloud_request_career_id = ""
-		_set_status("Status: HTTP save request() error %s" % str(err))
+		_set_status(tr("menu.cloud.save_error").replace("{code}", str(err)))
 
 
 # ------------------------------------------------------------
@@ -1599,7 +1599,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 	# ---- NETWORK FAIL ----
 	if result != OK:
 		if _inflight == "load":
-			_set_status("Status: Offline (load) result=%s" % str(result))
+			_set_status(tr("menu.cloud.offline_load").replace("{code}", str(result)))
 			print("[NET_FAIL][LOAD] result=", result, " code=", response_code)
 			_set_network_state("OFFLINE")
 
@@ -1612,7 +1612,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 				return
 
 		elif _inflight == "save":
-			_set_status("Status: Offline (save) result=%s" % str(result))
+			_set_status(tr("menu.cloud.offline_save").replace("{code}", str(result)))
 			print("[NET_FAIL][SAVE] result=", result, " code=", response_code)
 			_set_network_state("OFFLINE")
 			_dirty_local = true
@@ -1636,7 +1636,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 	# ---- HTTP FAIL ----
 	if response_code < 200 or response_code >= 300:
 		if _inflight == "load":
-			_set_status("Status: Cloud KO (%s)" % str(response_code))
+			_set_status(tr("menu.cloud.load_error").replace("{code}", str(response_code)))
 			print("[CLOUD_BODY]", txt)
 			_save_text_file(FILE_CLOUD_LAST_LOAD_TXT, txt)
 			_load_retry_count = 0
@@ -1646,7 +1646,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 			return
 
 		elif _inflight == "save":
-			_set_status("Status: Save KO (%s)" % str(response_code))
+			_set_status(tr("menu.cloud.save_error").replace("{code}", str(response_code)))
 			print("[CLOUD_SAVE_BODY]", txt)
 			_save_text_file(FILE_CLOUD_LAST_SAVE_TXT, txt)
 
@@ -1671,7 +1671,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 
 	# ---- 2xx ----
 	if _inflight == "load":
-		_set_status("Status: Cloud OK ✅")
+		_set_status(tr("menu.cloud.synced"))
 		print("[CLOUD_OK_BODY]", txt)
 
 		_load_retry_count = 0
@@ -1774,8 +1774,8 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		return
 
 	elif _inflight == "save":
-		_set_status("Status: Cloud OK ✅")
-		_toast_status("Cloud synced ✅", 1.6)
+		_set_status(tr("menu.cloud.synced"))
+		_toast_status(tr("menu.cloud.synced"), 1.6)
 
 		var requested_career_id_save := _cloud_request_career_id
 		var is_empty: bool = false
@@ -1920,7 +1920,7 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		return
 
 	if _inflight == "save":
-		_set_status("Status: Save OK ✅")
+		_set_status(tr("menu.save_ok"))
 		print("[CLOUD_SAVE_OK_BODY]", txt)
 
 		_save_retry_count = 0
@@ -1959,7 +1959,7 @@ func _roundtrip_start() -> void:
 	if now_ms < _rt_cooldown_until_ms:
 		var left: float = float(_rt_cooldown_until_ms - now_ms) / 1000.0
 		print("[DBG][RT] blocked by client cooldown, left=", left, "s")
-		_set_status("Status: Cooldown (%.1fs)" % left)
+		_set_status(tr("menu.cloud.cooldown").replace("{seconds}", "%.1f" % left))
 		return
 
 	_ensure_local_savegame_exists()
@@ -2885,6 +2885,10 @@ func _ensure_gestion_bg_is_root_layer() -> void:
 # I18N (simple, central)
 # ------------------------------------------------------------
 func _apply_i18n() -> void:
+	if BtnStadium != null:
+		BtnStadium.text = tr("stadium.title")
+	if BtnMusicToggle != null:
+		BtnMusicToggle.text = tr("menu.music.off" if AudioServer.is_bus_mute(0) else "menu.music.on")
 	# boutons + titres statiques (aucune variable runtime ici)
 	if Title != null:
 		Title.text = tr("menu.title")
@@ -2899,22 +2903,22 @@ func _apply_i18n() -> void:
 	if BtnSponsors != null:
 		BtnSponsors.text = tr("menu.sponsors")
 	if BtnMyTeam != null:
-		BtnMyTeam.text = "My team"
+		BtnMyTeam.text = tr("matchsim.team_default")
 	if BtnCoachs != null:
-		BtnCoachs.text = "Staff / Coachs"
+		BtnCoachs.text = tr("menu.staff_coaches")
 	# tabs
 	if BtnTabClub != null:
 		BtnTabClub.text = tr("menu.tab.club")
 	if BtnTabWinrates != null:
 		BtnTabWinrates.text = tr("menu.tab.ranking")
 	if BtnSave != null:
-		BtnSave.text = "Save"
+		BtnSave.text = tr("menu.btn_save")
 	if BtnLanguage != null:
 		BtnLanguage.text = tr("menu.languages")
 	if BtnClubTokens != null:
 		BtnClubTokens.text = tr("menu.club_tokens")
 	if LblSaveToast != null:
-		LblSaveToast.text = "Save OK"
+		LblSaveToast.text = tr("menu.save_ok")
 
 
 func _tr_safe(key: String) -> String:
@@ -3263,7 +3267,7 @@ func _ensure_music_toggle_button() -> void:
 
 	BtnMusicToggle = Button.new()
 	BtnMusicToggle.name = "BtnMusicToggle"
-	BtnMusicToggle.text = "Music ON"
+	BtnMusicToggle.text = tr("menu.music.on")
 	BtnMusicToggle.focus_mode = Control.FOCUS_NONE
 	BtnMusicToggle.mouse_filter = Control.MOUSE_FILTER_STOP
 	_bm_apply_play_game_button_style(BtnMusicToggle, Vector2(180, 48))
@@ -3591,7 +3595,7 @@ func _on_btn_music_toggle_pressed() -> void:
 	AudioServer.set_bus_mute(0, not muted)
 
 	if BtnMusicToggle != null:
-		BtnMusicToggle.text = ("Music ON" if muted else "Music OFF")
+		BtnMusicToggle.text = tr("menu.music.on" if muted else "menu.music.off")
 
 	print("[MENU][MUSIC] muted=", str(not muted))
 
@@ -4092,7 +4096,7 @@ func _save_local_only() -> void:
 	if OS.has_feature("web") and OS.is_userfs_persistent():
 		JavaScriptBridge.force_fs_sync()
 	_dirty_local = true
-	_toast_status("Saved locally", 2.0)
+	_toast_status(tr("menu.save.local_done"), 2.0)
 
 
 func _save_to_cloud_from_choice() -> void:
@@ -4103,10 +4107,10 @@ func _save_to_cloud_from_choice() -> void:
 
 	var access: String = str(Session.access_token).strip_edges()
 	if access.length() >= 20 and _inflight == "":
-		_toast_status("Saving to cloud…", 2.0)
+		_toast_status(tr("menu.save_choice.saving"), 2.0)
 		call_deferred("_try_cloud_save_from_local")
 	else:
-		_toast_status("Saved locally. Create an account to enable cloud save.", 2.5)
+		_toast_status(tr("menu.save.account_required"), 2.5)
 		var f := FileAccess.open("user://save_cloud_signup_return_menu.txt", FileAccess.WRITE)
 		if f != null:
 			f.store_string("1")
@@ -4171,13 +4175,17 @@ func _show_save_choice_popup() -> void:
 	save_tip.text = ""
 	save_tip.position = Vector2(30, 76)
 	save_tip.size = Vector2(400, 34)
+	if OS.has_feature("ios") and save_popup_vp.x > save_popup_vp.y:
+		save_tip.position.y = 66
+		save_tip.size.y = 55
+		save_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	save_tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	save_tip.add_theme_font_size_override("font_size", 18)
 	save_tip.add_theme_color_override("font_color", Color(0.82, 0.88, 1.0, 1.0))
 	card.add_child(save_tip)
 
 	var btn_local := Button.new()
-	btn_local.text = "Save Locally"
+	btn_local.text = tr("menu.save_choice.local")
 	btn_local.position = Vector2(40, 125)
 	btn_local.size = Vector2(180, 54)
 	btn_local.add_theme_font_size_override("font_size", 22)
@@ -4192,7 +4200,7 @@ func _show_save_choice_popup() -> void:
 	card.add_child(btn_local)
 
 	var btn_cloud := Button.new()
-	btn_cloud.text = "Save to Cloud"
+	btn_cloud.text = tr("menu.save_choice.cloud")
 	btn_cloud.position = Vector2(240, 125)
 	btn_cloud.size = Vector2(180, 54)
 	btn_cloud.add_theme_font_size_override("font_size", 22)
@@ -4203,7 +4211,7 @@ func _show_save_choice_popup() -> void:
 			return
 		if OS.has_feature("ios") and str(Session.access_token).strip_edges().length() >= 20:
 			if _inflight != "":
-				save_tip.text = "Cloud request in progress…"
+				save_tip.text = tr("menu.save_choice.pending")
 				return
 			_bm_save_choice_wait_for_cloud(popup, btn_cloud, save_tip)
 		else:
@@ -4213,7 +4221,7 @@ func _show_save_choice_popup() -> void:
 	card.add_child(btn_cloud)
 
 	var btn_cancel := Button.new()
-	btn_cancel.text = "Cancel"
+	btn_cancel.text = tr("login.btn.cancel")
 	btn_cancel.position = Vector2(150, 198)
 	btn_cancel.size = Vector2(160, 42)
 	btn_cancel.add_theme_font_size_override("font_size", 22)
@@ -4241,14 +4249,14 @@ func _bm_save_choice_wait_for_cloud(popup: Control, button: Button, tip: Label) 
 	feedback.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	feedback.add_theme_font_size_override("font_size", 18)
-	feedback.text = "Saving to cloud…"
+	feedback.text = tr("menu.save_choice.saving")
 	tip.hide()
 
 	var completed := func(result: int, code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
 		if not is_instance_valid(popup):
 			return
 		var success := result == OK and code >= 200 and code < 300
-		feedback.text = Status.text if Status != null else ("Cloud synced ✅" if success else "Cloud save failed")
+		feedback.text = Status.text if Status != null else (tr("menu.cloud.synced") if success else tr("menu.cloud.save_failed"))
 		if success:
 			get_tree().create_timer(1.6).timeout.connect(func():
 				if is_instance_valid(popup):
@@ -4267,7 +4275,7 @@ func _bm_save_choice_wait_for_cloud(popup: Control, button: Button, tip: Label) 
 	(func():
 		if is_instance_valid(popup) and _inflight != "save" and Http.request_completed.is_connected(completed):
 			Http.request_completed.disconnect(completed)
-			feedback.text = Status.text if Status != null else "Cloud save could not start"
+			feedback.text = Status.text if Status != null else tr("menu.cloud.start_failed")
 			popup.remove_meta("cloud_pending")
 			button.disabled = false
 	).call_deferred()
@@ -4277,7 +4285,7 @@ func _show_save_ok() -> void:
 	if LblSaveToast == null:
 		return
 
-	LblSaveToast.text = "Save OK"
+	LblSaveToast.text = tr("menu.save_ok")
 	LblSaveToast.visible = true
 	LblSaveToast.z_index = 1000
 
@@ -5276,7 +5284,7 @@ func _open_club_identity_popup() -> void:
 	popup.add_child(title_bg)
 
 	var title := Label.new()
-	title.text = "Club Identity"
+	title.text = tr("club_identity.title")
 	title.size = title_bg.size
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -5285,7 +5293,7 @@ func _open_club_identity_popup() -> void:
 	title_bg.add_child(title)
 
 	var info := Label.new()
-	info.text = "Upgrade crest to Lv%d for" % target_level
+	info.text = tr("club_identity.upgrade_level_for") % target_level
 	info.position = Vector2(95, 58)
 	info.size = Vector2(270, 32)
 	info.add_theme_font_size_override("font_size", 22)
@@ -5353,7 +5361,7 @@ func _open_club_identity_popup() -> void:
 		glow_tw.tween_property(lv2_preview, "modulate", Color(1, 1, 1, 1), 0.70)
 
 	var btn_cancel := Button.new()
-	btn_cancel.text = "Cancel"
+	btn_cancel.text = tr("club_identity.cancel")
 	btn_cancel.position = Vector2(110, 258)
 	btn_cancel.size = Vector2(120, 50)
 	var cancel_sb := StyleBoxFlat.new()
@@ -5368,7 +5376,7 @@ func _open_club_identity_popup() -> void:
 	popup.add_child(btn_cancel)
 
 	var btn_upgrade := Button.new()
-	btn_upgrade.text = "Upgrade"
+	btn_upgrade.text = tr("club_identity.upgrade")
 	btn_upgrade.position = Vector2(290, 258)
 	btn_upgrade.size = Vector2(120, 50)
 	var upgrade_sb := StyleBoxFlat.new()

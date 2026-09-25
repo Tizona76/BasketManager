@@ -867,7 +867,7 @@ func _bm_play_division_transition(
 	if old_division == new_division:
 		return
 
-	if get_node_or_null("DivisionTransitionOverlay") != null:
+	if get_node_or_null("Overlays/DivisionTransitionOverlay" if has_node("Overlays") else "DivisionTransitionOverlay") != null:
 		return
 
 	var vp: Vector2 = get_viewport_rect().size
@@ -2077,7 +2077,7 @@ func _bm_maybe_show_pending_intro_after_new_season() -> void:
 
 			# Attendre la disparition réelle de l'overlay avant
 			# de reprendre la chaîne normale des popups/intros.
-			while get_node_or_null("DivisionTransitionOverlay") != null:
+			while get_node_or_null("Overlays/DivisionTransitionOverlay" if has_node("Overlays") else "DivisionTransitionOverlay") != null:
 				await get_tree().process_frame
 
 	# Suite normale existante.
@@ -2184,7 +2184,7 @@ func _bm_store_progress_hud_seen(level_value: int, xp_value: int) -> void:
 func _bm_show_market_coming_soon_popup() -> void:
 	var popup := AcceptDialog.new()
 	popup.title = "Market"
-	popup.dialog_text = "Coming soon. Stay tuned !"
+	popup.dialog_text = tr("club_tokens.status.coming_soon")
 	if popup.get_label() != null:
 		popup.get_label().add_theme_font_size_override("font_size", 18)
 	popup.ok_button_text = "OK"
@@ -2317,7 +2317,7 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 	_mission_tokens_popup_pending_labels = []
 
 	var lbl_mission := Label.new()
-	lbl_mission.text = mission_txt.strip_edges() + ". Congrats !"
+	lbl_mission.text = mission_txt.strip_edges() + ". " + tr("home_arena.congratulations")
 	lbl_mission.position = Vector2(20, 18)
 	lbl_mission.size = Vector2(720, 34)
 	lbl_mission.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2360,7 +2360,7 @@ func _show_mission_tokens_reward_popup(tokens_gain: int) -> void:
 	tokens_row.add_child(tokens_icon)
 
 	var btn := Button.new()
-	btn.text = "Close"
+	btn.text = tr("common.close")
 	btn.custom_minimum_size = Vector2(160, 46)
 	btn.size = Vector2(160, 46)
 	btn.position = Vector2(300, 235)
@@ -2467,7 +2467,7 @@ func _show_pending_season_reward_popup(rank: int, euros_gain: int, tokens_gain: 
 	popup.add_child(card)
 
 	var title := Label.new()
-	title.text = "Season reward"
+	title.text = tr("season.reward.title")
 	title.position = Vector2(0, 24)
 	title.size = Vector2(620, 42)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2475,7 +2475,7 @@ func _show_pending_season_reward_popup(rank: int, euros_gain: int, tokens_gain: 
 	card.add_child(title)
 
 	var subtitle := Label.new()
-	subtitle.text = "Final rank: #" + str(rank)
+	subtitle.text = tr("season.reward.rank").replace("{rank}", str(rank))
 	subtitle.position = Vector2(0, 66)
 	subtitle.size = Vector2(620, 34)
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2484,7 +2484,7 @@ func _show_pending_season_reward_popup(rank: int, euros_gain: int, tokens_gain: 
 	card.add_child(subtitle)
 
 	var subtitle_money := Label.new()
-	subtitle_money.text = "Prize money"
+	subtitle_money.text = tr("season.reward.money")
 	subtitle_money.position = Vector2(45, 116)
 	subtitle_money.size = Vector2(230, 32)
 	subtitle_money.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2492,7 +2492,7 @@ func _show_pending_season_reward_popup(rank: int, euros_gain: int, tokens_gain: 
 	card.add_child(subtitle_money)
 
 	var subtitle_tokens := Label.new()
-	subtitle_tokens.text = "Prize tokens"
+	subtitle_tokens.text = tr("season.reward.tokens")
 	subtitle_tokens.position = Vector2(345, 116)
 	subtitle_tokens.size = Vector2(230, 32)
 	subtitle_tokens.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2534,7 +2534,7 @@ func _show_pending_season_reward_popup(rank: int, euros_gain: int, tokens_gain: 
 	tokens_row.add_child(tokens_icon)
 
 	var btn := Button.new()
-	btn.text = "Close"
+	btn.text = tr("common.close")
 	btn.custom_minimum_size = Vector2(180, 52)
 	btn.size = Vector2(180, 52)
 	btn.position = Vector2(220, 254)
@@ -2701,7 +2701,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	if typeof(_save_cta) == TYPE_DICTIONARY:
 		_round_cta = int(_save_cta.get("season_round", 0))
 	var _open_finances_cta: bool = (_round_cta <= 1)
-	btn.text = (_bm_tr_or_fallback("popup.last_match_finance.cta_finances", "See club finances") if _open_finances_cta else "Close")
+	btn.text = (_bm_tr_or_fallback("popup.last_match_finance.cta_finances", "See club finances") if _open_finances_cta else tr("common.close"))
 	btn.custom_minimum_size = Vector2(320, 52)
 	btn.size = Vector2(320, 52)
 	btn.position = Vector2(330, 270)
@@ -2944,10 +2944,9 @@ func _ready() -> void:
 	_bm_refresh_match_button_opponent_line()
 	var save_after := PL.load_savegame()
 	if save_after.has("pending_season_reward") and typeof(save_after["pending_season_reward"]) == TYPE_DICTIONARY:
-		var r: Dictionary = save_after["pending_season_reward"] as Dictionary
+		# Rewards are displayed after end-season confirmation via pending_season_reward_popup.
 		save_after.erase("pending_season_reward")
 		PL.write_savegame(save_after)
-		call_deferred("_show_season_reward_popup", int(r.get("rank", 0)), int(r.get("euros", 0)), int(r.get("tokens", 0)))
 
 	_maybe_show_last_match_finance_popup()
 	if not _last_match_finance_popup_shown_this_entry:
@@ -3424,6 +3423,8 @@ func _prepare_new_season() -> void:
 
 	print("[SAISON] Nouvelle saison préparée : season_round=0, journee=1, standings vidés")
 
+	if OS.has_feature("ios") and next_division != current_division and bg != null:
+		bg.texture = load(_bm_division_transition_bg_path(next_division))
 	_ensure_season_day_label()
 	
 static func _get_division_verdict(division: int, rank: int) -> Dictionary:

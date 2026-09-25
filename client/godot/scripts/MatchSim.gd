@@ -1599,7 +1599,7 @@ func _bm_make_away_road_sign_identity(rect: Rect2, crest_path: String, team_name
 	exit_label.size = Vector2(rect.size.x - 36.0, rect.size.y * 0.22)
 	exit_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	exit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	exit_label.text = "NEXT EXIT"
+	exit_label.text = tr("matchsim.next_exit").to_upper()
 	exit_label.add_theme_font_size_override("font_size", maxi(13, int(font_size * 0.62)))
 	exit_label.add_theme_color_override("font_color", Color(0.96, 0.98, 1.0, 1.0))
 	exit_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.65))

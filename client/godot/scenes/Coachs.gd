@@ -14,15 +14,15 @@ const LeagueDataScript := preload("res://scripts/LeagueData.gd")
 
 const COACH_UI_CONFIG := {
 	"coach_junior": {
-		"contract_text": "Contract: 2 seasons",
+		"contract_seasons": 2,
 		"payment_text": "Payment: euros / tokens / mix"
 	},
 	"coach_confirme": {
-		"contract_text": "Contract: 3 seasons",
+		"contract_seasons": 3,
 		"payment_text": "Payment: euros / tokens / mix"
 	},
 	"coach_elite": {
-		"contract_text": "Contract: 2 seasons",
+		"contract_seasons": 2,
 		"payment_text": "Payment: euros / tokens / mix"
 	}
 }
@@ -95,7 +95,7 @@ func _bm_get_seasons_progress_text(coach_id: String) -> String:
 	var hired_season: int = maxi(1, int(coachs.get("last_hired_season", current_season)))
 	var used: int = maxi(1, current_season - hired_season + 1)
 	used = mini(used, duration)
-	return "Seasons : %d/%d" % [used, duration]
+	return tr("coach.seasons_progress") % [used, duration]
 
 func _bm_ensure_seasons_label(parent_node: Control, label_name: String, x: float, y: float, txt: String) -> void:
 	if parent_node == null:
@@ -162,6 +162,15 @@ func _bm_refresh_active_coach_visuals() -> void:
 	_bm_queue_ios_staff_layout()
 
 func _ready() -> void:
+	if LblIntro != null:
+		LblIntro.text = tr("coach.choose_prompt")
+	if lbl_title_coachs != null:
+		lbl_title_coachs.text = tr("menu.staff_coaches").to_upper()
+	if BtnBack != null:
+		BtnBack.text = tr("common.back")
+	var unlock_label := get_node_or_null("InfoPanel/LblInfoUnlock") as Label
+	if unlock_label != null:
+		unlock_label.text = tr("matchsim.unlock")
 	_bm_apply_coach_quotes_i18n()
 	_bm_setup_title_tooltip()
 	if BtnBack != null:
@@ -314,10 +323,10 @@ func _fill_inline_label(coach_id: String, lbl: Label) -> void:
 		return
 
 	var coach_cfg: Dictionary = COACH_UI_CONFIG.get(coach_id, {
-		"contract_text": "Contract: -",
+		"contract_seasons": "-",
 		"payment_text": "Payment: -"
 	}) as Dictionary
-	var contract_txt: String = str(coach_cfg.get("contract_text", "Contract: -"))
+	var contract_txt: String = tr("coach.contract_seasons") % str(coach_cfg.get("contract_seasons", "-"))
 	var payment_txt: String = str(coach_cfg.get("payment_text", "Payment: -"))
 
 	var historical_euros_cost: int = int(data.get("euros_cost", 0))
@@ -325,7 +334,7 @@ func _fill_inline_label(coach_id: String, lbl: Label) -> void:
 	var tokens_cost: int = _get_displayed_tokens_cost(coach_id)
 	var status_txt: String = _coach_status_text(coach_id)
 	var owned: bool = (status_txt == "Owned")
-	lbl.text = contract_txt + "\nCost: " + _fmt_cost(euros_cost) + " / season"
+	lbl.text = contract_txt + "\n" + (tr("coach.cost_per_season") % _fmt_cost(euros_cost))
 
 	if owned:
 		lbl.add_theme_color_override("font_color", Color(0.42, 1.0, 0.42, 1))
@@ -390,17 +399,16 @@ func _coach_confirm_text(coach_id: String) -> String:
 		return "Coach data unavailable"
 
 	var coach_cfg: Dictionary = COACH_UI_CONFIG.get(coach_id, {
-		"contract_text": "Contract: -",
+		"contract_seasons": "-",
 		"payment_text": "Payment: -"
 	}) as Dictionary
 
-	var contract_txt: String = str(coach_cfg.get("contract_text", "Contract: -"))
+	var contract_txt: String = tr("coach.contract_seasons") % str(coach_cfg.get("contract_seasons", "-"))
 	var historical_euros_cost: int = int(data.get("euros_cost", 0))
 	var euros_cost: int = _get_displayed_staff_season_cost(historical_euros_cost)
 	var tokens_cost: int = _get_displayed_tokens_cost(coach_id)
 
-	return contract_txt + "
-Cost: " + _fmt_cost(euros_cost) + " / season"
+	return contract_txt + "\n" + (tr("coach.cost_per_season") % _fmt_cost(euros_cost))
 
 
 func _open_unlock_confirm(coach_id: String) -> void:
@@ -422,7 +430,7 @@ func _open_unlock_confirm(coach_id: String) -> void:
 	if LblTokensAvailable != null and not d.is_empty():
 		var tokens_now: int = PL.get_tokens(d)
 		var tokens_needed: int = _get_displayed_tokens_cost(coach_id)
-		LblTokensAvailable.text = "Available: " + str(tokens_now)
+		LblTokensAvailable.text = tr("coach.tokens_available") % tokens_now
 		if tokens_now < tokens_needed:
 			LblTokensAvailable.add_theme_color_override("font_color", Color(0.92, 0.22, 0.22, 1))
 		else:

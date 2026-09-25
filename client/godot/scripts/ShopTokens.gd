@@ -2741,7 +2741,7 @@ func _request_payment_cloud_load() -> void:
 	_payment_refresh_request_in_flight = true
 	if BtnConfirm != null:
 		BtnConfirm.disabled = true
-	_set_status("Synchronizing your Club Tokens...")
+	_set_status(tr("club_tokens.stripe.syncing_tokens"))
 
 	var http := HTTPRequest.new()
 	add_child(http)

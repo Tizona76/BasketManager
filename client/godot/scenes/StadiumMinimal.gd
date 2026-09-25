@@ -2511,7 +2511,7 @@ func _show_upgrade_acceleration_popup(message: String) -> void:
 
 	var cancel_btn := Button.new()
 	cancel_btn.name = "BtnUpgradeAccelerationCancel"
-	cancel_btn.text = "Cancel"
+	cancel_btn.text = tr("login.btn.cancel")
 	_apply_upgrade_cancel_button_style(cancel_btn)
 	cancel_btn.pressed.connect(func() -> void:
 		_upgrade_accel_mode = false
@@ -3314,7 +3314,7 @@ func _on_tab_upgrade() -> void:
 		var lbl_remaining := panel.get_node_or_null("VBoxUpgrade/LblUpgradeRemaining") as Label
 		var btn_accel := panel.get_node_or_null("VBoxUpgrade/BtnUpgradeAccelerate") as Button
 		if btn_confirm != null:
-			btn_confirm.text = "Confirm Upgrade"
+			btn_confirm.text = _stadium_tr("stadium.confirm_upgrade")
 			btn_confirm.visible = true
 			btn_confirm.disabled = false
 			btn_confirm.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -3855,7 +3855,7 @@ func _ensure_upgrade_panel() -> void:
 
 	var btn_cancel_scene := _get_upgrade_cancel_button(panel)
 	if btn_cancel_scene != null:
-		btn_cancel_scene.text = "Cancel"
+		btn_cancel_scene.text = tr("login.btn.cancel")
 		_apply_upgrade_cancel_button_style(btn_cancel_scene)
 		if not btn_cancel_scene.pressed.is_connected(_on_close_upgrade_pressed):
 			btn_cancel_scene.pressed.connect(_on_close_upgrade_pressed)
@@ -4109,7 +4109,7 @@ func _ensure_shop_panel() -> void:
 		hdr_left.add_theme_constant_override("separation", 14)
 		hdr_frame.add_child(hdr_left)
 
-		var h1l := Label.new(); h1l.text = "PRODUIT"; h1l.custom_minimum_size.x = 126; h1l.modulate = Color(1,1,1,1)
+		var h1l := Label.new(); h1l.text = _stadium_tr("stadium.shop.col.product").to_upper(); h1l.custom_minimum_size.x = 126; h1l.modulate = Color(1,1,1,1)
 		h1l.add_theme_font_size_override("font_size", 22)
 		var h2l := Label.new(); h2l.text = "STOCK";	  h2l.custom_minimum_size.x = 110; h2l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; h2l.modulate = Color(1,1,1,1)
 		h2l.add_theme_font_size_override("font_size", 22)
@@ -6384,7 +6384,7 @@ func _show_shop_restock_popup(pid: String) -> void:
 	card.move_to_front()
 
 	var title := Label.new()
-	title.text = "Restock"
+	title.text = _stadium_tr("stadium.shop.col.restock")
 	title.position = Vector2(28, 20)
 	title.size = Vector2(320, 42)
 	title.add_theme_font_size_override("font_size", 30)
@@ -6413,11 +6413,11 @@ func _show_shop_restock_popup(pid: String) -> void:
 
 	# BM_RESTOCK_POPUP_MINI_TABLE_V1
 	var headers := [
-		{"text": "Order", "x": 42.0, "w": 170.0},
-		{"text": "Units", "x": 225.0, "w": 90.0},
-		{"text": "Cost/unit", "x": 330.0, "w": 120.0},
-		{"text": "Total cost", "x": 465.0, "w": 130.0},
-		{"text": "New stock", "x": 610.0, "w": 140.0}
+		{"text": _stadium_tr("stadium.shop.restock.order"), "x": 42.0, "w": 170.0},
+		{"text": _stadium_tr("stadium.shop.restock.units"), "x": 225.0, "w": 90.0},
+		{"text": _stadium_tr("stadium.shop.restock.unit_cost"), "x": 330.0, "w": 120.0},
+		{"text": _stadium_tr("stadium.shop.restock.total_cost"), "x": 465.0, "w": 130.0},
+		{"text": _stadium_tr("stadium.shop.restock.new_stock"), "x": 610.0, "w": 140.0}
 	]
 	for h in headers:
 		var lbl_h := Label.new()
@@ -6430,7 +6430,7 @@ func _show_shop_restock_popup(pid: String) -> void:
 		card.add_child(lbl_h)
 
 	var small_lbl := Label.new()
-	small_lbl.text = "Small order"
+	small_lbl.text = _stadium_tr("stadium.shop.small_order")
 	small_lbl.position = Vector2(42, 122)
 	small_lbl.size = Vector2(170, 38)
 	small_lbl.add_theme_font_size_override("font_size", 23)
@@ -6469,7 +6469,7 @@ func _show_shop_restock_popup(pid: String) -> void:
 	card.add_child(small_stock_lbl)
 
 	var large_lbl := Label.new()
-	large_lbl.text = "Large order"
+	large_lbl.text = _stadium_tr("stadium.shop.large_order")
 	large_lbl.position = Vector2(42, 182)
 	large_lbl.size = Vector2(170, 38)
 	large_lbl.add_theme_font_size_override("font_size", 23)
@@ -6508,7 +6508,7 @@ func _show_shop_restock_popup(pid: String) -> void:
 	card.add_child(large_stock_lbl)
 
 	var small_btn := Button.new()
-	small_btn.text = "Small order"
+	small_btn.text = _stadium_tr("stadium.shop.small_order")
 	small_btn.position = Vector2(770, 105)
 	small_btn.size = Vector2(160, 48)
 	small_btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
@@ -6519,7 +6519,7 @@ func _show_shop_restock_popup(pid: String) -> void:
 	card.add_child(small_btn)
 
 	var large_btn := Button.new()
-	large_btn.text = "Large order"
+	large_btn.text = _stadium_tr("stadium.shop.large_order")
 	large_btn.position = Vector2(770, 175)
 	large_btn.size = Vector2(160, 48)
 	large_btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))

@@ -77,7 +77,7 @@ club_tokens.history.reason.mission,Mission terminée,Mission completed,Misión c
 club_tokens.history.reason.tournament,Récompense de tournoi,Tournament reward,Recompensa de torneo,Ricompensa torneo,Recompensa de torneio
 club_tokens.history.reason.token_pack,Pack de Tokens,Token pack,Pack de Tokens,Pacchetto Token,Pacote de Tokens
 club_tokens.history.reason.club_identity,Club Identity,Club Identity,Club Identity,Club Identity,Club Identity
-club_tokens.history.reason.auto_save_lineup,Auto Save Lineup,Auto Save Lineup,Auto Save Lineup,Auto Save Lineup,Auto Save Lineup
+club_tokens.history.reason.auto_save_lineup,Sauvegarde automatique de la composition,Auto Save Lineup,Guardado automático de la alineación,Salvataggio automatico della formazione,Gravação automática da formação
 club_tokens.history.reason.skip_match_summary,Résumé de match passé,Skip Match Summary,Saltar resumen del partido,Salta riepilogo partita,Saltar resumo do jogo
 club_tokens.nav.overview,Overview,Overview,Resumen,Panoramica,Resumo
 club_tokens.nav.comfort,Confort,Comfort,Comodidad,Comfort,Conforto
@@ -85,7 +85,7 @@ club_tokens.nav.development,Développement,Development,Desarrollo,Sviluppo,Desen
 club_tokens.nav.premium,Premium,Premium,Premium,Premium,Premium
 home_arena.title,HOME ARENA,HOME ARENA,HOME ARENA,HOME ARENA,HOME ARENA
 home_arena.overview_subtitle,Transforme tes matchs à domicile en arena premium.,Transform your home games into a premium arena.,Transforma tus partidos en casa en una arena premium.,Trasforma le partite in casa in un'arena premium.,Transforma os teus jogos em casa numa arena premium.
-home_arena.setup_cta,SET UP HOME ARENA,SET UP HOME ARENA,CONFIGURAR HOME ARENA,CONFIGURA HOME ARENA,CONFIGURAR HOME ARENA
+home_arena.setup_cta,CONFIGURER HOME ARENA,SET UP HOME ARENA,CONFIGURAR HOME ARENA,CONFIGURA HOME ARENA,CONFIGURAR HOME ARENA
 home_arena.placeholder_cta,BIENTÔT DISPONIBLE,COMING SOON,PRÓXIMAMENTE,IN ARRIVO,EM BREVE
 home_arena.select,SÉLECTIONNER,SELECT,SELECCIONAR,SELEZIONA,SELECIONAR
 home_arena.selected,SÉLECTIONNÉE,SELECTED,SELECCIONADA,SELEZIONATA,SELECIONADA
@@ -98,7 +98,7 @@ sponsors.current_empty,Aucun sponsor actif.,No active sponsor.,No hay patrocinad
 sponsors.available_title,OFFRES DISPONIBLES,AVAILABLE OFFERS,OFERTAS DISPONIBLES,OFFERTE DISPONIBILI,OFERTAS DISPONÍVEIS
 sponsors.available_empty,Aucune offre disponible pour le moment.,No offers available yet.,Aún no hay ofertas disponibles.,Nessuna offerta disponibile per ora.,Ainda não há ofertas disponíveis.
 sponsors.info,De nouvelles opportunités de sponsoring seront disponibles à mesure que ton club grandira.,New sponsorship opportunities will become available as your club grows.,Nuevas oportunidades de patrocinio estarán disponibles a medida que tu club crezca.,Nuove opportunità di sponsorizzazione saranno disponibili man mano che il club cresce.,Novas oportunidades de patrocínio ficarão disponíveis à medida que seu clube crescer.
-sponsors.sign_contract,SIGN CONTRACT,SIGN CONTRACT,FIRMAR CONTRATO,FIRMA CONTRATTO,ASSINAR CONTRATO
+sponsors.sign_contract,SIGNER LE CONTRAT,SIGN CONTRACT,FIRMAR CONTRATO,FIRMA CONTRATTO,ASSINAR CONTRATO
 sponsors.active,ACTIVE,ACTIVE,ACTIVO,ATTIVO,ATIVO
 sponsors.unavailable,INDISPONIBLE,UNAVAILABLE,NO DISPONIBLE,NON DISPONIBILE,INDISPONÍVEL
 sponsors.remaining,Restant,Remaining,Restante,Rimanente,Restante
@@ -106,7 +106,7 @@ sponsors.remaining_matches,matchs,games,partidos,partite,partidas
 sponsors.remaining_seasons,saison,season,temporada,stagione,temporada
 sponsors.expired,EXPIRÉ,EXPIRED,EXPIRADO,SCADUTO,EXPIRADO
 sponsors.no_active_contract,Aucun contrat sponsor actif. De nouvelles offres seront disponibles au début de la prochaine saison.,No active sponsor contract. New offers will be available at the start of next season.,No hay contrato de patrocinio activo. Habrá nuevas ofertas al inicio de la próxima temporada.,Nessun contratto sponsor attivo. Nuove offerte saranno disponibili all'inizio della prossima stagione.,Nenhum contrato de patrocínio ativo. Novas ofertas estarão disponíveis no início da próxima temporada.
-sponsors.confirm_title,Confirm sponsor agreement ?,Confirm sponsor agreement ?,Confirm sponsor agreement ?,Confirm sponsor agreement ?,Confirm sponsor agreement ?
+sponsors.confirm_title,Confirmer le contrat ?,Confirm sponsor agreement?,¿Confirmar el contrato?,Confermare il contratto?,Confirmar o contrato?
 sponsors.confirm_message,Confirmer l'engagement avec ce sponsor ?,Confirm agreement with this sponsor?,¿Confirmar acuerdo con este patrocinador?,Confermare l'accordo con questo sponsor?,Confirmar acordo com este patrocinador?
 sponsors.family.local,Local,Local,Local,Locale,Local
 sponsors.family.national,National,National,Nacional,Nazionale,Nacional
@@ -190,15 +190,15 @@ matchsim.mvp_home_short,—,—,—,—,—
 matchsim.btn_skip,Voir le résultat,See final result,Ver resultado final,Vedi risultato finale,Ver resultado final
 matchsim.continue_to_season,Continuer vers la Saison,Continue to Season,Continuar a Temporada,Continua alla Stagione,Continuar para a Temporada
 season.btn_play_match,Jouer le match,Play game,Jugar el partido,Gioca la partita,Jogar a partida
-stadium.title,Stadium,Stadium,,,
+stadium.title,Stadium,Stadium,Estadio,Stadio,Estádio
 stadium.tab.shop,Boutique,Shop,Tienda,Negozio,Loja
 stadium.tab.ticketing,Billetterie,Ticketing,Entradas,Biglietteria,Bilheteria
 stadium.tab.cafe,Cafétéria,Cafeteria,,,
 stadium.tab.upgrade,Évolution Stade,Stadium Upgrade,Mejora del estadio,Evoluzione stadio,Evolução do estádio
-stadium.ticketing.title,Billetterie,Ticketing,,,
+stadium.ticketing.title,Billetterie,Ticketing,Entradas,Biglietteria,Bilhetes
 stadium.ticketing.col.category,Cat.,Cat.,,,
-stadium.ticketing.col.price,Prix ($),Price ($),,,
-stadium.ticketing.col.seats,Places,Seats,,,
+stadium.ticketing.col.price,Prix ($),Price ($),Precio ($),Prezzo ($),Preço ($)
+stadium.ticketing.col.seats,Places,Seats,Asientos,Posti,Lugares
 stadium.ticketing.col.estimated_revenue_short,Rev. est.,Est. Revenue,Ing. est.,Ric. stim.,Rec. est.
 stadium.ticketing.cat.a,A,A,,,
 stadium.ticketing.cat.b,B,B,,,
@@ -228,7 +228,7 @@ saison.tab.missions,Missions,Missions,Misiones,Missioni,Missões
 saison.tab.tournois,Tournois,Tournaments,Torneos,Tornei,Torneios
 popup_intro_title,Build Your Roster,Build Your Roster,Build Your Roster,Build Your Roster,Build Your Roster
 popup_intro_build_title,🏟 Construisez votre club,🏟 Build your club,🏟 Construye tu club,🏟 Costruisci il tuo club,🏟 Construa seu clube
-popup_intro_build_body,"Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.","Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.","Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.","Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.","Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players."
+popup_intro_build_body,"Choisissez vos joueurs : comparez leurs attributs et salaires pour créer votre effectif.\nDès le match 5, composez votre équipe avec ces joueurs.","Start by selecting the players for your club : compare their attributes and salaries to build your roster.\nFrom game 5, you'll choose your lineup with these players.","Elige a tus jugadores: compara atributos y salarios para crear tu plantilla.\nDesde el partido 5, elegirás tu alineación con estos jugadores.","Scegli i giocatori: confronta attributi e stipendi per creare la rosa.\nDalla partita 5, scegli la formazione con questi giocatori.","Escolha seus jogadores: compare atributos e salários para montar o elenco.\nA partir do jogo 5, escolha a escalação com esses jogadores."
 popup_intro_select_players,Select Players,Select Players,Select Players,Select Players,Select Players
 popup_intro_decisions_title,📊 Prenez les bonnes décisions,📊 Make the right decisions,📊 Toma las decisiones correctas,📊 Prendi le decisioni giuste,📊 Tome as decisões certas
 popup_intro_decisions_body,"Recrutez des joueurs, développez votre popularité : plus elle est élevée, plus les spectateurs viendront au stade.","Recruit players, grow your popularity: the higher it is, the more spectators will come to the stadium.","Ficha jugadores y aumenta tu popularidad: cuanto más alta sea, más espectadores vendrán al estadio.","Ingaggia giocatori e aumenta la tua popolarità: più è alta, più spettatori verranno allo stadio.","Contrate jogadores e aumente sua popularidade: quanto mais alta ela for, mais espectadores virão ao estádio."
@@ -243,10 +243,10 @@ popup_match_season_title,>> Suivez votre saison,>> Follow your season,>> Sigue t
 popup_match_season_body,Consultez le classement et suivez la progression de votre club.,Check the standings and track your club’s progress.,Consulta la clasificación y sigue el progreso de tu club.,Controlla la classifica e segui i progressi del tuo club.,Veja a classificação e acompanhe o progresso do seu clube.
 popup_match_extra_title,>> Relevez des défis supplémentaires,>> Take on extra challenges,>> Acepta nuevos desafíos,>> Affronta nuove sfide,>> Enfrente novos desafios
 popup_match_extra_body,Participez aux tournois et accomplissez des missions pour développer votre club.,Join tournaments and complete missions to grow your club.,Participa en torneos y completa misiones para desarrollar tu club.,Partecipa ai tornei e completa missioni per far crescere il tuo club.,Participe de torneios e complete missões para desenvolver seu clube.
-popup.sponsors.title,New Sponsorship Opportunities,New Sponsorship Opportunities,New Sponsorship Opportunities,New Sponsorship Opportunities,New Sponsorship Opportunities
-popup.sponsors.body,Your club is starting to attract attention.\nChoose the contract that best fits your ambitions.,Your club is starting to attract attention.\nChoose the contract that best fits your ambitions.,Your club is starting to attract attention.\nChoose the contract that best fits your ambitions.,Your club is starting to attract attention.\nChoose the contract that best fits your ambitions.,Your club is starting to attract attention.\nChoose the contract that best fits your ambitions.
-popup.sponsors_expired.title,New Sponsorship Opportunities,New Sponsorship Opportunities,New Sponsorship Opportunities,New Sponsorship Opportunities,New Sponsorship Opportunities
-popup.sponsors_expired.body,Your sponsorship contract has ended.\nNew partnership opportunities are now available.,Your sponsorship contract has ended.\nNew partnership opportunities are now available.,Your sponsorship contract has ended.\nNew partnership opportunities are now available.,Your sponsorship contract has ended.\nNew partnership opportunities are now available.,Your sponsorship contract has ended.\nNew partnership opportunities are now available.
+popup.sponsors.title,Nouveaux sponsors,New Sponsorship Opportunities,Nuevos patrocinadores,Nuovi sponsor,Novos patrocinadores
+popup.sponsors.body,Votre club attire l’attention.\nChoisissez le contrat adapté à vos ambitions.,Your club is starting to attract attention.\nChoose the contract that best fits your ambitions.,Tu club empieza a llamar la atención.\nElige el contrato que encaje con tus ambiciones.,Il tuo club attira l’attenzione.\nScegli il contratto adatto alle tue ambizioni.,Seu clube está chamando atenção.\nEscolha o contrato ideal para suas ambições.
+popup.sponsors_expired.title,Nouveaux sponsors,New Sponsorship Opportunities,Nuevos patrocinadores,Nuovi sponsor,Novos patrocinadores
+popup.sponsors_expired.body,Votre contrat de sponsoring a expiré.\nDe nouveaux partenariats sont disponibles.,Your sponsorship contract has ended.\nNew partnership opportunities are now available.,Tu contrato de patrocinio ha terminado.\nHay nuevas ofertas disponibles.,Il contratto di sponsorizzazione è scaduto.\nSono disponibili nuove offerte.,Seu contrato de patrocínio terminou.\nNovas parcerias estão disponíveis.
 popup.club_tokens.title,Club Tokens,Club Tokens,Club Tokens,Club Tokens,Club Tokens
 popup.club_tokens.body,"Tes premiers tokens sont prêts !
 Gagne-les grâce aux missions, aux tournois et aux récompenses.","Your first tokens are ready!
@@ -264,15 +264,15 @@ stadium.new_capacity,Nouvelle capacité,New Capacity,Nueva capacidad,Nuova capac
 stadium.cost,Coût,Cost,Coste,Costo,Custo
 stadium.duration,Durée des travaux,Works duration,Duración de las obras,Durata dei lavori,Duração das obras
 stadium.duration_unit,match(s),games,partidos,partite,jogos
-stadium.work_duration,Work duration,Work duration,Work duration,Work duration,Work duration
+stadium.work_duration,Durée des travaux,Work duration,Duración de las obras,Durata dei lavori,Duração das obras
 stadium.duration_one_game,1 game,1 game,1 game,1 game,1 game
-stadium.basic_improvements,Basic Improvements,Basic Improvements,Basic Improvements,Basic Improvements,Basic Improvements
-stadium.basic_improvements_desc,Improve seating and refresh the facilities.,Improve seating and refresh the facilities.,Improve seating and refresh the facilities.,Improve seating and refresh the facilities.,Improve seating and refresh the facilities.
-stadium.capacity_bonus.basic,Better fan comfort,Better fan comfort,Better fan comfort,Better fan comfort,Better fan comfort
+stadium.basic_improvements,Améliorations de base,Basic Improvements,Mejoras básicas,Miglioramenti di base,Melhorias básicas
+stadium.basic_improvements_desc,Améliorez les sièges et rénovez les installations.,Improve seating and refresh the facilities.,Mejora los asientos y renueva las instalaciones.,Migliora i posti a sedere e rinnova le strutture.,Melhore os assentos e renove as instalações.
+stadium.capacity_bonus.basic,Meilleur confort du public,Better fan comfort,Mayor comodidad para el público,Più comfort per il pubblico,Maior conforto para o público
 stadium.capacity_bonus.1_2,VIP seating,VIP seating,VIP seating,VIP seating,VIP seating
-stadium.capacity_bonus.1_3,New food court,New food court,New food court,New food court,New food court
-stadium.capacity_bonus.2_1,Covered stands,Covered stands,Covered stands,Covered stands,Covered stands
-stadium.capacity_bonus.2_2,Premium hospitality,Premium hospitality,Premium hospitality,Premium hospitality,Premium hospitality
+stadium.capacity_bonus.1_3,Nouvel espace de restauration,New food court,Nueva zona de restauración,Nuova area ristoro,Nova zona de restauração
+stadium.capacity_bonus.2_1,Tribunes couvertes,Covered stands,Gradas cubiertas,Tribune coperte,Bancadas cobertas
+stadium.capacity_bonus.2_2,Accueil haut de gamme,Premium hospitality,Hospitalidad prémium,Ospitalità premium,Hospitalidade premium
 stadium.confirm_upgrade,Confirmer l'évolution,Confirm upgrade,Confirmar mejora,Conferma miglioramento,Confirmar melhoria
 stadium.upgrade.save_missing,Save introuvable.,Save not found.,Guardado no encontrado.,Salvataggio non trovato.,Save não encontrado.
 stadium.upgrade.next_level_missing,Fonction stadium_next_level introuvable.,stadium_next_level function not found.,Función stadium_next_level no encontrada.,Funzione stadium_next_level non trovata.,Função stadium_next_level não encontrada.
@@ -289,7 +289,7 @@ club.popularity,Popularité,Popularity,Popularidad,Popolarità,Popularidade
 btn.confirm,Confirmer,Confirm,Confirmar,Conferma,Confirmar
 season.ball.season,Saison,Season,Temporada,Stagione,Temporada
 season.ball.matches,Matchs,Gamees,Partidos,Partite,Partidas
-season.label,Season {season} - Day {day},Season {season} - Day {day},Temporada {season} - Día {day},Stagione {season} - Giorno {day},Temporada {season} - Dia {day}
+season.label,Saison {season} - Journée {day},Season {season} - Day {day},Temporada {season} - Día {day},Stagione {season} - Giorno {day},Temporada {season} - Dia {day}
 END_SEASON_TITLE,Fin de saison,End of season,Fin de temporada,Fine stagione,Fim da temporada
 END_SEASON_RANK,Votre équipe termine à la place %d.,Your team finishes in position %d.,Tu equipo termina en la posición %d.,La tua squadra termina in posizione %d.,Sua equipe termina na posição %d.
 END_SEASON_RANK_1,Votre équipe termine à la 1re place.,Your team finishes 1st.,Tu equipo termina en 1ª posición.,La tua squadra termina al 1° posto.,Sua equipe termina em 1º lugar.
@@ -384,7 +384,7 @@ missions.lv2.pts_90_1,Marquer 90 points 1 fois,Score 90 points 1 time,Anotar 90 
 missions.lv2.mercato_3,Acheter 3 joueurs au mercato,Buy 3 players in the transfer market,Comprar 3 jugadores en el mercado de fichajes,Acquistare 3 giocatori al mercato,Comprar 3 jogadores no mercado
 missions.lv2.streak_3,Gagner 3 matchs d'affilée,Win 3 games in a row,Ganar 3 partidos seguidos,Vincere 3 partite di fila,Vencer 3 partidas seguidas
 mercato.closed.title,Mercato fermé,Transfer market closed,Mercado cerrado,Mercato chiuso,Mercado fechado
-mercato.closed.body,"Mercato fermé.Ouverture : avant la saison jusqu'au match 2 inclus, puis pendant les matchs 10, 11 et 12.","Transfer market closed.Open before the season up to game 2 inclusive, then during gamees 10, 11 and 12.","Mercado cerrado.Abierto antes de la temporada hasta el partido 2 inclusive, luego durante los partidos 10, 11 y 12.","Mercato chiuso.Aperto prima della stagione fino alla partita 2 inclusa, poi durante le partite 10, 11 e 12.","Mercado fechado.Aberto antes da temporada até o jogo 2 inclusive, depois durante os jogos 10, 11 e 12."
+mercato.closed.body,"Mercato fermé. Ouverture : avant la saison jusqu'au match 2 inclus, puis pendant les matchs 10, 11 et 12.","Transfer market closed. Open before the season up to game 2 inclusive, then during games 10, 11 and 12.","Mercado cerrado. Abierto antes de la temporada hasta el partido 2 inclusive, luego durante los partidos 10, 11 y 12.","Mercato chiuso. Aperto prima della stagione fino alla partita 2 inclusa, poi durante le partite 10, 11 e 12.","Mercado fechado. Aberto antes da temporada até o jogo 2 inclusive, depois durante os jogos 10, 11 e 12."
 mercato.buy,Acheter,Buy,Comprar,Acquistare,Comprar
 mercato.bought,Acheté,Bought,Comprado,Acquistato,Comprado
 common.back,Retour,Back,Volver,Indietro,Voltar
@@ -417,10 +417,10 @@ player.position.short.point_forward,P.F.,P.F.,P.F.,P.F.,P.F.
 player.position.short.center,C.,C.,C.,C.,C.
 popup.last_match_finance.title,Bilan financier du dernier match,Last game financial summary,Balance financiero del último partido,Bilancio finanziario dell'ultima partita,Balanço financeiro da última partida
 popup.last_match_finance.cta_finances,Voir les finances du club,See club finance,Ver las finanzas del club,Vedi le finanze del club,Ver as finanças do clube
-popup.shop_out_of_stock.title,Shop Out of Stock,Shop Out of Stock,Shop Out of Stock,Shop Out of Stock,Shop Out of Stock
-popup.shop_out_of_stock.body,Restock your products in the Shop to keep generating income for your club.,Restock your products in the Shop to keep generating income for your club.,Restock your products in the Shop to keep generating income for your club.,Restock your products in the Shop to keep generating income for your club.,Restock your products in the Shop to keep generating income for your club.
+popup.shop_out_of_stock.title,Boutique en rupture de stock,Shop Out of Stock,Tienda sin existencias,Scorte del negozio esaurite,Loja sem stock
+popup.shop_out_of_stock.body,Réapprovisionnez la boutique pour continuer à générer des revenus.,Restock your products in the Shop to keep generating income for your club.,Repón los productos de la tienda para seguir generando ingresos.,Rifornisci il negozio per continuare a generare entrate.,Reabasteça a loja para continuar gerando receita.
 teamname.placeholder,Créer le nom de l’équipe,Create team name,Crear nombre del equipo,Crea nome squadra,Criar nome da equipa
-popup_stadium_home_only,Les revenus des visiteurs au stade ont lieu uniquement pendant les matchs à domicile.,Stadium visitor income only happens during home gamees.,Los ingresos de los visitantes del estadio solo se generan en los partidos en casa.,Le entrate dei visitatori dello stadio si generano solo durante le partite in casa.,As receitas dos visitantes do estádio só acontecem nos jogos em casa.
+popup_stadium_home_only,Les revenus des visiteurs au stade ont lieu uniquement pendant les matchs à domicile.,Stadium visitor income only happens during home games.,Los ingresos de los visitantes del estadio solo se generan en los partidos en casa.,Le entrate dei visitatori dello stadio si generano solo durante le partite in casa.,As receitas dos visitantes do estádio só acontecem nos jogos em casa.
 popup.match_compo.title,Compose ton équipe de joueurs pour le match,Set your player lineup for the match,Compón tu equipo de jugadores para el partido,Componi la tua squadra per la partita,Monte sua equipe para a partida
 popup.match_compo.body,"Avant les matchs, tu dois composer ton équipe de 8 joueurs parmi les meilleurs. Prends en compte leur état de fatigue et leur motivation pour mettre toutes les chances de ton équipe de remporter le match. Bonne chance !","Before each match, you need to build your team of 8 players from your best options. Take their fatigue and motivation into account to give your team the best chance to win. Good luck!","Antes de cada partido, debes componer tu equipo de 8 jugadores entre los mejores. Ten en cuenta su fatiga y motivación para darle a tu equipo las mejores opciones de ganar. ¡Buena suerte!","Prima di ogni partita, devi comporre la tua squadra di 8 giocatori scegliendo i migliori. Tieni conto di fatica e motivazione per dare alla tua squadra le migliori possibilità di vincere. Buona fortuna!","Antes de cada partida, você deve montar sua equipe de 8 jogadores entre os melhores. Leve em conta fadiga e motivação para dar ao seu time a melhor chance de vencer. Boa sorte!"
 popup.match_compo.cta,Faire la compo,Set lineup,Hacer la alineación,Crea la formazione,Montar escalação
@@ -443,11 +443,11 @@ club.popularity.tooltip,"Indice qui indique le taux de remplissage du stade. Il 
 coach.quote.junior,Je sécurise ta composition en évitant les erreurs majeures. Ton équipe devient stable et fiable.,I secure your lineup by avoiding major mistakes. Your team becomes stable and reliable.,Aseguro tu alineación evitando errores graves. Tu equipo se vuelve estable y fiable.,Rendo la tua formazione sicura evitando errori gravi. La tua squadra diventa stabile e affidabile.,Asseguro a tua formação evitando erros graves. A tua equipa torna-se estável e fiável.
 coach.quote.confirme,J’optimise ta composition selon la forme et la fatigue des joueurs. Ton équipe devient plus performante.,I optimize your lineup using player form and fatigue. Your team performs more consistently.,Optimizo tu alineación según la forma y la fatiga de los jugadores. Tu equipo rinde mejor.,Ottimizzo la tua formazione in base a forma e fatica dei giocatori. La tua squadra è più performante.,Otimizo a tua formação com base na forma e fadiga dos jogadores. A tua equipa rende melhor.
 coach.quote.elite,Je sélectionne en continu la meilleure composition et donne un vrai avantage en match.,I constantly select the best possible lineup and give your team a real edge in games.,Selecciono continuamente la mejor alineación y doy una ventaja real en los partidos.,Seleziono continuamente la migliore formazione e do un vero vantaggio in partita.,Seleciono continuamente a melhor formação e dou uma vantagem real nos jogos.
-coach.title.tooltip,"With a coach, you no longer need to prepare your lineup before every match. He selects the team for you based on player attributes, helping you save time and play more efficiently.","With a coach, you no longer need to prepare your lineup before every match. He selects the team for you based on player attributes, helping you save time and play more efficiently.","Con un entrenador, ya no necesitas preparar tu alineación antes de cada partido. Él selecciona el equipo según los atributos de los jugadores, ayudándote a ahorrar tiempo y a jugar con más eficacia.","Con un coach, non devi più preparare la tua formazione prima di ogni partita. Seleziona lui la squadra in base agli attributi dei giocatori, aiutandoti a risparmiare tempo e a giocare in modo più efficace.","Com um treinador, já não precisas de preparar a tua equipa antes de cada jogo. Ele escolhe a equipa com base nos atributos dos jogadores, ajudando-te a poupar tempo e a jogar com mais eficácia."
+coach.title.tooltip,"Avec un coach, inutile de préparer votre composition avant chaque match. Il choisit les joueurs selon leurs attributs pour vous faire gagner du temps et rendre votre équipe plus efficace.","With a coach, you no longer need to prepare your lineup before every match. He selects the team for you based on player attributes, helping you save time and play more efficiently.","Con un entrenador, ya no necesitas preparar tu alineación antes de cada partido. Él selecciona el equipo según los atributos de los jugadores, ayudándote a ahorrar tiempo y a jugar con más eficacia.","Con un coach, non devi più preparare la tua formazione prima di ogni partita. Seleziona lui la squadra in base agli attributi dei giocatori, aiutandoti a risparmiare tempo e a giocare in modo più efficace.","Com um treinador, já não precisas de preparar a tua equipa antes de cada jogo. Ele escolhe a equipa com base nos atributos dos jogadores, ajudando-te a poupar tempo e a jogar com mais eficácia."
 common.confirm,Confirmer,Confirm,Confirmar,Conferma,Confirmar
 mercato.btn.confirm_buy,Confirmer achat,Confirm buy,Confirmar compra,Conferma acquisto,Confirmar compra
 coach.popup.not_enough_tokens,Pas assez de tokens,Not enough tokens,No tienes suficientes tokens,Token insufficienti,Tokens insuficientes
-mercato.licensed_players,Licensed players: %d / 12,Licensed players: %d / 12,Jugadores con licencia: %d / 12,Giocatori con licenza: %d / 12,Jogadores com licença: %d / 12
+mercato.licensed_players,Joueurs licenciés : %d / 12,Licensed players: %d / 12,Jugadores con licencia: %d / 12,Giocatori con licenza: %d / 12,Jogadores com licença: %d / 12
 player.attr.tir,Tir,Shooting,Tiro,Tiro,Tiro
 player.card.age,Âge,Age,Edad,Età,Idade
 player.card.salary,Salaire,Salary,Salario,Salario,Salário
@@ -785,3 +785,89 @@ login.status.code_expired,Code expiré,Code expired,Código caducado,Codice scad
 login.status.code_locked,Trop de tentatives,Too many attempts,Demasiados intentos,Troppi tentativi,Muitas tentativas
 login.status.code_invalid,Code incorrect,Invalid code,Código incorrecto,Codice non valido,Código inválido
 login.status.email_invalid,Email invalide,Invalid email,Email no válido,Email non valida,E-mail inválido
+login.explainer.title,Pourquoi votre email ?,Why do we ask for your email?,¿Por qué pedimos tu email?,Perché chiediamo la tua email?,Por que pedimos seu email?
+login.explainer.body,• Créer un profil unique\n\n• Apparaître au classement mondial\n\n• Demandé une seule fois\n\n• Un code à usage unique sécurise la connexion\n\n• Vos données restent confidentielles,"• Create a unique user profile\n\n• Appear in the global leaderboard\n\n• Requested only once\n\n• A one-time code is sent for secure verification\n\n• Safe, secure and confidential",• Crea un perfil único\n\n• Aparece en la clasificación mundial\n\n• Solo se solicita una vez\n\n• Un código de un solo uso protege el acceso\n\n• Tus datos son seguros y confidenciales,• Crea un profilo unico\n\n• Entra nella classifica mondiale\n\n• Richiesta una sola volta\n\n• Un codice monouso protegge l’accesso\n\n• I tuoi dati sono sicuri e riservati,• Crie um perfil único\n\n• Apareça na classificação mundial\n\n• Solicitado apenas uma vez\n\n• Um código de uso único protege o acesso\n\n• Seus dados são seguros e confidenciais
+menu.save_choice.local,Sauver en local,Save Locally,Guardar local,Salva in locale,Salvar local
+menu.save_choice.cloud,Sauver en ligne,Save to Cloud,Guardar online,Salva online,Salvar online
+menu.save_choice.pending,Requête cloud en cours…,Cloud request in progress…,Petición cloud en curso…,Richiesta cloud in corso…,Solicitação cloud em curso…
+menu.save_choice.saving,Sauvegarde en ligne…,Saving to cloud…,Guardando online…,Salvataggio online…,Salvando online…
+season.reward.title,Récompense de saison,Season reward,Premio de temporada,Premio stagionale,Prêmio da temporada
+season.reward.rank,Classement final : #{rank},Final rank: #{rank},Puesto final: #{rank},Posizione finale: #{rank},Posição final: #{rank}
+season.reward.money,Prime,Prize money,Premio en dinero,Premio in denaro,Prêmio em dinheiro
+season.reward.tokens,Jetons gagnés,Prize tokens,Fichas ganadas,Gettoni vinti,Fichas ganhas
+mercato.col.rank,Rang,Rank,Rango,Rango,Rank
+mercato.col.position_short,Poste,Pos.,Pos.,Pos.,Pos.
+club_identity.overview_subtitle,Personnalisez votre blason et affirmez votre identité.,Customize your club badge and build your identity.,Personaliza tu escudo y crea tu identidad.,Personalizza lo stemma e crea la tua identità.,Personalize o escudo e crie sua identidade.
+club_identity.setup_cta,PERSONNALISER LE CLUB,SET UP CLUB IDENTITY,PERSONALIZAR EL CLUB,PERSONALIZZA IL CLUB,PERSONALIZAR O CLUBE
+club_tokens.stripe.refreshing_session,Actualisation de la session sécurisée…,Refreshing secure session...,Actualizando la sesión segura…,Aggiornamento della sessione sicura…,Atualizando a sessão segura…
+menu.save.local_done,Sauvegarde locale effectuée,Saved locally,Guardado local completado,Salvataggio locale completato,Guardado local concluído
+menu.save.account_required,Sauvegarde locale effectuée. Créez un compte pour sauvegarder en ligne.,Saved locally. Create an account to enable cloud save.,Guardado local completado. Crea una cuenta para guardar en la nube.,Salvataggio locale completato. Crea un account per salvare nel cloud.,Guardado local concluído. Cria uma conta para guardar na nuvem.
+menu.cloud.synced,Synchronisation cloud réussie ✅,Cloud synced ✅,Nube sincronizada ✅,Cloud sincronizzato ✅,Nuvem sincronizada ✅
+menu.cloud.offline_save,Sauvegarde hors ligne ({code}),Save offline ({code}),Guardado sin conexión ({code}),Salvataggio offline ({code}),Guardado sem ligação ({code})
+menu.cloud.offline_load,Chargement hors ligne ({code}),Load offline ({code}),Carga sin conexión ({code}),Caricamento offline ({code}),Carregamento sem ligação ({code})
+menu.cloud.save_error,Échec de sauvegarde ({code}),Save failed ({code}),Error al guardar ({code}),Salvataggio non riuscito ({code}),Falha ao guardar ({code})
+menu.cloud.load_error,Échec du chargement cloud ({code}),Cloud load failed ({code}),Error al cargar de la nube ({code}),Caricamento cloud non riuscito ({code}),Falha ao carregar da nuvem ({code})
+menu.cloud.save_failed,Échec de la sauvegarde cloud,Cloud save failed,Error al guardar en la nube,Salvataggio cloud non riuscito,Falha ao guardar na nuvem
+menu.cloud.start_failed,Impossible de lancer la sauvegarde cloud,Cloud save could not start,No se pudo iniciar el guardado en la nube,Impossibile avviare il salvataggio cloud,Não foi possível iniciar o guardado na nuvem
+menu.cloud.sign_in_required,Connectez-vous pour sauvegarder en ligne,Sign in to save to cloud,Inicia sesión para guardar en la nube,Accedi per salvare nel cloud,Inicia sessão para guardar na nuvem
+menu.cloud.profile_missing,Profil introuvable pour la sauvegarde,Save profile missing,Falta el perfil para guardar,Profilo di salvataggio mancante,Perfil em falta para guardar
+menu.cloud.career_missing,Carrière introuvable pour la sauvegarde,Save career missing,Falta la carrera para guardar,Carriera di salvataggio mancante,Carreira em falta para guardar
+menu.cloud.cooldown,Veuillez patienter ({seconds} s),Please wait ({seconds}s),Espera ({seconds} s),Attendi ({seconds} s),Aguarda ({seconds} s)
+popup.last_match_finance.income,Recettes,Income,Ingresos,Entrate,Receitas
+popup.last_match_finance.expenses,Dépenses,Expenses,Gastos,Spese,Despesas
+popup.tokens.first_reward.line3,Débloquez des améliorations premium et du contenu spécial.,Tokens unlock premium upgrades and special content.,Los tokens desbloquean mejoras premium y contenido especial.,I token sbloccano migliorie premium e contenuti speciali.,Os tokens desbloqueiam melhorias premium e conteúdo especial.
+popup.tokens.first_reward.fallback_mission,Mission terminée.,Mission completed.,Misión completada.,Missione completata.,Missão concluída.
+popup_stadium_cta,Aller au stade,Go to Stadium,Ir al estadio,Vai allo stadio,Ir ao estádio
+matchsim.not_enough_tokens_inline,Tokens insuffisants,Not enough tokens,Tokens insuficientes,Token insufficienti,Tokens insuficientes
+tournois.reward_tokens_title,Gain de tokens,Prize tokens,Tokens ganados,Token vinti,Tokens ganhos
+myteam.lineup_summary.subtitle,Aperçu de vos choix,Decision impact preview,Impacto de tus decisiones,Impatto delle tue scelte,Impacto das tuas escolhas
+myteam.lineup_confirm.for_one_game,pour 1 match,for 1 game,para 1 partido,per 1 partita,para 1 jogo
+myteam.lineup_save.title,Sauver la compo,Save Lineup,Guardar alineación,Salva formazione,Guardar formação
+myteam.lineup_confirm.title,Valider la compo,Confirm Lineup,Confirmar equipo,Conferma squadra,Confirmar equipa
+myteam.lineup_save.cost_one,Pour {count} match = {cost},For {count} game = {cost},Por {count} partido = {cost},Per {count} partita = {cost},Por {count} jogo = {cost}
+myteam.lineup_save.cost_many,Pour {count} matchs = {cost},For {count} matches = {cost},Por {count} partidos = {cost},Per {count} partite = {cost},Por {count} jogos = {cost}
+player.header.speed_short,VIT,SPD,VEL,VEL,VEL
+player.header.accuracy_short,PRÉC,ACC,PREC,PREC,PREC
+player.header.defense_short,DÉF,DEF,DEF,DIF,DEF
+player.header.shooting_short,TIR,SHOT,TIRO,TIRO,TIRO
+player.header.salary_short,SAL.,SAL.,SAL.,SAL.,SAL.
+player.header.motivation_short,MOT.,MOT.,MOT.,MOT.,MOT.
+player.header.speed,VIT.,SPEED,VEL.,VEL.,VEL.
+player.header.accuracy,PRÉC.,ACC.,PREC.,PREC.,PREC.
+stadium.shop.col.restock,Réassortiment,Restock,Reposición,Riassortimento,Reposição
+stadium.shop.small_order,Petite commande,Small order,Pedido pequeño,Ordine piccolo,Encomenda pequena
+stadium.shop.large_order,Grande commande,Large order,Pedido grande,Ordine grande,Encomenda grande
+stadium.shop.col.product,Produit,Product,Producto,Prodotto,Produto
+selection.select_players_count,Sélectionne 12 joueurs : %d/%d,Select 12 players: %d/%d,Selecciona 12 jugadores: %d/%d,Seleziona 12 giocatori: %d/%d,Seleciona 12 jogadores: %d/%d
+club_identity.upgrade_level_for,Améliorer le blason niv.%d pour,Upgrade crest to Lv%d for,Mejorar escudo a niv.%d por,Migliora stemma a liv.%d per,Melhorar emblema a nv.%d por
+menu.staff_coaches,Staff / Coachs,Staff / Coaches,Cuerpo técnico,Staff / Allenatori,Equipa técnica
+login.code.placeholder,Code à 6 chiffres,6-digit code,Código de 6 dígitos,Codice a 6 cifre,Código de 6 dígitos
+menu.music.on,Musique : oui,Music ON,Música: sí,Musica: sì,Música: sim
+menu.music.off,Musique : non,Music OFF,Música: no,Musica: no,Música: não
+menu.cloud.session_expired,Session expirée : reconnectez-vous,Session expired: sign in again,Sesión caducada: vuelve a iniciar sesión,Sessione scaduta: accedi di nuovo,Sessão expirada: inicia sessão novamente
+menu.cloud.not_connected,Non connecté,Not signed in,Sesión no iniciada,Accesso non effettuato,Sessão não iniciada
+menu.cloud.retry,Réseau… nouvel essai de %s (%.1f s),Network… retrying %s (%.1fs),Red… reintentando %s (%.1f s),Rete… nuovo tentativo di %s (%.1f s),Rede… nova tentativa de %s (%.1f s)
+menu.cloud.operation.load,chargement,loading,carga,caricamento,carregamento
+menu.cloud.operation.save,sauvegarde,saving,guardado,salvataggio,gravação
+menu.cloud.reconnecting,Hors ligne : reconnexion…,Offline: reconnecting…,Sin conexión: reconectando…,Offline: riconnessione…,Sem ligação: a reconectar…
+menu.cloud.auth_failed,Connexion échouée,Sign-in failed,Error al iniciar sesión,Accesso non riuscito,Falha ao iniciar sessão
+menu.cloud.auth_invalid,Session invalide : reconnectez-vous,Invalid session: sign in again,Sesión no válida: vuelve a iniciarla,Sessione non valida: accedi di nuovo,Sessão inválida: inicia sessão novamente
+menu.cloud.starting_session,Ouverture de la session en ligne…,Starting online session…,Iniciando sesión online…,Avvio della sessione online…,A iniciar sessão online…
+menu.cloud.invalid_token,Jeton de connexion invalide (longueur : %s),Invalid login token (length: %s),Token de acceso no válido (longitud: %s),Token di accesso non valido (lunghezza: %s),Token de acesso inválido (comprimento: %s)
+menu.cloud.load_profile_missing,Profil introuvable pour le chargement,Load profile missing,Falta el perfil para cargar,Profilo di caricamento mancante,Perfil em falta para carregar
+menu.cloud.load_career_missing,Carrière introuvable pour le chargement,Load career missing,Falta la carrera para cargar,Carriera da caricare mancante,Carreira em falta para carregar
+menu.cloud.loading,Chargement cloud…,Loading from cloud…,Cargando desde la nube…,Caricamento dal cloud…,A carregar da nuvem…
+stadium.shop.restock.order,Commande,Order,Pedido,Ordine,Encomenda
+stadium.shop.restock.units,Quantité,Units,Unidades,Unità,Unidades
+stadium.shop.restock.unit_cost,Coût/unité,Cost/unit,Coste/unidad,Costo/unità,Custo/unidade
+stadium.shop.restock.total_cost,Coût total,Total cost,Coste total,Costo totale,Custo total
+stadium.shop.restock.new_stock,Nouveau stock,New stock,Nuevo stock,Nuove scorte,Novo stock
+coach.contract_seasons,Contrat : %s saisons,Contract: %s seasons,Contrato: %s temporadas,Contratto: %s stagioni,Contrato: %s épocas
+coach.cost_per_season,Coût : %s / saison,Cost: %s / season,Coste: %s / temporada,Costo: %s / stagione,Custo: %s / época
+coach.tokens_available,Disponibles : %d,Available: %d,Disponibles: %d,Disponibili: %d,Disponíveis: %d
+coach.seasons_progress,Saisons : %d/%d,Seasons: %d/%d,Temporadas: %d/%d,Stagioni: %d/%d,Épocas: %d/%d
+tournois.final.title,Finale du tournoi,Tournament final,Final del torneo,Finale del torneo,Final do torneio
+player.card.rating_tooltip,"Note basée sur le tir, la vitesse, la défense et la motivation.","Rating based on shooting, speed, defense and motivation.","Valoración basada en el tiro, la velocidad, la defensa y la motivación.","Valutazione basata su tiro, velocità, difesa e motivazione.","Avaliação baseada no lançamento, na velocidade, na defesa e na motivação."
+club_tokens.stripe.syncing_tokens,Synchronisation de vos Club Tokens…,Synchronizing your Club Tokens…,Sincronizando tus Club Tokens…,Sincronizzazione dei tuoi Club Tokens…,A sincronizar os teus Club Tokens…
+coach.choose_prompt,Choisissez un coach,Choose a coach,Elige un entrenador,Scegli un allenatore,Escolhe um treinador
+matchsim.next_exit,Prochaine sortie,Next exit,Próxima salida,Prossima uscita,Próxima saída

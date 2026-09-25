@@ -189,7 +189,8 @@ func _try_refresh(rt: String) -> void:
 
 func _on_refresh_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	var txt := body.get_string_from_utf8()
-	print("[BOOT][REFRESH] result=", result, " code=", response_code, " body=", txt)
+	if OS.is_debug_build():
+		print("[BOOT][REFRESH] result=", result, " code=", response_code, " body=", txt)
 
 	_refresh_in_flight = false
 
@@ -221,7 +222,8 @@ func _on_refresh_completed(result: int, response_code: int, _headers: PackedStri
 
 	# --- CAS HTTP FAIL (réponse reçue mais pas 2xx) ---
 	if response_code < 200 or response_code >= 300:
-		print("[BOOT][REFRESH] http fail code=", response_code, " body=", txt)
+		if OS.is_debug_build():
+			print("[BOOT][REFRESH] http fail code=", response_code, " body=", txt)
 
 		# ✅ purge si refresh invalide
 		if response_code == 401 or txt.find("REFRESH_INVALID") != -1:
@@ -301,7 +303,8 @@ func _try_guest_auth() -> void:
 
 func _on_guest_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	var txt := body.get_string_from_utf8()
-	print("[BOOT][GUEST] result=", result, " code=", response_code, " body=", txt)
+	if OS.is_debug_build():
+		print("[BOOT][GUEST] result=", result, " code=", response_code, " body=", txt)
 
 	if result != HTTPRequest.RESULT_SUCCESS or response_code == 0:
 		print("[BOOT][GUEST] network fail -> LOGIN")

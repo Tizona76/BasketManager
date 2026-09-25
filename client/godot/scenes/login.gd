@@ -180,7 +180,7 @@ func _show_login_explainer_popup() -> void:
 
 	var title := Label.new()
 	title.name = "LoginExplainerTitle"
-	title.text = "Why do we ask for your email?"
+	title.text = tr("login.explainer.title")
 	if mobile_landscape:
 		title.position = Vector2(24, 14)
 		title.size = Vector2(card.size.x - 48.0, 34)
@@ -197,15 +197,7 @@ func _show_login_explainer_popup() -> void:
 
 	var body := Label.new()
 	body.name = "LoginExplainerBody"
-	body.text = "• Create a unique user profile
-
-• Appear in the global leaderboard
-
-• Requested only once
-
-• A one-time code is sent for secure verification
-
-• Safe, secure and confidential"
+	body.text = tr("login.explainer.body").replace("\\n", "\n")
 	if mobile_landscape:
 		body.position = Vector2(42, 58)
 		body.size = Vector2(card.size.x - 84.0, card.size.y - 122.0)
@@ -297,6 +289,8 @@ var _pending_action := ""   # "start" ou "verify"
 
 
 func _apply_i18n() -> void:
+	if code != null:
+		code.placeholder_text = tr("login.code.placeholder")
 	if lbl_step_email != null:
 		lbl_step_email.text = tr("login.step_email")
 	if lbl_step_send_code != null:
@@ -473,7 +467,8 @@ func _on_validate() -> void:
 
 
 func _http_post_json(url: String, payload: Dictionary) -> void:
-	print("[HTTP] POST ", url, " payload=", payload)
+	if OS.is_debug_build():
+		print("[HTTP] POST ", url, " payload=", payload)
 
 	var headers := PackedStringArray(["Content-Type: application/json"])
 	var body := JSON.stringify(payload)
@@ -500,7 +495,8 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		if typeof(parsed) == TYPE_DICTIONARY:
 			data = parsed
 
-	print("[HTTP] result=", result, " code=", response_code, " body=", txt)
+	if OS.is_debug_build():
+		print("[HTTP] result=", result, " code=", response_code, " body=", txt)
 
 	if response_code < 200 or response_code >= 300:
 		var msg := "Status: erreur HTTP " + str(response_code)
@@ -519,10 +515,14 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 
 	if _pending_action == "verify":
 		# DEBUG brut (avant extraction)
-		print("[DBG][VERIFY_RAW] keys=", data.keys())
-		print("[DBG][VERIFY_RAW] access_token=", str(data.get("access_token", "")).left(20), "...")
-		print("[DBG][VERIFY_RAW] refresh_token=", str(data.get("refresh_token", "")).left(20), "...")
-		print("[DBG][VERIFY_RAW] token_type=", str(data.get("token_type", "")))
+		if OS.is_debug_build():
+			print("[DBG][VERIFY_RAW] keys=", data.keys())
+		if OS.is_debug_build():
+			print("[DBG][VERIFY_RAW] access_token=", str(data.get("access_token", "")).left(20), "...")
+		if OS.is_debug_build():
+			print("[DBG][VERIFY_RAW] refresh_token=", str(data.get("refresh_token", "")).left(20), "...")
+		if OS.is_debug_build():
+			print("[DBG][VERIFY_RAW] token_type=", str(data.get("token_type", "")))
 
 		# extraction unique
 		var at := str(data.get("access_token", "")).strip_edges()
@@ -532,7 +532,8 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 
 		if at == "":
 			_set_login_status("login.status.missing_token", "Status: connecté mais token manquant (API)", {})
-			print("[AUTH] ERROR: missing access_token in response:", data)
+			if OS.is_debug_build():
+				print("[AUTH] ERROR: missing access_token in response:", data)
 			_pending_action = ""
 			return
 

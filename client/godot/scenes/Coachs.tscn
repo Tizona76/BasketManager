@@ -53,7 +53,7 @@ theme_override_colors/font_color = Color(0.45, 0.78, 1, 1)
 theme_override_colors/font_outline_color = Color(0.05, 0.22, 0.55, 0.95)
 theme_override_constants/outline_size = 6
 theme_override_font_sizes/font_size = 40
-text = "STAFF / COACHS"
+text = "menu.staff_coaches"
 horizontal_alignment = 1
 
 [node name="TitleHover" type="Control" parent="."]
@@ -98,7 +98,7 @@ offset_right = 320.0
 offset_bottom = 122.0
 grow_horizontal = 2
 theme_override_font_sizes/font_size = 22
-text = "Choose a coach"
+text = "coach.choose_prompt"
 horizontal_alignment = 1
 
 [node name="ScrollCoachs" type="ScrollContainer" parent="."]
@@ -333,7 +333,7 @@ offset_right = 384.0
 offset_bottom = 196.0
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 26
-text = "Unlock"
+text = "matchsim.unlock"
 horizontal_alignment = 2
 vertical_alignment = 1
 
@@ -428,4 +428,4 @@ grow_vertical = 0
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
 theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
-text = "Back"
+text = "common.back"

@@ -593,7 +593,7 @@ func _bm_show_tournament_final_cinematic(team_a: String, team_b: String, score_a
 	layer.add_child(overlay)
 
 	var title := Label.new()
-	title.text = "TOURNAMENT FINAL"
+	title.text = tr("tournois.final.title").to_upper()
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 34)
@@ -745,7 +745,7 @@ func _bm_show_tournament_final_cinematic(team_a: String, team_b: String, score_a
 	await get_tree().create_timer(0.65).timeout
 
 	var btn := Button.new()
-	btn.text = "PLAY!"
+	btn.text = tr("tournois.info.registration").to_upper() + "!"
 	btn.size = Vector2(210, 64)
 	btn.position = Vector2((vp.x - 210) * 0.5, vp.y * 0.80)
 	btn.add_theme_font_size_override("font_size", 28)
@@ -777,7 +777,7 @@ func _bm_show_tournament_final_cinematic(team_a: String, team_b: String, score_a
 
 	await btn.pressed
 
-	btn.text = "CLOSE"
+	btn.text = tr("common.close").to_upper()
 
 	# Keep Play fixed and the final content inside its frame on iOS landscape.
 	if final_side_shift == 0.0:

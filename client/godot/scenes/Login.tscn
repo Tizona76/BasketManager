@@ -88,7 +88,7 @@ text = "3. Saisissez le code"
 
 [node name="Code" type="LineEdit" parent="UI"]
 layout_mode = 2
-placeholder_text = "Code à 6 chiffres"
+placeholder_text = "login.code.placeholder"
 secret = true
 
 [node name="LblStepValidateOtp" type="Label" parent="UI"]

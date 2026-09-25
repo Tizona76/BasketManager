@@ -988,8 +988,8 @@ func _bm_apply_lineup_popup_button_text(btn: Button, primary_text: String, secon
 
 
 func _bm_save_lineup_secondary_text() -> String:
-	var match_word := "game" if SAVE_LINEUP_MATCH_COUNT == 1 else "matches"
-	return "For " + str(SAVE_LINEUP_MATCH_COUNT) + " " + match_word + " = " + str(SAVE_LINEUP_TOKEN_COST)
+	var text_key := "myteam.lineup_save.cost_one" if SAVE_LINEUP_MATCH_COUNT == 1 else "myteam.lineup_save.cost_many"
+	return tr(text_key).replace("{count}", str(SAVE_LINEUP_MATCH_COUNT)).replace("{cost}", str(SAVE_LINEUP_TOKEN_COST))
 
 
 func _bm_get_current_lineup_preview_players() -> Array:
@@ -1166,9 +1166,9 @@ func _bm_refresh_lineup_summary_popup(ready: bool) -> void:
 	var row_y := 54.0 if native_landscape else 86.0
 	var stats_h := 44.0 if native_landscape else 58.0
 	var stats_fs := 18 if native_landscape else 20
-	_bm_add_lineup_summary_label(lineup_summary_card, "Attack\n" + str(int(round(attack))), Vector2(start_x, row_y), Vector2(col_w, stats_h), stats_fs, Color(1.00, 0.72, 0.20, 1.0))
-	_bm_add_lineup_summary_label(lineup_summary_card, "Defense\n" + str(int(round(defense))), Vector2(start_x + 180.0, row_y), Vector2(col_w, stats_h), stats_fs, Color(0.42, 0.92, 1.00, 1.0))
-	_bm_add_lineup_summary_label(lineup_summary_card, "Energy\n" + str(int(round(energy))), Vector2(start_x + 360.0, row_y), Vector2(col_w, stats_h), stats_fs, Color(0.35, 1.00, 0.55, 1.0))
+	_bm_add_lineup_summary_label(lineup_summary_card, tr("player.card.graph.attack") + "\n" + str(int(round(attack))), Vector2(start_x, row_y), Vector2(col_w, stats_h), stats_fs, Color(1.00, 0.72, 0.20, 1.0))
+	_bm_add_lineup_summary_label(lineup_summary_card, tr("player.card.graph.defense") + "\n" + str(int(round(defense))), Vector2(start_x + 180.0, row_y), Vector2(col_w, stats_h), stats_fs, Color(0.42, 0.92, 1.00, 1.0))
+	_bm_add_lineup_summary_label(lineup_summary_card, tr("matchsim.energy") + "\n" + str(int(round(energy))), Vector2(start_x + 360.0, row_y), Vector2(col_w, stats_h), stats_fs, Color(0.35, 1.00, 0.55, 1.0))
 
 	var content := Control.new()
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1206,7 +1206,7 @@ func _bm_refresh_lineup_summary_popup(ready: bool) -> void:
 	lineup_summary_card.add_child(btn_auto_save_match_selection)
 	btn_auto_save_match_selection.position = Vector2((card_w * 0.5) - 260.0, card_h - 66.0)
 	btn_auto_save_match_selection.size = Vector2(220, 54)
-	_bm_apply_lineup_popup_button_text(btn_auto_save_match_selection, "Save Lineup", _bm_save_lineup_secondary_text())
+	_bm_apply_lineup_popup_button_text(btn_auto_save_match_selection, tr("myteam.lineup_save.title"), _bm_save_lineup_secondary_text())
 	var save_secondary_lbl := btn_auto_save_match_selection.get_node_or_null("LineupButtonSecondary") as Label
 	if save_secondary_lbl != null:
 		save_secondary_lbl.position = Vector2(-6.0, 27.0)
@@ -1249,7 +1249,7 @@ func _bm_refresh_lineup_summary_popup(ready: bool) -> void:
 	lineup_summary_card.add_child(btn_confirm_match_selection)
 	btn_confirm_match_selection.position = Vector2((card_w * 0.5) + 20.0, card_h - 66.0)
 	btn_confirm_match_selection.size = Vector2(240, 54)
-	_bm_apply_lineup_popup_button_text(btn_confirm_match_selection, "Confirm Lineup", _bm_myteam_tr_or_fallback("myteam.lineup_confirm.for_one_game", "for 1 game"))
+	_bm_apply_lineup_popup_button_text(btn_confirm_match_selection, tr("myteam.lineup_confirm.title"), _bm_myteam_tr_or_fallback("myteam.lineup_confirm.for_one_game", "for 1 game"))
 	btn_confirm_match_selection.visible = true
 	btn_confirm_match_selection.disabled = false
 	_bm_style_confirm_lineup_button(btn_confirm_match_selection)
@@ -1864,16 +1864,16 @@ func _ensure_table_header() -> void:
 	avatar_slot.alignment = BoxContainer.ALIGNMENT_CENTER
 	myteam_table_header.add_child(avatar_slot)
 
-	myteam_table_header.add_child(_make_header_column(_make_header_button("RANK", 58.0, Callable(self, "_on_sort_stars_pressed"), false), 72.0))
-	myteam_table_header.add_child(_make_header_column(_make_header_button("POS.", 49.0, Callable(self, "_on_sort_poste_pressed"), false), 82.0))
-	myteam_table_header.add_child(_make_header_column(_make_header_button("AGE", 32.0, Callable(self, "_on_sort_age_pressed"), false), 62.0))
+	myteam_table_header.add_child(_make_header_column(_make_header_button(tr("mercato.col.rank").to_upper(), 58.0, Callable(self, "_on_sort_stars_pressed"), false), 72.0))
+	myteam_table_header.add_child(_make_header_column(_make_header_button(tr("mercato.col.position_short").to_upper(), 49.0, Callable(self, "_on_sort_poste_pressed"), false), 82.0))
+	myteam_table_header.add_child(_make_header_column(_make_header_button(tr("mercato.col.age").to_upper(), 32.0, Callable(self, "_on_sort_age_pressed"), false), 62.0))
 	btn_sort_tir = _make_header_button(tr("player.attr.tir"), 52.0, Callable(self, "_on_sort_tir_pressed"), false)
 	myteam_table_header.add_child(_make_header_column(btn_sort_tir, 72.0))
-	myteam_table_header.add_child(_make_header_column(_make_header_button("SPEED", 58.0, Callable(self, "_on_sort_speed_pressed"), false), 72.0))
-	myteam_table_header.add_child(_make_header_column(_make_header_button("DEFENSE", 74.0, Callable(self, "_on_sort_defense_pressed"), false), 82.0))
-	myteam_table_header.add_child(_make_header_column(_make_header_button("ACCURACY", 80.0, Callable(self, "_on_sort_accuracy_pressed"), false), 88.0))
+	myteam_table_header.add_child(_make_header_column(_make_header_button(tr("player.header.speed").to_upper(), 58.0, Callable(self, "_on_sort_speed_pressed"), false), 72.0))
+	myteam_table_header.add_child(_make_header_column(_make_header_button(tr("player.card.defense").to_upper(), 74.0, Callable(self, "_on_sort_defense_pressed"), false), 82.0))
+	myteam_table_header.add_child(_make_header_column(_make_header_button(tr("player.header.accuracy").to_upper(), 80.0, Callable(self, "_on_sort_accuracy_pressed"), false), 88.0))
 	myteam_table_header.add_child(_make_header_column(_make_header_button(tr("selection.header.motivation"), 64.0, Callable(self, "_on_sort_motivation_pressed"), false), 82.0))
-	myteam_table_header.add_child(_make_header_column(_make_header_button("SALARY", 60.0, Callable(self, "_on_sort_salaire_pressed"), false), 92.0))
+	myteam_table_header.add_child(_make_header_column(_make_header_button(tr("mercato.col.salary").to_upper(), 60.0, Callable(self, "_on_sort_salaire_pressed"), false), 92.0))
 
 	if _bm_is_lineup_screen() and _is_match_selection_unlocked():
 		myteam_table_header.add_child(_make_header_column(_make_header_visual_button(tr("myteam.btn.select_to_play"), 112.0), 120.0))
