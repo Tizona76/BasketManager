@@ -14,6 +14,7 @@ signal go_finances
 signal go_my_team
 signal go_back
 signal action_requested(action: String)
+signal cloud_save_attempt_completed(result: int, code: int)
 
 # ------------------------------------------------------------
 # API
@@ -647,6 +648,17 @@ func _find_first_texture_rect(n: Node) -> TextureRect:
 	return null
 
 
+# iOS Save recovery owns one immutable request until its terminal response.
+# Origin is explicit at user entry points; deferred synchronization/retries stay automatic.
+enum CloudSaveOrigin { AUTOMATIC, USER_CHOICE, SIGNUP_RETURN, DEBUG_ROUNDTRIP }
+# SceneTree survives Management scene recreation and ends with the app process.
+const CLOUD_REQUEST_TIMEOUT_S := 15.0
+const CLOUD_CONFLICTS_META := &"basket_cloud_conflicts_by_profile_career"
+var _cloud_save_conflict_key := ""
+var _cloud_save_auth_retry_used := false
+var _cloud_save_request_body := ""
+var _cloud_save_request_profile := ""
+
 var _did_auto_save: bool = false
 var _inflight: String = ""   # "", "load", "save"
 var _cloud_request_career_id: String = ""
@@ -1026,6 +1038,7 @@ func _ready() -> void:
 
 	# connect cloud http propre
 	if Http != null:
+		Http.timeout = CLOUD_REQUEST_TIMEOUT_S
 		if Http.request_completed.is_connected(_on_http_completed):
 			Http.request_completed.disconnect(_on_http_completed)
 		Http.request_completed.connect(_on_http_completed)
@@ -1033,7 +1046,7 @@ func _ready() -> void:
 	if FileAccess.file_exists("user://save_cloud_signup_return_menu.txt"):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path("user://save_cloud_signup_return_menu.txt"))
 		_toast_status(tr("menu.save_choice.saving"), 2.0)
-		call_deferred("_try_cloud_save_from_local")
+		call_deferred("_try_cloud_save_from_local", CloudSaveOrigin.SIGNUP_RETURN)
 
 	# connect leaderboard http (ranking)
 	if HttpLb != null:
@@ -1044,6 +1057,7 @@ func _ready() -> void:
 		print("[RANKING] HttpLb missing")
 	# connect auth http propre
 	if HttpAuth != null:
+		HttpAuth.timeout = CLOUD_REQUEST_TIMEOUT_S
 		if HttpAuth.request_completed.is_connected(_on_auth_completed):
 			HttpAuth.request_completed.disconnect(_on_auth_completed)
 		HttpAuth.request_completed.connect(_on_auth_completed)
@@ -1255,7 +1269,7 @@ func _maybe_flush_dirty_local(reason: String) -> void:
 # ------------------------------------------------------------
 # SESSION LOCAL (user://session.json) - BONUS
 # ------------------------------------------------------------
-func _save_session_local_from_menu() -> void:
+func _save_session_local_from_menu() -> bool:
 	var d := {
 		"profile_uuid": str(Session.profile_uuid),
 		"refresh_token": str(Session.refresh_token),
@@ -1265,10 +1279,12 @@ func _save_session_local_from_menu() -> void:
 	var f := FileAccess.open(SESSION_FILE, FileAccess.WRITE)
 	if f == null:
 		print("[FILE] cannot write ", SESSION_FILE)
-		return
+		return false
 	f.store_string(JSON.stringify(d, "\t"))
 	f.close()
 	print("[FILE] wrote:", SESSION_FILE)
+
+	return true
 
 
 # ------------------------------------------------------------
@@ -1522,7 +1538,13 @@ func _try_cloud_load() -> void:
 # ------------------------------------------------------------
 # CLOUD SAVE (depuis la carriere active)
 # ------------------------------------------------------------
-func _try_cloud_save_from_local() -> void:
+func _try_cloud_save_from_local(origin: CloudSaveOrigin = CloudSaveOrigin.AUTOMATIC) -> void:
+	if OS.has_feature("ios") and origin == CloudSaveOrigin.AUTOMATIC:
+		var conflicts: Dictionary = get_tree().get_meta(CLOUD_CONFLICTS_META, {})
+		if not conflicts.is_empty():
+			var active_key := JSON.stringify([str(Session.profile_uuid).strip_edges(), _cloud_active_career_id()])
+			if conflicts.has(active_key):
+				return
 	if _inflight != "":
 		print("[CLOUD_SAVE_SKIP] inflight=", _inflight)
 		return
@@ -1544,6 +1566,9 @@ func _try_cloud_save_from_local() -> void:
 		_set_status(tr("menu.cloud.career_missing"))
 		print("[CLOUD_SAVE_SKIP] missing active career_id")
 		return
+
+	if OS.has_feature("ios"):
+		_cloud_save_conflict_key = JSON.stringify([puuid, career_id])
 
 	_ensure_local_savegame_exists()
 
@@ -1581,6 +1606,10 @@ func _try_cloud_save_from_local() -> void:
 	headers.append("Content-Type: application/json")
 
 	var body_txt: String = JSON.stringify(payload)
+	if OS.has_feature("ios"):
+		_cloud_save_auth_retry_used = false
+		_cloud_save_request_body = body_txt
+		_cloud_save_request_profile = puuid
 
 	var url := API_BASE + PATH_CLOUD_SAVE
 	var err := Http.request(url, headers, HTTPClient.METHOD_POST, body_txt)
@@ -1588,12 +1617,137 @@ func _try_cloud_save_from_local() -> void:
 		_inflight = ""
 		_cloud_request_career_id = ""
 		_set_status(tr("menu.cloud.save_error").replace("{code}", str(err)))
+		_dirty_local = true
+		_clear_cloud_save_auth_attempt()
 
 
 # ------------------------------------------------------------
 # HTTP CALLBACK UNIQUE (LOAD + SAVE)
 # ------------------------------------------------------------
-func _on_http_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+func _cloud_save_auth_context_matches() -> bool:
+	return _inflight == "save" and _cloud_save_request_body != "" \
+		and str(Session.profile_uuid).strip_edges() == _cloud_save_request_profile \
+		and _cloud_active_career_id() == _cloud_request_career_id
+
+
+func _clear_cloud_save_auth_attempt() -> void:
+	_cloud_save_conflict_key = ""
+	_cloud_save_auth_retry_used = false
+	_cloud_save_request_body = ""
+	_cloud_save_request_profile = ""
+
+
+func _finish_cloud_save_auth_failure(message: String, code: int = 401, result: int = HTTPRequest.RESULT_SUCCESS) -> void:
+	_set_status(message)
+	_dirty_local = true
+	_save_retry_count = 0
+	_rt_pending_reload = false
+	_rt_last_local_checksum = ""
+	_inflight = ""
+	_cloud_request_career_id = ""
+	_clear_cloud_save_auth_attempt()
+	cloud_save_attempt_completed.emit(result, code)
+
+
+func _recover_cloud_save_auth() -> void:
+	var refresh := str(Session.refresh_token).strip_edges()
+	if refresh.length() < 10 or _auth_inflight or not _cloud_save_auth_context_matches():
+		_finish_cloud_save_auth_failure(tr("menu.cloud.sign_in_required"))
+		return
+	_set_status(tr("menu.cloud.reconnecting"))
+	# Separate request: the normal HttpAuth callback also loads cloud data.
+	var auth := HTTPRequest.new()
+	add_child(auth)
+	auth.timeout = CLOUD_REQUEST_TIMEOUT_S
+	var err := auth.request(API_BASE + PATH_AUTH_REFRESH,
+		PackedStringArray(["Content-Type: application/json"]), HTTPClient.METHOD_POST,
+		JSON.stringify({"refresh_token": refresh}))
+	if err != OK:
+		auth.queue_free()
+		_finish_cloud_save_auth_failure(tr("menu.cloud.auth_failed"))
+		return
+	var response: Array = await auth.request_completed
+	auth.queue_free()
+	if not _cloud_save_auth_context_matches() or str(Session.refresh_token).strip_edges() != refresh:
+		_finish_cloud_save_auth_failure(tr("menu.cloud.sign_in_required"))
+		return
+	if response[0] != HTTPRequest.RESULT_SUCCESS or response[1] < 200 or response[1] >= 300:
+		_finish_cloud_save_auth_failure(tr("menu.cloud.session_expired") if response[1] == 401 else tr("menu.cloud.auth_failed"))
+		return
+	var data: Variant = JSON.parse_string((response[3] as PackedByteArray).get_string_from_utf8())
+	if not data is Dictionary or not data.get("access_token") is String or str(data.get("access_token", "")).strip_edges().length() < 20:
+		_finish_cloud_save_auth_failure(tr("menu.cloud.auth_invalid"))
+		return
+	var rotated := str(data.get("refresh_token", "")).strip_edges()
+	Session.set_tokens(data["access_token"], rotated if rotated != "" else refresh, "Bearer")
+	if not _save_session_local_from_menu():
+		_finish_cloud_save_auth_failure(tr("menu.cloud.auth_failed"))
+		return
+	_set_status(tr("menu.save_choice.saving"))
+	var headers := PackedStringArray(["Authorization: Bearer %s" % Session.access_token,
+		"Accept: application/json", "Content-Type: application/json"])
+	# Do not reread the local save or reconstruct its career/revision/checksum.
+	err = Http.request(API_BASE + PATH_CLOUD_SAVE, headers, HTTPClient.METHOD_POST, _cloud_save_request_body)
+	if err != OK:
+		_finish_cloud_save_auth_failure(tr("menu.cloud.save_error").replace("{code}", str(err)))
+
+
+func _on_http_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+	var is_save := _inflight == "save"
+	# A timed-out iOS attempt is terminal; do not immediately occupy Http again.
+	if OS.has_feature("ios") and result == HTTPRequest.RESULT_TIMEOUT:
+		_set_network_state("OFFLINE")
+		if is_save:
+			_finish_cloud_save_auth_failure(tr("menu.cloud.offline_save").replace("{code}", str(result)), response_code, result)
+		else:
+			_set_status(tr("menu.cloud.offline_load").replace("{code}", str(result)))
+			_load_retry_count = 0
+			_rt_pending_reload = false
+			_rt_last_local_checksum = ""
+			_inflight = ""
+			_cloud_request_career_id = ""
+		return
+	if OS.has_feature("ios") and is_save:
+		if result == HTTPRequest.RESULT_SUCCESS and response_code == 409:
+			var conflict: Variant = JSON.parse_string(body.get_string_from_utf8())
+			if conflict is Dictionary and conflict.get("detail") == "REV_CONFLICT":
+				_dirty_local = true
+				var conflicts: Dictionary = get_tree().get_meta(CLOUD_CONFLICTS_META, {})
+				if _cloud_save_conflict_key != "":
+					conflicts[_cloud_save_conflict_key] = true
+					get_tree().set_meta(CLOUD_CONFLICTS_META, conflicts)
+				_set_status(tr("menu.cloud.rev_conflict"))
+				_save_retry_count = 0
+				_rt_pending_reload = false
+				_rt_last_local_checksum = ""
+				_inflight = ""
+				_cloud_request_career_id = ""
+				_clear_cloud_save_auth_attempt()
+				cloud_save_attempt_completed.emit(result, response_code)
+				return
+		if not _cloud_save_auth_retry_used and result == HTTPRequest.RESULT_SUCCESS and response_code == 401:
+			var error: Variant = JSON.parse_string(body.get_string_from_utf8())
+			if error is Dictionary and error.get("detail") == "INVALID_TOKEN":
+				_cloud_save_auth_retry_used = true
+				_save_text_file(FILE_CLOUD_LAST_SAVE_TXT, JSON.stringify({"detail": "INVALID_TOKEN"}))
+				call_deferred("_recover_cloud_save_auth")
+				return
+		if _cloud_save_auth_retry_used and not _cloud_save_auth_context_matches():
+			_finish_cloud_save_auth_failure(tr("menu.cloud.sign_in_required"))
+			return
+		# A failed retry is terminal, including network errors and cooldowns.
+		if _cloud_save_auth_retry_used and (result != HTTPRequest.RESULT_SUCCESS or response_code < 200 or response_code >= 300):
+			_finish_cloud_save_auth_failure(tr("menu.cloud.save_error").replace("{code}", str(response_code)), response_code, result)
+			return
+	_handle_cloud_http_completed(result, response_code, headers, body)
+	if _inflight == "":
+		_cloud_request_career_id = ""
+	if is_save:
+		_clear_cloud_save_auth_attempt()
+		cloud_save_attempt_completed.emit(result, response_code)
+
+
+func _handle_cloud_http_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	var txt: String = body.get_string_from_utf8()
 
 	# ---- NETWORK FAIL ----
@@ -1787,6 +1941,9 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 				_inflight = ""
 				_cloud_request_career_id = ""
 				return
+
+			if OS.has_feature("ios") and d.get("ok", false) == true and _cloud_save_auth_context_matches():
+				_dirty_local = false
 
 			if FileAccess.file_exists(FILE_NEW_CLUB_PENDING_CLOUD):
 				DirAccess.remove_absolute(ProjectSettings.globalize_path(FILE_NEW_CLUB_PENDING_CLOUD))
@@ -1987,7 +2144,7 @@ func _roundtrip_start() -> void:
 	print("[DBG][RT] local edited -> checksum_canon=", _rt_last_local_checksum)
 
 	_rt_pending_reload = true
-	call_deferred("_try_cloud_save_from_local")
+	call_deferred("_try_cloud_save_from_local", CloudSaveOrigin.DEBUG_ROUNDTRIP)
 
 
 func _roundtrip_validate_against_cloud_blob() -> bool:
@@ -4108,7 +4265,7 @@ func _save_to_cloud_from_choice() -> void:
 	var access: String = str(Session.access_token).strip_edges()
 	if access.length() >= 20 and _inflight == "":
 		_toast_status(tr("menu.save_choice.saving"), 2.0)
-		call_deferred("_try_cloud_save_from_local")
+		call_deferred("_try_cloud_save_from_local", CloudSaveOrigin.USER_CHOICE)
 	else:
 		_toast_status(tr("menu.save.account_required"), 2.5)
 		var f := FileAccess.open("user://save_cloud_signup_return_menu.txt", FileAccess.WRITE)
@@ -4252,7 +4409,7 @@ func _bm_save_choice_wait_for_cloud(popup: Control, button: Button, tip: Label) 
 	feedback.text = tr("menu.save_choice.saving")
 	tip.hide()
 
-	var completed := func(result: int, code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
+	var completed := func(result: int, code: int) -> void:
 		if not is_instance_valid(popup):
 			return
 		var success := result == OK and code >= 200 and code < 300
@@ -4265,16 +4422,16 @@ func _bm_save_choice_wait_for_cloud(popup: Control, button: Button, tip: Label) 
 		else:
 			popup.remove_meta("cloud_pending")
 			button.disabled = false
-	Http.request_completed.connect(completed, CONNECT_ONE_SHOT)
+	cloud_save_attempt_completed.connect(completed, CONNECT_ONE_SHOT)
 	popup.tree_exiting.connect(func():
-		if Http.request_completed.is_connected(completed):
-			Http.request_completed.disconnect(completed)
+		if cloud_save_attempt_completed.is_connected(completed):
+			cloud_save_attempt_completed.disconnect(completed)
 	)
 	_save_to_cloud_from_choice()
 	# The existing deferred upload runs first; detect validation/request() failures.
 	(func():
-		if is_instance_valid(popup) and _inflight != "save" and Http.request_completed.is_connected(completed):
-			Http.request_completed.disconnect(completed)
+		if is_instance_valid(popup) and _inflight != "save" and cloud_save_attempt_completed.is_connected(completed):
+			cloud_save_attempt_completed.disconnect(completed)
 			feedback.text = Status.text if Status != null else tr("menu.cloud.start_failed")
 			popup.remove_meta("cloud_pending")
 			button.disabled = false
