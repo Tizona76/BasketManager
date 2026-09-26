@@ -1832,6 +1832,7 @@ func _ensure_teamname_center_ball() -> void:
 		ball.z_index = 50
 		add_child(ball)
 
+	ball.visible = false
 	await get_tree().process_frame
 	await get_tree().process_frame
 
@@ -1849,6 +1850,7 @@ func _ensure_teamname_center_ball() -> void:
 		anchor_pos.x + (anchor_size.x - ball.size.x) * 0.5,
 		anchor_pos.y - offset_y
 	)
+	ball.visible = true
 
 	if _teamname_ball_tween != null and _teamname_ball_tween.is_valid():
 		_teamname_ball_tween.kill()

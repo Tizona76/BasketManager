@@ -3047,7 +3047,7 @@ func _bm_set_tab(mode: String) -> void:
 	if LblTokens != null:
 		LblTokens.visible = show_club
 	if LblProgress != null:
-		LblProgress.visible = show_club
+		LblProgress.visible = false
 	if Status != null:
 		Status.visible = show_club
 
