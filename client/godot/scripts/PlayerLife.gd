@@ -874,7 +874,7 @@ static func spend_euros_or_tokens(save: Dictionary, euros_cost: int, tokens_cost
 	var euros_have: int = maxi(0, int(wallet.get("euros", 0)))
 	var tokens_have: int = maxi(0, int(wallet.get("tokens", 0)))
 
-	if euros_have >= euros_needed:
+	if euros_have >= euros_needed and (euros_needed > 0 or tokens_needed == 0):
 		wallet["euros"] = euros_have - euros_needed
 		if reason != "":
 			print("[ECON][EUROS] -", euros_needed, " reason=", reason, " => euros=", int(wallet["euros"]))
@@ -918,7 +918,7 @@ static func can_afford_coach(save: Dictionary, euros_cost: int, tokens_cost: int
 	var euros_needed: int = maxi(0, int(euros_cost))
 	var tokens_needed: int = maxi(0, int(tokens_cost))
 
-	if euros_have >= euros_needed:
+	if euros_have >= euros_needed and (euros_needed > 0 or tokens_needed == 0):
 		return true
 
 	if euros_needed <= 0:
