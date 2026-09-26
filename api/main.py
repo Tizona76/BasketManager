@@ -185,6 +185,7 @@ import os
 from typing import Optional
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
 
 _LB_ENGINE: Optional[Engine] = None
 
@@ -1608,6 +1609,46 @@ def cloud_save_v2(p: CloudSavePayloadV2, request: Request, authorization: str = 
     except HTTPException as he:
         _audit("/v1/cloud/save", int(he.status_code), user_id=user_id, ip=ip)
         raise
+
+
+@app.get("/v1/cloud/meta")
+def cloud_meta_v2(response: Response, profile_uuid: str, career_id: str, authorization: str = Header(default="")):
+    claims = _require_bearer_claims(authorization)
+    user_id = claims.get("sub")
+    if not isinstance(user_id, str) or not user_id.strip():
+        raise HTTPException(status_code=401, detail="INVALID_TOKEN")
+
+    for value, minimum, detail in ((profile_uuid, 16, "BAD_PROFILE_UUID"), (career_id, 1, "BAD_CAREER_ID")):
+        if not (minimum <= len(value) <= 128 and value.isascii()
+                and all(char.isalnum() or char in "_-" for char in value)):
+            raise HTTPException(status_code=400, detail=detail)
+
+    eng = _lb_get_engine()
+    if eng is None:
+        raise HTTPException(status_code=503, detail="CLOUD_DB_NOT_READY")
+
+    # No schema init, legacy attachment, wallet creation, rate limit or DB audit.
+    try:
+        with eng.connect() as conn:
+            row = conn.execute(text("""
+                SELECT rev, checksum, updated_at
+                FROM cloud_saves_v2
+                WHERE user_id = :uid AND profile_uuid = :p AND career_id = :c
+                LIMIT 1;
+            """), {"uid": user_id, "p": profile_uuid, "c": career_id}).fetchone()
+    except SQLAlchemyError:
+        raise HTTPException(status_code=503, detail="CLOUD_DB_NOT_READY") from None
+
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "ok": True,
+        "exists": row is not None,
+        "profile_uuid": profile_uuid,
+        "career_id": career_id,
+        "rev": int(row[0]) if row is not None else None,
+        "checksum": row[1] if row is not None else None,
+        "updated_at": str(row[2]) if row is not None else None,
+    }
 
 
 @app.get("/v1/cloud/load")
