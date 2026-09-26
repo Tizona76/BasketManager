@@ -1377,10 +1377,61 @@ func _try_cloud_load() -> void:
 # ------------------------------------------------------------
 # CLOUD SAVE (depuis la carriere active)
 # ------------------------------------------------------------
+# Save-only, process-local cooldown. The JWT subject is used only as a bucket
+# identity, never as authentication or authorization evidence.
+func _cloud_save_cooldown_key() -> String:
+	var identity := "profile:" + str(Session.profile_uuid).strip_edges()
+	var parts := str(Session.access_token).split(".")
+	if parts.size() == 3:
+		var encoded := parts[1].replace("-", "+").replace("_", "/")
+		while encoded.length() % 4 != 0:
+			encoded += "="
+		var document := JSON.new()
+		if document.parse(Marshalls.base64_to_utf8(encoded)) == OK and document.data is Dictionary:
+			var subject: Variant = document.data.get("sub")
+			if subject is String and not subject.is_empty():
+				identity = "user:" + subject
+	return API_BASE + PATH_CLOUD_SAVE + ":" + identity.sha256_text()
+
+
+func _cloud_save_cooldown_active() -> bool:
+	var deadlines: Dictionary = get_tree().get_meta(&"steam_cloud_save_cooldowns", {})
+	return Time.get_ticks_msec() < int(deadlines.get(_cloud_save_cooldown_key(), 0))
+
+
+func _cloud_save_retry_after(headers: PackedStringArray, fallback: float) -> float:
+	# Bound malformed/unreasonable delays; no timer sends a request at expiry.
+	for header in headers:
+		var separator := header.find(":")
+		if separator < 0 or header.left(separator).strip_edges().to_lower() != "retry-after":
+			continue
+		var value := header.substr(separator + 1).strip_edges()
+		if value.is_valid_int() and not value.begins_with("-") and not value.begins_with("+"):
+			return clampf(value.to_float(), 1.0, 3600.0)
+		# Standard IMF-fixdate (UTC). Other/malformed dates use the safe fallback.
+		var pattern := RegEx.new()
+		pattern.compile("^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), ([0-9]{2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ([0-9]{4}) ([0-9]{2}):([0-9]{2}):([0-9]{2}) GMT$")
+		var matched := pattern.search(value)
+		if matched != null:
+			var month := ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].find(matched.get_string(3)) + 1
+			var stamp := "%s-%02d-%sT%s:%s:%s" % [matched.get_string(4), month, matched.get_string(2), matched.get_string(5), matched.get_string(6), matched.get_string(7)]
+			var year := matched.get_string(4).to_int()
+			var day := matched.get_string(2).to_int()
+			var days := [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+			if year >= 1970 and day >= 1 and day <= days[month - 1] and matched.get_string(5).to_int() < 24 and matched.get_string(6).to_int() < 60 and matched.get_string(7).to_int() < 60:
+				var delay := float(Time.get_unix_time_from_datetime_string(stamp)) - Time.get_unix_time_from_system()
+				if delay > 0.0:
+					return clampf(delay, 1.0, 3600.0)
+	return fallback
+
+
 func _try_cloud_save_from_local(origin: CloudSaveOrigin = CloudSaveOrigin.AUTOMATIC) -> void:
 	var key := JSON.stringify([str(Session.profile_uuid).strip_edges(), _cloud_active_career_id()])
 	var locks: Dictionary = get_tree().get_meta(CLOUD_CONFLICT_LOCKS, {})
 	if origin == CloudSaveOrigin.AUTOMATIC and locks.has(key):
+		return
+	if _cloud_save_cooldown_active():
+		_cloud_save_feedback(_tr_safe("menu.save_choice.cloud_rate_limited"))
 		return
 	if _auth_inflight:
 		_cloud_save_feedback("Cloud authentication in progress. Please try again shortly.")
@@ -1449,7 +1500,7 @@ func _try_cloud_save_from_local(origin: CloudSaveOrigin = CloudSaveOrigin.AUTOMA
 	var body_txt: String = JSON.stringify(payload)
 
 	_cloud_save_attempt = {"profile": puuid, "career": career_id, "body": body_txt,
-		"origin": origin, "key": key, "auth_retry": false}
+		"origin": origin, "key": key, "auth_retry": false, "cooldown_key": _cloud_save_cooldown_key()}
 	_dirty_local = true
 	var url := API_BASE + PATH_CLOUD_SAVE
 	var err := Http.request(url, headers, HTTPClient.METHOD_POST, body_txt)
@@ -1553,6 +1604,18 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 		var document := JSON.new()
 		if result == HTTPRequest.RESULT_SUCCESS and document.parse(txt) == OK:
 			reply = document.data
+		if result == HTTPRequest.RESULT_SUCCESS and response_code == 429:
+			# Local backend defaults: SAVE_COOLDOWN=10s; rate-limit window=60s.
+			var fallback := 10.0 if reply is Dictionary and reply.get("detail") == "SAVE_COOLDOWN" else 60.0
+			var delay := _cloud_save_retry_after(_headers, fallback)
+			var deadlines: Dictionary = get_tree().get_meta(&"steam_cloud_save_cooldowns", {})
+			var cooldown_key: String = _cloud_save_attempt.get("cooldown_key", _cloud_save_cooldown_key())
+			deadlines[cooldown_key] = maxi(int(deadlines.get(cooldown_key, 0)), Time.get_ticks_msec() + int(ceil(delay * 1000.0)))
+			get_tree().set_meta(&"steam_cloud_save_cooldowns", deadlines)
+			_save_text_file(FILE_CLOUD_LAST_SAVE_TXT, txt)
+			_set_network_state("ONLINE")
+			_end_cloud_save_failure(_tr_safe("menu.save_choice.cloud_rate_limited"))
+			return
 		if result == HTTPRequest.RESULT_SUCCESS and response_code == 409 and reply is Dictionary and reply.get("detail") == "REV_CONFLICT":
 			var locks: Dictionary = get_tree().get_meta(CLOUD_CONFLICT_LOCKS, {})
 			if _cloud_save_attempt.has("key"):
@@ -1633,13 +1696,6 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 			print("[CLOUD_SAVE_BODY]", txt)
 			_save_text_file(FILE_CLOUD_LAST_SAVE_TXT, txt)
 
-			if response_code == 429 and txt.find("SAVE_COOLDOWN") != -1:
-				_rt_cooldown_until_ms = Time.get_ticks_msec() + 3000 # 3s
-				print("[DBG][RT] server cooldown -> client cooldown 3s")
-				_dirty_local = true
-				_inflight = ""
-				_schedule_retry("save", 3.0)
-				return
 
 			_save_retry_count = 0
 			_dirty_local = true
