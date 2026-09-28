@@ -1547,10 +1547,50 @@ func _ios_cloud_block(reason: String) -> void:
 			notice.title = "Cloud"
 			notice.dialog_text = _ios_cloud_message(reason)
 			notice.dialog_autowrap = true
+			# Match the Mercato information popup without changing dialog actions.
+			var notice_theme := Theme.new()
+			var panel_style := StyleBoxFlat.new()
+			panel_style.bg_color = Color(0.055, 0.065, 0.095, 0.98)
+			panel_style.set_corner_radius_all(18)
+			panel_style.set_border_width_all(2)
+			panel_style.border_color = Color(0.85, 0.75, 0.25, 0.24)
+			panel_style.content_margin_left = 24
+			panel_style.content_margin_right = 24
+			panel_style.content_margin_top = 20
+			panel_style.content_margin_bottom = 16
+			notice_theme.set_stylebox("panel", "AcceptDialog", panel_style)
+			var frame_style := notice.get_theme_stylebox("embedded_border", "Window").duplicate() as StyleBoxFlat
+			if frame_style != null:
+				frame_style.bg_color = panel_style.bg_color
+				frame_style.border_color = panel_style.border_color
+				frame_style.set_corner_radius_all(18)
+				notice_theme.set_stylebox("embedded_border", "Window", frame_style)
+			notice_theme.set_font_size("title_font_size", "Window", 22)
+			notice_theme.set_color("title_color", "Window", Color(1, 1, 1, 1))
+			notice_theme.set_font_size("font_size", "Label", 20)
+			notice_theme.set_constant("line_spacing", "Label", 6)
+			notice_theme.set_color("font_color", "Label", Color(0.92, 0.94, 1.0, 1.0))
+			var button_style := StyleBoxFlat.new()
+			button_style.bg_color = Color(0.20, 0.55, 0.95, 1.0)
+			button_style.set_corner_radius_all(12)
+			button_style.content_margin_left = 16
+			button_style.content_margin_right = 16
+			button_style.content_margin_top = 8
+			button_style.content_margin_bottom = 8
+			notice_theme.set_stylebox("normal", "Button", button_style)
+			var button_hover := button_style.duplicate() as StyleBoxFlat
+			button_hover.bg_color = Color(0.25, 0.62, 1.0, 1.0)
+			notice_theme.set_stylebox("hover", "Button", button_hover)
+			notice_theme.set_font_size("font_size", "Button", 18)
+			notice_theme.set_color("font_color", "Button", Color(1, 1, 1, 1))
+			notice.theme = notice_theme
+			notice.get_label().horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			notice.get_ok_button().custom_minimum_size = Vector2(140, 48)
 			add_child(notice)
 			notice.confirmed.connect(notice.queue_free)
 			notice.close_requested.connect(notice.queue_free)
-			notice.popup_centered(Vector2i(640, 180))
+			var notice_size := Vector2(640, 260).min(get_viewport_rect().size - Vector2(48, 64))
+			notice.popup_centered(Vector2i(notice_size))
 
 
 func _ios_user_save_dispatch(id: int, context: Dictionary) -> void:
