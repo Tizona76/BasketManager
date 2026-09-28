@@ -134,6 +134,11 @@ func _show_login_explainer_popup() -> void:
 	popup.mouse_filter = Control.MOUSE_FILTER_STOP
 	popup.z_index = RenderingServer.CANVAS_ITEM_Z_MAX
 	add_child(popup)
+	if OS.has_feature("ios"):
+		popup.set_as_top_level(true)
+		popup.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		popup.position = Vector2.ZERO
+		popup.size = get_viewport_rect().size
 
 	# Masquer complètement le formulaire pendant l'explication.
 	# Evite le mélange visuel formulaire + texte explicatif.
@@ -160,6 +165,12 @@ func _show_login_explainer_popup() -> void:
 			minf(vp.y - 36.0, 340.0)
 		)
 
+	if OS.has_feature("ios") and mobile_landscape:
+		card.size = Vector2(
+			minf(vp.x - 120.0, 620.0),
+			minf(vp.y - 64.0, 310.0)
+		)
+
 	card.position = (vp - card.size) * 0.5
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.clip_contents = true
@@ -180,13 +191,36 @@ func _show_login_explainer_popup() -> void:
 	card.add_child(bg)
 	card.move_child(bg, 0)
 
+	if OS.has_feature("ios"):
+		var frame := Panel.new()
+		frame.name = "LoginExplainerFrame"
+		frame.set_anchors_preset(Control.PRESET_FULL_RECT)
+		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+		var frame_style := StyleBoxFlat.new()
+		frame_style.bg_color = Color(0, 0, 0, 0)
+		frame_style.border_color = Color(0.64, 0.80, 1.0, 0.95)
+		frame_style.border_width_left = 3
+		frame_style.border_width_top = 3
+		frame_style.border_width_right = 3
+		frame_style.border_width_bottom = 3
+		frame_style.corner_radius_top_left = 18
+		frame_style.corner_radius_top_right = 18
+		frame_style.corner_radius_bottom_left = 18
+		frame_style.corner_radius_bottom_right = 18
+		frame_style.shadow_color = Color(0.45, 0.62, 1.0, 0.25)
+		frame_style.shadow_size = 6
+
+		frame.add_theme_stylebox_override("panel", frame_style)
+		card.add_child(frame)
+
 	var title := Label.new()
 	title.name = "LoginExplainerTitle"
 	title.text = tr("login.explainer.title")
 	if mobile_landscape:
-		title.position = Vector2(24, 14)
-		title.size = Vector2(card.size.x - 48.0, 34)
-		title.add_theme_font_size_override("font_size", 20)
+		title.position = Vector2(24, 12)
+		title.size = Vector2(card.size.x - 48.0, 32)
+		title.add_theme_font_size_override("font_size", 19 if OS.has_feature("ios") else 20)
 	else:
 		title.position = Vector2(28, 22)
 		title.size = Vector2(704, 42)
@@ -201,9 +235,9 @@ func _show_login_explainer_popup() -> void:
 	body.name = "LoginExplainerBody"
 	body.text = tr("login.explainer.body").replace("\\n", "\n")
 	if mobile_landscape:
-		body.position = Vector2(42, 58)
-		body.size = Vector2(card.size.x - 84.0, card.size.y - 122.0)
-		body.add_theme_font_size_override("font_size", 16)
+		body.position = Vector2(38, 52)
+		body.size = Vector2(card.size.x - 76.0, card.size.y - 102.0)
+		body.add_theme_font_size_override("font_size", 14 if OS.has_feature("ios") else 16)
 	else:
 		body.position = Vector2(54, 90)
 		body.size = Vector2(652, 230)
@@ -211,7 +245,7 @@ func _show_login_explainer_popup() -> void:
 
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_theme_color_override("font_color", Color(1, 1, 1, 1))
-	body.add_theme_constant_override("line_spacing", 5)
+	body.add_theme_constant_override("line_spacing", 2 if OS.has_feature("ios") and mobile_landscape else 5)
 	card.add_child(body)
 
 	var ok_btn := Button.new()
