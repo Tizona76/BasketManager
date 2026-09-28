@@ -415,7 +415,7 @@ player.position.short.shooting_guard,S.G.,S.G.,S.G.,S.G.,S.G.
 player.position.short.small_forward,S.F.,S.F.,S.F.,S.F.,S.F.
 player.position.short.point_forward,P.F.,P.F.,P.F.,P.F.,P.F.
 player.position.short.center,C.,C.,C.,C.,C.
-popup.last_match_finance.title,Bilan financier du dernier match,Last game financial summary,Balance financiero del último partido,Bilancio finanziario dell'ultima partita,Balanço financeiro da última partida
+popup.last_match_finance.title,Bilan du dernier match,Last game summary,Resumen del último partido,Riepilogo dell'ultima partita,Resumo da última partida
 popup.last_match_finance.cta_finances,Voir les finances du club,See club finance,Ver las finanzas del club,Vedi le finanze del club,Ver as finanças do clube
 popup.shop_out_of_stock.title,Boutique en rupture de stock,Shop Out of Stock,Tienda sin existencias,Scorte del negozio esaurite,Loja sem stock
 popup.shop_out_of_stock.body,Réapprovisionnez la boutique pour continuer à générer des revenus.,Restock your products in the Shop to keep generating income for your club.,Repón los productos de la tienda para seguir generando ingresos.,Rifornisci il negozio per continuare a generare entrate.,Reabasteça a loja para continuar gerando receita.
@@ -814,6 +814,7 @@ menu.cloud.profile_missing,Profil introuvable pour la sauvegarde,Save profile mi
 menu.cloud.career_missing,Carrière introuvable pour la sauvegarde,Save career missing,Falta la carrera para guardar,Carriera di salvataggio mancante,Carreira em falta para guardar
 menu.cloud.cooldown,Veuillez patienter ({seconds} s),Please wait ({seconds}s),Espera ({seconds} s),Attendi ({seconds} s),Aguarda ({seconds} s)
 popup.last_match_finance.income,Recettes,Income,Ingresos,Entrate,Receitas
+popup.last_match_finance.attendance,Affluence,Attendance,Asistencia,Affluenza,Público
 popup.last_match_finance.expenses,Dépenses,Expenses,Gastos,Spese,Despesas
 popup.tokens.first_reward.line3,Débloquez des améliorations premium et du contenu spécial.,Tokens unlock premium upgrades and special content.,Los tokens desbloquean mejoras premium y contenido especial.,I token sbloccano migliorie premium e contenuti speciali.,Os tokens desbloqueiam melhorias premium e conteúdo especial.
 popup.tokens.first_reward.fallback_mission,Mission terminée.,Mission completed.,Misión completada.,Missione completata.,Missão concluída.

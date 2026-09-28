@@ -996,6 +996,7 @@ func _bm_place_match_result_label(text_value: String, color_value: Color) -> voi
 	lbl_match_result.visible = text_value.strip_edges() != ""
 
 
+
 func _bm_matchsim_mobile_font_plus2(ctrl: Control) -> void:
 	if ctrl == null:
 		return
@@ -2752,11 +2753,16 @@ func _append_finance_history_to_save(save: Dictionary) -> void:
 	(save["finance_history_solde"] as Array).append(solde_total)
 
 
-func _store_last_match_finance_popup(save: Dictionary, recettes_match: int, depenses_match: int, xp_match: int) -> void:
+func _store_last_match_finance_popup(save: Dictionary, recettes_match: int, depenses_match: int, xp_match: int, is_home: bool, attendance_delta_pct: Variant, popularity_delta: int) -> void:
 	save["last_match_finance_popup_pending"] = true
 	save["last_match_finance_recettes"] = int(recettes_match)
 	save["last_match_finance_depenses"] = int(depenses_match)
 	save["last_match_finance_xp"] = int(xp_match)
+	save["last_match_finance_is_home"] = is_home
+	save.erase("last_match_finance_attendance")
+	save.erase("last_match_finance_popularity")
+	save["last_match_finance_attendance_delta_pct"] = attendance_delta_pct if is_home else null
+	save["last_match_finance_popularity_delta"] = popularity_delta
 
 func _pick_home_mvp_name_or_fallback() -> String:
 	var save := PlayerLife.load_savegame()
@@ -4210,6 +4216,8 @@ func _fin_match() -> void:
 
 	# --- PATCH ULTRA-CIBLÉ: update joueurs "vivants" + rewrite savegame.json ---
 	var save := PlayerLife.load_savegame()
+	var summary_popularity_before: int = int(save.get("popularite", 50))
+	var summary_previous_attendance: int = int(save.get("last_home_attendance_for_summary", -1))
 	# BM_POP_FIN_APPLY_V2 ------------------------------------------------------
 	PlayerLife.ensure_finance_schema(save)
 
@@ -4245,6 +4253,7 @@ func _fin_match() -> void:
 		print("[DBG LAST WRITE] season_results=", save.get("season_results", {}))
 		PlayerLife.write_savegame(save)
 
+	var summary_attendance_delta_pct: Variant = null
 	if not already_applied and _user_is_home:
 		var coef := PlayerLife.popularity_coef(save)
 		var prev_shop := _compute_shop_prevision(save)
@@ -4290,6 +4299,10 @@ func _fin_match() -> void:
 			ticket_offered_seats,
 			ticket_potential_attendance
 		)
+
+		if summary_previous_attendance > 0:
+			summary_attendance_delta_pct = int(round(float(ticket_actual_attendance - summary_previous_attendance) / float(summary_previous_attendance) * 100.0))
+		save["last_home_attendance_for_summary"] = ticket_actual_attendance
 
 		var ticket_offered_fill_ratio: float = 0.0
 
@@ -4713,7 +4726,8 @@ func _fin_match() -> void:
 	elif did_win:
 		xp_match = XP_WIN
 
-	_store_last_match_finance_popup(save, recettes_match, depenses_match, xp_match)
+	_store_last_match_finance_popup(save, recettes_match, depenses_match, xp_match, _user_is_home, summary_attendance_delta_pct, int(save.get("popularite", 50)) - summary_popularity_before)
+	var end_popularity_delta: int = int(save["last_match_finance_popularity_delta"])
 
 
 	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
@@ -4849,6 +4863,9 @@ func _fin_match() -> void:
 				roster_sync_reset["match_selected_ids"] = []
 			save_sync["roster"] = roster_sync_reset
 
+		# Snapshot the final popularity, including the existing ranking adjustment.
+		save_sync["last_match_finance_popularity_delta"] = int(save_sync.get("popularite", 50)) - summary_popularity_before
+		end_popularity_delta = int(save_sync["last_match_finance_popularity_delta"])
 		print("[DBG ROUND SYNC FRESH] season_results=", JSON.stringify(save_sync["season_results"]))
 		PlayerLife.write_savegame(save_sync)
 		if int(save_sync.get("season_number", 1)) == 1 and int(save_sync.get("season_round", 0)) >= int(SeasonState.total_matchs_saison):
@@ -4963,6 +4980,9 @@ func _fin_match() -> void:
 			var fx: Dictionary = ss.call("get_user_fixture_for_round", _user_team_name, int(ss.matchs_joues))
 			if typeof(fx) == TYPE_DICTIONARY and fx.size() > 0:
 				ss.opponent_name = str(fx.get("opponent", "")).strip_edges()
+
+	if lbl_match_result != null and is_instance_valid(lbl_match_result):
+		lbl_match_result.text = resultat + " - " + tr("club.popularity") + "  " + ("+ " if end_popularity_delta > 0 else "- " if end_popularity_delta < 0 else "") + "%d%%" % absi(end_popularity_delta)
 
 	if btn_retour != null:
 		_bm_style_btn_skip_final_result_clicked()

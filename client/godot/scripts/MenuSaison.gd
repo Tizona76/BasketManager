@@ -2585,7 +2585,7 @@ func _show_pending_season_reward_popup_after_end_season() -> void:
 		call_deferred("_show_pending_season_reward_popup", rank, euros_gain, tokens_gain)
 
 
-func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_gain: int) -> void:
+func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_gain: int, is_home: bool, attendance_delta_pct: Variant, popularity_delta: Variant) -> void:
 	var already := get_node_or_null("LastMatchFinancePopup")
 	if already != null:
 		return
@@ -2610,8 +2610,9 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	popup.add_child(dark)
 
 	var card := Panel.new()
-	var card_w: float = 980.0
-	var card_h: float = 360.0
+	var card_w: float = 940.0
+	var show_home_details: bool = is_home and attendance_delta_pct != null
+	var card_h: float = 350.0 if show_home_details else 320.0
 	var card_scale := Vector2.ONE
 	if _bm_saison_is_mobile_layout():
 		var vp := get_viewport_rect().size
@@ -2633,7 +2634,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	popup.add_child(card)
 
 	var title := Label.new()
-	title.text = _bm_tr_or_fallback("popup.last_match_finance.title", "Last match financial summary")
+	title.text = _bm_tr_or_fallback("popup.last_match_finance.title", "Last game summary")
 	title.position = Vector2(40, 24)
 	title.size = Vector2(card_w - 80.0, 40)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2643,7 +2644,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 
 	var lbl_income_title := Label.new()
 	lbl_income_title.text = _bm_tr_or_fallback("popup.last_match_finance.income", "Income")
-	lbl_income_title.position = Vector2(70, 95)
+	lbl_income_title.position = Vector2(60, 85)
 	lbl_income_title.size = Vector2(260, 32)
 	lbl_income_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl_income_title.add_theme_font_size_override("font_size", 22)
@@ -2652,7 +2653,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 
 	var lbl_expenses_title := Label.new()
 	lbl_expenses_title.text = _bm_tr_or_fallback("popup.last_match_finance.expenses", "Expenses")
-	lbl_expenses_title.position = Vector2(370, 95)
+	lbl_expenses_title.position = Vector2(340, 85)
 	lbl_expenses_title.size = Vector2(260, 32)
 	lbl_expenses_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl_expenses_title.add_theme_font_size_override("font_size", 22)
@@ -2661,7 +2662,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 
 	var lbl_xp_title := Label.new()
 	lbl_xp_title.text = _bm_tr_or_fallback("popup.last_match_finance.xp", "XP")
-	lbl_xp_title.position = Vector2(690, 95)
+	lbl_xp_title.position = Vector2(640, 85)
 	lbl_xp_title.size = Vector2(220, 32)
 	lbl_xp_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl_xp_title.add_theme_font_size_override("font_size", 22)
@@ -2670,7 +2671,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 
 	var income_lbl := Label.new()
 	income_lbl.text = _season_reward_menu_fmt_amount(0)
-	income_lbl.position = Vector2(70, 150)
+	income_lbl.position = Vector2(60, 135)
 	income_lbl.size = Vector2(260, 52)
 	income_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	income_lbl.add_theme_font_size_override("font_size", 38)
@@ -2679,7 +2680,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 
 	var expenses_lbl := Label.new()
 	expenses_lbl.text = "-0 $"
-	expenses_lbl.position = Vector2(370, 150)
+	expenses_lbl.position = Vector2(340, 135)
 	expenses_lbl.size = Vector2(260, 52)
 	expenses_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	expenses_lbl.add_theme_font_size_override("font_size", 38)
@@ -2688,12 +2689,42 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 
 	var xp_lbl := Label.new()
 	xp_lbl.text = "+0 XP"
-	xp_lbl.position = Vector2(690, 150)
+	xp_lbl.position = Vector2(640, 135)
 	xp_lbl.size = Vector2(220, 52)
 	xp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	xp_lbl.add_theme_font_size_override("font_size", 38)
 	xp_lbl.add_theme_color_override("font_color", Color(0.20, 0.55, 0.95, 1.0))
 	card.add_child(xp_lbl)
+
+	if show_home_details:
+		var details := HBoxContainer.new()
+		details.position = Vector2(40, 203)
+		details.size = Vector2(card_w - 80.0, 32)
+		details.alignment = BoxContainer.ALIGNMENT_CENTER
+		details.add_theme_constant_override("separation", 32)
+		card.add_child(details)
+		for metric in ["attendance"]:
+			var delta: Variant = attendance_delta_pct if metric == "attendance" else popularity_delta
+			if delta == null:
+				continue
+			var value := int(delta)
+			var caption := _bm_tr_or_fallback("popup.last_match_finance.attendance", "Attendance") if metric == "attendance" else tr("club.popularity")
+			var formatted := "%d%%" % value
+			if metric == "attendance" and value != 0:
+				formatted = ("+ " if value > 0 else "- ") + "%d%%" % absi(value)
+			elif value > 0:
+				formatted = "+" + formatted
+			var detail := Label.new()
+			detail.text = caption + ": " + formatted
+			detail.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			detail.add_theme_font_size_override("font_size", 22 if _bm_saison_is_mobile_layout() else 24)
+			var tint := Color(0.82, 0.86, 0.92, 1.0)
+			if value > 0:
+				tint = Color(0.18, 0.72, 0.25, 1.0)
+			elif value < 0:
+				tint = Color(0.86, 0.22, 0.22, 1.0)
+			detail.add_theme_color_override("font_color", tint)
+			details.add_child(detail)
 
 	var btn := Button.new()
 	var _save_cta: Dictionary = PL.load_savegame()
@@ -2704,7 +2735,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	btn.text = (_bm_tr_or_fallback("popup.last_match_finance.cta_finances", "See club finances") if _open_finances_cta else tr("common.close"))
 	btn.custom_minimum_size = Vector2(320, 52)
 	btn.size = Vector2(320, 52)
-	btn.position = Vector2(330, 270)
+	btn.position = Vector2(310, 260 if show_home_details else 230)
 
 	var _sb_close := StyleBoxFlat.new()
 	_sb_close.bg_color = Color(0.20, 0.55, 0.95, 1.0)
@@ -2753,21 +2784,21 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	card.add_child(btn)
 
 	# BM_LAST_MATCH_FINANCE_POPUP_TEXT_PLUS4_FORCE_V3
-	title.add_theme_font_size_override("font_size", 32)
+	title.add_theme_font_size_override("font_size", 29)
 	lbl_income_title.add_theme_font_size_override("font_size", 26)
 	lbl_expenses_title.add_theme_font_size_override("font_size", 26)
 	lbl_xp_title.add_theme_font_size_override("font_size", 26)
-	income_lbl.add_theme_font_size_override("font_size", 42)
-	expenses_lbl.add_theme_font_size_override("font_size", 42)
-	xp_lbl.add_theme_font_size_override("font_size", 42)
+	income_lbl.add_theme_font_size_override("font_size", 38)
+	expenses_lbl.add_theme_font_size_override("font_size", 38)
+	xp_lbl.add_theme_font_size_override("font_size", 38)
 	btn.add_theme_font_size_override("font_size", 28)
 	if _bm_saison_is_mobile_layout():
 		lbl_income_title.add_theme_font_size_override("font_size", 28)
 		lbl_expenses_title.add_theme_font_size_override("font_size", 28)
 		lbl_xp_title.add_theme_font_size_override("font_size", 28)
-		income_lbl.add_theme_font_size_override("font_size", 44)
-		expenses_lbl.add_theme_font_size_override("font_size", 44)
-		xp_lbl.add_theme_font_size_override("font_size", 44)
+		income_lbl.add_theme_font_size_override("font_size", 40)
+		expenses_lbl.add_theme_font_size_override("font_size", 40)
+		xp_lbl.add_theme_font_size_override("font_size", 40)
 
 	_season_reward_menu_animate_amount(income_lbl, recettes_gain)
 
@@ -2799,6 +2830,9 @@ func _maybe_show_last_match_finance_popup() -> void:
 	var recettes_gain: int = int(save.get("last_match_finance_recettes", 0))
 	var depenses_gain: int = int(save.get("last_match_finance_depenses", 0))
 	var xp_gain: int = int(save.get("last_match_finance_xp", 0))
+	var is_home: bool = bool(save.get("last_match_finance_is_home", false))
+	var attendance_delta_pct: Variant = save.get("last_match_finance_attendance_delta_pct", null)
+	var popularity_delta: Variant = save.get("last_match_finance_popularity_delta", null)
 
 	# 🚫 Anti-popup fantôme : si pending existe mais sans vraies valeurs,
 	# on consomme le flag et on nettoie immédiatement.
@@ -2807,6 +2841,11 @@ func _maybe_show_last_match_finance_popup() -> void:
 		save.erase("last_match_finance_recettes")
 		save.erase("last_match_finance_depenses")
 		save.erase("last_match_finance_xp")
+		save.erase("last_match_finance_is_home")
+		save.erase("last_match_finance_attendance")
+		save.erase("last_match_finance_popularity")
+		save.erase("last_match_finance_attendance_delta_pct")
+		save.erase("last_match_finance_popularity_delta")
 		PL.write_savegame(save)
 		return
 
@@ -2814,10 +2853,15 @@ func _maybe_show_last_match_finance_popup() -> void:
 	save.erase("last_match_finance_recettes")
 	save.erase("last_match_finance_depenses")
 	save.erase("last_match_finance_xp")
+	save.erase("last_match_finance_is_home")
+	save.erase("last_match_finance_attendance")
+	save.erase("last_match_finance_popularity")
+	save.erase("last_match_finance_attendance_delta_pct")
+	save.erase("last_match_finance_popularity_delta")
 	PL.write_savegame(save)
 	_last_match_finance_popup_shown_this_entry = true
 
-	call_deferred("_show_last_match_finance_popup", recettes_gain, depenses_gain, xp_gain)
+	call_deferred("_show_last_match_finance_popup", recettes_gain, depenses_gain, xp_gain, is_home, attendance_delta_pct, popularity_delta)
 
 
 
