@@ -2533,7 +2533,7 @@ func _show_pending_season_reward_popup_after_end_season() -> void:
 		call_deferred("_show_pending_season_reward_popup", rank, euros_gain, tokens_gain)
 
 
-func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_gain: int) -> void:
+func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_gain: int, is_home: bool, attendance_delta_pct: Variant) -> void:
 	var already := get_node_or_null("LastMatchFinancePopup")
 	if already != null:
 		return
@@ -2553,7 +2553,8 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 
 	var card := Panel.new()
 	var card_w: float = 980.0
-	var card_h: float = 360.0
+	var show_attendance: bool = is_home and attendance_delta_pct != null
+	var card_h: float = 408.0 if show_attendance else 360.0
 	if _bm_saison_is_mobile_layout():
 		card_w *= 1.15
 		card_h *= 1.15
@@ -2648,6 +2649,23 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	tw_ball.tween_property(ball, "position:y", 214.0, 0.34).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_IN)
 	tw_ball.tween_interval(0.10)
 
+	if show_attendance:
+		var attendance_value := int(attendance_delta_pct)
+		var attendance_label := Label.new()
+		attendance_label.text = tr("popup.last_match_finance.attendance") + ": " + ("+ " if attendance_value > 0 else "- " if attendance_value < 0 else "") + "%d%%" % absi(attendance_value)
+		attendance_label.position = Vector2(40, 270)
+		attendance_label.size = Vector2(card_w - 80.0, 32)
+		attendance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		attendance_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		attendance_label.add_theme_font_size_override("font_size", 24)
+		var attendance_color := Color(0.82, 0.86, 0.92, 1.0)
+		if attendance_value > 0:
+			attendance_color = Color(0.18, 0.72, 0.25, 1.0)
+		elif attendance_value < 0:
+			attendance_color = Color(0.86, 0.22, 0.22, 1.0)
+		attendance_label.add_theme_color_override("font_color", attendance_color)
+		card.add_child(attendance_label)
+
 	var btn := Button.new()
 	var _save_cta: Dictionary = PL.load_savegame()
 	var _round_cta: int = 0
@@ -2657,7 +2675,7 @@ func _show_last_match_finance_popup(recettes_gain: int, depenses_gain: int, xp_g
 	btn.text = (_bm_tr_or_fallback("popup.last_match_finance.cta_finances", "See club finances") if _open_finances_cta else "Close")
 	btn.custom_minimum_size = Vector2(320, 52)
 	btn.size = Vector2(320, 52)
-	btn.position = Vector2(330, 270)
+	btn.position = Vector2(330, 318 if show_attendance else 270)
 
 	var _sb_close := StyleBoxFlat.new()
 	_sb_close.bg_color = Color(0.20, 0.55, 0.95, 1.0)
@@ -2752,6 +2770,8 @@ func _maybe_show_last_match_finance_popup() -> void:
 	var recettes_gain: int = int(save.get("last_match_finance_recettes", 0))
 	var depenses_gain: int = int(save.get("last_match_finance_depenses", 0))
 	var xp_gain: int = int(save.get("last_match_finance_xp", 0))
+	var is_home: bool = bool(save.get("last_match_finance_is_home", false))
+	var attendance_delta_pct: Variant = save.get("last_match_finance_attendance_delta_pct", null)
 
 	# 🚫 Anti-popup fantôme : si pending existe mais sans vraies valeurs,
 	# on consomme le flag et on nettoie immédiatement.
@@ -2760,6 +2780,8 @@ func _maybe_show_last_match_finance_popup() -> void:
 		save.erase("last_match_finance_recettes")
 		save.erase("last_match_finance_depenses")
 		save.erase("last_match_finance_xp")
+		save.erase("last_match_finance_is_home")
+		save.erase("last_match_finance_attendance_delta_pct")
 		PL.write_savegame(save)
 		return
 
@@ -2767,10 +2789,12 @@ func _maybe_show_last_match_finance_popup() -> void:
 	save.erase("last_match_finance_recettes")
 	save.erase("last_match_finance_depenses")
 	save.erase("last_match_finance_xp")
+	save.erase("last_match_finance_is_home")
+	save.erase("last_match_finance_attendance_delta_pct")
 	PL.write_savegame(save)
 	_last_match_finance_popup_shown_this_entry = true
 
-	call_deferred("_show_last_match_finance_popup", recettes_gain, depenses_gain, xp_gain)
+	call_deferred("_show_last_match_finance_popup", recettes_gain, depenses_gain, xp_gain, is_home, attendance_delta_pct)
 
 
 
