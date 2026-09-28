@@ -1,10 +1,11 @@
 extends Control
+
+const P0Api = preload("res://scripts/ApiConfig.gd")
 const PL = preload("res://scripts/PlayerLife.gd")
 
 signal selection_done()
 signal back_requested()
 
-const BM_GENERIC_FUNNEL_URL := "https://api.basketmanager-game.com/v1/funnel/event"
 const BM_GENERIC_FUNNEL_MAX_RETRIES := 2
 const MAX_SEL := 12
 const BM_SELECTION_CANONICAL_AVATARS := [
@@ -83,7 +84,7 @@ func _bm_send_generic_funnel_event(event_name: String, flag_name: String, meta: 
 	var request := HTTPRequest.new()
 	request.timeout = 8.0
 	get_tree().root.add_child(request)
-	var request_url := BM_GENERIC_FUNNEL_URL
+	var request_url := (P0Api.get_api_base() + "/v1/funnel/event")
 	var payload_data := {
 		"profile_uuid": profile_uuid,
 		"event_name": event_name,
@@ -91,7 +92,7 @@ func _bm_send_generic_funnel_event(event_name: String, flag_name: String, meta: 
 		"meta": meta,
 	}
 	if event_name == "selection-validated":
-		request_url = "https://api.basketmanager-game.com/v1/funnel/selection-validated"
+		request_url = (P0Api.get_api_base() + "/v1/funnel/selection-validated")
 		payload_data = {"profile_uuid": profile_uuid}
 	var payload := JSON.stringify(payload_data)
 
@@ -106,7 +107,7 @@ func _bm_send_generic_funnel_event(event_name: String, flag_name: String, meta: 
 			_bm_schedule_generic_funnel_retry(event_name, flag_name, meta, attempt)
 	, CONNECT_ONE_SHOT)
 
-	var request_error := request.request(
+	var request_error := P0Api.request(request,
 		request_url,
 		["Content-Type: application/json"],
 		HTTPClient.METHOD_POST,

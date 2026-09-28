@@ -1,5 +1,7 @@
 extends Control
 
+const P0Api = preload("res://scripts/ApiConfig.gd")
+
 const BM_TEST_FORCE_MERCATO_OPEN := false # TEST TEMPORAIRE: remettre à false après tests
 const SHOP_DEBUG_VISIBLE := false
 const BM_DEBUG_FORCE_CLUB_TOKENS_VISIBLE := false # DEBUG TEMPORAIRE: true uniquement pour tester Club Tokens dès le début
@@ -15,11 +17,11 @@ signal go_my_team
 signal go_back
 signal action_requested(action: String)
 signal cloud_save_attempt_completed(result: int, code: int)
+signal cloud_user_save_completed(id: int, result: int, code: int, message: String)
 
 # ------------------------------------------------------------
 # API
 # ------------------------------------------------------------
-const API_BASE := "https://api.basketmanager-game.com"
 const PATH_CLOUD_LOAD := "/v1/cloud/load"
 const PATH_CLOUD_SAVE := "/v1/cloud/save"
 const PATH_AUTH_REFRESH := "/v1/auth/refresh"
@@ -658,6 +660,12 @@ var _cloud_save_conflict_key := ""
 var _cloud_save_auth_retry_used := false
 var _cloud_save_request_body := ""
 var _cloud_save_request_profile := ""
+const CLOUD_BASES_META := &"basket_cloud_integrated_bases_by_profile_career"
+var _cloud_request_context: Dictionary = {}
+# iOS user intent survives the gap between its prerequisite Load and its Save.
+var _user_save_sequence: int = 0
+var _pending_user_save: Dictionary = {}
+var _request_user_save_id: int = 0
 
 var _did_auto_save: bool = false
 var _inflight: String = ""   # "", "load", "save"
@@ -1305,12 +1313,12 @@ func _try_auth_refresh(rt: String) -> void:
 
 	_set_status(tr("menu.cloud.reconnecting"))
 
-	var url := API_BASE + PATH_AUTH_REFRESH
+	var url := P0Api.get_api_base() + PATH_AUTH_REFRESH
 	var headers := PackedStringArray(["Content-Type: application/json"])
 	var body := JSON.stringify({"refresh_token": rt})
 
 	print("[AUTH][REFRESH] POST ", url, " rt_len=", str(rt.length()))
-	var err := HttpAuth.request(url, headers, HTTPClient.METHOD_POST, body)
+	var err := P0Api.request(HttpAuth, url, headers, HTTPClient.METHOD_POST, body)
 	print("[AUTH][REFRESH] request err=", err)
 
 	if err != OK:
@@ -1339,10 +1347,10 @@ func _on_auth_completed(result: int, response_code: int, _headers: PackedStringA
 				_auth_inflight = false
 				return
 
-			var url := API_BASE + PATH_AUTH_REFRESH
+			var url := P0Api.get_api_base() + PATH_AUTH_REFRESH
 			var headers := PackedStringArray(["Content-Type: application/json"])
 			var body2 := JSON.stringify({"refresh_token": rt2})
-			var err := HttpAuth.request(url, headers, HTTPClient.METHOD_POST, body2)
+			var err := P0Api.request(HttpAuth, url, headers, HTTPClient.METHOD_POST, body2)
 			print("[AUTH][REFRESH] retry request err=", err)
 			if err != OK:
 				_auth_inflight = false
@@ -1438,6 +1446,10 @@ func _on_auth_completed(result: int, response_code: int, _headers: PackedStringA
 
 
 func _cloud_active_career_id() -> String:
+	if OS.has_feature("ios"):
+		var local_profile := str(ProfileManager.get_active_profile_id_no_ensure())
+		var index: Variant = ProfileManager._read_careers_index(local_profile)
+		return str(index.get("active_career_id", "")).strip_edges() if index is Dictionary else ""
 	if ProfileManager == null or not ProfileManager.has_method("get_active_career_id"):
 		return ""
 	return str(ProfileManager.get_active_career_id()).strip_edges()
@@ -1473,6 +1485,226 @@ func _cloud_set_meta_for_career(career_id: String, rev: Variant, checksum: Varia
 		Session.set_cloud_meta_for_career(career_id, rev, checksum)
 
 
+# iOS: Session's historical rev may only be observed, never a trusted local base.
+# Bases/conflicts survive scene recreation, are scoped to profile + career, and
+# are deliberately revalidated after app restart. No persistent format changes.
+func _ios_cloud_context() -> Dictionary:
+	# The usual ProfileManager/PL getters normalize indexes and may write them.
+	# Callback guards must read identity without repairing another career/profile.
+	var local_profile := str(ProfileManager.get_active_profile_id_no_ensure())
+	var career := _cloud_active_career_id()
+	return {"profile": str(Session.profile_uuid).strip_edges(), "career": career,
+		"local_profile": local_profile, "path": ProfileManager._career_save_path(local_profile, career),
+		"access": str(Session.access_token), "refresh": str(Session.refresh_token)}
+
+
+func _ios_cloud_key(context: Dictionary) -> String:
+	return JSON.stringify([context.get("profile", ""), context.get("career", "")])
+
+
+func _ios_cloud_context_matches(context: Dictionary) -> bool:
+	return not context.is_empty() and context == _ios_cloud_context()
+
+
+func _ios_cloud_message(reason: String) -> String:
+	var messages := {
+		"CAREER_CLOUD_CONFLICT": {
+			"fr": "Cette sauvegarde Cloud appartient à une autre carrière. Votre progression locale est conservée.",
+			"en": "This Cloud save belongs to another career. Your local progress is preserved.",
+			"es": "Esta partida en la nube pertenece a otra carrera. Tu progreso local se conserva.",
+			"it": "Questo salvataggio Cloud appartiene a un'altra carriera. I tuoi progressi locali sono conservati.",
+			"pt": "Esta gravação na nuvem pertence a outra carreira. O teu progresso local é preservado."},
+		"LEGACY_CLOUD_UNCLAIMED": {
+			"fr": "Une ancienne sauvegarde Cloud existe mais ne peut pas être associée automatiquement à cette carrière. Votre progression locale est conservée.",
+			"en": "An older Cloud save exists but cannot be linked to this career automatically. Your local progress is preserved.",
+			"es": "Existe una partida antigua en la nube que no se puede asociar automáticamente a esta carrera. Tu progreso local se conserva.",
+			"it": "Esiste un vecchio salvataggio Cloud che non può essere associato automaticamente a questa carriera. I tuoi progressi locali sono conservati.",
+			"pt": "Existe uma gravação antiga na nuvem que não pode ser associada automaticamente a esta carreira. O teu progresso local é preservado."},
+		"UNRESOLVED": {
+			"fr": "La sauvegarde Cloud n’a pas été intégrée ou confirmée pour cette carrière. Sauvegarde Cloud suspendue ; vous pouvez continuer à jouer localement.",
+			"en": "The Cloud save has not been integrated or confirmed for this career. Cloud saving is paused; you can continue playing locally.",
+			"es": "La partida en la nube no se ha integrado o confirmado para esta carrera. El guardado en la nube está suspendido; puedes seguir jugando localmente.",
+			"it": "Il salvataggio Cloud non è stato integrato o confermato per questa carriera. Il salvataggio Cloud è sospeso; puoi continuare a giocare localmente.",
+			"pt": "A gravação na nuvem não foi integrada ou confirmada para esta carreira. A gravação na nuvem está suspensa; podes continuar a jogar localmente."}}
+	if reason == "REV_CONFLICT":
+		return tr("menu.cloud.rev_conflict")
+	var localized: Dictionary = messages.get(reason, messages["UNRESOLVED"])
+	return str(localized[_bm_club_lang_code()])
+
+
+func _ios_cloud_block(reason: String) -> void:
+	var conflicts: Dictionary = get_tree().get_meta(CLOUD_CONFLICTS_META, {})
+	var first_notice := not conflicts.has(_ios_cloud_key(_cloud_request_context))
+	conflicts[_ios_cloud_key(_cloud_request_context)] = reason
+	get_tree().set_meta(CLOUD_CONFLICTS_META, conflicts)
+	if _ios_cloud_context_matches(_cloud_request_context):
+		# Preserve dirty and local data; refusal is not a successful synchronization.
+		_set_status(_ios_cloud_message(reason))
+		if first_notice:
+			# Status is clipped in Management: show the complete refusal once.
+			var notice := AcceptDialog.new()
+			notice.title = "Cloud"
+			notice.dialog_text = _ios_cloud_message(reason)
+			notice.dialog_autowrap = true
+			add_child(notice)
+			notice.confirmed.connect(notice.queue_free)
+			notice.close_requested.connect(notice.queue_free)
+			notice.popup_centered(Vector2i(640, 180))
+
+
+func _ios_user_save_dispatch(id: int, context: Dictionary) -> void:
+	if not OS.has_feature("ios") or id == 0 or int(_pending_user_save.get("id", 0)) != id:
+		return
+	if not _ios_cloud_context_matches(context):
+		_ios_user_save_finish(id, ERR_UNAUTHORIZED, 409, _ios_cloud_message("UNRESOLVED"))
+		return
+	if _inflight != "":
+		_ios_user_save_finish(id, ERR_BUSY, 0, tr("menu.cloud.start_failed"))
+		return
+	_try_cloud_save_from_local(CloudSaveOrigin.USER_CHOICE, id)
+	# Preflight refusals return without a request and without a transport callback.
+	if int(_pending_user_save.get("id", 0)) == id and (_request_user_save_id != id or _inflight not in ["load", "save"]):
+		var message: String = Status.text if Status != null else tr("menu.cloud.start_failed")
+		_ios_user_save_finish(id, ERR_CANT_CONNECT, 0, message)
+
+
+func _ios_user_save_finish(id: int, result: int, code: int, message: String) -> void:
+	if not OS.has_feature("ios") or id == 0 or int(_pending_user_save.get("id", 0)) != id:
+		return
+	_pending_user_save.clear()
+	if _request_user_save_id == id:
+		_request_user_save_id = 0
+	cloud_user_save_completed.emit(id, result, code, message)
+
+
+func _ios_cloud_end(result: int, code: int, continue_user_save: bool = false) -> void:
+	var was_save := _inflight == "save"
+	var was_load := _inflight == "load"
+	var user_save_id := _request_user_save_id
+	var context := _cloud_request_context.duplicate()
+	var context_matches := _ios_cloud_context_matches(context)
+	var message: String = Status.text if Status != null and context_matches else _ios_cloud_message("UNRESOLVED")
+	if was_load and result == OK and code >= 200 and code < 300:
+		message = tr("menu.cloud.synced")
+	_request_user_save_id = 0
+	_inflight = ""
+	_cloud_request_career_id = ""
+	_cloud_request_context = {}
+	_load_retry_count = 0
+	_save_retry_count = 0
+	_rt_pending_reload = false
+	_rt_last_local_checksum = ""
+	_clear_cloud_save_auth_attempt()
+	if was_save:
+		cloud_save_attempt_completed.emit(result, code)
+	if user_save_id != 0:
+		if was_load and continue_user_save and result == OK and code >= 200 and code < 300:
+			if context_matches and FileAccess.file_exists(str(context["path"])):
+				call_deferred("_ios_cloud_deferred_save", context, user_save_id)
+				return
+			_ios_user_save_finish(user_save_id, ERR_UNAUTHORIZED, 409, _ios_cloud_message("UNRESOLVED"))
+		elif not context_matches:
+			_ios_user_save_finish(user_save_id, ERR_UNAUTHORIZED, 409, _ios_cloud_message("UNRESOLVED"))
+		else:
+			# A validated Load without an upload is neutral, never an upload ACK.
+			var terminal_result: int = ERR_SKIP if was_load and result == OK and code >= 200 and code < 300 else result
+			_ios_user_save_finish(user_save_id, terminal_result, code, message)
+
+
+func _ios_cloud_set_base(rev: int, checksum: String) -> void:
+	var bases: Dictionary = get_tree().get_meta(CLOUD_BASES_META, {})
+	bases[_ios_cloud_key(_cloud_request_context)] = rev
+	get_tree().set_meta(CLOUD_BASES_META, bases)
+	_cloud_set_meta_for_career(_cloud_request_career_id, rev, checksum)
+
+
+func _ios_cloud_deferred_save(context: Dictionary, user_save_id: int = 0) -> void:
+	if OS.has_feature("ios") and user_save_id != 0:
+		_ios_user_save_dispatch(user_save_id, context)
+		return
+	if _ios_cloud_context_matches(context):
+		_try_cloud_save_from_local()
+
+
+func _ios_cloud_success(data: Variant) -> void:
+	if not data is Dictionary or data.get("ok") != true or data.get("profile_uuid") != _cloud_request_context["profile"]:
+		_ios_cloud_block("UNRESOLVED")
+		_ios_cloud_end(HTTPRequest.RESULT_SUCCESS, 409)
+		return
+	var is_load := _inflight == "load"
+	var user_save_id := _request_user_save_id
+	var context := _cloud_request_context.duplicate()
+	if is_load and data.get("found") == false and data.get("blob") == null and not data.has("career_id"):
+		# Absent is the only successful response with no server career_id.
+		_ios_cloud_set_base(0, "")
+		_ios_cloud_end(HTTPRequest.RESULT_SUCCESS, 200, user_save_id != 0)
+		_set_status(tr("menu.cloud.synced"))
+		if user_save_id == 0 and FileAccess.file_exists(str(context["path"])):
+			call_deferred("_ios_cloud_deferred_save", context)
+		return
+	if not data.get("career_id") is String or data["career_id"] != _cloud_request_career_id:
+		_ios_cloud_block("CAREER_CLOUD_CONFLICT" if data.has("career_id") else "UNRESOLVED")
+		_ios_cloud_end(HTTPRequest.RESULT_SUCCESS, 409)
+		return
+	var remote_rev: Variant = data.get("rev")
+	if (not remote_rev is int and not remote_rev is float) or float(remote_rev) != floor(float(remote_rev)) or float(remote_rev) < 1:
+		_ios_cloud_block("UNRESOLVED")
+		_ios_cloud_end(HTTPRequest.RESULT_SUCCESS, 409)
+		return
+	var path: String = context["path"]
+	var local_checksum := _sha256_canonical_from_file(path)
+	if is_load:
+		var blob: Variant = data.get("blob")
+		if data.get("found") != true or not blob is Dictionary or blob.is_empty():
+			_ios_cloud_block("UNRESOLVED")
+			_ios_cloud_end(HTTPRequest.RESULT_SUCCESS, 409)
+			return
+		var blob_checksum := _sha256_canonical_from_variant(blob)
+		var bases: Dictionary = get_tree().get_meta(CLOUD_BASES_META, {})
+		if FileAccess.file_exists(path):
+			if local_checksum != blob_checksum:
+				# Known continuation: this process already integrated/acknowledged
+				# this exact rev; gameplay edits do not adopt any newer remote rev.
+				if int(bases.get(_ios_cloud_key(context), -1)) != int(remote_rev):
+					_ios_cloud_block("UNRESOLVED")
+					_ios_cloud_end(HTTPRequest.RESULT_SUCCESS, 409)
+					return
+				_ios_cloud_end(HTTPRequest.RESULT_SUCCESS, 200)
+				_set_status(tr("menu.cloud.synced"))
+				return
+		else:
+			# Preserve existing writer/schema normalization; verify disk before
+			# adopting a base (write_savegame has no success return value).
+			var applied: Dictionary = blob.duplicate(true)
+			PL.write_savegame(applied, path)
+			if not FileAccess.file_exists(path) or _sha256_canonical_from_file(path) != _sha256_canonical_from_variant(applied):
+				_ios_cloud_block("UNRESOLVED")
+				_ios_cloud_end(HTTPRequest.RESULT_SUCCESS, 409)
+				return
+			_bm_apply_locale_from_save(applied)
+			var ss := get_node_or_null("/root/SeasonState")
+			if ss != null and ss.has_method("hydrate_from_save"):
+				ss.call("hydrate_from_save", applied)
+			_just_loaded_from_cloud = true
+			_update_club_name_label_from_save()
+		_ios_cloud_set_base(int(remote_rev), str(data.get("checksum", "")))
+		_dirty_local = _sha256_canonical_from_file(path) != blob_checksum
+	else:
+		var sent: Dictionary = JSON.parse_string(_cloud_save_request_body)
+		if int(remote_rev) != int(sent["client_rev"]) + 1 or local_checksum != str(sent["checksum"]):
+			# Local changed while upload was in flight: do not mark it clean or
+			# adopt an acknowledgement for different bytes as its new base.
+			_ios_cloud_block("UNRESOLVED")
+			_ios_cloud_end(HTTPRequest.RESULT_SUCCESS, 409)
+			return
+		_ios_cloud_set_base(int(remote_rev), str(sent["checksum"]))
+		_dirty_local = false
+		if FileAccess.file_exists(FILE_NEW_CLUB_PENDING_CLOUD):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(FILE_NEW_CLUB_PENDING_CLOUD))
+	_set_status(tr("menu.cloud.synced"))
+	_ios_cloud_end(HTTPRequest.RESULT_SUCCESS, 200)
+
+
 func _cloud_response_matches_request(response: Dictionary, requested_career_id: String) -> bool:
 	var requested := str(requested_career_id).strip_edges()
 	var current := _cloud_active_career_id()
@@ -1488,7 +1720,14 @@ func _cloud_response_matches_request(response: Dictionary, requested_career_id: 
 # ------------------------------------------------------------
 # CLOUD LOAD
 # ------------------------------------------------------------
-func _try_cloud_load() -> void:
+func _try_cloud_load(user_save_id: int = 0) -> void:
+	if OS.has_feature("ios"):
+		if not _pending_user_save.is_empty() and int(_pending_user_save["id"]) != user_save_id:
+			return
+		if user_save_id != 0 and int(_pending_user_save.get("id", 0)) != user_save_id:
+			return
+	if OS.has_feature("ios") and _inflight != "":
+		return
 	var access: String = str(Session.access_token).strip_edges()
 	if access == "":
 		if _is_web_guest_auth_pending():
@@ -1516,20 +1755,34 @@ func _try_cloud_load() -> void:
 		print("[CLOUD_LOAD_SKIP] missing active career_id")
 		return
 
+	if OS.has_feature("ios"):
+		_cloud_request_context = _ios_cloud_context()
+		var conflicts: Dictionary = get_tree().get_meta(CLOUD_CONFLICTS_META, {})
+		var reason: Variant = conflicts.get(_ios_cloud_key(_cloud_request_context), "")
+		if reason != "":
+			_set_status(_ios_cloud_message(str(reason)))
+			_cloud_request_context = {}
+			return
 	_set_status(tr("menu.cloud.loading"))
+	if OS.has_feature("ios"):
+		_request_user_save_id = user_save_id
 	_inflight = "load"
 	_cloud_request_career_id = career_id
 
-	var url := API_BASE + PATH_CLOUD_LOAD + "?profile_uuid=%s&career_id=%s" % [puuid.uri_encode(), career_id.uri_encode()]
-	if _cloud_should_attach_legacy(career_id):
+	var url := P0Api.get_api_base() + PATH_CLOUD_LOAD + "?profile_uuid=%s&career_id=%s" % [puuid.uri_encode(), career_id.uri_encode()]
+	if not OS.has_feature("ios") and _cloud_should_attach_legacy(career_id):
 		url += "&attach_legacy=true"
 
 	var headers := PackedStringArray()
 	headers.append("Authorization: Bearer %s" % access)
 	headers.append("Accept: application/json")
 
-	var err := Http.request(url, headers, HTTPClient.METHOD_GET)
+	var err := P0Api.request(Http, url, headers, HTTPClient.METHOD_GET)
 	if err != OK:
+		if OS.has_feature("ios") and user_save_id != 0:
+			_set_status(tr("menu.cloud.load_error").replace("{code}", str(err)))
+			_ios_cloud_end(err, 0)
+			return
 		_inflight = ""
 		_cloud_request_career_id = ""
 		_set_status(tr("menu.cloud.load_error").replace("{code}", str(err)))
@@ -1538,13 +1791,12 @@ func _try_cloud_load() -> void:
 # ------------------------------------------------------------
 # CLOUD SAVE (depuis la carriere active)
 # ------------------------------------------------------------
-func _try_cloud_save_from_local(origin: CloudSaveOrigin = CloudSaveOrigin.AUTOMATIC) -> void:
-	if OS.has_feature("ios") and origin == CloudSaveOrigin.AUTOMATIC:
-		var conflicts: Dictionary = get_tree().get_meta(CLOUD_CONFLICTS_META, {})
-		if not conflicts.is_empty():
-			var active_key := JSON.stringify([str(Session.profile_uuid).strip_edges(), _cloud_active_career_id()])
-			if conflicts.has(active_key):
-				return
+func _try_cloud_save_from_local(origin: CloudSaveOrigin = CloudSaveOrigin.AUTOMATIC, user_save_id: int = 0) -> void:
+	if OS.has_feature("ios"):
+		if not _pending_user_save.is_empty() and int(_pending_user_save["id"]) != user_save_id:
+			return
+		if user_save_id != 0 and (int(_pending_user_save.get("id", 0)) != user_save_id or origin != CloudSaveOrigin.USER_CHOICE):
+			return
 	if _inflight != "":
 		print("[CLOUD_SAVE_SKIP] inflight=", _inflight)
 		return
@@ -1568,12 +1820,29 @@ func _try_cloud_save_from_local(origin: CloudSaveOrigin = CloudSaveOrigin.AUTOMA
 		return
 
 	if OS.has_feature("ios"):
-		_cloud_save_conflict_key = JSON.stringify([puuid, career_id])
+		var context := _ios_cloud_context()
+		var key := _ios_cloud_key(context)
+		var conflicts: Dictionary = get_tree().get_meta(CLOUD_CONFLICTS_META, {})
+		if conflicts.has(key):
+			_set_status(_ios_cloud_message(str(conflicts[key])))
+			return
+		var bases: Dictionary = get_tree().get_meta(CLOUD_BASES_META, {})
+		if not bases.has(key):
+			# Never trust a previously observed Session rev as a local base.
+			_try_cloud_load(user_save_id)
+			return
+		_cloud_request_context = context
+		_cloud_save_conflict_key = key
 
-	_ensure_local_savegame_exists()
+	if not OS.has_feature("ios"):
+		_ensure_local_savegame_exists()
 
-	var active_save_path: String = PL._resolve_save_path(FILE_SAVEGAME)
+	var active_save_path: String = str(_cloud_request_context["path"]) if OS.has_feature("ios") else PL._resolve_save_path(FILE_SAVEGAME)
 	var local_parsed: Variant = _read_json_file(active_save_path)
+	if OS.has_feature("ios") and (not local_parsed is Dictionary or local_parsed.is_empty()):
+		_ios_cloud_block("UNRESOLVED")
+		_ios_cloud_end(HTTPRequest.RESULT_SUCCESS, 409)
+		return
 	var blob_to_send: Dictionary = {}
 
 	if typeof(local_parsed) == TYPE_DICTIONARY:
@@ -1588,6 +1857,8 @@ func _try_cloud_save_from_local(origin: CloudSaveOrigin = CloudSaveOrigin.AUTOMA
 			checksum = _sha256_hex(raw_txt2)
 
 	_set_status(tr("menu.save_choice.saving"))
+	if OS.has_feature("ios"):
+		_request_user_save_id = user_save_id
 	_inflight = "save"
 	_cloud_request_career_id = career_id
 
@@ -1597,8 +1868,13 @@ func _try_cloud_save_from_local(origin: CloudSaveOrigin = CloudSaveOrigin.AUTOMA
 		"blob": blob_to_send,
 		"checksum": checksum,
 		"client_rev": _cloud_rev_for_career(career_id),
-		"attach_legacy": _cloud_should_attach_legacy(career_id)
+		"attach_legacy": false if OS.has_feature("ios") else _cloud_should_attach_legacy(career_id)
 	}
+
+	if OS.has_feature("ios"):
+		payload.erase("attach_legacy")
+		var bases: Dictionary = get_tree().get_meta(CLOUD_BASES_META, {})
+		payload["client_rev"] = int(bases[_ios_cloud_key(_cloud_request_context)])
 
 	var headers := PackedStringArray()
 	headers.append("Authorization: Bearer %s" % access)
@@ -1611,9 +1887,14 @@ func _try_cloud_save_from_local(origin: CloudSaveOrigin = CloudSaveOrigin.AUTOMA
 		_cloud_save_request_body = body_txt
 		_cloud_save_request_profile = puuid
 
-	var url := API_BASE + PATH_CLOUD_SAVE
-	var err := Http.request(url, headers, HTTPClient.METHOD_POST, body_txt)
+	var url := P0Api.get_api_base() + PATH_CLOUD_SAVE
+	var err := P0Api.request(Http, url, headers, HTTPClient.METHOD_POST, body_txt)
 	if err != OK:
+		if OS.has_feature("ios") and user_save_id != 0:
+			_set_status(tr("menu.cloud.save_error").replace("{code}", str(err)))
+			_dirty_local = true
+			_ios_cloud_end(err, 0)
+			return
 		_inflight = ""
 		_cloud_request_career_id = ""
 		_set_status(tr("menu.cloud.save_error").replace("{code}", str(err)))
@@ -1625,6 +1906,8 @@ func _try_cloud_save_from_local(origin: CloudSaveOrigin = CloudSaveOrigin.AUTOMA
 # HTTP CALLBACK UNIQUE (LOAD + SAVE)
 # ------------------------------------------------------------
 func _cloud_save_auth_context_matches() -> bool:
+	if OS.has_feature("ios") and not _ios_cloud_context_matches(_cloud_request_context):
+		return false
 	return _inflight == "save" and _cloud_save_request_body != "" \
 		and str(Session.profile_uuid).strip_edges() == _cloud_save_request_profile \
 		and _cloud_active_career_id() == _cloud_request_career_id
@@ -1638,8 +1921,15 @@ func _clear_cloud_save_auth_attempt() -> void:
 
 
 func _finish_cloud_save_auth_failure(message: String, code: int = 401, result: int = HTTPRequest.RESULT_SUCCESS) -> void:
+	if OS.has_feature("ios") and not _ios_cloud_context_matches(_cloud_request_context):
+		_ios_cloud_block("UNRESOLVED")
+		_ios_cloud_end(result, code)
+		return
 	_set_status(message)
 	_dirty_local = true
+	if OS.has_feature("ios") and _request_user_save_id != 0:
+		_ios_cloud_end(result, code)
+		return
 	_save_retry_count = 0
 	_rt_pending_reload = false
 	_rt_last_local_checksum = ""
@@ -1659,7 +1949,7 @@ func _recover_cloud_save_auth() -> void:
 	var auth := HTTPRequest.new()
 	add_child(auth)
 	auth.timeout = CLOUD_REQUEST_TIMEOUT_S
-	var err := auth.request(API_BASE + PATH_AUTH_REFRESH,
+	var err := P0Api.request(auth, P0Api.get_api_base() + PATH_AUTH_REFRESH,
 		PackedStringArray(["Content-Type: application/json"]), HTTPClient.METHOD_POST,
 		JSON.stringify({"refresh_token": refresh}))
 	if err != OK:
@@ -1680,6 +1970,9 @@ func _recover_cloud_save_auth() -> void:
 		return
 	var rotated := str(data.get("refresh_token", "")).strip_edges()
 	Session.set_tokens(data["access_token"], rotated if rotated != "" else refresh, "Bearer")
+	if OS.has_feature("ios"):
+		_cloud_request_context["access"] = str(Session.access_token)
+		_cloud_request_context["refresh"] = str(Session.refresh_token)
 	if not _save_session_local_from_menu():
 		_finish_cloud_save_auth_failure(tr("menu.cloud.auth_failed"))
 		return
@@ -1687,13 +1980,28 @@ func _recover_cloud_save_auth() -> void:
 	var headers := PackedStringArray(["Authorization: Bearer %s" % Session.access_token,
 		"Accept: application/json", "Content-Type: application/json"])
 	# Do not reread the local save or reconstruct its career/revision/checksum.
-	err = Http.request(API_BASE + PATH_CLOUD_SAVE, headers, HTTPClient.METHOD_POST, _cloud_save_request_body)
+	err = P0Api.request(Http, P0Api.get_api_base() + PATH_CLOUD_SAVE, headers, HTTPClient.METHOD_POST, _cloud_save_request_body)
 	if err != OK:
 		_finish_cloud_save_auth_failure(tr("menu.cloud.save_error").replace("{code}", str(err)))
 
 
 func _on_http_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
 	var is_save := _inflight == "save"
+	if OS.has_feature("ios"):
+		if _inflight == "":
+			return
+		if not _ios_cloud_context_matches(_cloud_request_context):
+			_ios_cloud_block("UNRESOLVED")
+			_ios_cloud_end(result, 409)
+			return
+		if result == HTTPRequest.RESULT_SUCCESS and response_code == 409:
+			var rejection: Variant = JSON.parse_string(body.get_string_from_utf8())
+			var reason := str(rejection.get("detail", "UNRESOLVED")) if rejection is Dictionary else "UNRESOLVED"
+			if is_save and reason == "REV_CONFLICT":
+				_dirty_local = true
+			_ios_cloud_block(reason)
+			_ios_cloud_end(result, response_code)
+			return
 	# A timed-out iOS attempt is terminal; do not immediately occupy Http again.
 	if OS.has_feature("ios") and result == HTTPRequest.RESULT_TIMEOUT:
 		_set_network_state("OFFLINE")
@@ -1701,6 +2009,9 @@ func _on_http_completed(result: int, response_code: int, headers: PackedStringAr
 			_finish_cloud_save_auth_failure(tr("menu.cloud.offline_save").replace("{code}", str(result)), response_code, result)
 		else:
 			_set_status(tr("menu.cloud.offline_load").replace("{code}", str(result)))
+			if _request_user_save_id != 0:
+				_ios_cloud_end(result, response_code)
+				return
 			_load_retry_count = 0
 			_rt_pending_reload = false
 			_rt_last_local_checksum = ""
@@ -1708,23 +2019,6 @@ func _on_http_completed(result: int, response_code: int, headers: PackedStringAr
 			_cloud_request_career_id = ""
 		return
 	if OS.has_feature("ios") and is_save:
-		if result == HTTPRequest.RESULT_SUCCESS and response_code == 409:
-			var conflict: Variant = JSON.parse_string(body.get_string_from_utf8())
-			if conflict is Dictionary and conflict.get("detail") == "REV_CONFLICT":
-				_dirty_local = true
-				var conflicts: Dictionary = get_tree().get_meta(CLOUD_CONFLICTS_META, {})
-				if _cloud_save_conflict_key != "":
-					conflicts[_cloud_save_conflict_key] = true
-					get_tree().set_meta(CLOUD_CONFLICTS_META, conflicts)
-				_set_status(tr("menu.cloud.rev_conflict"))
-				_save_retry_count = 0
-				_rt_pending_reload = false
-				_rt_last_local_checksum = ""
-				_inflight = ""
-				_cloud_request_career_id = ""
-				_clear_cloud_save_auth_attempt()
-				cloud_save_attempt_completed.emit(result, response_code)
-				return
 		if not _cloud_save_auth_retry_used and result == HTTPRequest.RESULT_SUCCESS and response_code == 401:
 			var error: Variant = JSON.parse_string(body.get_string_from_utf8())
 			if error is Dictionary and error.get("detail") == "INVALID_TOKEN":
@@ -1739,6 +2033,18 @@ func _on_http_completed(result: int, response_code: int, headers: PackedStringAr
 		if _cloud_save_auth_retry_used and (result != HTTPRequest.RESULT_SUCCESS or response_code < 200 or response_code >= 300):
 			_finish_cloud_save_auth_failure(tr("menu.cloud.save_error").replace("{code}", str(response_code)), response_code, result)
 			return
+	if OS.has_feature("ios"):
+		if result == HTTPRequest.RESULT_SUCCESS and response_code >= 200 and response_code < 300:
+			_set_network_state("ONLINE")
+			_ios_cloud_success(JSON.parse_string(body.get_string_from_utf8()))
+		else:
+			# A failed Load never authorizes a Save; transport ambiguity never
+			# advances its base. A later explicit Save can receive REV_CONFLICT.
+			if is_save:
+				_dirty_local = true
+			_set_status(tr("menu.cloud.save_error" if is_save else "menu.cloud.load_error").replace("{code}", str(response_code)))
+			_ios_cloud_end(result, response_code)
+		return
 	_handle_cloud_http_completed(result, response_code, headers, body)
 	if _inflight == "":
 		_cloud_request_career_id = ""
@@ -2108,6 +2414,8 @@ func _handle_cloud_http_completed(result: int, response_code: int, _headers: Pac
 # ROUND-TRIP (F9)
 # ------------------------------------------------------------
 func _roundtrip_start() -> void:
+	if OS.has_feature("ios") and not _pending_user_save.is_empty():
+		return
 	if _inflight != "":
 		print("[DBG][RT] abort: inflight=", _inflight)
 		return
@@ -4142,7 +4450,7 @@ func _bm_wr_fetch_top() -> void:
 		if season_id == "":
 			season_id = "2026-01"
 
-	var url := API_BASE + PATH_LB_TOP + "?season_id=%s&sort=winrate&limit=50" % season_id
+	var url := P0Api.get_api_base() + PATH_LB_TOP + "?season_id=%s&sort=winrate&limit=50" % season_id
 
 	var headers := PackedStringArray(["Accept: application/json"])
 	var access := str(Session.access_token).strip_edges()
@@ -4151,7 +4459,7 @@ func _bm_wr_fetch_top() -> void:
 
 	print("[RANKING] GET ", url)
 	_bm_lb_inflight = "top"
-	var err := HttpLb.request(url, headers, HTTPClient.METHOD_GET)
+	var err := P0Api.request(HttpLb, url, headers, HTTPClient.METHOD_GET)
 	print("[RANKING] request err=", err)
 	if err != OK:
 		_bm_lb_inflight = ""
@@ -4256,7 +4564,16 @@ func _save_local_only() -> void:
 	_toast_status(tr("menu.save.local_done"), 2.0)
 
 
-func _save_to_cloud_from_choice() -> void:
+func _save_to_cloud_from_choice(user_save_id: int = 0) -> void:
+	if OS.has_feature("ios"):
+		if not _pending_user_save.is_empty() and int(_pending_user_save["id"]) != user_save_id:
+			return
+		if user_save_id != 0:
+			if int(_pending_user_save.get("id", 0)) != user_save_id:
+				return
+			if not _ios_cloud_context_matches(_pending_user_save["context"]):
+				_ios_user_save_finish(user_save_id, ERR_UNAUTHORIZED, 409, _ios_cloud_message("UNRESOLVED"))
+				return
 	# BM_SAVE_CLOUD_SIGNUP_GATE_V1
 	# Toujours sécuriser la partie localement avant d'ouvrir le parcours Sign Up/Login.
 	_ensure_local_savegame_exists()
@@ -4265,8 +4582,14 @@ func _save_to_cloud_from_choice() -> void:
 	var access: String = str(Session.access_token).strip_edges()
 	if access.length() >= 20 and _inflight == "":
 		_toast_status(tr("menu.save_choice.saving"), 2.0)
-		call_deferred("_try_cloud_save_from_local", CloudSaveOrigin.USER_CHOICE)
+		if OS.has_feature("ios") and user_save_id != 0:
+			call_deferred("_ios_user_save_dispatch", user_save_id, _pending_user_save["context"].duplicate())
+		else:
+			call_deferred("_try_cloud_save_from_local", CloudSaveOrigin.USER_CHOICE)
 	else:
+		if OS.has_feature("ios") and user_save_id != 0:
+			_ios_user_save_finish(user_save_id, ERR_BUSY, 0, tr("menu.cloud.start_failed"))
+			return
 		_toast_status(tr("menu.save.account_required"), 2.5)
 		var f := FileAccess.open("user://save_cloud_signup_return_menu.txt", FileAccess.WRITE)
 		if f != null:
@@ -4393,6 +4716,12 @@ func _show_save_choice_popup() -> void:
 
 
 func _bm_save_choice_wait_for_cloud(popup: Control, button: Button, tip: Label) -> void:
+	if not _pending_user_save.is_empty() or _inflight != "":
+		tip.text = tr("menu.save_choice.pending")
+		return
+	_user_save_sequence += 1
+	var user_save_id := _user_save_sequence
+	_pending_user_save = {"id": user_save_id, "context": _ios_cloud_context()}
 	popup.set_meta("cloud_pending", true)
 	button.disabled = true
 	# Keep the existing hover tooltip separate from the request feedback.
@@ -4409,11 +4738,15 @@ func _bm_save_choice_wait_for_cloud(popup: Control, button: Button, tip: Label) 
 	feedback.text = tr("menu.save_choice.saving")
 	tip.hide()
 
-	var completed := func(result: int, code: int) -> void:
-		if not is_instance_valid(popup):
+	var completed := func(id: int, result: int, code: int, message: String) -> void:
+		if id != user_save_id or not is_instance_valid(popup):
 			return
+		var listener: Callable = popup.get_meta("cloud_user_listener")
+		if cloud_user_save_completed.is_connected(listener):
+			cloud_user_save_completed.disconnect(listener)
+		popup.remove_meta("cloud_user_listener")
 		var success := result == OK and code >= 200 and code < 300
-		feedback.text = Status.text if Status != null else (tr("menu.cloud.synced") if success else tr("menu.cloud.save_failed"))
+		feedback.text = message
 		if success:
 			get_tree().create_timer(1.6).timeout.connect(func():
 				if is_instance_valid(popup):
@@ -4422,20 +4755,13 @@ func _bm_save_choice_wait_for_cloud(popup: Control, button: Button, tip: Label) 
 		else:
 			popup.remove_meta("cloud_pending")
 			button.disabled = false
-	cloud_save_attempt_completed.connect(completed, CONNECT_ONE_SHOT)
+	popup.set_meta("cloud_user_listener", completed)
+	cloud_user_save_completed.connect(completed)
 	popup.tree_exiting.connect(func():
-		if cloud_save_attempt_completed.is_connected(completed):
-			cloud_save_attempt_completed.disconnect(completed)
+		if cloud_user_save_completed.is_connected(completed):
+			cloud_user_save_completed.disconnect(completed)
 	)
-	_save_to_cloud_from_choice()
-	# The existing deferred upload runs first; detect validation/request() failures.
-	(func():
-		if is_instance_valid(popup) and _inflight != "save" and cloud_save_attempt_completed.is_connected(completed):
-			cloud_save_attempt_completed.disconnect(completed)
-			feedback.text = Status.text if Status != null else tr("menu.cloud.start_failed")
-			popup.remove_meta("cloud_pending")
-			button.disabled = false
-	).call_deferred()
+	_save_to_cloud_from_choice(user_save_id)
 
 
 func _show_save_ok() -> void:
@@ -4541,14 +4867,14 @@ func _bm_lb_submit_from_save() -> void:
 	headers.append("Accept: application/json")
 	headers.append("Content-Type: application/json")
 
-	var url := API_BASE + PATH_LB_SUBMIT
+	var url := P0Api.get_api_base() + PATH_LB_SUBMIT
 	var body_txt := JSON.stringify(payload)
 
 	print("[LB] POST ", url)
 	print("[LB] payload club=", club, " season_id=", season_id, " winrate=", winrate, " score_final=", score_final)
 
 	_bm_lb_inflight = "submit"
-	var err := HttpLb.request(url, headers, HTTPClient.METHOD_POST, body_txt)
+	var err := P0Api.request(HttpLb, url, headers, HTTPClient.METHOD_POST, body_txt)
 	print("[LB] request err=", err)
 	if err != OK:
 		_bm_lb_inflight = ""

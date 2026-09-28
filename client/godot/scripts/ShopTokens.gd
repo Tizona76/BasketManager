@@ -1,5 +1,7 @@
 extends Control
 
+const P0Api = preload("res://scripts/ApiConfig.gd")
+
 const PlayerLife = preload("res://scripts/PlayerLife.gd")
 const StadiumDataRef = preload("res://scripts/StadiumData.gd")
 const BM_DEBUG_ENABLE_TOKEN_PACK_GRANTS := false
@@ -8,7 +10,6 @@ const BM_SKIP_FINAL_RESULT_TOKEN_COST_DISPLAY := 1
 const BM_AUTO_SAVE_LINEUP_TOKEN_COST_DISPLAY := 8
 const HOME_ARENA_COST := 15
 const TOKEN_ICON_PATH := "res://assets/images/token.png"
-const API_BASE := "https://api.basketmanager-game.com"
 const CHECKOUT_SESSION_PATH := "/v1/payments/create_checkout_session"
 const AUTH_REFRESH_PATH := "/v1/auth/refresh"
 const CLOUD_LOAD_PATH := "/v1/cloud/load"
@@ -2556,8 +2557,8 @@ func _on_confirm_purchase() -> void:
 		"career_id": career_id,
 		"pack_id": pack_id
 	})
-	print("[STRIPE_UX] REQUEST_START endpoint=", API_BASE + CHECKOUT_SESSION_PATH)
-	var err := http.request(API_BASE + CHECKOUT_SESSION_PATH, headers, HTTPClient.METHOD_POST, body_txt)
+	print("[STRIPE_UX] REQUEST_START endpoint=", P0Api.get_api_base() + CHECKOUT_SESSION_PATH)
+	var err := P0Api.request(http, P0Api.get_api_base() + CHECKOUT_SESSION_PATH, headers, HTTPClient.METHOD_POST, body_txt)
 	print("[STRIPE_UX] REQUEST_CALL_RESULT=", err)
 	if err != OK:
 		_checkout_session_request_in_flight = false
@@ -2597,7 +2598,7 @@ func _request_checkout_auth_refresh_or_guest() -> void:
 
 	var body_txt := JSON.stringify({"refresh_token": refresh})
 	print("[STRIPE_UX] AUTH_RETRY_START refresh=true")
-	var err := http.request(API_BASE + AUTH_REFRESH_PATH, PackedStringArray(["Content-Type: application/json"]), HTTPClient.METHOD_POST, body_txt)
+	var err := P0Api.request(http, P0Api.get_api_base() + AUTH_REFRESH_PATH, PackedStringArray(["Content-Type: application/json"]), HTTPClient.METHOD_POST, body_txt)
 	if err != OK:
 		_checkout_auth_request_in_flight = false
 		_checkout_auth_retry_done = false
@@ -2714,7 +2715,7 @@ func _open_checkout_url(checkout_url: String) -> bool:
 		var js_result := str(JavaScriptBridge.eval(js, true))
 		print("[STRIPE_UX] CHECKOUT_OPEN_JS_RESULT=", js_result)
 		return js_result == "OPEN_CALLED"
-	var err := OS.shell_open(checkout_url)
+	var err := P0Api.open_checkout(checkout_url)
 	print("[STRIPE_UX] DESKTOP_OPEN_RESULT=", err)
 	return err == OK
 
@@ -2752,8 +2753,8 @@ func _request_payment_cloud_load() -> void:
 		"Authorization: Bearer " + access,
 		"Accept: application/json"
 	])
-	var url := API_BASE + CLOUD_LOAD_PATH + "?profile_uuid=%s&career_id=%s" % [puuid.uri_encode(), career_id.uri_encode()]
-	var err := http.request(url, headers, HTTPClient.METHOD_GET)
+	var url := P0Api.get_api_base() + CLOUD_LOAD_PATH + "?profile_uuid=%s&career_id=%s" % [puuid.uri_encode(), career_id.uri_encode()]
+	var err := P0Api.request(http, url, headers, HTTPClient.METHOD_GET)
 	if err != OK:
 		_payment_refresh_request_in_flight = false
 		if BtnConfirm != null:

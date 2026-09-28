@@ -1,5 +1,7 @@
 extends Control
 
+const P0Api = preload("res://scripts/ApiConfig.gd")
+
 
 func _make_lineedit_style(bg: Color, border: Color) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
@@ -272,7 +274,6 @@ func _play_login_ball_float() -> void:
 signal auth_success
 signal cancel_requested
 
-const API_BASE := "https://api.basketmanager-game.com"
 const PATH_AUTH_START := "/v1/auth/start"
 const PATH_AUTH_VERIFY := "/v1/auth/verify"
 
@@ -439,7 +440,7 @@ func _on_send() -> void:
 	btn_val.disabled = true
 
 	_pending_action = "start"
-	_http_post_json(API_BASE + PATH_AUTH_START, {"email": e})
+	_http_post_json(P0Api.get_api_base() + PATH_AUTH_START, {"email": e})
 
 
 func _on_validate() -> void:
@@ -463,7 +464,7 @@ func _on_validate() -> void:
 	btn_val.disabled = true
 
 	_pending_action = "verify"
-	_http_post_json(API_BASE + PATH_AUTH_VERIFY, {"email": e, "code": c})
+	_http_post_json(P0Api.get_api_base() + PATH_AUTH_VERIFY, {"email": e, "code": c})
 
 
 func _http_post_json(url: String, payload: Dictionary) -> void:
@@ -474,7 +475,7 @@ func _http_post_json(url: String, payload: Dictionary) -> void:
 	var body := JSON.stringify(payload)
 
 	http.timeout = 30
-	var err := http.request(url, headers, HTTPClient.METHOD_POST, body)
+	var err := P0Api.request(http, url, headers, HTTPClient.METHOD_POST, body)
 	print("[HTTP] request() err=", err)
 
 	if err != OK:

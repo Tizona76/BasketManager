@@ -1,5 +1,7 @@
 extends Control
 
+const P0Api = preload("res://scripts/ApiConfig.gd")
+
 
 
 # BM_PLAYERLIFE_PRELOAD_V1 (avoid class_name resolution order)
@@ -45,7 +47,6 @@ var _team_name_written: bool = false
 
 const TEAM_NAME_FUNNEL_RETRY_DELAY_SECONDS: float = 1.0
 const TEAM_NAME_FUNNEL_MAX_RETRIES: int = 20
-const BM_GENERIC_FUNNEL_URL := "https://api.basketmanager-game.com/v1/funnel/event"
 const BM_GENERIC_FUNNEL_MAX_RETRIES := 2
 var _team_name_funnel_pending: String = ""
 var _team_name_funnel_retry_count: int = 0
@@ -1217,8 +1218,8 @@ func _bm_send_generic_funnel_event(event_name: String, flag_name: String, meta: 
 			_bm_schedule_generic_funnel_retry(event_name, flag_name, meta, attempt)
 	, CONNECT_ONE_SHOT)
 
-	var request_error := request.request(
-		BM_GENERIC_FUNNEL_URL,
+	var request_error := P0Api.request(request,
+		(P0Api.get_api_base() + "/v1/funnel/event"),
 		["Content-Type: application/json"],
 		HTTPClient.METHOD_POST,
 		payload
@@ -1270,7 +1271,7 @@ func _try_guest_auth_silent() -> void:
 	var http := HTTPRequest.new()
 	add_child(http)
 
-	var url := "https://api.basketmanager-game.com/v1/auth/guest"
+	var url := (P0Api.get_api_base() + "/v1/auth/guest")
 	var headers := PackedStringArray(["Content-Type: application/json"])
 
 	http.request_completed.connect(func(result, code, _h, body):
@@ -1300,7 +1301,7 @@ func _try_guest_auth_silent() -> void:
 	_bm_guest_auth_request_start_ms = Time.get_ticks_msec()
 	print("[BM_GUEST_AUTH_TIMING] event=http_request_start time_ms=", _bm_guest_auth_request_start_ms, " url=", url)
 	print("[TRACE_FLOW] C HTTP_SENT")
-	var request_error := http.request(url, headers, HTTPClient.METHOD_POST, "{}")
+	var request_error := P0Api.request(http, url, headers, HTTPClient.METHOD_POST, "{}")
 	if request_error != OK:
 		_bm_guest_auth_last_outcome = "request_error"
 		_finish_web_guest_auth_silent()
@@ -1456,8 +1457,8 @@ func _track_team_name_created(team_name: String) -> void:
 		payload_data["meta"] = browser_meta
 	var payload := JSON.stringify(payload_data)
 
-	var request_error := http.request(
-		"https://api.basketmanager-game.com/v1/funnel/team-name-created",
+	var request_error := P0Api.request(http,
+		(P0Api.get_api_base() + "/v1/funnel/team-name-created"),
 		PackedStringArray(["Content-Type: application/json"]),
 		HTTPClient.METHOD_POST,
 		payload
@@ -1477,7 +1478,7 @@ func _cloud_save(data: Dictionary) -> void:
 	var http := HTTPRequest.new()
 	add_child(http)
 
-	var url := "https://api.basketmanager-game.com/v1/cloud/save"
+	var url := (P0Api.get_api_base() + "/v1/cloud/save")
 
 	var headers := PackedStringArray([
 		"Content-Type: application/json",
@@ -1498,4 +1499,4 @@ func _cloud_save(data: Dictionary) -> void:
 			print("[CLOUD_SAVE] failed code=", code)
 	)
 
-	http.request(url, headers, HTTPClient.METHOD_POST, body)
+	P0Api.request(http, url, headers, HTTPClient.METHOD_POST, body)

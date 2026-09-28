@@ -1,6 +1,7 @@
 extends Node
 
-const API_BASE := "https://api.basketmanager-game.com"
+const P0Api = preload("res://scripts/ApiConfig.gd")
+
 const PATH_REFRESH := "/v1/auth/refresh"
 const PATH_GUEST := "/v1/auth/guest"
 
@@ -173,12 +174,12 @@ func _try_refresh(rt: String) -> void:
 		_http.request_completed.disconnect(_on_refresh_completed)
 	_http.request_completed.connect(_on_refresh_completed)
 
-	var url := API_BASE + PATH_REFRESH
+	var url := P0Api.get_api_base() + PATH_REFRESH
 	var headers := PackedStringArray(["Content-Type: application/json"])
 	var body := JSON.stringify({"refresh_token": rt})
 
 	print("[BOOT][REFRESH] POST ", url, " rt_len=", str(rt.length()))
-	var err := _http.request(url, headers, HTTPClient.METHOD_POST, body)
+	var err := P0Api.request(_http, url, headers, HTTPClient.METHOD_POST, body)
 	print("[BOOT][REFRESH] request err=", err)
 
 	if err != OK:
@@ -288,12 +289,12 @@ func _try_guest_auth() -> void:
 		_http.request_completed.disconnect(_on_guest_completed)
 	_http.request_completed.connect(_on_guest_completed)
 
-	var url := API_BASE + PATH_GUEST
+	var url := P0Api.get_api_base() + PATH_GUEST
 	var headers := PackedStringArray(["Content-Type: application/json"])
 	var body := "{}"
 
 	print("[BOOT][GUEST] POST ", url)
-	var err := _http.request(url, headers, HTTPClient.METHOD_POST, body)
+	var err := P0Api.request(_http, url, headers, HTTPClient.METHOD_POST, body)
 	print("[BOOT][GUEST] request err=", err)
 
 	if err != OK:
