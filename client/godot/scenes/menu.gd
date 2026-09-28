@@ -658,6 +658,7 @@ const CLOUD_REQUEST_TIMEOUT_S := 15.0
 const CLOUD_CONFLICTS_META := &"basket_cloud_conflicts_by_profile_career"
 var _cloud_save_conflict_key := ""
 var _cloud_save_auth_retry_used := false
+var _cloud_load_auth_retry_used := false
 var _cloud_save_request_body := ""
 var _cloud_save_request_profile := ""
 const CLOUD_BASES_META := &"basket_cloud_integrated_bases_by_profile_career"
@@ -1921,13 +1922,14 @@ func _clear_cloud_save_auth_attempt() -> void:
 
 
 func _finish_cloud_save_auth_failure(message: String, code: int = 401, result: int = HTTPRequest.RESULT_SUCCESS) -> void:
+	_cloud_load_auth_retry_used = false
 	if OS.has_feature("ios") and not _ios_cloud_context_matches(_cloud_request_context):
 		_ios_cloud_block("UNRESOLVED")
 		_ios_cloud_end(result, code)
 		return
 	_set_status(message)
 	_dirty_local = true
-	if OS.has_feature("ios") and _request_user_save_id != 0:
+	if OS.has_feature("ios") and (_inflight == "load" or _request_user_save_id != 0):
 		_ios_cloud_end(result, code)
 		return
 	_save_retry_count = 0
@@ -1940,8 +1942,10 @@ func _finish_cloud_save_auth_failure(message: String, code: int = 401, result: i
 
 
 func _recover_cloud_save_auth() -> void:
+	var is_load := OS.has_feature("ios") and _inflight == "load"
+	var context := _cloud_request_context.duplicate()
 	var refresh := str(Session.refresh_token).strip_edges()
-	if refresh.length() < 10 or _auth_inflight or not _cloud_save_auth_context_matches():
+	if refresh.length() < 10 or _auth_inflight or (not _ios_cloud_context_matches(context) if is_load else not _cloud_save_auth_context_matches()):
 		_finish_cloud_save_auth_failure(tr("menu.cloud.sign_in_required"))
 		return
 	_set_status(tr("menu.cloud.reconnecting"))
@@ -1958,7 +1962,7 @@ func _recover_cloud_save_auth() -> void:
 		return
 	var response: Array = await auth.request_completed
 	auth.queue_free()
-	if not _cloud_save_auth_context_matches() or str(Session.refresh_token).strip_edges() != refresh:
+	if (not _ios_cloud_context_matches(context) if is_load else not _cloud_save_auth_context_matches()) or str(Session.refresh_token).strip_edges() != refresh:
 		_finish_cloud_save_auth_failure(tr("menu.cloud.sign_in_required"))
 		return
 	if response[0] != HTTPRequest.RESULT_SUCCESS or response[1] < 200 or response[1] >= 300:
@@ -1973,6 +1977,8 @@ func _recover_cloud_save_auth() -> void:
 	if OS.has_feature("ios"):
 		_cloud_request_context["access"] = str(Session.access_token)
 		_cloud_request_context["refresh"] = str(Session.refresh_token)
+		if is_load and _request_user_save_id != 0:
+			_pending_user_save["context"] = _cloud_request_context.duplicate()
 	if not _save_session_local_from_menu():
 		_finish_cloud_save_auth_failure(tr("menu.cloud.auth_failed"))
 		return
@@ -1980,17 +1986,25 @@ func _recover_cloud_save_auth() -> void:
 	var headers := PackedStringArray(["Authorization: Bearer %s" % Session.access_token,
 		"Accept: application/json", "Content-Type: application/json"])
 	# Do not reread the local save or reconstruct its career/revision/checksum.
-	err = P0Api.request(Http, P0Api.get_api_base() + PATH_CLOUD_SAVE, headers, HTTPClient.METHOD_POST, _cloud_save_request_body)
+	if is_load:
+		# Keep the original intent and retry budget; do not re-enter _try_cloud_load.
+		var url := P0Api.get_api_base() + PATH_CLOUD_LOAD + "?profile_uuid=%s&career_id=%s" % [str(context["profile"]).uri_encode(), str(context["career"]).uri_encode()]
+		err = P0Api.request(Http, url, headers, HTTPClient.METHOD_GET)
+	else:
+		err = P0Api.request(Http, P0Api.get_api_base() + PATH_CLOUD_SAVE, headers, HTTPClient.METHOD_POST, _cloud_save_request_body)
 	if err != OK:
 		_finish_cloud_save_auth_failure(tr("menu.cloud.save_error").replace("{code}", str(err)))
 
 
 func _on_http_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
 	var is_save := _inflight == "save"
+	if OS.has_feature("ios") and _inflight == "load" and (result != HTTPRequest.RESULT_SUCCESS or response_code != 401):
+		_cloud_load_auth_retry_used = false
 	if OS.has_feature("ios"):
 		if _inflight == "":
 			return
 		if not _ios_cloud_context_matches(_cloud_request_context):
+			_cloud_load_auth_retry_used = false
 			_ios_cloud_block("UNRESOLVED")
 			_ios_cloud_end(result, 409)
 			return
@@ -2018,6 +2032,15 @@ func _on_http_completed(result: int, response_code: int, headers: PackedStringAr
 			_inflight = ""
 			_cloud_request_career_id = ""
 		return
+	if OS.has_feature("ios") and _inflight == "load" and result == HTTPRequest.RESULT_SUCCESS and response_code == 401:
+		var error: Variant = JSON.parse_string(body.get_string_from_utf8())
+		if _cloud_load_auth_retry_used:
+			_finish_cloud_save_auth_failure(tr("menu.cloud.load_error").replace("{code}", "401"))
+			return
+		if error is Dictionary and error.get("detail") in ["INVALID_TOKEN", "BAD_TOKEN_TYPE", "MISSING_BEARER"]:
+			_cloud_load_auth_retry_used = true
+			call_deferred("_recover_cloud_save_auth")
+			return
 	if OS.has_feature("ios") and is_save:
 		if not _cloud_save_auth_retry_used and result == HTTPRequest.RESULT_SUCCESS and response_code == 401:
 			var error: Variant = JSON.parse_string(body.get_string_from_utf8())
