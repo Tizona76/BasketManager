@@ -29,6 +29,13 @@ var _bm_lbl_info_base_position: Vector2 = Vector2.ZERO
 var _bm_lbl_info_base_size: Vector2 = Vector2.ZERO
 var _bm_lbl_info_base_font_size: int = 22
 var _bm_skip_final_result_clicked: bool = false
+var spotlight_already_shown: bool = false
+var _spotlight_portrait: TextureRect = null
+var _spotlight_fallback: String = ""
+var _spotlight_info_rect: Rect2
+var _spotlight_info_alignment: HorizontalAlignment
+var _spotlight_panel_position: Vector2
+var _spotlight_tween: Tween = null
 static var _bm_last_coach_insight_family: String = ""
 static var _bm_last_coach_insight_player: String = ""
 
@@ -2179,7 +2186,95 @@ func _update_ui() -> void:
 	if lbl_score != null:
 		lbl_score.text = str(score_dom) + " - " + str(score_ext)
 
+func _bm_clear_live_spotlight() -> void:
+	if _spotlight_fallback == "":
+		return
+	if _spotlight_tween != null:
+		_spotlight_tween.kill()
+	lbl_info.text = _spotlight_fallback
+	lbl_info.horizontal_alignment = _spotlight_info_alignment
+	lbl_info.position = _spotlight_info_rect.position + lbl_info.get_parent_area_size() * Vector2(lbl_info.anchor_left, lbl_info.anchor_top)
+	lbl_info.size = _spotlight_info_rect.size
+	lbl_info.modulate.a = 1.0
+	info_panel.position = _spotlight_panel_position + info_panel.get_parent_area_size() * Vector2(info_panel.anchor_left, info_panel.anchor_top)
+	info_panel.modulate.a = 1.0
+	_spotlight_portrait.hide()
+	_spotlight_fallback = ""
+
+func _bm_try_live_spotlight(trigger_minute: int, info_position: Vector2, panel_position: Vector2) -> void:
+	if spotlight_already_shown or not OS.has_feature("pc") or info_panel == null:
+		return
+	var save: Dictionary = PlayerLife.load_savegame()
+	var spotlight_minute := 10 if int(save.get("season_round", 0)) % 2 == 0 else 25
+	if trigger_minute != spotlight_minute:
+		return
+	if typeof(save.get("players_by_id", {})) != TYPE_DICTIONARY:
+		return
+	var by_id: Dictionary = save.get("players_by_id", {})
+	var profiles: Array[Dictionary] = []
+	for raw_id in _bm_get_effective_played_ids(save):
+		if not str(raw_id).is_valid_float():
+			return
+		var player_id := str(int(round(float(str(raw_id)))))
+		if typeof(by_id.get(player_id)) != TYPE_DICTIONARY:
+			return
+		var pd: Dictionary = by_id.get(player_id, {})
+		if not pd.has_all(["tir", "precision", "defense", "motivation", "fatigue"]):
+			return
+		var profile := _bm_build_coach_insight_player_profile(pd)
+		profile["id"] = player_id
+		profiles.append(profile)
+	var families := ["motivation", "offense", "defense"] if trigger_minute == 10 else ["fatigue", "motivation", "offense", "defense"]
+	for family in families:
+		var limits: Array = {"fatigue": [24.0, 3.0, 8.0], "motivation": [78.0, 3.0, 8.0], "offense": [52.0, 6.0, 2.0, 8.0, 65.0, 2.5], "defense": [76.0, 6.0, 0.75, 7.0, 86.0, 0.75]}[family]
+		var chosen := _bm_get_distinct_coach_insight_player(profiles, family, limits[0], limits[1], limits[2], true) if limits.size() == 3 else _bm_get_adaptive_coach_insight_player(profiles, family, limits[0], limits[1], limits[2], limits[3], limits[4], limits[5])
+		if chosen.is_empty() or float(chosen[family]) < float(limits[0]):
+			continue
+		var pd: Dictionary = by_id.get(str(chosen.get("id", "")), {})
+		var path := str(pd.get("avatar_path", "")).strip_edges()
+		var player_name := _bm_player_display_name(pd)
+		if path == "" or not ResourceLoader.exists(path) or player_name == "Player":
+			return
+		var texture := load(path) as Texture2D
+		if texture == null:
+			return
+		var text_value := tr("matchsim.live.spotlight." + family) % player_name
+		var font := lbl_info.get_theme_font("font")
+		var width := lbl_info.size.x - 60.0
+		var available_height := info_panel.size.y - 36.0
+		var panel_rect := info_panel.get_global_rect()
+		if width <= 0.0 or available_height < 48.0 or not get_viewport_rect().encloses(panel_rect.merge(Rect2(panel_rect.position - Vector2(0, 6), panel_rect.size))):
+			return
+		var paragraph := TextParagraph.new()
+		paragraph.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE
+		paragraph.width = width
+		paragraph.add_string(text_value, font, 34, lbl_info.language)
+		var text_size := paragraph.get_size()
+		text_size.y += maxf(0.0, paragraph.get_line_count() - 1) * lbl_info.get_theme_constant("line_spacing")
+		if text_size.x > width or text_size.y > available_height:
+			return
+		_spotlight_info_rect = Rect2(info_position - lbl_info.get_parent_area_size() * Vector2(lbl_info.anchor_left, lbl_info.anchor_top), lbl_info.size)
+		_spotlight_info_alignment = lbl_info.horizontal_alignment
+		_spotlight_panel_position = panel_position - info_panel.get_parent_area_size() * Vector2(info_panel.anchor_left, info_panel.anchor_top)
+		_spotlight_fallback = lbl_info.text
+		_spotlight_portrait = TextureRect.new()
+		_spotlight_portrait.position = Vector2(28, 18)
+		_spotlight_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_spotlight_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		_spotlight_portrait.custom_minimum_size = Vector2(48, 48)
+		_spotlight_portrait.size = Vector2(48, 48)
+		_spotlight_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_spotlight_portrait.texture = texture
+		info_panel.add_child(_spotlight_portrait)
+		lbl_info.position = info_position + Vector2(60, 6)
+		lbl_info.size = Vector2(width, available_height)
+		lbl_info.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		lbl_info.text = text_value
+		spotlight_already_shown = true
+		return
+
 func _bm_clear_live_match_comment() -> void:
+	_bm_clear_live_spotlight()
 	_live_comment_token += 1
 	_live_comment_clear_minute = -1
 	if lbl_info != null and not match_fini:
@@ -2282,7 +2377,13 @@ func _bm_show_live_match_comment(trigger_minute: int) -> void:
 		live_panel_pos = live_info_pos - Vector2(28.0, 18.0)
 		info_panel.position = live_panel_pos + Vector2(0.0, 6.0)
 		info_panel.size = lbl_info.size + Vector2(56.0, 78.0)
+	_bm_try_live_spotlight(trigger_minute, live_info_pos, live_panel_pos)
+	if _spotlight_fallback != "":
+		live_info_pos = lbl_info.position - Vector2(0, 6)
+		display_text = lbl_info.text
 	var live_tw := create_tween()
+	if _spotlight_fallback != "":
+		_spotlight_tween = live_tw
 	live_tw.set_parallel(true)
 	live_tw.tween_property(lbl_info, "modulate:a", 1.0, 0.16)
 	live_tw.tween_property(lbl_info, "position", live_info_pos, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -3782,6 +3883,7 @@ func _apply_popularity_after_match(save: Dictionary, did_win: bool, did_draw: bo
 func _fin_match() -> void:
 	if match_fini:
 		return
+	_bm_clear_live_spotlight()
 	match_fini = true
 	_live_comment_token += 1
 	_live_comment_clear_minute = -1
@@ -4702,6 +4804,7 @@ func _on_btn_skip_gate_pressed() -> void:
 
 
 func _on_btn_skip_pressed() -> void:
+	_bm_clear_live_spotlight()
 	# Avance le match jusqu'à la fin sans changer la simulation : on saute l'attente.
 	if match_fini:
 		return
@@ -4724,5 +4827,7 @@ func _on_btn_retour_pressed() -> void:
 
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_SIZE_CHANGED or what == NOTIFICATION_EXIT_TREE:
+		_bm_clear_live_spotlight()
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
 		call_deferred("_bm_matchsim_apply_mobile_layout")
