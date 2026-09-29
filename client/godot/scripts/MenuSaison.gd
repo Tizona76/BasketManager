@@ -1588,11 +1588,12 @@ func _bm_maybe_show_shop_restock_notice_match14() -> void:
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(lbl)
 
-	card.scale = Vector2(0.92, 0.92)
+	var popup_scale: float = 0.85 if OS.has_feature("ios") else 1.0
+	card.scale = Vector2(0.92, 0.92) * popup_scale
 	card.pivot_offset = card.size * 0.5
 
 	var tw := create_tween()
-	tw.tween_property(card, "scale", Vector2.ONE, 0.22)
+	tw.tween_property(card, "scale", Vector2.ONE * popup_scale, 0.22)
 	tw.tween_interval(4.0)
 	tw.tween_property(overlay, "modulate:a", 0.0, 0.45)
 	tw.tween_callback(func():
@@ -1965,6 +1966,14 @@ func _show_shop_out_of_stock_popup() -> void:
 		popup.queue_free()
 	)
 	close_wrap.add_child(close_btn)
+
+	if OS.has_feature("ios"):
+		card.scale = Vector2.ONE * 0.85
+		var center_card := func() -> void:
+			card.pivot_offset = card.size * 0.5
+			card.position = (get_viewport_rect().size - card.size) * 0.5
+		card.resized.connect(center_card)
+		center_card.call()
 
 
 func _bm_maybe_show_sponsors_intro_popup(on_closed: Callable = Callable()) -> bool:
