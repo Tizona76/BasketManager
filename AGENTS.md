@@ -6,7 +6,7 @@ Ce fichier régit exclusivement le dépôt iOS ISOLATED et ses sous-répertoires
 /Users/isidroetannebosch/Dev/BasketManager_mobileiOS_ISOLATED
 
 Baseline validée de ce dépôt :
-BASELINE_IOS = b250b920ae2bd847db4b17d32c19ab5a97425abf
+BASELINE_IOS = a9c09fc59d1507e3b11050844743919be40d4c15
 
 Les deux dépôts sont indépendants. Les sections STEAM et iOS ci-dessous
 identifient leurs règles respectives ; la référence à l'autre dépôt est un
