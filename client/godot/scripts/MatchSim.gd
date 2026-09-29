@@ -30,6 +30,10 @@ var _bm_lbl_info_base_position: Vector2 = Vector2.ZERO
 var _bm_lbl_info_base_size: Vector2 = Vector2.ZERO
 var _bm_lbl_info_base_font_size: int = 22
 var _bm_skip_final_result_clicked: bool = false
+var spotlight_already_shown: bool = false
+var _spotlight_portrait: TextureRect = null
+var _spotlight_name: Label = null
+var _spotlight_fallback: String = ""
 static var _bm_last_coach_insight_family: String = ""
 static var _bm_last_coach_insight_player: String = ""
 
@@ -405,7 +409,7 @@ func _bm_current_lineup_position_text(poste: String) -> String:
 			return poste
 
 
-func _bm_current_lineup_player_avatar(pd: Dictionary, parent: Control, pos: Vector2) -> void:
+func _bm_current_lineup_player_avatar(pd: Dictionary, parent: Control, pos: Vector2) -> TextureRect:
 	var tex := TextureRect.new()
 	tex.position = pos
 	var compact := _bm_matchsim_is_mobile_layout() and get_viewport_rect().size.x > get_viewport_rect().size.y
@@ -418,6 +422,7 @@ func _bm_current_lineup_player_avatar(pd: Dictionary, parent: Control, pos: Vect
 	if path != "" and ResourceLoader.exists(path):
 		tex.texture = load(path) as Texture2D
 	parent.add_child(tex)
+	return tex
 
 
 func _bm_current_lineup_player_row(parent: Control, pd: Dictionary, y: float, row_w: float) -> void:
@@ -2540,7 +2545,89 @@ func _update_ui() -> void:
 	if lbl_score != null:
 		lbl_score.text = str(score_dom) + " - " + str(score_ext)
 
+func _bm_clear_live_spotlight() -> void:
+	if _spotlight_fallback == "":
+		return
+	var live_tw: Tween = _spotlight_portrait.get_meta("live_tween", null)
+	if live_tw != null:
+		live_tw.kill()
+	lbl_info.text = _spotlight_fallback
+	for control in [lbl_info, info_panel]:
+		var rect: Rect2 = _spotlight_portrait.get_meta("rect_" + str(control.get_instance_id()))
+		control.position = rect.position
+		control.size = rect.size
+		control.modulate.a = 1.0
+	_spotlight_portrait.hide()
+	_spotlight_name.hide()
+	_spotlight_fallback = ""
+
+func _bm_try_live_spotlight(trigger_minute: int) -> void:
+	if spotlight_already_shown or not (OS.has_feature("ios") and _bm_context_is_native_landscape()) or info_panel == null:
+		return
+	var save: Dictionary = PlayerLife.load_savegame()
+	var spotlight_minute := 10 if int(save.get("season_round", 0)) % 2 == 0 else 25
+	if trigger_minute != spotlight_minute:
+		return
+	if typeof(save.get("players_by_id", {})) != TYPE_DICTIONARY:
+		return
+	var by_id: Dictionary = save.get("players_by_id", {})
+	var profiles: Array[Dictionary] = []
+	for raw_id in _bm_get_effective_played_ids(save):
+		if not str(raw_id).is_valid_float():
+			return
+		var player_id := str(int(round(float(str(raw_id)))))
+		if typeof(by_id.get(player_id)) != TYPE_DICTIONARY:
+			return
+		var pd: Dictionary = by_id.get(player_id, {})
+		if not pd.has_all(["tir", "precision", "defense", "motivation", "fatigue"]):
+			return
+		var profile := _bm_build_coach_insight_player_profile(pd)
+		profile["id"] = player_id
+		profiles.append(profile)
+	var families := ["motivation", "offense", "defense"] if trigger_minute == 10 else ["fatigue", "motivation", "offense", "defense"]
+	for family in families:
+		var limits: Array = {"fatigue": [24.0, 3.0, 8.0], "motivation": [78.0, 3.0, 8.0], "offense": [52.0, 6.0, 2.0, 8.0, 65.0, 2.5], "defense": [76.0, 6.0, 0.75, 7.0, 86.0, 0.75]}[family]
+		var chosen := _bm_get_distinct_coach_insight_player(profiles, family, limits[0], limits[1], limits[2], true) if limits.size() == 3 else _bm_get_adaptive_coach_insight_player(profiles, family, limits[0], limits[1], limits[2], limits[3], limits[4], limits[5])
+		if chosen.is_empty() or float(chosen[family]) < float(limits[0]):
+			continue
+		var pd: Dictionary = by_id.get(str(chosen.get("id", "")), {})
+		var path := str(pd.get("avatar_path", "")).strip_edges()
+		var player_name := _bm_player_display_name(pd)
+		if path == "" or not ResourceLoader.exists(path) or player_name == "Player":
+			return
+		var text_value := tr("matchsim.live.spotlight." + family) % player_name
+		var font := lbl_info.get_theme_font("font")
+		var width := lbl_info.size.x - 60.0
+		if width <= 0.0:
+			return
+		var name_size := font.get_string_size(player_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 20)
+		var text_size := font.get_multiline_string_size(text_value, HORIZONTAL_ALIGNMENT_CENTER, width, lbl_info.get_theme_font_size("font_size")) + Vector2(0, 8)
+		var rect := Rect2(info_panel.position, Vector2(info_panel.size.x, maxf(48.0, name_size.y + 4.0 + text_size.y) + 16.0))
+		if name_size.x > width or text_size.x > width or not _bm_context_safe_rect().encloses(rect):
+			return
+		for button in [btn_retour, btn_skip, btn_current_lineup]:
+			if button != null and button.visible and rect.grow(14.0).intersects(button.get_global_rect()):
+				return
+		var portrait := _bm_current_lineup_player_avatar(pd, info_panel, Vector2(8, 8))
+		if portrait.texture == null:
+			portrait.free()
+			return
+		_spotlight_portrait = portrait
+		portrait.custom_minimum_size = Vector2(48, 48)
+		portrait.size = Vector2(48, 48)
+		_spotlight_name = _bm_current_lineup_label(info_panel, player_name, Vector2(68, 8), Vector2(width, name_size.y), 20, Color.WHITE)
+		_spotlight_fallback = lbl_info.text
+		for control in [lbl_info, info_panel]:
+			portrait.set_meta("rect_" + str(control.get_instance_id()), control.get_rect())
+		info_panel.size = rect.size
+		lbl_info.position += Vector2(60, name_size.y + 4)
+		lbl_info.size = Vector2(width, text_size.y)
+		lbl_info.text = text_value
+		spotlight_already_shown = true
+		return
+
 func _bm_clear_live_match_comment() -> void:
+	_bm_clear_live_spotlight()
 	_live_comment_token += 1
 	_live_comment_clear_minute = -1
 	if lbl_info != null and not match_fini:
@@ -2625,6 +2712,8 @@ func _bm_show_live_match_comment(trigger_minute: int) -> void:
 	lbl_info.text = display_text
 	print("[LIVE_PROBE] show after_write lbl_text=", lbl_info.text, " text_matches=", lbl_info.text == display_text, " lbl_visible=", lbl_info.visible, " lbl_visible_tree=", lbl_info.is_visible_in_tree(), " lbl_global_position=", lbl_info.global_position, " lbl_size=", lbl_info.size, " viewport_size=", get_viewport_rect().size)
 	_bm_layout_match_context()
+	_bm_try_live_spotlight(trigger_minute)
+	display_text = lbl_info.text
 	var live_info_pos := lbl_info.position
 	lbl_info.visible = true
 	lbl_info.modulate.a = 0.0
@@ -2642,10 +2731,13 @@ func _bm_show_live_match_comment(trigger_minute: int) -> void:
 		info_panel.z_index = 19
 		lbl_info.z_index = 20
 		info_panel.self_modulate = Color(0, 0, 0, 0.82)
-		live_panel_pos = live_info_pos - (Vector2(8, 8) if _bm_context_is_native_landscape() else Vector2(28.0, 18.0))
+		live_panel_pos = info_panel.position if _spotlight_fallback != "" else live_info_pos - (Vector2(8, 8) if _bm_context_is_native_landscape() else Vector2(28.0, 18.0))
 		info_panel.position = live_panel_pos + Vector2(0.0, 6.0)
-		info_panel.size = lbl_info.size + (Vector2(16, 16) if _bm_context_is_native_landscape() else Vector2(56.0, 78.0))
+		if _spotlight_fallback == "":
+			info_panel.size = lbl_info.size + (Vector2(16, 16) if _bm_context_is_native_landscape() else Vector2(56.0, 78.0))
 	var live_tw := create_tween()
+	if _spotlight_fallback != "":
+		_spotlight_portrait.set_meta("live_tween", live_tw)
 	live_tw.set_parallel(true)
 	live_tw.tween_property(lbl_info, "modulate:a", 1.0, 0.16)
 	live_tw.tween_property(lbl_info, "position", live_info_pos, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -4148,6 +4240,7 @@ func _apply_popularity_after_match(save: Dictionary, did_win: bool, did_draw: bo
 func _fin_match() -> void:
 	if match_fini:
 		return
+	_bm_clear_live_spotlight()
 	match_fini = true
 	if btn_skip != null:
 		btn_skip.visible = false
@@ -5074,6 +5167,7 @@ func _on_btn_skip_pressed() -> void:
 		return
 
 	# Stop timer et bascule l'affichage sur le score final (timeline dernière valeur)
+	_bm_clear_live_spotlight()
 	timer.stop()
 	minute = MATCH_DUREE_MINUTES
 
@@ -5100,5 +5194,7 @@ func _on_btn_retour_pressed() -> void:
 
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_SIZE_CHANGED or what == NOTIFICATION_EXIT_TREE:
+		_bm_clear_live_spotlight()
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
 		call_deferred("_bm_matchsim_apply_mobile_layout", "resize_deferred")
