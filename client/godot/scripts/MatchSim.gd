@@ -2588,6 +2588,10 @@ func _bm_try_live_spotlight(trigger_minute: int) -> void:
 	for family in families:
 		var limits: Array = {"fatigue": [24.0, 3.0, 8.0], "motivation": [78.0, 3.0, 8.0], "offense": [52.0, 6.0, 2.0, 8.0, 65.0, 2.5], "defense": [76.0, 6.0, 0.75, 7.0, 86.0, 0.75]}[family]
 		var chosen := _bm_get_distinct_coach_insight_player(profiles, family, limits[0], limits[1], limits[2], true) if limits.size() == 3 else _bm_get_adaptive_coach_insight_player(profiles, family, limits[0], limits[1], limits[2], limits[3], limits[4], limits[5])
+		if chosen.is_empty() and int(save.get("season_round", 0)) < 3:
+			for profile in profiles:
+				if float(profile.get(family, 0.0)) >= float(limits[0]) and (chosen.is_empty() or float(profile.get(family, 0.0)) > float(chosen.get(family, 0.0))):
+					chosen = profile
 		if chosen.is_empty() or float(chosen[family]) < float(limits[0]):
 			continue
 		var pd: Dictionary = by_id.get(str(chosen.get("id", "")), {})
