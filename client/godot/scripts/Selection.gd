@@ -1933,19 +1933,14 @@ func _on_validate() -> void:
 		"Rockets", "Eagles"
 	]
 
-	var all_crests_for_map: Array[String] = []
-	for crest_i in range(1, 20):
-		all_crests_for_map.append("starter_crest_" + str(crest_i))
+	var available_crests_for_ai: Array[String] = []
+	for crest_i in range(7, 20):
+		available_crests_for_ai.append("starter_crest_" + str(crest_i))
 
 	team_crest_map[my_team_name_for_crest] = selected_crest_id
 
-	var available_crests_for_ai: Array[String] = []
-	for crest_id_for_map in all_crests_for_map:
-		if crest_id_for_map != selected_crest_id:
-			available_crests_for_ai.append(crest_id_for_map)
-
 	for i in range(ai_teams_for_crest.size()):
-		team_crest_map[ai_teams_for_crest[i]] = available_crests_for_ai[i]
+		team_crest_map[ai_teams_for_crest[i]] = available_crests_for_ai[i % available_crests_for_ai.size()]
 
 	d["team_crest_map"] = team_crest_map
 
