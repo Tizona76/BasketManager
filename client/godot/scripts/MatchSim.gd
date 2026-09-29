@@ -2483,6 +2483,8 @@ func _build_match_summary(score_dom: int, score_ext: int) -> String:
 	var half_diff := 0
 	if _timeline_dom.size() >= 20 and _timeline_ext.size() >= 20:
 		half_diff = int(_timeline_dom[19]) - int(_timeline_ext[19])
+	if not _user_is_home:
+		half_diff = -half_diff
 
 	# Cas match nul (11 mots)
 	if diff == 0:
@@ -2690,11 +2692,11 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"family": "fatigue_player",
 			"player_name": name,
 			"variants": [
-				"Your lineup had value, but its physical balance was stretched by %s." % name,
-				"Your selection worked on paper, though %s made the fatigue risk clear." % name,
-				"%s brought quality to the lineup, with a clear fatigue cost." % name,
-				"Your group kept its shape, but %s showed the physical load in this selection." % name,
-				"With %s involved, the lineup had quality and a visible freshness concern." % name
+				tr("matchsim.impact.fatigue_player.1") % name,
+				tr("matchsim.impact.fatigue_player.2") % name,
+				tr("matchsim.impact.fatigue_player.3") % name,
+				tr("matchsim.impact.fatigue_player.4") % name,
+				tr("matchsim.impact.fatigue_player.5") % name
 			]
 		})
 
@@ -2705,11 +2707,11 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"family": "motivation_player",
 			"player_name": name,
 			"variants": [
-				"Your lineup had a stronger edge with %s involved." % name,
-				"Your selection gained energy from %s." % name,
-				"Your group looked more engaged with %s in the mix." % name,
-				"Your selection had more spark with %s part of the group." % name,
-				"%s gave the lineup a clearer mental edge." % name
+				tr("matchsim.impact.motivation_player.1") % name,
+				tr("matchsim.impact.motivation_player.2") % name,
+				tr("matchsim.impact.motivation_player.3") % name,
+				tr("matchsim.impact.motivation_player.4") % name,
+				tr("matchsim.impact.motivation_player.5") % name
 			]
 		})
 
@@ -2720,11 +2722,11 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"family": "offense_player",
 			"player_name": name,
 			"variants": [
-				"Your selection leaned toward offense, with %s giving it the clearest attacking profile." % name,
-				"Your lineup gained a sharper attacking identity with %s." % name,
-				"Your group had more offensive shape when %s was part of it." % name,
-				"With %s involved, your lineup had a more defined attacking profile." % name,
-				"Your selection found its strongest offensive identity through %s." % name
+				tr("matchsim.impact.offense_player.1") % name,
+				tr("matchsim.impact.offense_player.2") % name,
+				tr("matchsim.impact.offense_player.3") % name,
+				tr("matchsim.impact.offense_player.4") % name,
+				tr("matchsim.impact.offense_player.5") % name
 			]
 		})
 
@@ -2735,11 +2737,11 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"family": "defense_player",
 			"player_name": name,
 			"variants": [
-				"Your selection had more defensive structure with %s involved." % name,
-				"Your lineup gained a clearer defensive identity through %s." % name,
-				"Your group looked more stable with %s in the selection." % name,
-				"With %s in the group, your lineup had a firmer defensive base." % name,
-				"Your selection carried more defensive balance through %s." % name
+				tr("matchsim.impact.defense_player.1") % name,
+				tr("matchsim.impact.defense_player.2") % name,
+				tr("matchsim.impact.defense_player.3") % name,
+				tr("matchsim.impact.defense_player.4") % name,
+				tr("matchsim.impact.defense_player.5") % name
 			]
 		})
 
@@ -2750,11 +2752,11 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 			"family": "level_player",
 			"player_name": name,
 			"variants": [
-				"Your selection had its clearest overall base with %s involved." % name,
-				"Your lineup had a stronger current profile with %s in the group." % name,
-				"Your group leaned on %s as its most complete profile." % name,
-				"With %s included, the lineup had a more reliable overall shape." % name,
-				"Your selection drew its strongest all-around profile from %s." % name
+				tr("matchsim.impact.level_player.1") % name,
+				tr("matchsim.impact.level_player.2") % name,
+				tr("matchsim.impact.level_player.3") % name,
+				tr("matchsim.impact.level_player.4") % name,
+				tr("matchsim.impact.level_player.5") % name
 			]
 		})
 
@@ -2771,88 +2773,88 @@ func _bm_build_coach_insight_candidates(played_profiles: Array[Dictionary], avg_
 		candidates.append({
 			"family": "fatigue_group",
 			"variants": [
-				"Your lineup looked short on freshness.",
-				"Your selection had quality, but the group lacked freshness.",
-				"The group profile was solid, but fatigue limited its balance.",
-				"Your team shape was there, but the group looked physically stretched.",
-				"The selected group had enough structure, with freshness still the main concern."
+				tr("matchsim.impact.fatigue_group.1"),
+				tr("matchsim.impact.fatigue_group.2"),
+				tr("matchsim.impact.fatigue_group.3"),
+				tr("matchsim.impact.fatigue_group.4"),
+				tr("matchsim.impact.fatigue_group.5")
 			]
 		})
 	elif avg_motivation <= 58.0:
 		candidates.append({
 			"family": "motivation_group_low",
 			"variants": [
-				"Your selected group lacked a real motivation edge.",
-				"The lineup did not show a strong mental profile.",
-				"The group had structure, but not enough edge.",
-				"Your selection looked organized, but it lacked a sharper mental tone.",
-				"The group had a clear shape without much extra drive."
+				tr("matchsim.impact.motivation_group_low.1"),
+				tr("matchsim.impact.motivation_group_low.2"),
+				tr("matchsim.impact.motivation_group_low.3"),
+				tr("matchsim.impact.motivation_group_low.4"),
+				tr("matchsim.impact.motivation_group_low.5")
 			]
 		})
 	elif avg_offense - avg_defense >= 10.0:
 		candidates.append({
 			"family": "offense_balance",
 			"variants": [
-				"Your lineup clearly leaned toward offense.",
-				"Your selection gave the team a stronger attacking identity.",
-				"The group offered more attacking profile than defensive cover.",
-				"Your chosen group carried a clear attacking tilt.",
-				"The lineup's identity was built more around creation than protection."
+				tr("matchsim.impact.offense_balance.1"),
+				tr("matchsim.impact.offense_balance.2"),
+				tr("matchsim.impact.offense_balance.3"),
+				tr("matchsim.impact.offense_balance.4"),
+				tr("matchsim.impact.offense_balance.5")
 			]
 		})
 	elif avg_defense - avg_offense >= 10.0:
 		candidates.append({
 			"family": "defense_balance",
 			"variants": [
-				"Your lineup had a clear defensive base.",
-				"Your selection gave the team more structure than creation.",
-				"The group looked built to contain first.",
-				"Your chosen group leaned into defensive stability.",
-				"The lineup carried a more protective identity than an attacking one."
+				tr("matchsim.impact.defense_balance.1"),
+				tr("matchsim.impact.defense_balance.2"),
+				tr("matchsim.impact.defense_balance.3"),
+				tr("matchsim.impact.defense_balance.4"),
+				tr("matchsim.impact.defense_balance.5")
 			]
 		})
 	elif gap >= 1.5 or avg_rating >= 72.0:
 		candidates.append({
 			"family": "group_level_positive",
 			"variants": [
-				"Your selection gave the team a strong enough base.",
-				"The result reflected the quality of the group you chose.",
-				"Your lineup had enough overall level to support this outcome.",
-				"The group you selected had the overall profile to hold up.",
-				"Your lineup showed a solid enough current level."
+				tr("matchsim.impact.group_level_positive.1"),
+				tr("matchsim.impact.group_level_positive.2"),
+				tr("matchsim.impact.group_level_positive.3"),
+				tr("matchsim.impact.group_level_positive.4"),
+				tr("matchsim.impact.group_level_positive.5")
 			]
 		})
 	elif gap <= -1.5 or avg_rating <= 58.0:
 		candidates.append({
 			"family": "group_level_negative",
 			"variants": [
-				"Your selection exposed the current limits of the group.",
-				"The lineup lacked enough overall level to tilt this kind of matchup.",
-				"The core group lacked enough quality to control the matchup.",
-				"Your chosen group showed where the current level still feels thin.",
-				"The lineup profile left the team short of control."
+				tr("matchsim.impact.group_level_negative.1"),
+				tr("matchsim.impact.group_level_negative.2"),
+				tr("matchsim.impact.group_level_negative.3"),
+				tr("matchsim.impact.group_level_negative.4"),
+				tr("matchsim.impact.group_level_negative.5")
 			]
 		})
 	elif score_margin <= 5:
 		candidates.append({
 			"family": "close_collective",
 			"variants": [
-				"In a close matchup, your lineup balance mattered.",
-				"Small differences in the selected group shaped this result.",
-				"Your selection left very little margin.",
-				"The balance of your lineup carried real weight in a tight game.",
-				"With so little between the teams, the selected group mattered."
+				tr("matchsim.impact.close_collective.1"),
+				tr("matchsim.impact.close_collective.2"),
+				tr("matchsim.impact.close_collective.3"),
+				tr("matchsim.impact.close_collective.4"),
+				tr("matchsim.impact.close_collective.5")
 			]
 		})
 	else:
 		candidates.append({
 			"family": "fallback_collective",
 			"variants": [
-				"The main takeaway was the balance of the group you selected.",
-				"Your lineup gave a clear picture of the team's current identity.",
-				"This result reflected the profile of the group you chose.",
-				"Your selection offered a useful read on the team's current shape.",
-				"The group you chose gave a fair view of where the team stands."
+				tr("matchsim.impact.fallback_collective.1"),
+				tr("matchsim.impact.fallback_collective.2"),
+				tr("matchsim.impact.fallback_collective.3"),
+				tr("matchsim.impact.fallback_collective.4"),
+				tr("matchsim.impact.fallback_collective.5")
 			]
 		})
 
@@ -2902,9 +2904,9 @@ func _bm_build_player_context_insight_candidates(played_profiles: Array[Dictiona
 				"player_name": name,
 				"context_score": 49.0 + maxf(0.0, 22.0 - youngest_age) * 2.0 + maxf(0.0, young_rating - 68.0) * 0.7 + maxf(0.0, young_rating - avg_rating) * 1.1,
 				"variants": [
-					"Your selection gave a young profile real weight, with %s already important to the group." % name,
-					"One of your youngest players held a clear place in this lineup through %s." % name,
-					"Your lineup had a younger identity without losing level, with %s involved." % name
+					tr("matchsim.impact.context_young_anchor.1") % name,
+					tr("matchsim.impact.context_young_anchor.2") % name,
+					tr("matchsim.impact.context_young_anchor.3") % name
 				]
 			})
 
@@ -2917,9 +2919,9 @@ func _bm_build_player_context_insight_candidates(played_profiles: Array[Dictiona
 				"player_name": name,
 				"context_score": 48.0 + maxf(0.0, oldest_age - 32.0) * 1.4 + maxf(0.0, veteran_rating - 68.0) * 0.7 + maxf(0.0, veteran_rating - avg_rating) * 1.1,
 				"variants": [
-					"Your lineup kept an experienced base, with %s still carrying real weight in the selection." % name,
-					"The group had a veteran reference point through %s." % name,
-					"Your selection leaned on experience without losing current level, led by %s." % name
+					tr("matchsim.impact.context_veteran_anchor.1") % name,
+					tr("matchsim.impact.context_veteran_anchor.2") % name,
+					tr("matchsim.impact.context_veteran_anchor.3") % name
 				]
 			})
 
@@ -2933,9 +2935,9 @@ func _bm_build_player_context_insight_candidates(played_profiles: Array[Dictiona
 				"player_name": name,
 				"context_score": 46.0 + minf(8.0, salary_gap / 10000.0) + maxf(0.0, responsibility_rating - avg_rating) * 0.9,
 				"variants": [
-					"Your selection placed one of its major profiles at the heart of the group through %s." % name,
-					"The lineup gave %s a role that matched his importance in the squad." % name,
-					"Your group leaned on one of its key current profiles with %s involved." % name
+					tr("matchsim.impact.context_responsibility_player.1") % name,
+					tr("matchsim.impact.context_responsibility_player.2") % name,
+					tr("matchsim.impact.context_responsibility_player.3") % name
 				]
 			})
 
@@ -2945,9 +2947,9 @@ func _bm_build_player_context_insight_candidates(played_profiles: Array[Dictiona
 				"family": "context_young_group",
 				"context_score": 37.0 + maxf(0.0, 24.0 - avg_age) * 1.3 + maxf(0.0, avg_rating - 60.0) * 0.3,
 				"variants": [
-					"Your lineup had a noticeably young profile.",
-					"The selected group brought a younger identity to the floor.",
-					"Your selection leaned into youth while keeping a coherent team shape."
+					tr("matchsim.impact.context_young_group.1"),
+					tr("matchsim.impact.context_young_group.2"),
+					tr("matchsim.impact.context_young_group.3")
 				]
 			})
 		elif avg_age >= 31.0 and avg_rating >= 60.0:
@@ -2955,9 +2957,9 @@ func _bm_build_player_context_insight_candidates(played_profiles: Array[Dictiona
 				"family": "context_experienced_group",
 				"context_score": 37.0 + maxf(0.0, avg_age - 31.0) * 1.2 + maxf(0.0, avg_rating - 60.0) * 0.3,
 				"variants": [
-					"Your lineup clearly leaned on experience.",
-					"The selected group had an experienced core.",
-					"Your selection gave the team a more mature profile."
+					tr("matchsim.impact.context_experienced_group.1"),
+					tr("matchsim.impact.context_experienced_group.2"),
+					tr("matchsim.impact.context_experienced_group.3")
 				]
 			})
 		elif oldest_age - youngest_age >= 11.0 and avg_rating >= 60.0:
@@ -2965,9 +2967,9 @@ func _bm_build_player_context_insight_candidates(played_profiles: Array[Dictiona
 				"family": "context_generation_mix",
 				"context_score": 38.0 + minf(8.0, (oldest_age - youngest_age - 10.0) * 0.8) + maxf(0.0, avg_rating - 60.0) * 0.25,
 				"variants": [
-					"Your lineup combined experience with younger profiles.",
-					"The selected group showed a clear mix of ages.",
-					"Your selection balanced younger legs with experienced profiles."
+					tr("matchsim.impact.context_generation_mix.1"),
+					tr("matchsim.impact.context_generation_mix.2"),
+					tr("matchsim.impact.context_generation_mix.3")
 				]
 			})
 
