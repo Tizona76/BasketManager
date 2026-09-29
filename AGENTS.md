@@ -6,7 +6,7 @@ Ce fichier régit exclusivement le dépôt STEAM et ses sous-répertoires :
 /Users/isidroetannebosch/Dev/BasketManager_GIT
 
 Baseline validée de ce dépôt :
-BASELINE_STEAM = 49b1960086445910b234cec38d569a2c23fb6a3d
+BASELINE_STEAM = 327c0212aee0c46cab612093586df68186ffc183
 
 Les deux dépôts sont indépendants. Les sections STEAM et iOS ci-dessous
 identifient leurs règles respectives ; la référence à l'autre dépôt est un
