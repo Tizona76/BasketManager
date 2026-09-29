@@ -623,6 +623,9 @@ func _bm_position_panel_above_button(btn: Control) -> void:
 		panel_size = Vector2(380, 220)
 
 	panel_tournoi_info.size = panel_size
+	if OS.has_feature("ios"):
+		panel_tournoi_info.pivot_offset = panel_size * 0.5
+		panel_tournoi_info.scale = Vector2.ONE * 0.85
 
 	var x := r.position.x + (r.size.x - panel_size.x) * 0.5
 	var y := r.position.y - panel_size.y - 32.0
