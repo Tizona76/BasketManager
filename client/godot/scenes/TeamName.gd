@@ -2215,7 +2215,7 @@ func _apply_entry_flags_size() -> void:
 		lang_bar_entry.offset_right = -16.0
 		lang_bar_entry.offset_bottom = 50.0
 		lang_bar_entry.alignment = BoxContainer.ALIGNMENT_BEGIN
-		lang_bar_entry.add_theme_constant_override("separation", 22)
+		lang_bar_entry.add_theme_constant_override("separation", 12)
 	lang_bar_entry.clip_contents = false
 	for child in lang_bar_entry.get_children():
 		if child is Control:
