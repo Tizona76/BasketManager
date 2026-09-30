@@ -1793,7 +1793,11 @@ func _on_league_back_pressed() -> void:
 	if input_team != null:
 		input_team.text = _pending_league_team_name
 		input_team.editable = true
-		input_team.grab_focus()
+		if _bm_is_mobile_layout():
+			input_team.release_focus()
+			DisplayServer.virtual_keyboard_hide()
+		else:
+			input_team.grab_focus()
 	if btn_confirm != null:
 		btn_confirm.disabled = false
 	if btn_back != null:
