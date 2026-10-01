@@ -663,6 +663,7 @@ var _cloud_save_request_body := ""
 var _cloud_save_request_profile := ""
 const CLOUD_BASES_META := &"basket_cloud_integrated_bases_by_profile_career"
 var _cloud_request_context: Dictionary = {}
+var _cloud_preflight_origin: int = -1
 # iOS user intent survives the gap between its prerequisite Load and its Save.
 var _user_save_sequence: int = 0
 var _pending_user_save: Dictionary = {}
@@ -1052,7 +1053,8 @@ func _ready() -> void:
 			Http.request_completed.disconnect(_on_http_completed)
 		Http.request_completed.connect(_on_http_completed)
 
-	if FileAccess.file_exists("user://save_cloud_signup_return_menu.txt"):
+	var cloud_signup_return_pending := FileAccess.file_exists("user://save_cloud_signup_return_menu.txt")
+	if cloud_signup_return_pending:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path("user://save_cloud_signup_return_menu.txt"))
 		_toast_status(tr("menu.save_choice.saving"), 2.0)
 		call_deferred("_try_cloud_save_from_local", CloudSaveOrigin.SIGNUP_RETURN)
@@ -1111,7 +1113,10 @@ func _ready() -> void:
 	var management_viewport := get_viewport()
 	if not management_viewport.size_changed.is_connected(_bm_on_management_mobile_viewport_changed):
 		management_viewport.size_changed.connect(_bm_on_management_mobile_viewport_changed)
-	_try_cloud_load()
+	if not cloud_signup_return_pending:
+		var startup_local_exists := OS.has_feature("ios") and FileAccess.file_exists(str(_ios_cloud_context().get("path", "")))
+		if not startup_local_exists:
+			_try_cloud_load()
 
 
 func _input(event: InputEvent) -> void:
@@ -1504,7 +1509,15 @@ func _ios_cloud_key(context: Dictionary) -> String:
 
 
 func _ios_cloud_context_matches(context: Dictionary) -> bool:
-	return not context.is_empty() and context == _ios_cloud_context()
+	if context.is_empty():
+		return false
+	var current := _ios_cloud_context()
+	return (
+		str(context.get("profile", "")) == str(current.get("profile", ""))
+		and str(context.get("career", "")) == str(current.get("career", ""))
+		and str(context.get("local_profile", "")) == str(current.get("local_profile", ""))
+		and str(context.get("path", "")) == str(current.get("path", ""))
+	)
 
 
 func _ios_cloud_message(reason: String) -> String:
@@ -1631,6 +1644,7 @@ func _ios_cloud_end(result: int, code: int, continue_user_save: bool = false) ->
 	_inflight = ""
 	_cloud_request_career_id = ""
 	_cloud_request_context = {}
+	_cloud_preflight_origin = -1
 	_load_retry_count = 0
 	_save_retry_count = 0
 	_rt_pending_reload = false
@@ -1707,6 +1721,19 @@ func _ios_cloud_success(data: Variant) -> void:
 				# Known continuation: this process already integrated/acknowledged
 				# this exact rev; gameplay edits do not adopt any newer remote rev.
 				if int(bases.get(_ios_cloud_key(context), -1)) != int(remote_rev):
+					var preflight_origin := _cloud_preflight_origin
+					if preflight_origin == int(CloudSaveOrigin.USER_CHOICE) or preflight_origin == int(CloudSaveOrigin.SIGNUP_RETURN):
+						_ios_cloud_set_base(int(remote_rev), str(data.get("checksum", "")))
+						if user_save_id != 0:
+							_ios_cloud_end(HTTPRequest.RESULT_SUCCESS, 200, true)
+						else:
+							_ios_cloud_end(HTTPRequest.RESULT_SUCCESS, 200)
+							call_deferred("_try_cloud_save_from_local", CloudSaveOrigin.SIGNUP_RETURN)
+						return
+					if preflight_origin == int(CloudSaveOrigin.AUTOMATIC):
+						_dirty_local = true
+						_ios_cloud_end(ERR_SKIP, 0)
+						return
 					_ios_cloud_block("UNRESOLVED")
 					_ios_cloud_end(HTTPRequest.RESULT_SUCCESS, 409)
 					return
@@ -1870,6 +1897,7 @@ func _try_cloud_save_from_local(origin: CloudSaveOrigin = CloudSaveOrigin.AUTOMA
 		var bases: Dictionary = get_tree().get_meta(CLOUD_BASES_META, {})
 		if not bases.has(key):
 			# Never trust a previously observed Session rev as a local base.
+			_cloud_preflight_origin = int(origin)
 			_try_cloud_load(user_save_id)
 			return
 		_cloud_request_context = context
@@ -2006,7 +2034,13 @@ func _recover_cloud_save_auth() -> void:
 		_finish_cloud_save_auth_failure(tr("menu.cloud.sign_in_required"))
 		return
 	if response[0] != HTTPRequest.RESULT_SUCCESS or response[1] < 200 or response[1] >= 300:
-		_finish_cloud_save_auth_failure(tr("menu.cloud.session_expired") if response[1] == 401 else tr("menu.cloud.auth_failed"))
+		if response[1] == 401:
+			Session.refresh_token = ""
+			Session.access_token = ""
+			_save_session_local_from_menu()
+			_finish_cloud_save_auth_failure(tr("menu.cloud.session_expired"))
+		else:
+			_finish_cloud_save_auth_failure(tr("menu.cloud.auth_failed"))
 		return
 	var data: Variant = JSON.parse_string((response[3] as PackedByteArray).get_string_from_utf8())
 	if not data is Dictionary or not data.get("access_token") is String or str(data.get("access_token", "")).strip_edges().length() < 20:
@@ -3472,11 +3506,11 @@ func _tr_safe(key: String) -> String:
 				_: return "Save your progress"
 		"menu.save_choice.local_tip":
 			match _bm_club_lang_code():
-				"fr": return "Sauvegarde uniquement sur cet appareil."
-				"es": return "Guardar solo en este dispositivo."
-				"it": return "Salva solo su questo dispositivo."
-				"pt": return "Guardar apenas neste dispositivo."
-				_: return "Save on this device only."
+				"fr": return "Sauvegarde effectuée (uniquement sur cet appareil)."
+				"es": return "Guardado realizado (solo en este dispositivo)."
+				"it": return "Salvataggio completato (solo su questo dispositivo)."
+				"pt": return "Gravação concluída (apenas neste dispositivo)."
+				_: return "Save done (only on this device)."
 		"menu.save_choice.cloud_tip":
 			match _bm_club_lang_code():
 				"fr": return "Sauvegarde en ligne pour mieux protéger votre progression."
@@ -4735,7 +4769,6 @@ func _show_save_choice_popup() -> void:
 	btn_local.mouse_entered.connect(func(): save_tip.text = _tr_safe("menu.save_choice.local_tip"))
 	btn_local.mouse_exited.connect(func(): save_tip.text = "")
 	btn_local.pressed.connect(func():
-		popup.queue_free()
 		_save_local_only()
 		call_deferred("_bm_restore_management_mobile_layout")
 		call_deferred("_hide_menu_debug_texts")
@@ -4811,10 +4844,7 @@ func _bm_save_choice_wait_for_cloud(popup: Control, button: Button, tip: Label) 
 		var success := result == OK and code >= 200 and code < 300
 		feedback.text = message
 		if success:
-			get_tree().create_timer(1.6).timeout.connect(func():
-				if is_instance_valid(popup):
-					popup.queue_free()
-			)
+			popup.remove_meta("cloud_pending")
 		else:
 			popup.remove_meta("cloud_pending")
 			button.disabled = false
