@@ -6,6 +6,7 @@ const PlayerLife = preload("res://scripts/PlayerLife.gd")
 const StadiumDataRef = preload("res://scripts/StadiumData.gd")
 const BM_DEBUG_ENABLE_TOKEN_PACK_GRANTS := false
 const BM_SHOW_TOKEN_HISTORY_BUTTON := true
+const BM_IOS_TOKEN_STORE_UI_PREVIEW := true
 const BM_SKIP_FINAL_RESULT_TOKEN_COST_DISPLAY := 1
 const BM_AUTO_SAVE_LINEUP_TOKEN_COST_DISPLAY := 8
 const HOME_ARENA_COST := 15
@@ -64,6 +65,7 @@ var _expected_payment_tokens: int = 0
 var _return_refresh_done: bool = false
 var _payment_confirmation_shown: bool = false
 var _btn_buy_club_tokens: Button = null
+var _ios_landscape_packages_row: HBoxContainer = null
 var _is_token_purchase_screen: bool = false
 var _club_identity_preview_badge_id: String = ""
 var _club_tokens_active_section: String = "overview"
@@ -239,7 +241,7 @@ func _style_token_pack_button(btn: Button, amount: int) -> void:
 		return
 	_clear_purchase_pack_button_content(btn)
 	btn.text = ""
-	btn.custom_minimum_size = Vector2(240, 86)
+	btn.custom_minimum_size = Vector2(195.5, 96) if _is_ios_landscape() else Vector2(240, 86)
 	btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
 	btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
@@ -255,9 +257,9 @@ func _style_token_pack_button(btn: Button, amount: int) -> void:
 	title_above.name = "TokenPackTitle"
 	title_above.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title_above.position = Vector2(0, -28)
-	title_above.size = Vector2(240, 24)
-	title_above.custom_minimum_size = Vector2(240, 24)
-	title_above.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	title_above.size = Vector2(195.5, 24) if _is_ios_landscape() else Vector2(240, 24)
+	title_above.custom_minimum_size = Vector2(195.5, 24) if _is_ios_landscape() else Vector2(240, 24)
+	title_above.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if _is_ios_landscape() else HORIZONTAL_ALIGNMENT_LEFT
 	btn.add_child(title_above)
 
 	var box := VBoxContainer.new()
@@ -275,7 +277,7 @@ func _style_token_pack_button(btn: Button, amount: int) -> void:
 	var top_row := HBoxContainer.new()
 	top_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top_row.alignment = BoxContainer.ALIGNMENT_END
-	top_row.custom_minimum_size = Vector2(210, 24)
+	top_row.custom_minimum_size = Vector2(174, 24) if _is_ios_landscape() else Vector2(210, 24)
 	top_row.add_theme_constant_override("separation", 6)
 	box.add_child(top_row)
 	var price_lbl := _make_purchase_pack_label(_get_token_store_pack_price(amount), 21, Color(0.88, 0.96, 1.0, 1.0), 3)
@@ -286,7 +288,7 @@ func _style_token_pack_button(btn: Button, amount: int) -> void:
 	var amount_row := HBoxContainer.new()
 	amount_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	amount_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	amount_row.custom_minimum_size = Vector2(210, 34)
+	amount_row.custom_minimum_size = Vector2(174, 34) if _is_ios_landscape() else Vector2(210, 34)
 	amount_row.add_theme_constant_override("separation", 6)
 	box.add_child(amount_row)
 	var amount_lbl := _make_purchase_pack_label(str(amount), 32, Color(1.0, 0.92, 0.68, 1.0), 4)
@@ -355,16 +357,31 @@ func _style_token_purchase_ui() -> void:
 func _restore_purchase_popup_layout() -> void:
 	if PopupConfirm == null:
 		return
-	var viewport_width := get_viewport_rect().size.x
-	var popup_width := PURCHASE_CONFIRM_POPUP_WIDTH
-	var left := maxf(0.0, (viewport_width - popup_width) * 0.5)
-	PopupConfirm.offset_left = left
-	PopupConfirm.offset_top = 170.0
-	PopupConfirm.offset_right = left + popup_width
-	PopupConfirm.offset_bottom = 450.0
+
+	var vp := get_viewport_rect().size
+
+	if _is_ios_landscape():
+		var popup_width := minf(540.0, vp.x - 140.0)
+		var popup_height := minf(260.0, vp.y - 120.0)
+		var left := (vp.x - popup_width) * 0.5
+		var top := (vp.y - popup_height) * 0.5
+
+		PopupConfirm.offset_left = left
+		PopupConfirm.offset_top = top
+		PopupConfirm.offset_right = left + popup_width
+		PopupConfirm.offset_bottom = top + popup_height
+	else:
+		var popup_width := PURCHASE_CONFIRM_POPUP_WIDTH
+		var left := maxf(0.0, (vp.x - popup_width) * 0.5)
+		PopupConfirm.offset_left = left
+		PopupConfirm.offset_top = 170.0
+		PopupConfirm.offset_right = left + popup_width
+		PopupConfirm.offset_bottom = 450.0
+
 	var content := PopupConfirm.get_node_or_null("PurchaseConfirmContent") as Control
 	if content != null:
-		content.position.x = maxf(28.0, (popup_width - PURCHASE_CONFIRM_CONTENT_WIDTH) * 0.5)
+		var actual_width := PopupConfirm.offset_right - PopupConfirm.offset_left
+		content.position.x = maxf(28.0, (actual_width - PURCHASE_CONFIRM_CONTENT_WIDTH) * 0.5)
 
 
 func _set_payment_ready_popup_layout() -> void:
@@ -384,7 +401,34 @@ func _set_payment_ready_popup_layout() -> void:
 func _restore_confirm_button_layout() -> void:
 	if BtnConfirm == null or PopupConfirm == null:
 		return
+
 	var popup_width := PopupConfirm.offset_right - PopupConfirm.offset_left
+
+	if _is_ios_landscape():
+		var button_width := 137.7
+		var button_height := 36.72
+		var button_font_size := 19
+		var side_margin := 52.0
+		var x_shift := 30.0
+		var popup_height := PopupConfirm.offset_bottom - PopupConfirm.offset_top
+		var top := popup_height - 58.0
+
+		if BtnCancel != null:
+			BtnCancel.custom_minimum_size = Vector2(button_width, button_height)
+			BtnCancel.offset_left = side_margin - x_shift
+			BtnCancel.offset_right = side_margin + button_width - x_shift
+			BtnCancel.offset_top = top
+			BtnCancel.offset_bottom = top + button_height
+			BtnCancel.add_theme_font_size_override("font_size", button_font_size)
+
+		BtnConfirm.custom_minimum_size = Vector2(button_width, button_height)
+		BtnConfirm.offset_left = popup_width - side_margin - button_width - x_shift
+		BtnConfirm.offset_right = popup_width - side_margin - x_shift
+		BtnConfirm.offset_top = top
+		BtnConfirm.offset_bottom = top + button_height
+		BtnConfirm.add_theme_font_size_override("font_size", button_font_size)
+		return
+
 	var left := maxf(0.0, (popup_width - PURCHASE_CONFIRM_BUTTON_WIDTH) * 0.5)
 	BtnConfirm.custom_minimum_size = Vector2(PURCHASE_CONFIRM_BUTTON_WIDTH, 56)
 	BtnConfirm.offset_left = left
@@ -426,7 +470,7 @@ func _set_purchase_confirm_content(amount: int) -> void:
 	box.position = Vector2(maxf(28.0, (popup_width - PURCHASE_CONFIRM_CONTENT_WIDTH) * 0.5), 28)
 	box.size = Vector2(PURCHASE_CONFIRM_CONTENT_WIDTH, 150)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 7)
+	box.add_theme_constant_override("separation", 5)
 	PopupConfirm.add_child(box)
 	var title := _make_info_label(_club_tokens_tr("club_tokens.store.purchase_title", "Purchase Club Tokens"), 24, Color(1.0, 0.90, 0.62, 1.0), 3)
 	title.custom_minimum_size = Vector2(404, 30)
@@ -447,12 +491,13 @@ func _set_purchase_confirm_content(amount: int) -> void:
 	if ResourceLoader.exists(TOKEN_ICON_PATH):
 		icon.texture = load(TOKEN_ICON_PATH) as Texture2D
 	row.add_child(icon)
-	var price_lbl := _make_info_label(_get_token_store_pack_price(amount), 22, Color(0.88, 0.96, 1.0, 1.0), 3)
-	price_lbl.custom_minimum_size = Vector2(404, 28)
+	var price_lbl := _make_info_label(_get_token_store_pack_price(amount), 27 if _is_ios_landscape() else 22, Color(1.0, 0.92, 0.68, 1.0) if _is_ios_landscape() else Color(0.88, 0.96, 1.0, 1.0), 4 if _is_ios_landscape() else 3)
+	price_lbl.custom_minimum_size = Vector2(404, 34) if _is_ios_landscape() else Vector2(404, 28)
 	box.add_child(price_lbl)
-	var note_lbl := _make_info_label(_club_tokens_tr("club_tokens.store.secure_payment", "Continue to secure payment"), 18, Color(0.74, 0.82, 0.92, 0.90), 2)
-	note_lbl.custom_minimum_size = Vector2(404, 24)
-	box.add_child(note_lbl)
+	if not _is_ios_landscape():
+		var note_lbl := _make_info_label(_club_tokens_tr("club_tokens.store.secure_payment", "Continue to secure payment"), 18, Color(0.74, 0.82, 0.92, 0.90), 2)
+		note_lbl.custom_minimum_size = Vector2(404, 24)
+		box.add_child(note_lbl)
 
 
 func _set_payment_opened_content() -> void:
@@ -548,12 +593,22 @@ func _open_purchase_confirm(amount: int) -> void:
 	_set_purchase_confirm_content(amount)
 	if BtnCancel != null:
 		BtnCancel.visible = true
+		BtnCancel.mouse_filter = Control.MOUSE_FILTER_STOP
+		BtnCancel.z_index = 10
 	if BtnConfirm != null:
 		BtnConfirm.text = _format_buy_payment_button_text(amount)
 		BtnConfirm.disabled = false
+		BtnConfirm.mouse_filter = Control.MOUSE_FILTER_STOP
+		BtnConfirm.z_index = 10
 		_restore_confirm_button_layout()
 	if PopupConfirm != null:
+		PopupConfirm.z_index = 500
 		PopupConfirm.visible = true
+		PopupConfirm.move_to_front()
+	if BtnCancel != null:
+		BtnCancel.move_to_front()
+	if BtnConfirm != null:
+		BtnConfirm.move_to_front()
 
 
 func _show_token_purchase_confetti() -> void:
@@ -1956,12 +2011,12 @@ func _populate_overview_panel(root: Control, save: Dictionary, balance: int) -> 
 	box.add_theme_constant_override("separation", 6 if compact else 12)
 	root.add_child(box)
 
-	var progress_message := _make_info_label(_club_tokens_tr(_get_token_progress_message_key(balance), "Congratulations on your first Club Tokens!"), 18 if compact else 26, Color(1.0, 0.88, 0.42, 1.0), 4)
+	var progress_message := _make_info_label(_club_tokens_tr(_get_token_progress_message_key(balance), "Your first Club Token is ready!"), 18 if compact else 26, Color(1.0, 0.88, 0.42, 1.0), 4)
 	progress_message.custom_minimum_size = Vector2(panel_size.x, 28) if compact else Vector2(960, 42)
 	progress_message.add_theme_color_override("font_shadow_color", Color(1.0, 0.66, 0.12, 0.95))
 	progress_message.add_theme_constant_override("shadow_offset_x", 0)
 	progress_message.add_theme_constant_override("shadow_offset_y", 0)
-	progress_message.add_theme_constant_override("shadow_outline_size", 14)
+	progress_message.add_theme_constant_override("shadow_outline_size", 8 if compact else 14)
 	box.add_child(progress_message)
 
 	var cards_nav := HBoxContainer.new()
@@ -2346,17 +2401,26 @@ func _build_club_tokens_info_screen() -> void:
 
 	_add_history_button(root)
 
+	# BtnBack appartient à la scène statique, alors que l'overview est ajouté
+	# dynamiquement après lui. Le remettre devant après chaque rebuild garantit
+	# que toute sa surface visuelle reste tactile.
+	if BtnBack != null:
+		BtnBack.mouse_filter = Control.MOUSE_FILTER_STOP
+		BtnBack.z_index = 100
+		BtnBack.move_to_front()
+
 
 func _add_buy_club_tokens_access(root: VBoxContainer) -> void:
-	return
+	if not BM_IOS_TOKEN_STORE_UI_PREVIEW or not OS.has_feature("ios"):
+		return
 	_btn_buy_club_tokens = Button.new()
 	_btn_buy_club_tokens.name = "BtnBuyClubTokens"
 	var buy_text := _club_tokens_tr("club_tokens.buy", "BUY CLUB TOKENS")
 	_btn_buy_club_tokens.text = buy_text
 	_btn_buy_club_tokens.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_btn_buy_club_tokens.custom_minimum_size = Vector2(360, 87)
+	_btn_buy_club_tokens.custom_minimum_size = Vector2(270, 43.2) if _is_ios_landscape() else Vector2(360, 87)
 	_btn_buy_club_tokens.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_btn_buy_club_tokens.add_theme_font_size_override("font_size", 24)
+	_btn_buy_club_tokens.add_theme_font_size_override("font_size", 15 if _is_ios_landscape() else 24)
 	_btn_buy_club_tokens.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	_btn_buy_club_tokens.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
 	_btn_buy_club_tokens.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
@@ -2365,7 +2429,7 @@ func _add_buy_club_tokens_access(root: VBoxContainer) -> void:
 	_btn_buy_club_tokens.add_theme_constant_override("outline_size", 3)
 	_btn_buy_club_tokens.add_theme_constant_override("shadow_offset_x", 0)
 	_btn_buy_club_tokens.add_theme_constant_override("shadow_offset_y", 0)
-	_btn_buy_club_tokens.add_theme_constant_override("shadow_outline_size", 16)
+	_btn_buy_club_tokens.add_theme_constant_override("shadow_outline_size", 7 if _is_ios_landscape() else 16)
 	var buy_style := StyleBoxFlat.new()
 	buy_style.bg_color = Color(0.08, 0.62, 0.22, 1.0)
 	buy_style.border_color = Color(0.45, 1.0, 0.55, 0.95)
@@ -2390,37 +2454,90 @@ func _add_buy_club_tokens_access(root: VBoxContainer) -> void:
 		_btn_buy_club_tokens.icon = load(TOKEN_ICON_PATH) as Texture2D
 		_btn_buy_club_tokens.icon_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		_btn_buy_club_tokens.expand_icon = true
-		_btn_buy_club_tokens.add_theme_constant_override("icon_max_width", 44)
+		_btn_buy_club_tokens.add_theme_constant_override("icon_max_width", 25 if _is_ios_landscape() else 44)
 		_btn_buy_club_tokens.add_theme_constant_override("h_separation", 8)
 	root.add_child(_btn_buy_club_tokens)
+
+
+func _ensure_ios_landscape_packages_row() -> HBoxContainer:
+	if _ios_landscape_packages_row != null and is_instance_valid(_ios_landscape_packages_row):
+		return _ios_landscape_packages_row
+
+	var ui := get_node_or_null("UI") as Control
+	if ui == null:
+		return null
+
+	var row := HBoxContainer.new()
+	row.name = "IosLandscapePackagesRow"
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 18)
+	ui.add_child(row)
+
+	for btn in [Pkg1, Pkg2, Pkg3]:
+		if btn == null:
+			continue
+		btn.reparent(row)
+		btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+	_ios_landscape_packages_row = row
+	return row
 
 
 func _show_existing_token_packs() -> void:
 	if Packages == null:
 		return
+
 	_is_token_purchase_screen = true
+
 	var ui := get_node_or_null("UI") as Control
 	if ui != null:
 		var info_root := ui.get_node_or_null("ClubTokensInfoRoot")
 		if info_root != null:
 			info_root.visible = false
+
 		var balance_card := ui.get_node_or_null("ClubTokensBalanceCard")
 		if balance_card != null:
 			balance_card.visible = false
-	if LblStatus != null:
-		LblStatus.visible = true
-	Packages.visible = true
-	Packages.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	var package_width := 300.0
-	var package_left := (get_viewport_rect().size.x - package_width) * 0.5
-	Packages.offset_left = package_left
-	Packages.offset_top = 170.0
-	Packages.offset_right = package_left + package_width
-	Packages.offset_bottom = 500.0
-	Packages.alignment = BoxContainer.ALIGNMENT_CENTER
-	Packages.add_theme_constant_override("separation", 58)
+
+	if _is_ios_landscape():
+		if LblStatus != null:
+			LblStatus.visible = false
+
+		Packages.visible = false
+
+		var row := _ensure_ios_landscape_packages_row()
+		if row != null:
+			var vp := get_viewport_rect().size
+			var row_width := minf(624.0, vp.x - 80.0)
+
+			row.position = Vector2(
+				(vp.x - row_width) * 0.5,
+				(vp.y - 150.0) * 0.5
+			)
+			row.size = Vector2(row_width, 150.0)
+			row.visible = true
+			row.move_to_front()
+	else:
+		if LblStatus != null:
+			LblStatus.visible = true
+
+		Packages.visible = true
+		Packages.set_anchors_preset(Control.PRESET_TOP_LEFT)
+
+		var package_width := 300.0
+		var package_left := (get_viewport_rect().size.x - package_width) * 0.5
+
+		Packages.offset_left = package_left
+		Packages.offset_top = 170.0
+		Packages.offset_right = package_left + package_width
+		Packages.offset_bottom = 500.0
+		Packages.alignment = BoxContainer.ALIGNMENT_CENTER
+		Packages.add_theme_constant_override("separation", 58)
+
 	if _btn_buy_club_tokens != null and is_instance_valid(_btn_buy_club_tokens):
 		_btn_buy_club_tokens.visible = false
+
 
 func _notification(what: int) -> void:
 	if what != NOTIFICATION_WM_WINDOW_FOCUS_IN:
@@ -2439,6 +2556,8 @@ func _on_back() -> void:
 			PopupConfirm.visible = false
 		if Packages != null:
 			Packages.visible = false
+		if _ios_landscape_packages_row != null and is_instance_valid(_ios_landscape_packages_row):
+			_ios_landscape_packages_row.visible = false
 		if LblStatus != null:
 			LblStatus.visible = false
 		var ui := get_node_or_null("UI") as Control
@@ -2473,6 +2592,13 @@ func _on_pkg_300() -> void:
 	_open_purchase_confirm(75)
 
 func _on_confirm_purchase() -> void:
+	if BM_IOS_TOKEN_STORE_UI_PREVIEW and OS.has_feature("ios"):
+		print("[STOREKIT_UI_PREVIEW] Confirm pressed — no purchase sent.")
+		_pending_tokens_amount = 0
+		_reset_payment_attempt_state()
+		if PopupConfirm != null:
+			PopupConfirm.visible = false
+		return
 	if _payment_confirmation_shown:
 		_pending_tokens_amount = 0
 		_restore_purchase_popup_layout()
