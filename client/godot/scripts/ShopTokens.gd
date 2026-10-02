@@ -67,6 +67,9 @@ var _is_token_purchase_screen: bool = false
 var _club_identity_preview_badge_id: String = ""
 var _club_tokens_active_section: String = "overview"
 var _club_tokens_cards_scroll: ScrollContainer = null
+var _club_tokens_card_index: int = 0
+var _club_tokens_cards_count: int = 2
+var _club_tokens_cards_counter: Label = null
 var _home_arena_show_congratulations: bool = false
 
 func _active_career_id() -> String:
@@ -730,9 +733,20 @@ func _make_dashboard_section(title: String, entries: Array[Dictionary]) -> VBoxC
 
 func _make_club_tokens_category_card(title: String, subtitle: String, button_text: String, badge_texture_path: String, section_id: String) -> PanelContainer:
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(360, 390)
+	card.custom_minimum_size = Vector2(580, 440)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton:
+			var mb := event as InputEventMouseButton
+			if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
+				if section_id == "club_identity":
+					_show_club_identity_screen()
+				elif section_id == "home_arena":
+					_show_home_arena_screen()
+				accept_event()
+	)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.025, 0.03, 0.055, 0.90)
 	sb.border_width_left = 2
@@ -758,35 +772,26 @@ func _make_club_tokens_category_card(title: String, subtitle: String, button_tex
 	card.add_child(box)
 
 	var badge := TextureRect.new()
-	badge.custom_minimum_size = Vector2(110, 110)
+	badge.custom_minimum_size = Vector2(190, 190)
 	badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	if badge_texture_path != "" and ResourceLoader.exists(badge_texture_path):
 		badge.texture = load(badge_texture_path) as Texture2D
 	box.add_child(badge)
 
-	var title_lbl := _make_info_label(title, 28, Color(1.0, 0.86, 0.34, 1.0), 5)
-	title_lbl.custom_minimum_size = Vector2(320, 44)
+	var display_title := button_text
+	var title_lbl := _make_info_label(display_title, 26, Color(1.0, 0.86, 0.34, 1.0), 5)
+	title_lbl.custom_minimum_size = Vector2(460, 44)
 	box.add_child(title_lbl)
 
 	var subtitle_lbl := _make_info_label(subtitle, 20, Color(0.88, 0.95, 1.0, 0.98), 3)
-	subtitle_lbl.custom_minimum_size = Vector2(320, 58)
+	subtitle_lbl.custom_minimum_size = Vector2(460, 58)
 	subtitle_lbl.add_theme_color_override("font_shadow_color", Color(0.20, 0.55, 1.0, 0.45))
 	subtitle_lbl.add_theme_constant_override("shadow_offset_x", 0)
 	subtitle_lbl.add_theme_constant_override("shadow_offset_y", 0)
 	subtitle_lbl.add_theme_constant_override("shadow_outline_size", 6)
 	box.add_child(subtitle_lbl)
 
-	var cta := _make_hub_nav_button(button_text, section_id, true)
-	cta.custom_minimum_size = Vector2(300, 50)
-	cta.add_theme_font_size_override("font_size", 19)
-	cta.add_theme_color_override("font_color", Color(0.96, 0.98, 1.0, 1.0))
-	cta.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0, 1.0))
-	cta.add_theme_color_override("font_pressed_color", Color(1.0, 1.0, 1.0, 1.0))
-	cta.add_theme_color_override("font_outline_color", Color(0.02, 0.04, 0.08, 0.80))
-	cta.add_theme_constant_override("outline_size", 3)
-	cta.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.add_child(cta)
 	return card
 
 
@@ -851,8 +856,12 @@ func _make_club_tokens_cards_arrow(text: String, direction: int) -> Button:
 	btn.pressed.connect(func():
 		if _club_tokens_cards_scroll == null or not is_instance_valid(_club_tokens_cards_scroll):
 			return
-		var target := _club_tokens_cards_scroll.scroll_horizontal + direction * 390
-		_club_tokens_cards_scroll.scroll_horizontal = maxi(0, target)
+		_club_tokens_card_index = clampi(_club_tokens_card_index + direction, 0, _club_tokens_cards_count - 1)
+		var max_scroll := maxi(0, int(_club_tokens_cards_scroll.get_h_scroll_bar().max_value - _club_tokens_cards_scroll.get_h_scroll_bar().page))
+		var target := clampi(_club_tokens_card_index * 596, 0, max_scroll)
+		_club_tokens_cards_scroll.scroll_horizontal = target
+		if _club_tokens_cards_counter != null and is_instance_valid(_club_tokens_cards_counter):
+			_club_tokens_cards_counter.text = "%d / %d" % [_club_tokens_card_index + 1, _club_tokens_cards_count]
 	)
 	return btn
 
@@ -1124,7 +1133,10 @@ func _add_history_button(root: Control) -> void:
 	btn.offset_top = -86.0
 	btn.offset_right = -30.0
 	btn.offset_bottom = -26.0
-	btn.add_theme_font_size_override("font_size", 19)
+	var back_font_size := 24
+	if BtnBack != null:
+		back_font_size = BtnBack.get_theme_font_size("font_size")
+	btn.add_theme_font_size_override("font_size", back_font_size)
 	btn.add_theme_color_override("font_color", Color(1, 1, 1, 1))
 	btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1))
 	btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 1))
@@ -1837,7 +1849,7 @@ func _add_club_tokens_side_nav(root: Control) -> void:
 func _populate_overview_panel(root: Control, save: Dictionary, balance: int) -> void:
 	var box := VBoxContainer.new()
 	box.name = "ClubTokensOverviewBox"
-	box.position = Vector2(-58, 0)
+	box.position = Vector2(-58, -25)
 	box.size = Vector2(970, 580)
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1854,7 +1866,7 @@ func _populate_overview_panel(root: Control, save: Dictionary, balance: int) -> 
 
 	var cards_nav := HBoxContainer.new()
 	cards_nav.name = "ClubTokensCardsHorizontalNav"
-	cards_nav.custom_minimum_size = Vector2(970, 430)
+	cards_nav.custom_minimum_size = Vector2(970, 440)
 	cards_nav.alignment = BoxContainer.ALIGNMENT_CENTER
 	cards_nav.add_theme_constant_override("separation", 22)
 	box.add_child(cards_nav)
@@ -1863,17 +1875,59 @@ func _populate_overview_panel(root: Control, save: Dictionary, balance: int) -> 
 
 	_club_tokens_cards_scroll = ScrollContainer.new()
 	_club_tokens_cards_scroll.name = "ClubTokensCardsScroller"
-	_club_tokens_cards_scroll.custom_minimum_size = Vector2(860, 430)
-	_club_tokens_cards_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_club_tokens_cards_scroll.custom_minimum_size = Vector2(580, 440)
+	_club_tokens_cards_scroll.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_club_tokens_cards_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	_club_tokens_cards_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	cards_nav.add_child(_club_tokens_cards_scroll)
 
 	var category_cards := _make_club_tokens_category_cards()
-	category_cards.custom_minimum_size = Vector2(860, 430)
+	category_cards.custom_minimum_size = Vector2(1176, 440)
 	_club_tokens_cards_scroll.add_child(category_cards)
 
 	cards_nav.add_child(_make_club_tokens_cards_arrow("›", 1))
+
+	_club_tokens_card_index = 0
+	_club_tokens_cards_count = category_cards.get_child_count()
+
+	# Floating desktop carousel counter.
+	var counter_badge := PanelContainer.new()
+	counter_badge.name = "ClubTokensCardsCounterBadge"
+	counter_badge.custom_minimum_size = Vector2(82, 32)
+	counter_badge.position = Vector2(790, 66)
+	counter_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var counter_style := StyleBoxFlat.new()
+	counter_style.bg_color = Color(0.025, 0.10, 0.22, 0.94)
+	counter_style.border_width_left = 2
+	counter_style.border_width_top = 2
+	counter_style.border_width_right = 2
+	counter_style.border_width_bottom = 2
+	counter_style.border_color = Color(0.20, 0.62, 1.0, 0.95)
+	counter_style.corner_radius_top_left = 16
+	counter_style.corner_radius_top_right = 16
+	counter_style.corner_radius_bottom_left = 16
+	counter_style.corner_radius_bottom_right = 16
+	counter_style.shadow_color = Color(0.10, 0.48, 1.0, 0.30)
+	counter_style.shadow_size = 7
+	counter_style.content_margin_left = 10
+	counter_style.content_margin_right = 10
+	counter_style.content_margin_top = 3
+	counter_style.content_margin_bottom = 3
+	counter_badge.add_theme_stylebox_override("panel", counter_style)
+
+	_club_tokens_cards_counter = Label.new()
+	_club_tokens_cards_counter.text = "%d / %d" % [_club_tokens_card_index + 1, _club_tokens_cards_count]
+	_club_tokens_cards_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_club_tokens_cards_counter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_club_tokens_cards_counter.add_theme_font_size_override("font_size", 16)
+	_club_tokens_cards_counter.add_theme_color_override("font_color", Color(0.94, 0.97, 1.0, 1.0))
+	_club_tokens_cards_counter.add_theme_color_override("font_outline_color", Color(0.01, 0.03, 0.08, 0.92))
+	_club_tokens_cards_counter.add_theme_constant_override("outline_size", 3)
+	_club_tokens_cards_counter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	counter_badge.add_child(_club_tokens_cards_counter)
+	root.add_child(counter_badge)
+
 	_add_buy_club_tokens_access(box)
 
 
