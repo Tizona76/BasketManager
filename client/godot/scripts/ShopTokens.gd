@@ -81,6 +81,11 @@ var _club_tokens_cards_counter: Label = null
 var _home_arena_show_congratulations: bool = false
 var _ios_localized_token_prices: Dictionary = {}
 var _token_price_labels: Dictionary = {}
+var _ios_store_kit: RefCounted = null
+var _ios_events: Array = []
+var _ios_processing := false
+var _ios_purchase_requested := false
+var _ios_verified_transactions: Dictionary = {}
 
 func _is_ios_landscape() -> bool:
 	var vp := get_viewport_rect().size
@@ -2709,6 +2714,17 @@ func _on_confirm_purchase() -> void:
 		if PopupConfirm != null:
 			PopupConfirm.visible = false
 		return
+	if OS.has_feature("ios"):
+		if _ios_purchase_requested or _ios_processing:
+			return
+		if _pending_tokens_amount == 25:
+			await _ios_purchase_25()
+		else:
+			_pending_tokens_amount = 0
+			_reset_payment_attempt_state()
+			if PopupConfirm != null:
+				PopupConfirm.hide()
+		return
 	if _payment_confirmation_shown:
 		_pending_tokens_amount = 0
 		_restore_purchase_popup_layout()
@@ -2804,6 +2820,157 @@ func _on_confirm_purchase() -> void:
 		http.queue_free()
 		_set_status(_club_tokens_tr("club_tokens.stripe.session_failed", "Payment request failed. Please try again."))
 
+
+
+func _ios_account_uuid(access: String) -> String:
+	var parts := access.split(".")
+	if parts.size() != 3:
+		return ""
+	var payload := parts[1].replace("-", "+").replace("_", "/")
+	while payload.length() % 4 != 0:
+		payload += "="
+	var claims: Variant = JSON.parse_string(Marshalls.base64_to_utf8(payload))
+	if not claims is Dictionary or not claims.get("sub") is String:
+		return ""
+	var sub: String = claims["sub"]
+	if sub.length() != 32:
+		return ""
+	for character in sub.to_lower():
+		if not character in "0123456789abcdef":
+			return ""
+	sub = sub.to_lower()
+	return "%s-%s-%s-%s-%s" % [sub.substr(0, 8), sub.substr(8, 4), sub.substr(12, 4), sub.substr(16, 4), sub.substr(20, 12)]
+
+
+func _ios_purchase_25() -> void:
+	if BM_IOS_TOKEN_STORE_UI_PREVIEW or not OS.has_feature("ios") or _pending_tokens_amount != 25 or _ios_purchase_requested or _ios_processing:
+		return
+	var account := _ios_account_uuid(str(Session.access_token).strip_edges())
+	var career := _active_career_id()
+	if account.is_empty() or not _ios_account_context_matches(account, career) or not ClassDB.class_exists("GodotStoreKit2"):
+		_reset_payment_attempt_state()
+		push_warning("[APPLE25] Purchase unavailable: invalid account, career or plugin.")
+		return
+	if _ios_store_kit == null:
+		_ios_store_kit = ClassDB.instantiate("GodotStoreKit2") as RefCounted
+		if _ios_store_kit == null:
+			return
+		_ios_store_kit.connect("transaction_state_changed", _ios_receive_25)
+	_ios_purchase_requested = true
+	_checkout_session_request_in_flight = true
+	_ios_store_kit.call("purchase_product", "com.basketcorp.tokens25", 1, account)
+
+
+func _ios_receive_25(event: Dictionary) -> void:
+	if BM_IOS_TOKEN_STORE_UI_PREVIEW or not OS.has_feature("ios"):
+		return
+	_ios_events.append(event)
+	if _ios_processing:
+		return
+	_ios_processing = true
+	while not _ios_events.is_empty():
+		var item: Dictionary = _ios_events.pop_front()
+		if item.has("product_id") and item["product_id"] != "com.basketcorp.tokens25":
+			continue
+		var access := str(Session.access_token).strip_edges()
+		var account := _ios_account_uuid(access)
+		var career := _active_career_id()
+		if account.is_empty() or not _ios_account_context_matches(account, career):
+			_ios_purchase_requested = false
+			_reset_payment_attempt_state()
+			continue
+		if item.has("app_account_token") and item["app_account_token"] != "" and item["app_account_token"] != account:
+			continue
+		var state: Variant = item.get("transaction_state")
+		if item.get("error", "") != "" or state == 0 or state == 2 or state == 7:
+			print("[APPLE25] Purchase ended without credit; state=", state)
+			_ios_purchase_requested = false
+			_reset_payment_attempt_state()
+			continue
+		if item.get("product_id", "") != "com.basketcorp.tokens25" or state != 4:
+			continue
+		var transaction: Variant = item.get("transaction_id", "")
+		var jws: Variant = item.get("jws_representation", "")
+		if not transaction is String or transaction.strip_edges().is_empty() or not jws is String or jws.strip_edges().is_empty():
+			_ios_purchase_requested = false
+			_reset_payment_attempt_state()
+			continue
+		if _ios_verified_transactions.has(transaction):
+			continue
+		if await _ios_verify_25(item, access, account, career):
+			_ios_verified_transactions[transaction] = true
+		_ios_purchase_requested = false
+		_reset_payment_attempt_state()
+		_pending_tokens_amount = 0
+		if PopupConfirm != null:
+			PopupConfirm.hide()
+	_ios_processing = false
+
+
+func _ios_account_context_matches(account: String, career: String) -> bool:
+	return not career.is_empty() and _active_career_id() == career and _ios_account_uuid(str(Session.access_token).strip_edges()) == account and str(Session.profile_uuid).to_lower().replace("-", "") == account.replace("-", "")
+
+
+func _ios_verify_25(event: Dictionary, access: String, account: String, career: String) -> bool:
+	if BM_IOS_TOKEN_STORE_UI_PREVIEW or not OS.has_feature("ios"):
+		return false
+	if not _ios_account_context_matches(account, career):
+		return false
+	var http := HTTPRequest.new()
+	http.timeout = 30.0
+	add_child(http)
+	var headers := PackedStringArray(["Authorization: Bearer " + access, "Content-Type: application/json", "Accept: application/json"])
+	var err := P0Api.request(http, P0Api.get_api_base() + "/v1/payments/apple/verify", headers, HTTPClient.METHOD_POST, JSON.stringify({"signed_transaction_info": event["jws_representation"]}))
+	if err != OK:
+		http.queue_free()
+		return false
+	var response: Array = await http.request_completed
+	http.queue_free()
+	if response[0] != HTTPRequest.RESULT_SUCCESS or response[1] != 200:
+		return false
+	var data: Variant = JSON.parse_string((response[3] as PackedByteArray).get_string_from_utf8())
+	if not data is Dictionary:
+		return false
+	for flag in ["ok", "verified", "credited"]:
+		if typeof(data.get(flag)) != TYPE_BOOL or data[flag] != true:
+			return false
+	if typeof(data.get("credited_now")) != TYPE_BOOL or data.get("transaction_id") != event["transaction_id"] or data.get("product_id") != "com.basketcorp.tokens25" or data.get("pack_id") != "starter":
+		return false
+	# JSON numbers are floats in Godot; accept only integral, safely representable values.
+	var balance: Variant = data.get("balance")
+	var tokens: Variant = data.get("tokens")
+	if typeof(tokens) not in [TYPE_INT, TYPE_FLOAT] or tokens != 25:
+		return false
+	if typeof(balance) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(balance)) or balance < 0 or balance > 9007199254740991 or floor(float(balance)) != float(balance):
+		return false
+	if not _ios_account_context_matches(account, career):
+		return false
+	var local_save: Dictionary = PlayerLife.load_savegame()
+	if local_save.is_empty() or not local_save.get("wallet") is Dictionary:
+		return false
+	local_save["wallet"]["tokens"] = int(balance)
+	PlayerLife.write_savegame(local_save)
+	if _get_current_token_balance() != int(balance):
+		return false
+	_build_club_tokens_info_screen()
+	var finishes: Array = []
+	var receive := func(result: Dictionary) -> void: finishes.append(result)
+	_ios_store_kit.connect("transaction_finished", receive)
+	_ios_store_kit.call("finish_transaction", event["transaction_id"])
+	var deadline := Time.get_ticks_msec() + 30000
+	while Time.get_ticks_msec() < deadline:
+		if finishes.is_empty():
+			await get_tree().process_frame
+			continue
+		var result: Dictionary = finishes.pop_front()
+		if result.get("transaction_id") != event["transaction_id"]:
+			continue
+		print("[APPLE25] Finalization finished=", result.get("finished", false), " error_present=", result.get("error", "") != "")
+		break
+	_ios_store_kit.disconnect("transaction_finished", receive)
+	if Time.get_ticks_msec() >= deadline:
+		print("[APPLE25] Finalization timed out; no verification retry.")
+	return true
 
 
 func _is_checkout_invalid_token_response(result: int, response_code: int, raw_body: String) -> bool:
