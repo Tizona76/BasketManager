@@ -19,6 +19,11 @@ const TOKEN_STORE_PACK_IDS := {
 	75: "club",
 	150: "manager"
 }
+const APPLE_TOKEN_PRODUCT_IDS := {
+	25: "com.basketcorp.tokens25",
+	75: "com.basketcorp.tokens75",
+	150: "com.basketcorp.tokens150"
+}
 const TOKEN_STORE_PACKS := {
 	25: {"name_key": "club_tokens.store.starter_pack", "fallback_name": "STARTER PACK", "price": "0.99 €"},
 	75: {"name_key": "club_tokens.store.club_pack", "fallback_name": "CLUB PACK", "price": "2.99 €"},
@@ -74,6 +79,8 @@ var _club_tokens_card_index: int = 0
 var _club_tokens_cards_count: int = 2
 var _club_tokens_cards_counter: Label = null
 var _home_arena_show_congratulations: bool = false
+var _ios_localized_token_prices: Dictionary = {}
+var _token_price_labels: Dictionary = {}
 
 func _is_ios_landscape() -> bool:
 	var vp := get_viewport_rect().size
@@ -178,6 +185,31 @@ func _ready() -> void:
 
 	_build_club_tokens_info_screen()
 
+	if OS.has_feature("ios"):
+		call_deferred("_load_ios_token_prices")
+
+
+func _load_ios_token_prices() -> void:
+	if not OS.has_feature("ios") or not ClassDB.class_exists("GodotStoreKit2"):
+		return
+	var store_kit = ClassDB.instantiate("GodotStoreKit2")
+	if store_kit == null:
+		return
+	for amount in APPLE_TOKEN_PRODUCT_IDS:
+		var product_id: String = APPLE_TOKEN_PRODUCT_IDS[amount]
+		var info: Variant = await store_kit.call("request_product_info", product_id)
+		if not info is Dictionary:
+			continue
+		if str(info.get("error", "")) != "" or str(info.get("product_id", "")) != product_id:
+			continue
+		var price: Variant = info.get("localized_price", "")
+		if not price is String or price.strip_edges().is_empty():
+			continue
+		_ios_localized_token_prices[amount] = price
+		var label: Label = _token_price_labels.get(amount) as Label
+		if is_instance_valid(label):
+			label.text = _get_token_store_pack_price(amount)
+
 
 func _make_purchase_button_style(bg: Color, border: Color) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
@@ -213,6 +245,8 @@ func _get_token_store_pack_name(amount: int) -> String:
 
 
 func _get_token_store_pack_price(amount: int) -> String:
+	if OS.has_feature("ios") and _ios_localized_token_prices.has(amount):
+		return str(_ios_localized_token_prices[amount])
 	return str(_get_token_store_pack(amount).get("price", ""))
 
 
@@ -284,6 +318,7 @@ func _style_token_pack_button(btn: Button, amount: int) -> void:
 	top_row.add_theme_constant_override("separation", 6)
 	box.add_child(top_row)
 	var price_lbl := _make_purchase_pack_label(_get_token_store_pack_price(amount), 21, Color(0.88, 0.96, 1.0, 1.0), 3)
+	_token_price_labels[amount] = price_lbl
 	price_lbl.custom_minimum_size = Vector2(74, 24)
 	price_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	top_row.add_child(price_lbl)
