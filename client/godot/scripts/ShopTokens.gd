@@ -2526,7 +2526,7 @@ func _build_club_tokens_info_screen() -> void:
 
 
 func _add_buy_club_tokens_access(root: VBoxContainer) -> void:
-	if not BM_IOS_TOKEN_STORE_UI_PREVIEW or not OS.has_feature("ios"):
+	if not OS.has_feature("ios"):
 		return
 	_btn_buy_club_tokens = Button.new()
 	_btn_buy_club_tokens.name = "BtnBuyClubTokens"
