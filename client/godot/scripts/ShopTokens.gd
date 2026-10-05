@@ -405,7 +405,7 @@ func _restore_purchase_popup_layout() -> void:
 
 	if _is_ios_landscape():
 		var popup_width := minf(540.0, vp.x - 140.0)
-		var popup_height := minf(260.0, vp.y - 120.0)
+		var popup_height := minf(260.0, vp.y - 32.0)
 		var left := (vp.x - popup_width) * 0.5
 		var top := (vp.y - popup_height) * 0.5
 
