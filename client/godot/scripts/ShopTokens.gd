@@ -6,7 +6,7 @@ const PlayerLife = preload("res://scripts/PlayerLife.gd")
 const StadiumDataRef = preload("res://scripts/StadiumData.gd")
 const BM_DEBUG_ENABLE_TOKEN_PACK_GRANTS := false
 const BM_SHOW_TOKEN_HISTORY_BUTTON := true
-const BM_IOS_TOKEN_STORE_UI_PREVIEW := true
+const BM_IOS_TOKEN_STORE_UI_PREVIEW := false
 const BM_SKIP_FINAL_RESULT_TOKEN_COST_DISPLAY := 1
 const BM_AUTO_SAVE_LINEUP_TOKEN_COST_DISPLAY := 8
 const HOME_ARENA_COST := 15
@@ -2911,11 +2911,82 @@ func _ios_account_context_matches(account: String, career: String) -> bool:
 	return not career.is_empty() and _active_career_id() == career and _ios_account_uuid(str(Session.access_token).strip_edges()) == account and str(Session.profile_uuid).to_lower().replace("-", "") == account.replace("-", "")
 
 
-func _ios_verify_25(event: Dictionary, access: String, account: String, career: String) -> bool:
+func _ios_refresh_verify_auth(account: String, career: String) -> bool:
+	var current_account := _ios_account_uuid(str(Session.access_token).strip_edges())
+	var profile := str(Session.profile_uuid)
+	var current_career := _active_career_id()
+	var refresh := str(Session.refresh_token).strip_edges()
+	if current_account != account or current_career != career or not _ios_account_context_matches(account, career) or refresh.is_empty():
+		return false
+	var http := HTTPRequest.new()
+	http.timeout = 30.0
+	add_child(http)
+	var err := P0Api.request(http, P0Api.get_api_base() + AUTH_REFRESH_PATH,
+		PackedStringArray(["Content-Type: application/json"]), HTTPClient.METHOD_POST,
+		JSON.stringify({"refresh_token": refresh}))
+	if err != OK:
+		http.queue_free()
+		return false
+	var response: Array = await http.request_completed
+	http.queue_free()
+	if not _ios_account_context_matches(account, career) or str(Session.profile_uuid) != profile or str(Session.refresh_token).strip_edges() != refresh:
+		return false
+	if response[0] != HTTPRequest.RESULT_SUCCESS or response[1] < 200 or response[1] >= 300:
+		return false
+	var data: Variant = JSON.parse_string((response[3] as PackedByteArray).get_string_from_utf8())
+	if not data is Dictionary:
+		return false
+	for key in ["access_token", "refresh_token", "token_type", "profile_uuid"]:
+		if not data.get(key) is String or str(data[key]).strip_edges().is_empty():
+			return false
+	var new_access := str(data["access_token"]).strip_edges()
+	var new_refresh := str(data["refresh_token"]).strip_edges()
+	var token_type := str(data["token_type"]).strip_edges()
+	if _ios_account_uuid(new_access) != account or str(data["profile_uuid"]).to_lower().replace("-", "") != account.replace("-", "") or token_type.to_lower() != "bearer":
+		return false
+	Session.set_tokens(new_access, new_refresh, token_type)
+	if _ios_account_uuid(str(Session.access_token)) != current_account or str(Session.profile_uuid) != profile or not _ios_account_context_matches(account, current_career):
+		return false
+	# Preserve the existing session format, including optional access/type fields.
+	var saved: Dictionary = {}
+	if FileAccess.file_exists("user://session.json"):
+		var existing := FileAccess.open("user://session.json", FileAccess.READ)
+		if existing == null:
+			return false
+		var parsed: Variant = JSON.parse_string(existing.get_as_text())
+		existing.close()
+		if not parsed is Dictionary:
+			return false
+		saved = parsed
+	saved["profile_uuid"] = profile
+	saved["refresh_token"] = new_refresh
+	if saved.has("access_token"):
+		saved["access_token"] = str(Session.access_token)
+	if saved.has("token_type"):
+		saved["token_type"] = str(Session.token_type)
+	var file := FileAccess.open("user://session.json", FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(JSON.stringify(saved, "\t"))
+	file.flush()
+	var write_error := file.get_error()
+	file.close()
+	if write_error != OK:
+		return false
+	var check := FileAccess.open("user://session.json", FileAccess.READ)
+	if check == null:
+		return false
+	var persisted: Variant = JSON.parse_string(check.get_as_text())
+	check.close()
+	return persisted is Dictionary and persisted == saved
+
+
+func _ios_verify_25(event: Dictionary, access: String, account: String, career: String, apple_verify_auth_retry: int = 1) -> bool:
 	if BM_IOS_TOKEN_STORE_UI_PREVIEW or not OS.has_feature("ios"):
 		return false
 	if not _ios_account_context_matches(account, career):
 		return false
+	print("[APPLE25] APPLE_VERIFY_FIRST" if apple_verify_auth_retry > 0 else "[APPLE25] APPLE_VERIFY_RETRY")
 	var http := HTTPRequest.new()
 	http.timeout = 30.0
 	add_child(http)
@@ -2926,6 +2997,19 @@ func _ios_verify_25(event: Dictionary, access: String, account: String, career: 
 		return false
 	var response: Array = await http.request_completed
 	http.queue_free()
+	print("[APPLE25] APPLE_VERIFY_HTTP_CODE=", response[1])
+	if response[0] == HTTPRequest.RESULT_SUCCESS and response[1] == 401:
+		var error_data: Variant = JSON.parse_string((response[3] as PackedByteArray).get_string_from_utf8())
+		if error_data is Dictionary and error_data.get("detail") == "INVALID_TOKEN":
+			print("[APPLE25] APPLE_VERIFY_401_INVALID_TOKEN")
+			if apple_verify_auth_retry <= 0:
+				return false
+			print("[APPLE25] APPLE_REFRESH_START")
+			if not await _ios_refresh_verify_auth(account, career):
+				print("[APPLE25] APPLE_REFRESH_FAIL")
+				return false
+			print("[APPLE25] APPLE_REFRESH_OK")
+			return await _ios_verify_25(event, str(Session.access_token).strip_edges(), account, career, 0)
 	if response[0] != HTTPRequest.RESULT_SUCCESS or response[1] != 200:
 		return false
 	var data: Variant = JSON.parse_string((response[3] as PackedByteArray).get_string_from_utf8())
@@ -2952,7 +3036,11 @@ func _ios_verify_25(event: Dictionary, access: String, account: String, career: 
 	PlayerLife.write_savegame(local_save)
 	if _get_current_token_balance() != int(balance):
 		return false
+	print("[APPLE25] APPLE_VERIFY_SUCCESS")
+	if _is_token_purchase_screen:
+		_on_back()
 	_build_club_tokens_info_screen()
+	_show_apple_token_success_popup(int(tokens), int(balance))
 	var finishes: Array = []
 	var receive := func(result: Dictionary) -> void: finishes.append(result)
 	_ios_store_kit.connect("transaction_finished", receive)
@@ -2971,6 +3059,57 @@ func _ios_verify_25(event: Dictionary, access: String, account: String, career: 
 	if Time.get_ticks_msec() >= deadline:
 		print("[APPLE25] Finalization timed out; no verification retry.")
 	return true
+
+
+func _show_apple_token_success_popup(tokens: int, balance: int) -> void:
+	var ui := get_node_or_null("UI") as Control
+	if ui == null:
+		return
+	var old := ui.get_node_or_null("AppleTokenSuccessPopup")
+	if old != null:
+		ui.remove_child(old)
+		old.queue_free()
+	var compact := _is_ios_landscape()
+	var popup := PanelContainer.new()
+	popup.name = "AppleTokenSuccessPopup"
+	popup.z_index = 600
+	popup.mouse_filter = Control.MOUSE_FILTER_STOP
+	ui.add_child(popup)
+	popup.set_anchors_preset(Control.PRESET_CENTER)
+	var width := minf(380.0 if compact else 460.0, get_viewport_rect().size.x - 32.0)
+	var height := 180.0 if compact else 220.0
+	popup.offset_left = -width * 0.5
+	popup.offset_right = width * 0.5
+	popup.offset_top = -height * 0.5
+	popup.offset_bottom = height * 0.5
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.018, 0.024, 0.045, 0.98)
+	style.border_color = Color(1.0, 0.72, 0.22, 0.85)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(16)
+	style.content_margin_left = 20
+	style.content_margin_right = 20
+	style.content_margin_top = 16
+	style.content_margin_bottom = 16
+	popup.add_theme_stylebox_override("panel", style)
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 14)
+	popup.add_child(box)
+	var added_txt := _club_tokens_tr("club_tokens.apple_success.added", "%d Club Tokens added !") % tokens
+	var payment_txt := _club_tokens_tr("club_tokens.apple_success.payment", "Payment confirmed.")
+	var balance_txt := _club_tokens_tr("club_tokens.apple_success.balance", "New balance: %d Tokens") % balance
+	var message := _make_info_label("%s\n%s\n%s" % [added_txt, payment_txt, balance_txt], 20 if compact else 24, Color(1.0, 0.94, 0.78, 1.0), 3)
+	box.add_child(message)
+	var ok_btn := _make_club_identity_button(_club_tokens_tr("club_tokens.apple_success.ok", "OK"), Color(0.08, 0.62, 0.22, 1.0))
+	ok_btn.custom_minimum_size = Vector2(140, 38 if compact else 44)
+	ok_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	ok_btn.pressed.connect(func():
+		if is_instance_valid(popup):
+			popup.hide()
+			popup.queue_free()
+	)
+	box.add_child(ok_btn)
 
 
 func _is_checkout_invalid_token_response(result: int, response_code: int, raw_body: String) -> bool:

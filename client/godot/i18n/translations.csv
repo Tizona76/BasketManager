@@ -960,3 +960,7 @@ matchsim.live.spotlight.offense,%s apporte un solide profil offensif à cette co
 matchsim.live.spotlight.defense,%s apporte un solide profil défensif à ce groupe.,%s brings a strong defensive profile to this group.,%s aporta un sólido perfil defensivo a este grupo.,%s porta un solido profilo difensivo in questo gruppo.,%s traz um forte perfil defensivo a este grupo.
 matchsim.live.spotlight.motivation,%s aborde ce match avec un net avantage de motivation.,%s enters this game with a clear motivation edge.,%s afronta este partido con una clara ventaja de motivación.,%s affronta questa partita con un netto vantaggio motivazionale.,%s entra neste jogo com uma clara vantagem de motivação.
 matchsim.live.spotlight.fatigue,%s a débuté ce match avec un manque de fraîcheur.,%s entered this game with a freshness concern.,%s empezó este partido con cierta falta de frescura.,%s ha iniziato questa partita con poca freschezza.,%s começou este jogo com alguma falta de frescura.
+club_tokens.apple_success.added,%d Club Tokens ajoutés !,%d Club Tokens added !,¡%d Club Tokens añadidos!,%d Club Tokens aggiunti !,%d Club Tokens adicionados !
+club_tokens.apple_success.payment,Paiement confirmé.,Payment confirmed.,Pago confirmado.,Pagamento confermato.,Pagamento confirmado.
+club_tokens.apple_success.balance,Nouveau solde : %d Tokens,New balance: %d Tokens,Nuevo saldo: %d Tokens,Nuovo saldo: %d Tokens,Novo saldo: %d Tokens
+club_tokens.apple_success.ok,OK,OK,OK,OK,OK
