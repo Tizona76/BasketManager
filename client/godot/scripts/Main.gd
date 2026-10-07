@@ -1220,9 +1220,7 @@ func _create_new_career_from_pending_team_name() -> bool:
 
 
 func _on_menu_go_match() -> void:
-	print("[MAIN] go_match -> MatchSim")
-
-	get_tree().change_scene_to_file("res://scenes/MatchSim.tscn")
+	print("[MAIN] go_match -> MenuSaison handled by menu")
 
 
 func _bm_funnel_profile_uuid() -> String:
