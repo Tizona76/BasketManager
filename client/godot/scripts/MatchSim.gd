@@ -2145,22 +2145,14 @@ func _prepare_match_like_py() -> void:
 			mean_ext += coach_bonus
 		print("[COACHS][MATCH_BONUS] coach_bonus=", snapped(coach_bonus, 0.1), " user_is_home=", _user_is_home)
 
-	var season_number: int = int(save.get("season_number", 1))
-	var season_round: int = int(save.get("season_round", 0))
-	var lineup_impact_active: bool = season_number == 1 and season_round >= 5
-
-	var strength_gap_limit: float = 16.0 if lineup_impact_active else 12.0
-	var strength_gap_multiplier: float = 1.35 if lineup_impact_active else 1.20
-
-	var strength_gap: float = clampf(mean_dom - mean_ext, -strength_gap_limit, strength_gap_limit)
-	var boost_points: int = int(round(strength_gap * strength_gap_multiplier))
+	var strength_gap: float = clampf(mean_dom - mean_ext, -12.0, 12.0)
+	var boost_points: int = int(round(strength_gap * 1.20))
 
 	var league_id: String = str(save.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
 	if league_id == "":
 		league_id = LeagueDataScript.get_default_league_id()
 	var variance_coef: float = LeagueDataScript.get_coef(league_id, "ai_variance")
-	var variance_base: float = 4.0 if lineup_impact_active else 5.0
-	var variance_range: int = maxi(0, int(round(variance_base * variance_coef)))
+	var variance_range: int = maxi(0, int(round(5.0 * variance_coef)))
 
 	_score_final_dom = clampi(base_score + boost_points + randi_range(-variance_range, variance_range), 50, 120)
 	_score_final_ext = clampi(base_score - boost_points + randi_range(-variance_range, variance_range), 50, 120)
@@ -2270,7 +2262,10 @@ func _get_selected_team_rating_average(save_override: Dictionary = {}) -> float:
 	var count: int = 0
 
 	for pid in selected:
-		var key := str(pid)
+		var sid := str(pid).strip_edges()
+		if not sid.is_valid_float():
+			continue
+		var key := str(int(round(float(sid))))
 		if not players.has(key):
 			continue
 		var p = players[key]

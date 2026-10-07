@@ -1165,9 +1165,7 @@ func _on_menu_go_match() -> void:
 	if _bm_is_mobile_layout():
 		call_deferred("_show_saison")
 		return
-	print("[MAIN] go_match -> MatchSim")
-
-	get_tree().change_scene_to_file("res://scenes/MatchSim.tscn")
+	print("[MAIN] go_match -> MenuSaison handled by menu")
 
 
 func _bm_funnel_profile_uuid() -> String:
