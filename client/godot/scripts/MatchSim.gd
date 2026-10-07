@@ -1533,13 +1533,13 @@ func _ready() -> void:
 	if not timer.timeout.is_connected(_on_timer_timeout):
 		timer.timeout.connect(_on_timer_timeout)
 
-		print("[DBG READY] before _prepare_match_like_py")
-	_prepare_match_like_py()
-	print("[DBG READY] after _prepare_match_like_py")
-
 	print("[DBG READY] before _init_team_names")
 	_init_team_names()
 	print("[DBG READY] after _init_team_names")
+
+	print("[DBG READY] before _prepare_match_like_py")
+	_prepare_match_like_py()
+	print("[DBG READY] after _prepare_match_like_py")
 	_apply_home_arena_background_if_needed()
 
 	print("[DBG READY] before _fade_in_scoreboard")
@@ -1774,13 +1774,22 @@ func _prepare_match_like_py() -> void:
 			mean_ext += coach_bonus
 		print("[COACHS][MATCH_BONUS] coach_bonus=", snapped(coach_bonus, 0.1), " user_is_home=", _user_is_home)
 
-	var strength_gap: float = clampf(mean_dom - mean_ext, -12.0, 12.0)
-	var boost_points: int = int(round(strength_gap * 1.20))
+	var season_number: int = int(save.get("season_number", 1))
+	var season_round: int = int(save.get("season_round", 0))
+	var lineup_impact_active: bool = season_number == 1 and season_round >= 5
+
+	var strength_gap_limit: float = 16.0 if lineup_impact_active else 12.0
+	var strength_gap_multiplier: float = 1.35 if lineup_impact_active else 1.20
+
+	var strength_gap: float = clampf(mean_dom - mean_ext, -strength_gap_limit, strength_gap_limit)
+	var boost_points: int = int(round(strength_gap * strength_gap_multiplier))
+
 	var league_id: String = str(save.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
 	if league_id == "":
 		league_id = LeagueDataScript.get_default_league_id()
 	var variance_coef: float = LeagueDataScript.get_coef(league_id, "ai_variance")
-	var variance_range: int = maxi(0, int(round(5.0 * variance_coef)))
+	var variance_base: float = 4.0 if lineup_impact_active else 5.0
+	var variance_range: int = maxi(0, int(round(variance_base * variance_coef)))
 
 	_score_final_dom = clampi(base_score + boost_points + randi_range(-variance_range, variance_range), 50, 120)
 	_score_final_ext = clampi(base_score - boost_points + randi_range(-variance_range, variance_range), 50, 120)
