@@ -842,6 +842,9 @@ func _bm_update_lineup_button() -> void:
 			for color_name in ["font_color", "font_hover_color", "font_pressed_color", "font_disabled_color"]:
 				btn_reopen_lineup.add_theme_color_override(color_name, btn_back.get_theme_color(color_name))
 			btn_reopen_lineup.add_theme_font_size_override("font_size", btn_back.get_theme_font_size("font_size"))
+		for state in ["normal", "hover", "pressed"]:
+			var style := btn_reopen_lineup.get_theme_stylebox(state) as StyleBoxFlat
+			style.bg_color = (btn_confirm_match_selection.get_theme_stylebox(state) as StyleBoxFlat).bg_color
 		btn_reopen_lineup.pressed.connect(_bm_reopen_lineup)
 	btn_reopen_lineup.visible = pending_match_ids.size() == 8 and not is_instance_valid(lineup_summary_popup)
 	var right_edge := size.x - 34.0
