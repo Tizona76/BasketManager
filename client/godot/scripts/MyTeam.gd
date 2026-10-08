@@ -32,6 +32,8 @@ var img_auto_save_token: TextureRect
 var myteam_table_header: HBoxContainer
 var lineup_summary_popup: Control = null
 var lineup_summary_card: Panel = null
+var btn_reopen_lineup: Button = null
+var _lineup_manually_closed: bool = false
 var _sell_tooltip_popup: Panel = null
 var _lineup_save_tooltip_popup: Panel = null
 
@@ -591,7 +593,7 @@ func _ensure_match_selection_footer() -> void:
 		btn_auto_save_match_selection.pressed.connect(_on_auto_save_match_selection_pressed)
 
 
-func _refresh_match_selection_footer() -> void:
+func _refresh_match_selection_footer(force_open: bool = false) -> void:
 	if lbl_selected_to_play != null and not is_instance_valid(lbl_selected_to_play):
 		lbl_selected_to_play = null
 	if btn_confirm_match_selection != null and not is_instance_valid(btn_confirm_match_selection):
@@ -603,6 +605,8 @@ func _refresh_match_selection_footer() -> void:
 		return
 
 	if not _is_match_selection_unlocked():
+		if is_instance_valid(btn_reopen_lineup):
+			btn_reopen_lineup.hide()
 		_bm_close_lineup_summary_popup()
 		lbl_selected_to_play.visible = false
 		btn_confirm_match_selection.visible = false
@@ -617,11 +621,13 @@ func _refresh_match_selection_footer() -> void:
 	lbl_selected_to_play.text = tr("myteam.selected_to_play_count") + " : " + str(pending_match_ids.size()) + "/8"
 
 	var ready := pending_match_ids.size() == 8
-	var show_auto_save := ready and _bm_has_auto_save_lineup_token()
-	btn_confirm_match_selection.visible = ready
-	btn_confirm_match_selection.disabled = not ready
+	var show_popup := ready and (force_open or not _lineup_manually_closed or is_instance_valid(lineup_summary_popup))
+	var show_auto_save := show_popup and _bm_has_auto_save_lineup_token()
+	btn_confirm_match_selection.visible = show_popup
+	btn_confirm_match_selection.disabled = not show_popup
 	_bm_style_confirm_lineup_button(btn_confirm_match_selection)
-	_bm_refresh_lineup_summary_popup(ready)
+	_bm_refresh_lineup_summary_popup(show_popup)
+	_bm_update_lineup_button()
 	btn_auto_save_match_selection.visible = show_auto_save
 	btn_auto_save_match_selection.disabled = not show_auto_save
 	if img_auto_save_token != null:
@@ -820,6 +826,57 @@ func _bm_add_lineup_preview_section(parent: Control, title_text: String, players
 	return row_y
 
 
+func _bm_update_lineup_button() -> void:
+	if not _lineup_manually_closed or not _bm_is_lineup_screen():
+		return
+	if not is_instance_valid(btn_reopen_lineup):
+		btn_reopen_lineup = Button.new()
+		btn_reopen_lineup.name = "BtnReopenLineup"
+		btn_reopen_lineup.text = "Lineup"
+		btn_reopen_lineup.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn_reopen_lineup.focus_mode = Control.FOCUS_NONE
+		add_child(btn_reopen_lineup)
+		if btn_back != null:
+			for state in ["normal", "hover", "pressed", "disabled"]:
+				btn_reopen_lineup.add_theme_stylebox_override(state, btn_back.get_theme_stylebox(state).duplicate())
+			for color_name in ["font_color", "font_hover_color", "font_pressed_color", "font_disabled_color"]:
+				btn_reopen_lineup.add_theme_color_override(color_name, btn_back.get_theme_color(color_name))
+			btn_reopen_lineup.add_theme_font_size_override("font_size", btn_back.get_theme_font_size("font_size"))
+		btn_reopen_lineup.pressed.connect(_bm_reopen_lineup)
+	btn_reopen_lineup.visible = pending_match_ids.size() == 8 and not is_instance_valid(lineup_summary_popup)
+	var right_edge := size.x - 34.0
+	if lbl_total_salary != null and lbl_total_salary.visible:
+		right_edge = minf(right_edge, lbl_total_salary.position.x - 16.0)
+	var button_h := btn_back.size.y if btn_back != null else 62.0
+	var button_y := btn_back.position.y if btn_back != null else size.y - 92.0
+	btn_reopen_lineup.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	btn_reopen_lineup.offset_left = right_edge - 180.0 - size.x
+	btn_reopen_lineup.offset_right = right_edge - size.x
+	btn_reopen_lineup.offset_top = button_y - size.y
+	btn_reopen_lineup.offset_bottom = button_y + button_h - size.y
+
+
+func _bm_dismiss_lineup() -> void:
+	get_viewport().set_input_as_handled()
+	_lineup_manually_closed = true
+	_bm_hide_lineup_save_tooltip()
+	_bm_close_lineup_summary_popup()
+	for button in [btn_confirm_match_selection, btn_auto_save_match_selection]:
+		if is_instance_valid(button):
+			button.hide()
+			button.disabled = true
+	if is_instance_valid(img_auto_save_token):
+		img_auto_save_token.hide()
+	_bm_update_lineup_button()
+
+
+func _bm_reopen_lineup() -> void:
+	get_viewport().set_input_as_handled()
+	if pending_match_ids.size() != 8 or is_instance_valid(lineup_summary_popup):
+		return
+	_refresh_match_selection_footer(true)
+
+
 func _bm_close_lineup_summary_popup() -> void:
 	if btn_confirm_match_selection != null and is_instance_valid(btn_confirm_match_selection):
 		var parent_now := btn_confirm_match_selection.get_parent()
@@ -844,6 +901,7 @@ func _bm_close_lineup_summary_popup() -> void:
 
 	var existing := get_node_or_null("LineupSummaryPopup")
 	if existing != null and is_instance_valid(existing):
+		remove_child(existing)
 		existing.queue_free()
 
 	lineup_summary_popup = null
@@ -903,8 +961,8 @@ func _bm_refresh_lineup_summary_popup(ready: bool) -> void:
 	lineup_summary_card.add_theme_stylebox_override("panel", sb)
 	lineup_summary_popup.add_child(lineup_summary_card)
 
-	_bm_add_lineup_summary_label(lineup_summary_card, _bm_myteam_tr_or_fallback("matchsim.game_lineup", "Game Lineup"), Vector2(24, 16), Vector2(card_w - 48, 34), 28, Color(1, 1, 1, 1))
-	_bm_add_lineup_summary_label(lineup_summary_card, _bm_myteam_tr_or_fallback("myteam.lineup_summary.subtitle", "Decision impact preview"), Vector2(24, 50), Vector2(card_w - 48, 24), 16, Color(0.76, 0.84, 0.96, 0.88))
+	_bm_add_lineup_summary_label(lineup_summary_card, _bm_myteam_tr_or_fallback("matchsim.game_lineup", "Game Lineup"), Vector2(80, 16), Vector2(card_w - 160, 34), 28, Color(1, 1, 1, 1))
+	_bm_add_lineup_summary_label(lineup_summary_card, _bm_myteam_tr_or_fallback("myteam.lineup_summary.subtitle", "Decision impact preview"), Vector2(80, 50), Vector2(card_w - 160, 24), 16, Color(0.76, 0.84, 0.96, 0.88))
 
 	var col_w := 150.0
 	var start_x := (card_w - 510.0) * 0.5
@@ -978,6 +1036,28 @@ func _bm_refresh_lineup_summary_popup(ready: bool) -> void:
 	btn_confirm_match_selection.disabled = false
 	_bm_style_confirm_lineup_button(btn_confirm_match_selection)
 
+	var close_button := Button.new()
+	close_button.name = "BtnCloseLineupSummary"
+	close_button.text = "×"
+	close_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	close_button.focus_mode = Control.FOCUS_NONE
+	close_button.custom_minimum_size = Vector2(48, 48)
+	close_button.add_theme_font_size_override("font_size", 22)
+	lineup_summary_card.add_child(close_button)
+	for state in ["normal", "hover", "pressed"]:
+		var style := close_button.get_theme_stylebox(state).duplicate() as StyleBox
+		style.content_margin_left = 6.0
+		style.content_margin_right = 6.0
+		style.content_margin_top = 6.0
+		style.content_margin_bottom = 6.0
+		close_button.add_theme_stylebox_override(state, style)
+	close_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	close_button.offset_left = -64.0
+	close_button.offset_right = -16.0
+	close_button.offset_top = 12.0
+	close_button.offset_bottom = 60.0
+	close_button.pressed.connect(_bm_dismiss_lineup)
+
 
 func _save_pending_match_ids() -> void:
 	Save.ensure_exists(str(Session.profile_uuid))
@@ -996,7 +1076,6 @@ func _toggle_pending_match(pid: int) -> void:
 		if pending_match_ids.size() >= 8:
 			return
 		pending_match_ids.append(pid)
-	_save_pending_match_ids()
 	_build_team()
 
 func _on_confirm_sell_pressed() -> void:
@@ -2511,6 +2590,7 @@ func _tr_poste(poste: String) -> String:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
+		call_deferred("_bm_update_lineup_button")
 		call_deferred("_bm_myteam_apply_mobile_landscape_scroll")
 		call_deferred("_bm_myteam_lock_mobile_layout_positions")
 
