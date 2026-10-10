@@ -1747,6 +1747,9 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 					should_apply_load = (cloud_ck_load != local_ck_before_load)
 				if dload.has("blob"):
 					var blobv_load: Variant = dload.get("blob")
+					if not PL._l5_legacy_write_allowed(active_save_path_load, blobv_load if blobv_load is Dictionary else JSON.parse_string(str(blobv_load))):
+						should_apply_load = false
+						_cloud_save_feedback("Cloud conflict: saved match preserved.")
 					if bool(dload.get("found", true)) == false:
 						print("[APPLY_SKIP] cloud found=false ignored")
 						should_apply_load = false
@@ -1878,6 +1881,10 @@ func _on_http_completed(result: int, response_code: int, _headers: PackedStringA
 				if bool(d.get("found", true)) == false:
 					print("[APPLY_SKIP] cloud found=false ignored")
 					should_apply = false
+
+				if not PL._l5_legacy_write_allowed(active_save_path_apply, blobv if blobv is Dictionary else JSON.parse_string(str(blobv))):
+					should_apply = false
+					_cloud_save_feedback("Cloud conflict: saved match preserved.")
 
 				# ✅ ne jamais appliquer un cloud blob null
 				if typeof(blobv) == TYPE_NIL:
@@ -2048,6 +2055,12 @@ func _roundtrip_validate_against_cloud_blob() -> bool:
 # LOCAL FILE HELPERS
 # ------------------------------------------------------------
 func _save_text_file(path: String, content: String) -> void:
+	if path.get_file().begins_with("save_") or path.get_file() == "savegame.json":
+		var candidate: Variant = JSON.parse_string(content)
+		if not PL._l5_legacy_write_allowed(path, candidate):
+			_cloud_save_feedback("Cloud/local conflict: saved match preserved.")
+			return
+		if PL._l5_publish_existing(path, candidate): return
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
 		print("[FILE] open write failed:", path)

@@ -40,6 +40,10 @@ static var _bm_last_coach_insight_family: String = ""
 static var _bm_last_coach_insight_player: String = ""
 
 
+var _l1_match_plan: Dictionary = {}
+var _l1_start_save: Dictionary = {}
+var _l1_match_authorized := false
+
 func _bm_make_back_button_style(bg: Color, glow: Color, bottom_w: int, shadow_size: int) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
@@ -392,7 +396,12 @@ func _bm_current_lineup_header(parent: Control, y: float, row_w: float) -> void:
 
 
 func _bm_current_lineup_players() -> Array[Dictionary]:
-	var save: Dictionary = PlayerLife.load_savegame()
+	if _l1_match_plan.get("status") == "OK":
+		var prepared: Array[Dictionary] = []
+		for player in _l1_match_plan.players.slice(0, 8):
+			prepared.append(player.duplicate(true))
+		return prepared
+	var save: Dictionary = _l5_read_view()
 	var lineup_ids: Array = []
 	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
 		var roster: Dictionary = save["roster"] as Dictionary
@@ -422,7 +431,7 @@ func _bm_current_lineup_players() -> Array[Dictionary]:
 
 
 func _bm_current_lineup_active_coach_id() -> String:
-	var save: Dictionary = PlayerLife.load_savegame()
+	var save: Dictionary = _l5_read_view()
 	if typeof(save) != TYPE_DICTIONARY:
 		return ""
 	if not save.has("coachs") or typeof(save["coachs"]) != TYPE_DICTIONARY:
@@ -896,40 +905,11 @@ func _ensure_roster_players_minimal(save: Dictionary) -> void:
 
 	roster["players"] = out
 
-func _annual_salary_from_any(pd: Dictionary) -> int:
-	var raw_salary: int = int(pd.get("salary", pd.get("salaire", 0)))
-	if raw_salary > 0:
-		return raw_salary
+func _annual_salary_from_any(pd: Dictionary) -> Dictionary:
+	return PlayerLife._l4_annual_contract(pd)
 
-	return 0
-
-func _compute_total_salary_per_match(save: Dictionary) -> int:
-	var total_season: int = 0
-	var season_number: int = int(save.get("season_number", 1))
-	print("[SALARY MATCH][START] season_number=", season_number)
-	var inflation_coef: float = 1.0
-	if season_number >= 3:
-		inflation_coef = pow(1.04, float(season_number - 2))
-
-	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
-		var roster: Dictionary = save["roster"]
-
-		if roster.has("players") and typeof(roster["players"]) == TYPE_ARRAY:
-			print("[SALARY MATCH][ROSTER SIZE] ", (roster["players"] as Array).size())
-			for row_raw in roster["players"]:
-				if typeof(row_raw) != TYPE_DICTIONARY:
-					continue
-				var row: Dictionary = row_raw
-				var annual_salary: int = _annual_salary_from_any(row)
-				print("[SALARY MATCH][ROW] name=", str(row.get("name", row.get("nom", ""))), " salary=", annual_salary, " raw_salary=", row.get("salary", null), " raw_salaire=", row.get("salaire", null))
-				total_season += int(round(float(annual_salary) * inflation_coef))
-
-	print("[SALARY MATCH][TOTAL SEASON] ", total_season)
-	var matches_total := 22
-	var salary_league_coef := _get_salary_league_coef(save)
-	var per_match := int(round(float(total_season) * salary_league_coef / float(matches_total)))
-	print("[SALARY MATCH][PER MATCH] ", per_match)
-	return maxi(0, per_match)
+func _compute_total_salary_per_match(save: Dictionary) -> Dictionary:
+	return PlayerLife._l4_payroll(save)
 
 func _bm_format_int_spaces(value: int) -> String:
 	var neg := value < 0
@@ -1114,16 +1094,18 @@ func _show_season_reward_popup(final_rank: int, euros_gain: int, tokens_gain: in
 	_season_reward_animate_tokens(tokens_amount_lbl, tokens_gain)
 
 
-func _apply_salaries_and_level(save: Dictionary, did_win: bool, did_draw: bool) -> void:
+func _apply_salaries_and_level(save: Dictionary, did_win: bool, did_draw: bool) -> Dictionary:
+	var payroll := _compute_total_salary_per_match(save)
+	if payroll.status != "OK":
+		return payroll
 	_ensure_club_wallet_schema(save)
-	_ensure_roster_players_minimal(save)
 
 	var wallet: Dictionary = save["wallet"]
 	var club: Dictionary = save["club"]
 
 	# 1) Paiement salaires (1x / match)
 
-	var total_sal := _compute_total_salary_per_match(save)
+	var total_sal: int = payroll.per_match
 	PlayerLife.ensure_finance_schema(save)
 	# total_depenses est géré une seule fois dans _fin_match() après apply_post_match_to_save()
 	wallet["euros"] = int(wallet.get("euros", 0)) - total_sal
@@ -1141,6 +1123,7 @@ func _apply_salaries_and_level(save: Dictionary, did_win: bool, did_draw: bool) 
 
 	var PL = load("res://scripts/PlayerLife.gd")
 	PL.add_club_xp(save, xp_add, "match_result")
+	return payroll
 # ---------------------------------------------------------------------------
 
 var minute: int = 0
@@ -1183,7 +1166,7 @@ func _apply_home_arena_background_if_needed() -> void:
 		_bm_apply_away_match_identity_overlays()
 		return
 
-	var save := PlayerLife.load_savegame()
+	var save := _l5_read_view()
 	if not _is_home_arena_selected_for_match(save):
 		return
 
@@ -1315,7 +1298,7 @@ func _bm_apply_away_match_identity_overlays() -> void:
 	if old != null:
 		old.queue_free()
 
-	var save := PlayerLife.load_savegame()
+	var save := _l5_read_view()
 	var opponent_crest_path := PlayerLife.get_display_crest_path(save, _opp_team_name)
 	var vp := get_viewport_rect().size
 	if vp.x <= 0.0 or vp.y <= 0.0:
@@ -1384,7 +1367,8 @@ func _bm_schedule_generic_funnel_retry(event_name: String, flag_name: String, me
 
 
 func _bm_send_generic_funnel_event(event_name: String, flag_name: String, meta: Dictionary, attempt: int = 0) -> void:
-	var save: Dictionary = PlayerLife.load_savegame()
+	if not match_fini: return
+	var save: Dictionary = _l5_read_view()
 	if bool(save.get(flag_name, false)):
 		return
 
@@ -1416,9 +1400,7 @@ func _bm_send_generic_funnel_event(event_name: String, flag_name: String, meta: 
 		var sent_ok := result == HTTPRequest.RESULT_SUCCESS and response_code >= 200 and response_code < 300
 		request.queue_free()
 		if sent_ok:
-			var fresh_save: Dictionary = PlayerLife.load_savegame()
-			fresh_save[flag_name] = true
-			PlayerLife.write_savegame(fresh_save)
+			_l5_record_event_flag(_l5_new_io(), flag_name)
 		elif attempt < BM_GENERIC_FUNNEL_MAX_RETRIES:
 			_bm_schedule_generic_funnel_retry(event_name, flag_name, meta, attempt)
 	, CONNECT_ONE_SHOT)
@@ -1436,7 +1418,7 @@ func _bm_send_generic_funnel_event(event_name: String, flag_name: String, meta: 
 
 
 func _bm_track_match_start_milestones() -> void:
-	var save: Dictionary = PlayerLife.load_savegame()
+	var save: Dictionary = _l1_start_save
 	var season_number := int(save.get("season_number", 1))
 	var completed_matches := int(save.get("season_round", 0))
 	var match_number := completed_matches + 1
@@ -1455,7 +1437,7 @@ func _bm_track_match_start_milestones() -> void:
 
 
 func _bm_track_first_match_started() -> void:
-	var save: Dictionary = PlayerLife.load_savegame()
+	var save: Dictionary = _l1_start_save
 	var season_number := int(save.get("season_number", 1))
 	var match_number := int(save.get("season_round", 0)) + 1
 	var meta := {"season_number": season_number, "match_number": match_number}
@@ -1472,6 +1454,18 @@ func _bm_play_match_music() -> void:
 		am.call("play_music", "res://audio/music/match.mp3", true, false)
 
 func _ready() -> void:
+	_l1_match_authorized = false
+	_l5_io = _l5_new_io()
+	var opened: Dictionary = _l5_io.read_career(true)
+	if opened.status != "OK":
+		_l5_refuse(opened)
+		return
+	_l1_start_save = opened.data
+
+	_l1_match_plan = PlayerLife._l3_validate_lineup(_l1_start_save)
+	if _l1_match_plan.status != "OK":
+		_l1_refuse_match(_l1_match_plan)
+		return
 	_bm_play_match_music()
 	if timer != null:
 		timer.stop()
@@ -1538,7 +1532,8 @@ func _ready() -> void:
 	print("[DBG READY] after _init_team_names")
 
 	print("[DBG READY] before _prepare_match_like_py")
-	_prepare_match_like_py()
+	if not _prepare_match_like_py():
+		return
 	print("[DBG READY] after _prepare_match_like_py")
 	_apply_home_arena_background_if_needed()
 
@@ -1553,6 +1548,12 @@ func _ready() -> void:
 
 	print("[DBG READY] before match intro countdown")
 	await _bm_play_match_intro_countdown()
+	if not _l1_match_authorized or not is_inside_tree():
+		return
+	var l5_check: Dictionary = _l5_io.read_career()
+	if l5_check.status != "OK" or _l5_digest(l5_check.data) != _l5_digest(_l1_start_save):
+		_l5_refuse({"status":"STALE_OR_CAREER_CHANGED"})
+		return
 	print("[DBG READY] before timer.start")
 	timer.start()
 	call_deferred("_bm_show_match_progress_info_after_start")
@@ -1562,11 +1563,13 @@ func _ready() -> void:
 	print("[DBG READY] after timer.start")
 
 func _bm_play_match_intro_countdown() -> void:
+	if not _l1_match_authorized:
+		return
 	_match_progress_info_after_countdown = ""
-	var match_progress_save: Dictionary = PlayerLife.load_savegame()
+	var match_progress_save: Dictionary = _l5_read_view()
 	if typeof(match_progress_save) == TYPE_DICTIONARY and not bool(match_progress_save.get("match_progress_info_seen", false)) and int(match_progress_save.get("season_number", 1)) == 1 and int(match_progress_save.get("season_round", 0)) == 0:
 		match_progress_save["match_progress_info_seen"] = true
-		PlayerLife.write_savegame(match_progress_save)
+		# This presentation flag is included with the final receipt.
 		_match_progress_info_after_countdown = tr("matchsim.progress_info.line1") + "\n" + tr("matchsim.progress_info.line2")
 
 	var overlay := Control.new()
@@ -1619,18 +1622,30 @@ func _bm_play_match_intro_countdown() -> void:
 		tw.tween_property(ball, "position:y", get_viewport_rect().size.y * 0.5 - 16.0, 0.24).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 		tw.chain().tween_property(ball, "position:y", get_viewport_rect().size.y * 0.5 + 30.0, 0.24).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 		await get_tree().create_timer(0.54).timeout
+		if not _l1_match_authorized or not is_inside_tree():
+			return
 
 	await get_tree().create_timer(0.16).timeout
+
+	if not _l1_match_authorized or not is_inside_tree():
+
+		return
 
 	var fade_tw := create_tween()
 	fade_tw.tween_property(overlay, "modulate:a", 0.0, 0.18)
 	await get_tree().create_timer(0.20).timeout
+	if not _l1_match_authorized or not is_inside_tree():
+		return
 
 	overlay.queue_free()
 	await get_tree().process_frame
+	if not _l1_match_authorized or not is_inside_tree():
+		return
 
 
 func _bm_show_match_progress_info_after_start() -> void:
+	if not _l1_match_authorized:
+		return
 	var match_progress_info_text := _match_progress_info_after_countdown.strip_edges()
 	_match_progress_info_after_countdown = ""
 	if match_progress_info_text == "":
@@ -1658,17 +1673,23 @@ func _bm_show_match_progress_info_after_start() -> void:
 	overlay.add_child(progress_info_lbl)
 
 	await get_tree().create_timer(4.16).timeout
+
+	if not _l1_match_authorized or not is_inside_tree():
+
+		return
 	if not is_instance_valid(overlay):
 		return
 	var fade_tw := create_tween()
 	fade_tw.tween_property(overlay, "modulate:a", 0.0, 0.18)
 	await get_tree().create_timer(0.20).timeout
+	if not _l1_match_authorized or not is_inside_tree():
+		return
 	if is_instance_valid(overlay):
 		overlay.queue_free()
 
 
 func _bm_get_active_coach_match_bonus(save_override: Dictionary = {}) -> float:
-	var save: Dictionary = save_override if not save_override.is_empty() else PlayerLife.load_savegame()
+	var save: Dictionary = save_override if not save_override.is_empty() else _l5_read_view()
 	if typeof(save) != TYPE_DICTIONARY:
 		return 0.0
 	if not save.has("coachs") or typeof(save["coachs"]) != TYPE_DICTIONARY:
@@ -1753,18 +1774,35 @@ func _bm_update_scoreboard_club_crest(save_override: Dictionary = {}) -> void:
 	if scoreboard_panel == null:
 		return
 
-	var save: Dictionary = save_override if not save_override.is_empty() else PlayerLife.load_savegame()
+	var save: Dictionary = save_override if not save_override.is_empty() else _l5_read_view()
 	_bm_apply_scoreboard_crest_to_label("ScoreboardDomCrestIcon", _team_dom_name, lbl_team_dom, false, save)
 	_bm_apply_scoreboard_crest_to_label("ScoreboardExtCrestIcon", _team_ext_name, lbl_team_ext, true, save)
 
 
 
-func _prepare_match_like_py() -> void:
+func _prepare_match_like_py() -> bool:
+	if _l1_start_save.has("l5_match") and not _l1_start_save.l5_match is Dictionary:
+		_l5_refuse({"status":"INVALID_L5_STATE"});return false
+	if _l1_start_save.get("l5_match", {}).has("pending"):
+		if not _l1_start_save.l5_match.pending is Dictionary:
+			_l5_refuse({"status":"INVALID_PREPARATION"});return false
+		return _l5_resume(_l1_start_save.l5_match.pending)
+	var readiness := _l5_can_prepare(_l1_start_save)
+	if readiness.status != "OK":
+		_l5_refuse(readiness)
+		return false
+	if _l1_match_plan.get("status") != "OK":
+		_l1_refuse_match(_l1_match_plan)
+		return false
+	var save: Dictionary = _l1_start_save
+	var home := _estimate_strength_dom(save)
+	var away := _estimate_strength_ext(save)
+	if home.status != "OK" or away.status != "OK":
+		_l1_refuse_match(home if home.status != "OK" else away)
+		return false
 	var base_score: int = randi_range(70, 90)
-	var save: Dictionary = PlayerLife.load_savegame()
-
-	var mean_dom: float = _estimate_strength_dom(save)
-	var mean_ext: float = _estimate_strength_ext(save)
+	var mean_dom: float = home.value
+	var mean_ext: float = away.value
 
 	var coach_bonus: float = _bm_get_active_coach_match_bonus(save)
 	if coach_bonus > 0.0:
@@ -1795,6 +1833,7 @@ func _prepare_match_like_py() -> void:
 	print("[MATCHSIM][STRENGTH] dom=", snapped(mean_dom, 0.1), " ext=", snapped(mean_ext, 0.1), " gap=", snapped(strength_gap, 0.1), " boost=", boost_points)
 
 	_generate_timeline_scores(_score_final_dom, _score_final_ext, MATCH_DUREE_MINUTES)
+	return _l5_store_preparation()
 
 func _bm_get_effective_tir(pd: Dictionary) -> float:
 	var tir: float = float(pd.get("tir", pd.get("precision", 70)))
@@ -1804,112 +1843,24 @@ func _bm_get_effective_tir(pd: Dictionary) -> float:
 	var fatigue: float = float(pd.get("fatigue", 0))
 	return tir * (0.75 + motivation / 200.0) * (1.0 - fatigue / 200.0)
 
-func _bm_get_coach_auto_score(pd: Dictionary, active_coach_id: String = "") -> float:
-	var rating: float = float(pd.get("overall", pd.get("rating", pd.get("pondération", pd.get("ponderation", 70)))))
-	var motivation: float = float(pd.get("motivation", 75))
-	var fatigue: float = float(pd.get("fatigue", 0))
-	var attack_bonus: float = (_bm_get_effective_tir(pd) - 70.0) * 0.18
-
-	match active_coach_id:
-		"coach_junior":
-			return rating + attack_bonus + motivation * 0.04 - fatigue * 0.06
-		"coach_confirme":
-			return rating + attack_bonus + motivation * 0.10 - fatigue * 0.18
-		"coach_elite":
-			return rating + attack_bonus + motivation * 0.14 - fatigue * 0.28
-		_:
-			return rating + attack_bonus + motivation * 0.08 - fatigue * 0.12
+func _bm_get_coach_auto_score(pd: Dictionary, active_coach_id: String = "") -> Dictionary:
+	return PlayerLife._l1_coach_score(pd, active_coach_id)
 
 func _bm_get_effective_played_ids(save: Dictionary) -> Array:
-	var out: Array = []
-	if not save.has("roster") or typeof(save["roster"]) != TYPE_DICTIONARY:
-		return out
-	var roster: Dictionary = save["roster"] as Dictionary
-	var match_ids: Array = []
-	var selected_ids: Array = []
-	if roster.has("match_selected_ids") and typeof(roster["match_selected_ids"]) == TYPE_ARRAY:
-		match_ids = (roster["match_selected_ids"] as Array).duplicate()
-	if roster.has("selected_ids") and typeof(roster["selected_ids"]) == TYPE_ARRAY:
-		selected_ids = (roster["selected_ids"] as Array).duplicate()
-	var season_round_now: int = int(save.get("season_round", 0))
-	var season_number_now: int = int(save.get("season_number", 1))
-	var match_selection_unlocked := season_round_now >= 5 if season_number_now <= 1 else season_round_now >= 0
-	var active_coach_id: String = ""
-	if save.has("coachs") and typeof(save["coachs"]) == TYPE_DICTIONARY:
-		var coachs_pre: Dictionary = save["coachs"] as Dictionary
-		active_coach_id = str(coachs_pre.get("active", "")).strip_edges()
+	var result: Dictionary = _l1_match_plan if _l1_match_plan.get("status") == "OK" else PlayerLife._l3_validate_lineup(save)
+	return result.ids.duplicate() if result.status == "OK" else []
 
-	if match_ids.size() == 8:
-		return match_ids
-
-	if active_coach_id != "":
-		if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
-			return []
-		var by_id: Dictionary = save["players_by_id"] as Dictionary
-		var ranked: Array = []
-		var seen: Dictionary = {}
-		for pid in selected_ids:
-			var sid: String = str(pid).strip_edges()
-			if sid == "":
-				continue
-			var key: String = str(int(round(float(sid))))
-			if seen.has(key):
-				continue
-			seen[key] = true
-			if not by_id.has(key) or typeof(by_id[key]) != TYPE_DICTIONARY:
-				continue
-			var pd: Dictionary = by_id[key] as Dictionary
-			ranked.append({
-				"id": int(key),
-				"score": _bm_get_coach_auto_score(pd, active_coach_id)
-			})
-		if ranked.size() >= 8:
-			ranked.sort_custom(func(a, b): return float((a as Dictionary).get("score", 0.0)) > float((b as Dictionary).get("score", 0.0)))
-			for row in ranked:
-				out.append((row as Dictionary).get("id"))
-				if out.size() >= 8:
-					break
-			print("[COACHS][AUTO_COMPO] coach=", active_coach_id, " selected_pool=", selected_ids.size(), " played_ids=", out)
-			return out
-
-	if match_selection_unlocked:
-		return []
-	if active_coach_id == "":
-		return selected_ids
-	return []
-
-func _get_selected_team_rating_average(save_override: Dictionary = {}) -> float:
-	var save: Dictionary = save_override if not save_override.is_empty() else PlayerLife.load_savegame()
-
-	var players: Dictionary = {}
-	if save.has("players_by_id") and typeof(save["players_by_id"]) == TYPE_DICTIONARY:
-		players = save["players_by_id"] as Dictionary
-
-	var selected: Array = _bm_get_effective_played_ids(save)
-
-	var total: float = 0.0
-	var count: int = 0
-
-	for pid in selected:
-		var sid := str(pid).strip_edges()
-		if not sid.is_valid_float():
-			continue
-		var key := str(int(round(float(sid))))
-		if not players.has(key):
-			continue
-		var p = players[key]
-		if typeof(p) != TYPE_DICTIONARY:
-			continue
-		var pd: Dictionary = p as Dictionary
-		var rating: float = float(pd.get("overall", pd.get("rating", pd.get("pondération", pd.get("ponderation", 70)))))
-		var attack_bonus: float = (_bm_get_effective_tir(pd) - 70.0) * 0.18
-		total += rating + attack_bonus
-		count += 1
-
-	return total / float(count) if count > 0 else 72.0
+func _get_selected_team_rating_average(save_override: Dictionary = {}) -> Dictionary:
+	var result: Dictionary = _l1_match_plan
+	if result.get("status") != "OK":
+		var save: Dictionary = save_override if not save_override.is_empty() else _l5_read_view()
+		result = PlayerLife._l3_validate_lineup(save)
+	if result.status != "OK":
+		return result
+	return {"status": "OK", "value": result.force}
 
 func _get_opponent_team_rating_estimate(save_override: Dictionary = {}) -> float:
-	var save: Dictionary = save_override if not save_override.is_empty() else PlayerLife.load_savegame()
+	var save: Dictionary = save_override if not save_override.is_empty() else _l5_read_view()
 	var division: int = clampi(int(save.get("division_level", 3)), 1, 3)
 	var division_base: float = 72.0
 	if division == 2:
@@ -1924,11 +1875,11 @@ func _get_opponent_team_rating_estimate(save_override: Dictionary = {}) -> float
 	var league_rating_pressure: float = clampf((ai_strength_coef - 1.0) * 7.0, -1.5, 1.6)
 	return clampf(division_base + league_rating_pressure, 68.0, 82.0)
 
-func _estimate_strength_dom(save_override: Dictionary = {}) -> float:
-	return _get_selected_team_rating_average(save_override) if _user_is_home else _get_opponent_team_rating_estimate(save_override)
+func _estimate_strength_dom(save_override: Dictionary = {}) -> Dictionary:
+	return _get_selected_team_rating_average(save_override) if _user_is_home else {"status": "OK", "value": _get_opponent_team_rating_estimate(save_override)}
 
-func _estimate_strength_ext(save_override: Dictionary = {}) -> float:
-	return _get_opponent_team_rating_estimate(save_override) if _user_is_home else _get_selected_team_rating_average(save_override)
+func _estimate_strength_ext(save_override: Dictionary = {}) -> Dictionary:
+	return {"status": "OK", "value": _get_opponent_team_rating_estimate(save_override)} if _user_is_home else _get_selected_team_rating_average(save_override)
 
 func _generate_timeline_scores(target_dom: int, target_ext: int, duree: int) -> void:
 	_timeline_dom.clear()
@@ -2063,7 +2014,7 @@ func _init_team_names() -> void:
 
 	# Nom équipe depuis savegame (clé réelle = team_name)
 	var user_name := tr("matchsim.team_default")
-	var save := PlayerLife.load_savegame()
+	var save := _l5_read_view()
 
 	if typeof(save) == TYPE_DICTIONARY:
 		# ✅ priorité : team_name (création équipe)
@@ -2166,6 +2117,8 @@ func _fade_in_scoreboard() -> void:
 	tw.parallel().tween_property(info_panel, "modulate:a", 1.0, 1.30)
 
 func _on_timer_timeout() -> void:
+	if not _l1_match_authorized:
+		return
 	if match_fini:
 		return
 
@@ -2208,7 +2161,7 @@ func _bm_clear_live_spotlight() -> void:
 func _bm_try_live_spotlight(trigger_minute: int, info_position: Vector2, panel_position: Vector2) -> void:
 	if spotlight_already_shown or not OS.has_feature("pc") or info_panel == null:
 		return
-	var save: Dictionary = PlayerLife.load_savegame()
+	var save: Dictionary = _l5_read_view()
 	var spotlight_minute := 10 if int(save.get("season_round", 0)) % 2 == 0 else 25
 	if trigger_minute != spotlight_minute:
 		return
@@ -2305,8 +2258,12 @@ func _bm_pick_live_match_comment_variant(key_a: String, key_b: String, key_c: St
 	return tr(str(keys[randi() % keys.size()]))
 
 func _bm_pick_live_match_comment(trigger_minute: int) -> String:
-	var save: Dictionary = PlayerLife.load_savegame()
-	var gap: float = _estimate_strength_dom() - _estimate_strength_ext()
+	var save: Dictionary = _l5_read_view()
+	var home := _estimate_strength_dom()
+	var away := _estimate_strength_ext()
+	if home.status != "OK" or away.status != "OK":
+		return ""
+	var gap: float = float(home.value) - float(away.value)
 	if not _user_is_home:
 		gap = -gap
 	var user_score: int = int(score_dom if _user_is_home else score_ext)
@@ -2462,7 +2419,7 @@ func _persist_ranking_history_to_save() -> void:
 	if ss.has_method("push_current_club_rank"):
 		ss.call("push_current_club_rank", _user_team_name)
 
-	var save: Dictionary = PlayerLife.load_savegame()
+	var save: Dictionary = _l5_read_view()
 	save["ranking_history"] = ss.ranking_history.duplicate()
 	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
 		var roster_reset: Dictionary = save["roster"] as Dictionary
@@ -2508,7 +2465,7 @@ func _store_last_match_finance_popup(save: Dictionary, recettes_match: int, depe
 	save["last_match_finance_attendance_delta_pct"] = attendance_delta_pct if is_home else null
 
 func _pick_home_mvp_name_or_fallback() -> String:
-	var save := PlayerLife.load_savegame()
+	var save := _l5_read_view()
 	var played_ids: Array = []
 	if typeof(save) == TYPE_DICTIONARY:
 		played_ids = _bm_get_effective_played_ids(save)
@@ -2656,7 +2613,7 @@ func _resolve_and_tr_summary(raw: String) -> String:
 
 
 func _bm_build_match_impact_reason() -> String:
-	var save: Dictionary = PlayerLife.load_savegame()
+	var save: Dictionary = _l5_read_view()
 	var played_ids: Array = _bm_get_effective_played_ids(save)
 	if BM_COACH_INSIGHTS_DEBUG:
 		print("[COACH_INSIGHTS_DEBUG][PLAYED_IDS] ", played_ids)
@@ -2705,7 +2662,11 @@ func _bm_build_match_impact_reason() -> String:
 	var avg_offense: float = total_offense / count
 	var avg_defense: float = total_defense / count
 	var avg_rating: float = total_rating / count
-	var gap: float = _estimate_strength_dom() - _estimate_strength_ext()
+	var home := _estimate_strength_dom()
+	var away := _estimate_strength_ext()
+	if home.status != "OK" or away.status != "OK":
+		return ""
+	var gap: float = float(home.value) - float(away.value)
 	if not _user_is_home:
 		gap = -gap
 
@@ -3889,7 +3850,12 @@ func _apply_popularity_after_match(save: Dictionary, did_win: bool, did_draw: bo
 	save["popularite"] = pop
 	print("[POP] UPDATED =", pop)
 func _fin_match() -> void:
-	if match_fini:
+	if not _l1_match_authorized:
+		return
+	if match_fini: return
+	var committed := _l5_finish()
+	if committed.status != "COMMITTED" and committed.status != "ALREADY_COMMITTED":
+		_l5_refuse(committed)
 		return
 	_bm_clear_live_spotlight()
 	match_fini = true
@@ -3957,8 +3923,23 @@ func _fin_match() -> void:
 	if stats_end != null:
 		_compute_end_stats_and_show(_team_dom_name, _team_ext_name)
 
-	# --- PATCH ULTRA-CIBLÉ: update joueurs "vivants" + rewrite savegame.json ---
-	var save := PlayerLife.load_savegame()
+	var summary_popularity_before := int(_l1_start_save.get("popularite", 50))
+	var summary_popularity_after := int(_l5_committed.get("popularite", 50))
+	var popularity_delta: int = summary_popularity_after - summary_popularity_before
+	if lbl_match_result != null and is_instance_valid(lbl_match_result):
+		lbl_match_result.text = resultat.trim_suffix("!").strip_edges() + " ! " + tr("club.popularity") + " : " + ("+ " if popularity_delta > 0 else "- " if popularity_delta < 0 else "") + "%d%%" % absi(popularity_delta)
+	if lbl_info != null:
+		lbl_info.add_theme_font_size_override("font_size", lbl_info.get_theme_font_size("font_size") + 2)
+
+	if btn_retour != null:
+		_bm_style_btn_skip_final_result_clicked()
+		_bm_style_btn_retour()
+		btn_retour.disabled = false
+	_l5_send_committed_events()
+
+func _l5_candidate(base: Dictionary, pending: Dictionary, ss: SeasonState) -> Dictionary:
+	var user_score := score_dom if _user_is_home else score_ext
+	var save := base.duplicate(true)
 	var summary_popularity_before: int = int(save.get("popularite", 50))
 	var previous_home_attendance: int = int(save.get("last_home_attendance_for_summary", -1))
 	# BM_POP_FIN_APPLY_V2 ------------------------------------------------------
@@ -3994,7 +3975,7 @@ func _fin_match() -> void:
 		print("APPLY POP CALLED")
 		_apply_popularity_after_match(save, did_win_local, did_draw_local)
 		print("[DBG LAST WRITE] season_results=", save.get("season_results", {}))
-		PlayerLife.write_savegame(save)
+
 
 	var attendance_delta_pct: Variant = null
 	if not already_applied and _user_is_home:
@@ -4260,7 +4241,7 @@ func _fin_match() -> void:
 
 	if not already_applied and round_index_local != -1:
 		save["last_pop_fin_round"] = round_index_local
-	var played_ids: Array = _bm_get_effective_played_ids(save)
+	var played_ids: Array = pending.ids.duplicate()
 	print("[MATCHSIM][PLAYED_IDS_BEFORE_POST] ", played_ids)
 	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
 		print("[MATCHSIM][ROSTER_SELECTED_IDS] ", (save["roster"] as Dictionary).get("selected_ids", []))
@@ -4298,50 +4279,7 @@ func _fin_match() -> void:
 	for _pid in played_ids:
 		print("[MATCHSIM][PLAYED_ID_ITEM] ", _pid, " type=", typeof(_pid))
 
-	save = PlayerLife.apply_post_match_to_save(save, played_ids, did_win)
-
-	# FATIGUE HOTFIX DIRECT: appliquer sur le save réellement écrit en fin de match
-	if save.has("players_by_id") and typeof(save["players_by_id"]) == TYPE_DICTIONARY:
-		var by_id: Dictionary = save["players_by_id"] as Dictionary
-		var played_keys := {}
-		for raw_id in played_ids:
-			var sid := str(raw_id).strip_edges()
-			if sid == "":
-				continue
-			played_keys[str(int(round(float(sid))))] = true
-
-		for pid in by_id.keys():
-			var p = by_id[pid]
-			if typeof(p) != TYPE_DICTIONARY:
-				continue
-
-			PlayerLife._ensure_player_schema(p)
-			var key := str(pid).strip_edges()
-			var is_played := played_keys.has(key)
-
-			if is_played:
-				p["fatigue"] = clampi(int(p.get("fatigue", 0)) + int(PlayerLife.FATIGUE_GAIN_PLAY), int(PlayerLife.FATIGUE_MIN), int(PlayerLife.FATIGUE_MAX))
-				p["matchs_consecutifs"] = int(p.get("matchs_consecutifs", 0)) + 1
-				p["repos_consecutifs"] = 0
-				p["motivation"] = clampi(
-					int(p.get("motivation", 50)) + (int(PlayerLife.MOTIV_WIN_GAIN) if did_win else -int(PlayerLife.MOTIV_LOSS_DROP)),
-					int(PlayerLife.MOTIV_MIN),
-					int(PlayerLife.MOTIV_MAX)
-				)
-			else:
-				p["fatigue"] = clampi(int(p.get("fatigue", 0)) - int(PlayerLife.FATIGUE_RECOVER_REST), int(PlayerLife.FATIGUE_MIN), int(PlayerLife.FATIGUE_MAX))
-				p["repos_consecutifs"] = int(p.get("repos_consecutifs", 0)) + 1
-				p["matchs_consecutifs"] = 0
-				p["motivation"] = clampi(
-					int(p.get("motivation", 50)) + int(PlayerLife.MOTIV_REST_GAIN),
-					int(PlayerLife.MOTIV_MIN),
-					int(PlayerLife.MOTIV_MAX)
-				)
-
-			PlayerLife._recalc_derived(p)
-			by_id[pid] = p
-
-		save["players_by_id"] = by_id
+	save = PlayerLife.apply_post_match_to_save(save, played_ids, did_win, pending.injury_seed)
 
 	# --- MISSIONS V1 : compteurs match ---
 	if not save.has("missions_state") or typeof(save["missions_state"]) != TYPE_DICTIONARY:
@@ -4403,9 +4341,11 @@ func _fin_match() -> void:
 	# ✅ Salaires + XP/level : 1 seule fois / match (anti double-compte)
 	# On le fait APRÈS apply_post_match_to_save() car il réécrit 'save'.
 	if not already_applied:
-		_apply_salaries_and_level(save, did_win, did_draw_local)
+		var payroll := _apply_salaries_and_level(save, did_win, did_draw_local)
+		if payroll.status != "OK":
+			return payroll
 		PlayerLife.ensure_finance_schema(save)
-		var salary_match := _compute_total_salary_per_match(save)
+		var salary_match: int = payroll.per_match
 		save["salary_total_per_match"] = salary_match
 		save["total_depenses"] = int(save.get("total_depenses", 0)) + salary_match
 		save["total_salaires"] = int(save.get("total_salaires", 0)) + salary_match
@@ -4480,10 +4420,8 @@ func _fin_match() -> void:
 			roster_reset["match_selected_ids"] = []
 		save["roster"] = roster_reset
 
-	PlayerLife.write_savegame(save)
 
 	# Mise à jour saison
-	var ss := get_node_or_null("/root/SeasonState") as SeasonState
 	if ss != null:
 		# ✅ round du match réellement joué = round_index_local
 		var round_index: int = int(round_index_local)
@@ -4509,11 +4447,12 @@ func _fin_match() -> void:
 
 		# 2) simuler les autres matchs de la même journée round_index
 		if ss.has_method("simulate_other_games_for_round"):
-			ss.call("simulate_other_games_for_round", _team_dom_name, _team_ext_name, round_index, _user_team_name)
-			_persist_ranking_history_to_save()
+			ss.simulate_other_games_for_round(_team_dom_name, _team_ext_name, round_index, _user_team_name, save, pending.ai_seed)
+			ss.push_current_club_rank(_user_team_name)
+			save["ranking_history"] = ss.ranking_history.duplicate()
 
 			# --- Apply final rank-based popularity modifier AFTER real standings persist ---
-			var save_rank := PlayerLife.load_savegame()
+			var save_rank := save
 			if save_rank.has("ranking_history") and typeof(save_rank["ranking_history"]) == TYPE_ARRAY:
 				var hist: Array = save_rank["ranking_history"]
 				if hist.size() > 0:
@@ -4532,14 +4471,14 @@ func _fin_match() -> void:
 					save_rank["popularite"] = pop_final
 					if save.has("season_results") and typeof(save["season_results"]) == TYPE_DICTIONARY:
 						save_rank["season_results"] = (save["season_results"] as Dictionary).duplicate(true)
-					PlayerLife.write_savegame(save_rank)
+
 					print("[POP][RANK FINAL APPLIED] pop=", pop_final)
 
 		# 3) incrémenter APRES la journée complète (une seule fois)
 		ss.matchs_joues = mini(round_index_local + 1, int(SeasonState.total_matchs_saison))
 
 		# --- FINAL FRESH SAVE SYNC (source de vérité disque) ---
-		var save_sync := PlayerLife.load_savegame()
+		var save_sync := save
 		if typeof(save_sync) != TYPE_DICTIONARY:
 			save_sync = {}
 
@@ -4556,25 +4495,6 @@ func _fin_match() -> void:
 			"flag=", save_sync.get("funnel_first_match_finished_sent", false)
 		)
 
-		if int(save_sync.get("season_round", 0)) >= 1:
-			_bm_send_generic_funnel_event(
-				"first-match-finished",
-				"funnel_first_match_finished_sent",
-				{
-					"season_number": int(save_sync.get("season_number", 1)),
-					"match_number": int(save_sync.get("season_round", 0))
-				}
-			)
-
-		if int(save_sync.get("season_number", 1)) == 1 and int(save_sync.get("season_round", 0)) == 5:
-			_bm_send_generic_funnel_event(
-				"fifth-match-finished",
-				"funnel_fifth_match_finished_sent",
-				{
-					"season_number": 1,
-					"match_number": 5
-				}
-			)
 
 		if not save_sync.has("progress") or typeof(save_sync["progress"]) != TYPE_DICTIONARY:
 			save_sync["progress"] = {}
@@ -4609,13 +4529,8 @@ func _fin_match() -> void:
 			save_sync["roster"] = roster_sync_reset
 
 		print("[DBG ROUND SYNC FRESH] season_results=", JSON.stringify(save_sync["season_results"]))
-		PlayerLife.write_savegame(save_sync)
-		if int(save_sync.get("season_number", 1)) == 1 and int(save_sync.get("season_round", 0)) >= int(SeasonState.total_matchs_saison):
-			_bm_send_generic_funnel_event(
-				"season-finished",
-				"funnel_season_finished_sent",
-				{"season_number": 1, "match_number": int(save_sync.get("season_round", 0))}
-			)
+
+
 		print("[ROUND][SYNC FULL] season_round=", int(save_sync.get("season_round", -1)), " progress.journee=", int((save_sync["progress"] as Dictionary).get("journee", -1)), " season_results=", JSON.stringify(save_sync.get("season_results", {})))
 
 		# --- SEASON TOP 4 REWARD ------------------------------------------------
@@ -4690,54 +4605,28 @@ func _fin_match() -> void:
 						"tokens": int(tokens_gain)
 					}
 
-					PlayerLife.write_savegame(save_sync)
 					print("[SEASON REWARD STORED] rank=", final_rank, " euros=+", euros_gain, " tokens=+", tokens_gain)
 
 
 
-		# --- STADIUM WORKS SYNC -------------------------------------------------
-		var save_singleton := get_node_or_null("/root/SaveSingleton")
-		if save_singleton != null and save_singleton.has_method("stadium_sync_travaux"):
-			var current_matchs_saison: int = int(save_sync.get("season_round", 0))
-			var sync_any: Variant = save_singleton.call("stadium_sync_travaux", current_matchs_saison)
-			if typeof(sync_any) == TYPE_DICTIONARY:
-				var sync_result: Dictionary = sync_any as Dictionary
-				if bool(sync_result.get("finished", false)):
-					print("[STADIUM] travaux terminés -> niveau ", sync_result.get("new_ng"), ".", sync_result.get("new_ns"))
-					_bm_send_generic_funnel_event(
-						"stadium-upgraded",
-						"funnel_stadium_upgraded_sent",
-						{
-							"season_number": int(save_sync.get("season_number", 1)),
-							"match_number": int(save_sync.get("season_round", 0))
-						}
-					)
-		# ----------------------------------------------------------------------
+		preload("res://scripts/Save.gd")._l5_stadium_sync(save_sync, int(save_sync.season_round))
 
 		# 4) préparer l'adversaire suivant (optionnel)
-		if OS.has_feature("web") and OS.is_userfs_persistent():
-			JavaScriptBridge.force_fs_sync()
 
 		if ss.has_method("get_user_fixture_for_round"):
 			var fx: Dictionary = ss.call("get_user_fixture_for_round", _user_team_name, int(ss.matchs_joues))
 			if typeof(fx) == TYPE_DICTIONARY and fx.size() > 0:
 				ss.opponent_name = str(fx.get("opponent", "")).strip_edges()
 
-	var popularity_delta: int = summary_popularity_after - summary_popularity_before
-	if lbl_match_result != null and is_instance_valid(lbl_match_result):
-		lbl_match_result.text = resultat.trim_suffix("!").strip_edges() + " ! " + tr("club.popularity") + " : " + ("+ " if popularity_delta > 0 else "- " if popularity_delta < 0 else "") + "%d%%" % absi(popularity_delta)
-	if lbl_info != null:
-		lbl_info.add_theme_font_size_override("font_size", lbl_info.get_theme_font_size("font_size") + 2)
-
-	if btn_retour != null:
-		_bm_style_btn_skip_final_result_clicked()
-		_bm_style_btn_retour()
-		btn_retour.disabled = false
+	var missions = load("res://scripts/MenuSaison.gd").new()
+	missions._l5_claim_candidate(save)
+	missions.free()
+	return {"status":"OK", "data":save}
 
 func _bm_should_show_skip_final_result_button() -> bool:
 	if not BM_SKIP_FINAL_RESULT_TOKEN_MODE:
 		return true
-	var save: Dictionary = PlayerLife.load_savegame()
+	var save: Dictionary = _l5_read_view()
 	if typeof(save) != TYPE_DICTIONARY:
 		return false
 	return int(save.get("season_number", 1)) >= 2
@@ -4775,6 +4664,8 @@ func _bm_show_skip_final_result_not_enough_tokens() -> void:
 
 
 func _on_btn_skip_gate_pressed() -> void:
+	if not _l1_match_authorized:
+		return
 	if _bm_skip_final_result_clicked:
 		return
 
@@ -4789,7 +4680,7 @@ func _on_btn_skip_gate_pressed() -> void:
 	if not _bm_should_show_skip_final_result_button():
 		return
 
-	var save: Dictionary = PlayerLife.load_savegame()
+	var save: Dictionary = _l5_read_view()
 	if typeof(save) != TYPE_DICTIONARY:
 		return
 
@@ -4804,14 +4695,14 @@ func _on_btn_skip_gate_pressed() -> void:
 
 	_bm_style_btn_skip_final_result_clicked()
 
-	wallet["tokens"] = tokens_now - BM_SKIP_FINAL_RESULT_TOKEN_COST
-	save["wallet"] = wallet
-	PlayerLife.write_savegame(save)
+	_l5_skip_cost = BM_SKIP_FINAL_RESULT_TOKEN_COST
 
 	_on_btn_skip_pressed()
 
 
 func _on_btn_skip_pressed() -> void:
+	if not _l1_match_authorized:
+		return
 	_bm_clear_live_spotlight()
 	# Avance le match jusqu'à la fin sans changer la simulation : on saute l'attente.
 	if match_fini:
@@ -4831,11 +4722,173 @@ func _on_btn_skip_pressed() -> void:
 
 
 func _on_btn_retour_pressed() -> void:
+	if not match_fini: return
 	get_tree().change_scene_to_file("res://scenes/MenuSaison.tscn")
 
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_EXIT_TREE:
+		_l1_match_authorized = false
 	if what == NOTIFICATION_WM_SIZE_CHANGED or what == NOTIFICATION_EXIT_TREE:
 		_bm_clear_live_spotlight()
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
 		call_deferred("_bm_matchsim_apply_mobile_layout")
+
+func _l1_refuse_match(result: Dictionary) -> void:
+	_l1_match_authorized = false
+	if timer != null:
+		timer.stop()
+	if btn_skip != null:
+		btn_skip.disabled = true
+		btn_skip.visible = false
+	if btn_retour != null:
+		btn_retour.disabled = false
+		if not btn_retour.pressed.is_connected(_on_btn_retour_pressed):
+			btn_retour.pressed.connect(_on_btn_retour_pressed)
+	var dialog := AcceptDialog.new()
+	dialog.title = "Lineup"
+	dialog.dialog_text = PlayerLife._l1_lineup_error_text(result)
+	add_child(dialog)
+	dialog.confirmed.connect(func():
+		dialog.queue_free()
+		Session.set_meta("bm_myteam_screen_identity", "lineup")
+		get_tree().call_deferred("change_scene_to_file", "res://scenes/MyTeam.tscn")
+	)
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.popup_centered()
+
+var _l5_io: RefCounted
+var _l5_pending: Dictionary = {}
+var _l5_committed: Dictionary = {}
+var _l5_skip_cost := 0
+
+func _l5_read_view() -> Dictionary:
+	return (_l5_committed if not _l5_committed.is_empty() else _l1_start_save).duplicate(true)
+
+func _l5_digest(data: Dictionary) -> String:
+	return JSON.stringify(JSON.parse_string(JSON.stringify(data))).sha256_text()
+
+func _l5_key(save: Dictionary) -> String:
+	return JSON.stringify([save.get("profile_id"),save.get("career_id"),save.get("season_id"),int(save.get("season_number",1)),"championship",save.get("league_id","classic"),int(save.get("season_round",0))])
+
+func _l5_can_prepare(save: Dictionary) -> Dictionary:
+	if save.has("l5_match") and not save.l5_match is Dictionary: return {"status":"INVALID_L5_STATE"}
+	var round_index := int(save.get("season_round",0))
+	if round_index < 0 or round_index >= 22: return {"status":"SEASON_COMPLETE_OR_INVALID"}
+	if save.get("progress") is Dictionary and int(save.progress.get("journee",round_index+1)) != round_index+1:
+		return {"status":"ROUND_CONFLICT"}
+	if int(save.get("last_pop_fin_round",-1)) == round_index or save.get("season_results",{}).has(str(round_index)):
+		return {"status":"LEGACY_PARTIAL_EVIDENCE"}
+	if save.get("l5_match",{}).get("receipts",{}).has(_l5_key(save)): return {"status":"ROUND_RECEIPT_CONFLICT"}
+	return {"status":"OK"}
+
+func _l5_store_preparation() -> bool:
+	var data := _l1_start_save.duplicate(true)
+	if not data.has("l5_match"): data["l5_match"] = {"receipts":{},"revision":0}
+	if not data.l5_match.get("receipts") is Dictionary:
+		_l5_refuse({"status":"INVALID_RECEIPTS"});return false
+	var random_source := RandomNumberGenerator.new()
+	random_source.randomize()
+	var pending := {"key":_l5_key(data),"ids":_l1_match_plan.ids.duplicate(),"dom":_team_dom_name,"ext":_team_ext_name,"user":_user_team_name,"home":_user_is_home,"score_dom":_score_final_dom,"score_ext":_score_final_ext,"timeline_dom":Array(_timeline_dom),"timeline_ext":Array(_timeline_ext),"injury_seed":str(random_source.randi()),"ai_seed":str(random_source.randi()),"base_hash":_l5_digest(data)}
+	pending["seal"] = _l5_digest(pending)
+	data.l5_match["pending"] = pending
+	var result: Dictionary = _l5_io.write_verified(data)
+	if result.status != "COMMITTED":
+		_l5_refuse(result);return false
+	_l1_start_save = data
+	return _l5_resume(pending)
+
+func _l5_resume(pending: Dictionary) -> bool:
+	var sealed := pending.duplicate(true)
+	sealed.erase("seal")
+	if pending.get("seal") != _l5_digest(sealed):
+		_l5_refuse({"status":"INVALID_PREPARATION"});return false
+	var base := _l1_start_save.duplicate(true)
+	base.l5_match.erase("pending")
+	if pending.get("key") != _l5_key(base) or pending.get("base_hash") != _l5_digest(base) or _l5_digest({"ids":pending.get("ids")}) != _l5_digest({"ids":_l1_match_plan.ids}):
+		_l5_refuse({"status":"PREPARATION_CONFLICT"});return false
+	for field in ["dom","ext","user","home","score_dom","score_ext","timeline_dom","timeline_ext","injury_seed","ai_seed"]:
+		if not pending.has(field):
+			_l5_refuse({"status":"INVALID_PREPARATION"});return false
+	_l5_pending = pending.duplicate(true)
+	_team_dom_name = pending.dom;_team_ext_name = pending.ext;_user_team_name = pending.user;_user_is_home = pending.home
+	_score_final_dom = int(pending.score_dom);_score_final_ext = int(pending.score_ext)
+	_timeline_dom.assign(pending.timeline_dom);_timeline_ext.assign(pending.timeline_ext)
+	_l1_match_authorized = true
+	return true
+
+func _l5_finish() -> Dictionary:
+	if _l5_pending.is_empty(): return {"status":"NO_PREPARATION"}
+	if score_dom != int(_l5_pending.score_dom) or score_ext != int(_l5_pending.score_ext): return {"status":"RESULT_CONFLICT"}
+	var fresh: Dictionary = _l5_io.read_career()
+	if fresh.status != "OK": return fresh
+	var data: Dictionary = fresh.data
+	if data.get("profile_id") != _l1_start_save.get("profile_id") or data.get("career_id") != _l1_start_save.get("career_id"): return {"status":"CAREER_CONFLICT"}
+	if not data.get("l5_match") is Dictionary or not data.l5_match.get("receipts") is Dictionary: return {"status":"INVALID_L5_STATE"}
+	var receipt: Variant = data.get("l5_match",{}).get("receipts",{}).get(_l5_pending.key)
+	if receipt != null:
+		if not receipt is Dictionary or receipt.get("preparation_hash") != _l5_digest(_l5_pending): return {"status":"RESULT_CONFLICT"}
+		_l5_committed = data
+		return {"status":"ALREADY_COMMITTED"}
+	if _l5_digest(data) != _l5_digest(_l1_start_save): return {"status":"STALE"}
+	var ss: SeasonState = load("res://scripts/SeasonState.gd").new()
+	ss.hydrate_from_save(data, _user_team_name)
+	var candidate := _l5_candidate(data, _l5_pending, ss)
+	ss.free()
+	if candidate.status != "OK": return candidate
+	var final: Dictionary = candidate.data
+	if _l5_skip_cost > 0:
+		if int(data.get("wallet",{}).get("tokens",0)) < _l5_skip_cost: return {"status":"INSUFFICIENT_TOKENS"}
+		final.wallet.tokens = int(final.wallet.tokens) - _l5_skip_cost
+	final["match_progress_info_seen"] = true
+	final.l5_match.erase("pending")
+	final.l5_match["revision"] = int(data.l5_match.get("revision",0)) + 1
+	final.l5_match.receipts[_l5_pending.key] = {"preparation_hash":_l5_digest(_l5_pending),"score_dom":score_dom,"score_ext":score_ext,"ids":_l5_pending.ids.duplicate(),"skip_cost":_l5_skip_cost}
+	var published: Dictionary = _l5_io.write_verified(final)
+	if published.status == "COMMITTED":
+		_l5_committed = final
+		var live = get_node_or_null("/root/SeasonState") if is_inside_tree() else null
+		if live != null: live.hydrate_from_save(final,_user_team_name)
+	return published
+
+func _l5_refuse(result: Dictionary) -> void:
+	_l1_match_authorized = false
+	if timer != null: timer.stop()
+	if btn_skip != null: btn_skip.disabled = true
+	if btn_retour != null: btn_retour.disabled = true
+	var dialog := AcceptDialog.new()
+	dialog.title = "Match save"
+	dialog.dialog_text = "Match not committed: %s. No automatic retry. The saved career is preserved." % str(result.get("status","ERROR"))
+	add_child(dialog)
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.popup_centered()
+
+func _l5_send_committed_events() -> void:
+	_bm_track_match_start_milestones()
+	_bm_track_first_match_started()
+	var season_number := int(_l5_committed.get("season_number",1))
+	var completed := int(_l5_committed.get("season_round",0))
+	var meta := {"season_number":season_number,"match_number":completed}
+	if completed >= 1: _bm_send_generic_funnel_event("first-match-finished","funnel_first_match_finished_sent",meta)
+	if season_number == 1 and completed == 5: _bm_send_generic_funnel_event("fifth-match-finished","funnel_fifth_match_finished_sent",meta)
+	if season_number == 1 and completed >= 22: _bm_send_generic_funnel_event("season-finished","funnel_season_finished_sent",meta)
+	if _l1_start_save.get("stadium",{}).get("travaux_en_cours",false) and not _l5_committed.get("stadium",{}).get("travaux_en_cours",false):
+		_bm_send_generic_funnel_event("stadium-upgraded","funnel_stadium_upgraded_sent",meta)
+
+func _l5_new_io() -> RefCounted:
+	return preload("res://scripts/LocalIO.gd").new("user://")
+
+
+# A late analytics reply must never invalidate a prepared match.
+func _l5_record_event_flag(io, flag_name: String) -> void:
+	var fresh: Dictionary = io.read_career()
+	if fresh.status != "OK" or fresh.data.get("profile_id") != _l1_start_save.get("profile_id") or fresh.data.get("career_id") != _l1_start_save.get("career_id"): return
+	var data: Dictionary = fresh.data
+	var meta: Variant = data.get("l5_match")
+	if not meta is Dictionary or meta.has("pending"): return
+	if bool(data.get(flag_name, false)): return
+	data[flag_name] = true
+	meta["revision"] = int(meta.get("revision", 0)) + 1
+	var result: Dictionary = io.write_verified(data)
+	if result.status != "COMMITTED": push_warning("L5: analytics flag not saved: " + str(result.status))

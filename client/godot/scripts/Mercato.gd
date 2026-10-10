@@ -399,47 +399,18 @@ func _get_mercato_pool() -> Array:
 	return arr
 
 func _resolve_pool_from_save(save: Dictionary, m: Dictionary) -> Array:
-	# source de vérité unique : current_ids -> players_by_id
-	var current_ids: Array = []
-	if m.has("current_ids") and m["current_ids"] is Array:
-		current_ids = (m["current_ids"] as Array).duplicate()
-
-	var purchased_ids: Array = []
-	if m.has("purchased_ids") and m["purchased_ids"] is Array:
-		purchased_ids = (m["purchased_ids"] as Array).duplicate()
-
-	if not current_ids.is_empty() and save.has("players_by_id") and save["players_by_id"] is Dictionary:
-		var arr: Array = []
-		var by_id: Dictionary = save["players_by_id"]
-		var purchased_set := {}
-		for bought_pid in purchased_ids:
-			purchased_set[str(bought_pid).strip_edges()] = true
-
-		for pid in current_ids:
-			var k := str(pid).strip_edges()
-			if purchased_set.has(k):
-				continue
-
-			if by_id.has(k) and by_id[k] is Dictionary:
-				arr.append((by_id[k] as Dictionary).duplicate(true))
-				continue
-
-			if k.is_valid_float():
-				var k_int := str(int(float(k)))
-				if purchased_set.has(k_int):
-					continue
-				if by_id.has(k_int) and by_id[k_int] is Dictionary:
-					arr.append((by_id[k_int] as Dictionary).duplicate(true))
-
-		print("[MERCATO] source=current_ids -> players_by_id count=", arr.size())
-		return arr
-
-	if save.has("mercato_pool") and save["mercato_pool"] is Array and not (save["mercato_pool"] as Array).is_empty():
-		print("[MERCATO] source=mercato_pool")
-		return save["mercato_pool"]
-
-	print("[MERCATO] aucune source trouvée")
-	return []
+	var offered: Array = []
+	if m.get("current_ids") is Array:
+		offered = m.current_ids.duplicate()
+	if offered.is_empty() and save.get("mercato_pool") is Array:
+		for row in save.mercato_pool:
+			if row is Dictionary: offered.append(row.get("id"))
+	var probe := save.duplicate(false)
+	probe["roster"] = {"selected_ids":offered}
+	probe["mercato"] = {}
+	var available: Dictionary = preload("res://scripts/PlayerLife.gd")._l3_licensed_pool(probe)
+	var owned := _get_mercato_licensed_id_set(save)
+	return available.players.filter(func(row): return not owned.has(str(row.id)))
 
 func _make_row(p: Dictionary) -> Control:
 	var wrap := PanelContainer.new()
@@ -592,7 +563,7 @@ func _is_player_bought(pid: String) -> bool:
 	if save.has("mercato") and save["mercato"] is Dictionary:
 		var m: Dictionary = save["mercato"]
 		if m.has("purchased_ids") and m["purchased_ids"] is Array:
-			return pid in (m["purchased_ids"] as Array)
+			return (m["purchased_ids"] as Array).any(func(raw): return _mercato_normalized_id_key(raw) == _mercato_normalized_id_key(pid))
 
 	return false
 
@@ -618,10 +589,38 @@ func _toggle_player_bought(pid: String) -> bool:
 	if m.has("purchased_ids") and m["purchased_ids"] is Array:
 		purchased = (m["purchased_ids"] as Array).duplicate()
 
-	if pid in purchased:
-		purchased.erase(pid)
+	var key := _mercato_normalized_id_key(pid)
+	var pool: Dictionary = PL._l3_licensed_pool(save)
+	if key == "" or pool.status != "OK":
+		return false
+	if purchased.any(func(raw): return _mercato_normalized_id_key(raw) == key):
+		purchased = purchased.filter(func(raw): return _mercato_normalized_id_key(raw) != key)
+		# Retirer la sélection courante sans toucher aux droits payés ni au catalogue.
+		if save.get("roster") is Dictionary:
+			for field in ["selected_ids", "match_selected_ids"]:
+				if save.roster.get(field) is Array:
+					save.roster[field] = save.roster[field].filter(func(raw): return _mercato_normalized_id_key(raw) != key)
+		if save.get("roster") is Dictionary and save.roster.get("players") is Array:
+			save.roster.players = save.roster.players.filter(func(row): return not (row is Dictionary and _mercato_normalized_id_key(row.get("id")) == key))
+		if save.get("players") is Array:
+			save.players = save.players.filter(func(row): return not (row is Dictionary and _mercato_normalized_id_key(row.get("id")) == key))
 		is_now_bought = false
 	else:
+		if pool.by_id.has(key):
+			return false
+		# Une acquisition doit provenir de l'offre courante, avec identité résolue.
+		var offered := false
+		for row in _resolve_pool_from_save(save, m):
+			if row is Dictionary and _mercato_normalized_id_key(row.get("id")) == key:
+				offered = true
+		var probe := save.duplicate(true)
+		probe.mercato["purchased_ids"] = purchased + [pid]
+		if not offered or PL._l3_licensed_pool(probe).status != "OK":
+			return false
+		var payroll: Dictionary = PL._l4_payroll(probe)
+		if payroll.status != "OK":
+			_l4_show_contract_error(payroll)
+			return false
 		if purchased.size() >= 4:
 			return false
 
@@ -1143,34 +1142,20 @@ func _fmt_int_spaces(n: int) -> String:
 	return ("-" if n < 0 else "") + out
 
 func _player_salary_value(p: Dictionary) -> int:
-	var salaire := 0
-	if p.has("salaire"):
-		salaire = int(p["salaire"])
-	elif p.has("salary"):
-		salaire = int(p["salary"])
-	elif p.has("wage"):
-		salaire = int(p["wage"])
-
-	# Mercato doit toujours afficher le salaire annuel saison.
-	# Si la valeur stockée ressemble à un petit montant par match, on reconstruit l'annuel.
-	if salaire > 0 and salaire < 5000:
-		var perf := float(p.get("pondération", p.get("ponderation", p.get("overall", 70))))
-		salaire = int(70000 + perf * 500.0)
-		salaire = clamp(salaire, 70000, 130000)
-
-	return salaire
+	var contract: Dictionary = preload("res://scripts/PlayerLife.gd")._l4_annual_contract(p)
+	return int(contract.annual) if contract.status == "OK" else -1
 
 func _player_salary_text(p: Dictionary) -> String:
-	return _fmt_int_spaces(_player_salary_value(p)) + " $"
+	var amount := _player_salary_value(p)
+	return _fmt_int_spaces(amount) + " $" if amount >= 0 else "—"
 
 func _sync_mercato_owned_players_into_roster(save: Dictionary) -> void:
+	var payroll: Dictionary = preload("res://scripts/PlayerLife.gd")._l4_payroll(save)
+	if payroll.status != "OK":
+		return
 	if not save.has("roster") or not (save["roster"] is Dictionary):
 		save["roster"] = {}
 	var roster: Dictionary = save["roster"]
-
-	var selected_ids: Array = []
-	if roster.has("selected_ids") and roster["selected_ids"] is Array:
-		selected_ids = (roster["selected_ids"] as Array).duplicate()
 
 	var purchased_ids: Array = []
 	if save.has("mercato") and save["mercato"] is Dictionary:
@@ -1181,49 +1166,21 @@ func _sync_mercato_owned_players_into_roster(save: Dictionary) -> void:
 	if purchased_ids.size() > 4:
 		purchased_ids = purchased_ids.slice(0, 4)
 
-	var by_id: Dictionary = {}
-	if save.has("players_by_id") and save["players_by_id"] is Dictionary:
-		by_id = save["players_by_id"]
-
 	var roster_players: Array = []
 	var total_salary := 0
 
-	for pid_v in selected_ids:
+	var licensed: Dictionary = preload("res://scripts/PlayerLife.gd")._l3_licensed_pool(save)
+	for pid_v in licensed.ids:
 		var pid_txt := str(pid_v).strip_edges()
 		if pid_txt == "":
 			continue
 		var key := str(int(float(pid_txt)))
-		if not by_id.has(key) or not (by_id[key] is Dictionary):
-			continue
-		var p: Dictionary = by_id[key]
+		var p: Dictionary = licensed.by_id[key]
 		var overall := int(round(float(p.get("overall", p.get("rating", p.get("pondération", p.get("ponderation", 70)))))))
 		var age := int(p.get("age", 25))
 		var pos := str(p.get("pos", p.get("poste", "")))
 		var name := str(p.get("name", p.get("nom", "Player"))).strip_edges()
-		var salary := int(p.get("salaire", p.get("salary", 0)))
-		roster_players.append({
-			"id": key,
-			"name": name,
-			"pos": pos,
-			"age": age,
-			"overall": overall,
-			"salary": salary
-		})
-		total_salary += salary
-
-	for pid_v in purchased_ids:
-		var pid_txt := str(pid_v).strip_edges()
-		if pid_txt == "":
-			continue
-		var key := str(int(float(pid_txt)))
-		if not by_id.has(key) or not (by_id[key] is Dictionary):
-			continue
-		var p: Dictionary = by_id[key]
-		var overall := int(round(float(p.get("overall", p.get("rating", p.get("pondération", p.get("ponderation", 70)))))))
-		var age := int(p.get("age", 25))
-		var pos := str(p.get("pos", p.get("poste", "")))
-		var name := str(p.get("name", p.get("nom", "Player"))).strip_edges()
-		var salary := int(p.get("salaire", p.get("salary", 0)))
+		var salary: int = payroll.contracts[key]
 		roster_players.append({
 			"id": key,
 			"name": name,
@@ -1236,7 +1193,7 @@ func _sync_mercato_owned_players_into_roster(save: Dictionary) -> void:
 
 	roster["players"] = roster_players
 	save["roster"] = roster
-	save["salary_total_per_match"] = int(round(float(total_salary) / 22.0))
+	save["salary_total_per_match"] = payroll.per_match
 	var ms_buy: Dictionary = save.get("missions_state", {}) as Dictionary
 	var c_buy: Dictionary = ms_buy.get("counters", {}) as Dictionary
 	c_buy["mercato_achats"] = int(purchased_ids.size())
@@ -1265,52 +1222,28 @@ func _get_purchased_ids() -> Array:
 
 
 func _mercato_normalized_id_key(raw_id: Variant) -> String:
-	var id_txt := str(raw_id).strip_edges()
-	if id_txt == "":
-		return ""
-	return str(int(float(id_txt)))
-
+	return preload("res://scripts/PlayerLife.gd")._l3_license_id(raw_id)
 
 func _get_mercato_licensed_id_set(save: Dictionary) -> Dictionary:
-	var effective_ids := {}
-	if save.has("roster") and save["roster"] is Dictionary:
-		var roster: Dictionary = save["roster"]
-		if roster.has("selected_ids") and roster["selected_ids"] is Array:
-			for raw_sid in (roster["selected_ids"] as Array):
-				var sid_key := _mercato_normalized_id_key(raw_sid)
-				if sid_key != "":
-					effective_ids[sid_key] = true
-	if save.has("mercato") and save["mercato"] is Dictionary:
-		var mercato: Dictionary = save["mercato"]
-		if mercato.has("purchased_ids") and mercato["purchased_ids"] is Array:
-			for raw_pid in (mercato["purchased_ids"] as Array):
-				var pid_key := _mercato_normalized_id_key(raw_pid)
-				if pid_key != "":
-					effective_ids[pid_key] = true
-	return effective_ids
-
+	var pool: Dictionary = preload("res://scripts/PlayerLife.gd")._l3_licensed_pool(save)
+	var ids := {}
+	for id in pool.ids: ids[str(id)] = true
+	return ids
 
 func _get_new_salaries_total() -> int:
-	var PL = load("res://scripts/PlayerLife.gd")
-	if PL == null:
-		return 0
-	var save: Dictionary = {}
-	if PL.has_method("load_savegame"):
-		save = PL.load_savegame()
-	var purchased_ids: Array = _get_purchased_ids()
-	if purchased_ids.is_empty():
-		return 0
-	if not save.has("players_by_id") or not (save["players_by_id"] is Dictionary):
-		return 0
-	var by_id: Dictionary = save["players_by_id"]
+	var PL = preload("res://scripts/PlayerLife.gd")
+	var save: Dictionary = PL.load_savegame()
+	var payroll: Dictionary = PL._l4_payroll(save)
+	if payroll.status != "OK": return -1
+	var seen := {}
 	var total := 0
-	for pid_v in purchased_ids:
-		var key := str(pid_v)
-		if by_id.has(key) and by_id[key] is Dictionary:
-			var p: Dictionary = by_id[key]
-			total += int(p.get("salaire", p.get("salary", 0)))
+	if save.get("mercato") is Dictionary and save.mercato.get("purchased_ids") is Array:
+		for raw in save.mercato.purchased_ids:
+			var key := PL._l3_license_id(raw)
+			if not seen.has(key):
+				total += int(payroll.contracts[key])
+				seen[key] = true
 	return total
-
 
 func _get_current_licensed_count() -> int:
 	var PL = load("res://scripts/PlayerLife.gd")
@@ -1324,7 +1257,7 @@ func _get_current_licensed_count() -> int:
 func _update_new_salaries_ui() -> void:
 	var total := _get_new_salaries_total()
 	if lbl_new_salaries_total != null:
-		lbl_new_salaries_total.text = _tr_any(["mercato.new_salaries_total"], "New salaries") + " : " + _fmt_int_spaces(total) + " $"
+		lbl_new_salaries_total.text = _tr_any(["mercato.new_salaries_total"], "New salaries") + " : " + (_fmt_int_spaces(total) + " $" if total >= 0 else "—")
 	if btn_confirmer_mercato != null:
 		var purchased_count: int = _get_purchased_ids().size()
 		var licensed_count: int = _get_current_licensed_count()
@@ -1348,3 +1281,12 @@ func _update_new_salaries_ui() -> void:
 			btn_confirmer_mercato.add_theme_stylebox_override("pressed", sb)
 			btn_confirmer_mercato.add_theme_stylebox_override("focus", sb)
 			btn_confirmer_mercato.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+
+func _l4_show_contract_error(result: Dictionary) -> void:
+	var dialog := AcceptDialog.new()
+	dialog.title = "Contract"
+	dialog.dialog_text = "Purchase not confirmed: %s (player %s). No salary was invented." % [str(result.status), str(result.get("id", "?"))]
+	add_child(dialog)
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.popup_centered()

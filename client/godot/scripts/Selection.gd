@@ -1580,6 +1580,18 @@ func _bm_init_player_from_avatar(p: Dictionary) -> Dictionary:
 	j["reussite_2pts"] = clamp(base2, 0.30, 0.65)
 	j["reussite_3pts"] = clamp(base3, 0.20, 0.45)
 
+	# L1B : conserver la base économique et tous les tirages ci-dessus.
+	# Seule la note sportive utilise C36 après la motivation définitive.
+	j["rating_provenance"] = {
+		"kind": "canonical", "source": "Selection._bm_init_player_from_avatar",
+		"accuracy_unit": "fraction"
+	}
+	var sports_rating: Dictionary = PL._l1_player_rating(j)
+	if sports_rating.get("status") != "OK":
+		push_error("[SELECTION] Invalid new player rating: " + str(sports_rating))
+		return {}
+	j["pondération"] = sports_rating["value"]
+
 	print("[BM_SELECTION_ID_DEBUG] FINAL_PLAYER id=", int(j.get("id", -1)), " nom=", str(j.get("nom", "")), " avatar_key=", str(j.get("avatar_key", "")), " avatar_path=", str(j.get("avatar_path", "")))
 	return j
 
@@ -1802,86 +1814,32 @@ func _on_validate() -> void:
 	if not d.has("roster") or typeof(d["roster"]) != TYPE_DICTIONARY:
 		d["roster"] = {}
 
-	# ✅ Ensure persistent players stats (like basket_team_selector.py)
-	if not d.has("players_by_id") or typeof(d["players_by_id"]) != TYPE_DICTIONARY:
-		d["players_by_id"] = {}
-
-	var pmap: Dictionary = d["players_by_id"] as Dictionary
-
-	# Build/merge the full catalog from avatars (16 by default)
+	# L1B : une revalidation conserve intégralement les joueurs existants.
+	# Une entrée ambiguë/invalide n'autorise ni remplacement ni réparation.
+	if d.has("players_by_id") and typeof(d["players_by_id"]) != TYPE_DICTIONARY:
+		push_error("[SELECTION] Invalid player catalog; validation cancelled")
+		return
+	var pmap_py: Dictionary = (d.get("players_by_id", {}) as Dictionary).duplicate(true)
 	var all_players: Array = _avatar_players()
 	for p in all_players:
 		var pid: int = int(p.get("id", -1))
 		if pid < 0:
 			continue
-
 		var key := str(pid)
-		if not pmap.has(key) or typeof(pmap[key]) != TYPE_DICTIONARY:
-			# Create true persistent player entry (same logic as Selection/MyTeam)
-			var new_j: Dictionary = _bm_init_player_from_avatar(p)
-			new_j["gender"] = str(p.get("gender", "U"))
-			new_j["form"] = 0
-			new_j["injury"] = 0
-			new_j["xp"] = 0
-			pmap[key] = new_j
-		else:
-			# Merge statique : réaligner identité visuelle + nom, garder les stats évolutives
-			var cur: Dictionary = pmap[key] as Dictionary
-			cur["avatar_key"] = str(p.get("avatar_key", cur.get("avatar_key", "")))
-			cur["avatar_path"] = str(p.get("avatar_path", cur.get("avatar_path", "")))
-			cur["gender"] = str(p.get("gender", cur.get("gender", "U")))
-			cur["name"] = str(p.get("name", cur.get("name", "")))
-			cur["nom"] = str(p.get("name", cur.get("nom", "")))
-			if not cur.has("pos"):
-				cur["pos"] = str(p.get("pos", ""))
-			if not cur.has("rating"):
-				cur["rating"] = int(p.get("rating", 50))
-			pmap[key] = cur
-
-	# write back (explicit)
-	d["players_by_id"] = pmap
-	
-	# ✅ players_by_id: init/merge persistent stats (py-like)
-	if not d.has("players_by_id") or typeof(d["players_by_id"]) != TYPE_DICTIONARY:
-		d["players_by_id"] = {}
-
-	var pmap_py: Dictionary = d["players_by_id"] as Dictionary
-
-	for p in all_players:
-		var pid2: int = int(p.get("id", -1))
-		if pid2 < 0:
+		if pmap_py.has(key):
+			if typeof(pmap_py[key]) != TYPE_DICTIONARY:
+				push_error("[SELECTION] Invalid existing player; validation cancelled: " + key)
+				return
 			continue
-
-		var key2 := str(pid2)
-		if not pmap_py.has(key2) or typeof(pmap_py[key2]) != TYPE_DICTIONARY:
-			pmap_py[key2] = _bm_init_player_from_avatar(p)
-		else:
-			var cur2: Dictionary = pmap_py[key2] as Dictionary
-			if not cur2.has("id"):
-				cur2["id"] = pid2
-			cur2["avatar_key"] = str(p.get("avatar_key", cur2.get("avatar_key", "")))
-			cur2["avatar_path"] = str(p.get("avatar_path", cur2.get("avatar_path", "")))
-			cur2["gender"] = str(p.get("gender", cur2.get("gender", "U")))
-			cur2["name"] = str(p.get("name", cur2.get("name", "")))
-			cur2["nom"] = str(p.get("name", cur2.get("nom", "")))
-			var base_j: Dictionary = _bm_init_player_from_avatar(p)
-
-			# Réparation ciblée: corriger uniquement les salaires aberrants
-			if (not cur2.has("salaire")) or int(cur2.get("salaire", 0)) < 10000:
-				cur2["salaire"] = int(base_j.get("salaire", 0))
-
-
-			if not cur2.has("poste") or not cur2.has("age") or not cur2.has("pondération") or not cur2.has("salaire") or not cur2.has("tir"):
-				for kk in base_j.keys():
-					if not cur2.has(kk):
-						cur2[kk] = base_j[kk]
-
-			# migration: anciens joueurs créés avec motivation=100
-			if (not cur2.has("motivation")) or int(cur2.get("motivation", 100)) == 100:
-				cur2["motivation"] = int(base_j.get("motivation", 80))
-
-			pmap_py[key2] = cur2
-
+		var new_j: Dictionary = _bm_init_player_from_avatar(p)
+		if new_j.is_empty():
+			return
+		new_j["name"] = str(p.get("name", ""))
+		new_j["gender"] = str(p.get("gender", "U"))
+		new_j["form"] = 0
+		new_j["injury"] = 0
+		new_j["xp"] = 0
+		pmap_py[key] = new_j
 	d["players_by_id"] = pmap_py
 
 	var selected_players: Array = []

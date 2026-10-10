@@ -267,7 +267,12 @@ static func stadium_launch_upgrade(target_ng: int, target_ns: int, current_match
 	}
 
 static func stadium_sync_travaux(current_matchs_saison: int) -> Dictionary:
-	var d: Dictionary = read_dict()
+	var data := read_dict()
+	var result := _l5_stadium_sync(data, current_matchs_saison)
+	if result.get("changed", false): write_dict(data)
+	return result
+
+static func _l5_stadium_sync(d: Dictionary, current_matchs_saison: int) -> Dictionary:
 	_ensure_stadium_block(d)
 
 	var stadium: Dictionary = d["stadium"] as Dictionary
@@ -305,7 +310,6 @@ static func stadium_sync_travaux(current_matchs_saison: int) -> Dictionary:
 		stadium["travaux_duree_totale"] = 0
 		stadium["travaux_baseline_matchs_saison"] = 0
 
-		write_dict(d)
 
 		return {
 			"changed": true,
@@ -318,7 +322,6 @@ static func stadium_sync_travaux(current_matchs_saison: int) -> Dictionary:
 			))
 		}
 
-	write_dict(d)
 
 	return {
 		"changed": true,

@@ -1,4 +1,13 @@
 extends Control
+var _l6_preparing := false
+var _l6_failed := false
+var _l6_info: Dictionary = {}
+var _l6_record: Dictionary = {}
+var _l6_scores: Array = []
+var _l6_cursor := 0
+var _l6_committed := false
+var _l6_io = null
+
 
 const Save := preload("res://scripts/Save.gd")
 const PlayerLife := preload("res://scripts/PlayerLife.gd")
@@ -158,6 +167,7 @@ func _bm_get_tournament_tuning_id() -> String:
 			return "tournoi_a"
 
 func _bm_get_current_season_number() -> int:
+	if not _l6_info.is_empty(): return int(_l6_info.season)
 	var parsed: Dictionary = PlayerLife.load_savegame()
 	if parsed.has("season_number"):
 		return max(1, int(parsed.get("season_number", 1)))
@@ -167,43 +177,18 @@ func _bm_get_current_season_number() -> int:
 	return 1
 
 func _bm_get_current_team_rank_value() -> int:
-	var ss := get_node_or_null("/root/SeasonState")
+	if not _l6_info.is_empty(): return int(_l6_info.rank)
+	var ss := (get_node_or_null("/root/SeasonState") if is_inside_tree() else null)
 	var my_team := _get_my_team_name()
 	if ss != null and ss.has_method("get_current_club_rank"):
 		return max(1, int(ss.call("get_current_club_rank", my_team)))
 	return 8
 
 func _bm_get_current_team_rating_value() -> float:
-	var parsed: Dictionary = PlayerLife.load_savegame()
-	if parsed.is_empty():
-		return 60.0
-
-	var players_by_id = parsed.get("players_by_id", {})
-	var roster = parsed.get("roster", {})
-	var selected_ids = []
-
-	if roster is Dictionary:
-		selected_ids = roster.get("selected_ids", [])
-
-	var total := 0.0
-	var count := 0
-
-	if selected_ids is Array and players_by_id is Dictionary:
-		for pid in selected_ids:
-			var pd = players_by_id.get(pid, {})
-			if pd is Dictionary:
-				var rating := float(pd.get("overall", pd.get("rating", pd.get("ponderation", pd.get("pondération", pd.get("note", 0))))))
-				if rating > 0.0:
-					total += rating
-					count += 1
-
-	if count > 0:
-		return total / float(count)
-
-	return 60.0
+	return float(_l6_info.rating) if _l6_info.has("rating") else NAN
 
 
-func _jouer_match_avec_score(e1: String, e2: String) -> Dictionary:
+func _l6_score_kernel(e1: String, e2: String) -> Dictionary:
 	var s1 := randi_range(62, 98)
 	var s2 := randi_range(62, 98)
 
@@ -251,7 +236,8 @@ func _jouer_match_avec_score(e1: String, e2: String) -> Dictionary:
 	}
 
 func _get_my_team_name() -> String:
-	var ss := get_node_or_null("/root/SeasonState")
+	if not _l6_info.is_empty(): return str(_l6_info.team)
+	var ss := (get_node_or_null("/root/SeasonState") if is_inside_tree() else null)
 	if ss != null and ss.has_method("bm_get_my_team_name"):
 		return str(ss.call("bm_get_my_team_name")).strip_edges()
 	return ""
@@ -337,40 +323,9 @@ func _to_int_safe(v: Variant) -> int:
 			return 0
 
 func _grant_tournament_reward_once(tournament_key: String, outcome: String) -> Dictionary:
-	var reward: Dictionary = _get_tournament_reward(tournament_key, outcome)
-	if _tournament_reward_granted:
-		return reward
+	if not _l6_committed: return {}
+	return _get_tournament_reward(tournament_key, outcome)
 
-	_tournament_reward_granted = true
-
-	var euros_gain: int = _to_int_safe(reward.get("euros", 0))
-
-	var tokens_gain: int = _to_int_safe(reward.get("tokens", 0))
-	var xp_gain: int = _to_int_safe(reward.get("xp", 0))
-	if euros_gain <= 0 and tokens_gain <= 0 and xp_gain <= 0:
-		return reward
-
-	var d: Dictionary = PlayerLife.load_savegame()
-	if typeof(d) != TYPE_DICTIONARY:
-		d = {}
-
-	if euros_gain > 0:
-		var total_tournois_now: int = _to_int_safe(d.get("total_tournois", 0))
-		d["total_tournois"] = total_tournois_now + euros_gain
-
-		var total_recettes_now: int = _to_int_safe(d.get("total_recettes", 0))
-		d["total_recettes"] = total_recettes_now + euros_gain
-
-	if tokens_gain > 0:
-		var PL = load("res://scripts/PlayerLife.gd")
-		PL.add_tokens(d, tokens_gain, "tournament_reward_%s_%s" % [tournament_key, outcome])
-
-	if xp_gain > 0:
-		PlayerLife.add_club_xp(d, xp_gain, "tournament_reward_%s_%s" % [tournament_key, outcome])
-
-	PlayerLife.write_savegame(d)
-	_bm_refresh_tokens_hud_from_save(d)
-	return reward
 
 func _bm_refresh_tokens_hud_from_save(d: Dictionary) -> void:
 	if typeof(d) != TYPE_DICTIONARY:
@@ -460,18 +415,12 @@ func _animate_tournament_reward_tokens(lbl: Label, tokens_gain: int) -> void:
 	lbl.text = "+" + str(tokens_gain)
 
 func _show_tournament_reward_popup(tournament_key: String, outcome: String) -> void:
+	if not _l6_committed: return
 	var already := get_node_or_null("TournamentRewardPopup")
 	if already != null:
 		return
 
 	var reward: Dictionary = _grant_tournament_reward_once(tournament_key, outcome)
-	var save := PlayerLife.load_savegame()
-	var ms_t: Dictionary = save.get("missions_state", {}) as Dictionary
-	var c_t: Dictionary = ms_t.get("counters", {}) as Dictionary
-	c_t["tournois_participations"] = int(c_t.get("tournois_participations", 0)) + 1
-	ms_t["counters"] = c_t
-	save["missions_state"] = ms_t
-	PlayerLife.write_savegame(save)
 	var euros_gain: int = _to_int_safe(reward.get("euros", 0))
 	var tokens_gain: int = _to_int_safe(reward.get("tokens", 0))
 
@@ -897,9 +846,13 @@ func _bm_send_generic_funnel_event(event_name: String, flag_name: String, meta: 
 		var sent_ok := result == HTTPRequest.RESULT_SUCCESS and response_code >= 200 and response_code < 300
 		request.queue_free()
 		if sent_ok:
-			var fresh_save: Dictionary = PlayerLife.load_savegame()
+			var event_io = _l6_new_io()
+			var verified: Dictionary = load("res://scripts/TournoisAccueil.gd")._l6_verify(event_io, _l6_record)
+			if verified.status != "OK": return
+			var fresh_save: Dictionary = verified.data
 			fresh_save[flag_name] = true
-			PlayerLife.write_savegame(fresh_save)
+			fresh_save.l5_match["revision"] = int(fresh_save.l5_match.get("revision",0)) + 1
+			event_io.write_verified(fresh_save)
 		elif attempt < BM_GENERIC_FUNNEL_MAX_RETRIES:
 			_bm_schedule_generic_funnel_retry(event_name, flag_name, meta, attempt)
 	, CONNECT_ONE_SHOT)
@@ -938,27 +891,14 @@ func _bm_has_tournament_result_any_season() -> bool:
 
 	return false
 
-func _bm_store_tournament_result(result_key: String) -> void:
-	var d := _bm_load_tournament_save_dict()
-	var season_key := str(d.get("season_id", "")).strip_edges()
-	if season_key == "":
-		season_key = "season_1"
-
-	var all_results = d.get("tournament_results_by_season", {})
-	if not (all_results is Dictionary):
-		all_results = {}
-
-	var season_results = all_results.get(season_key, {})
-	if not (season_results is Dictionary):
-		season_results = {}
-
-	season_results["tournoi_a"] = result_key
-	all_results[season_key] = season_results
-	d["tournament_results_by_season"] = all_results
-	_bm_write_tournament_save_dict(d)
+func _bm_store_tournament_result(_result_key: String) -> void:
+	# Published with reward and receipt by _l6_commit.
+	pass
 
 
 func _maybe_show_tournament_finalist_popup() -> void:
+	if not _l6_committed: return
+	if _l6_preparing: return
 	var my_team := _get_my_team_name()
 	if my_team == "":
 		return
@@ -1068,6 +1008,8 @@ func _maybe_show_tournament_finalist_popup() -> void:
 	card.add_child(btn)
 
 func _maybe_show_tournament_victory_popup() -> void:
+	if not _l6_committed: return
+	if _l6_preparing: return
 	var my_team := _get_my_team_name()
 	if my_team == "":
 		return
@@ -1075,10 +1017,6 @@ func _maybe_show_tournament_victory_popup() -> void:
 		return
 
 	_bm_store_tournament_result("winner")
-	var d_cup: Dictionary = PlayerLife.load_savegame()
-	if typeof(d_cup) == TYPE_DICTIONARY:
-		d_cup["club_has_tournament_cup_crest"] = true
-		PlayerLife.write_savegame(d_cup)
 	var already := get_node_or_null("TournamentVictoryPopup")
 	if already != null:
 		return
@@ -1348,6 +1286,7 @@ func _bm_style_internal_tournament_back_button() -> void:
 
 
 func _ready() -> void:
+	if not _l6_load(): return
 	_play_tournois_music()
 	if btn_retour != null:
 		btn_retour.text = tr("teamname.back")
@@ -1362,6 +1301,7 @@ func _ready() -> void:
 	_refresh_ui()
 
 func _refresh_ui() -> void:
+	if _l6_preparing: return
 	if lbl_title != null:
 		lbl_title.text = tr("tournois.tournament_a") + " - " + tr("tournois.beginner")
 
@@ -1466,8 +1406,8 @@ func _init_tournoi() -> void:
 	vainqueur_resultat = ""
 
 	print("[TOURNOI A] my_team=", _get_my_team_name())
-	var dbg_save_svc := get_node_or_null("/root/SaveSvc")
-	var dbg_ss := get_node_or_null("/root/SeasonState")
+	var dbg_save_svc := (get_node_or_null("/root/SaveSvc") if is_inside_tree() else null)
+	var dbg_ss := (get_node_or_null("/root/SeasonState") if is_inside_tree() else null)
 	var dbg_a := ""
 	var dbg_b := ""
 	var dbg_c := _get_my_team_name()
@@ -1484,6 +1424,11 @@ func _jouer_match(e1: String, e2: String) -> String:
 	return e1 if randi() % 2 == 0 else e2
 
 func _jouer_round() -> void:
+	if not _l6_preparing:
+		if _l6_record.is_empty() or _l6_committed or _l6_failed: return
+		var valid: Dictionary = load("res://scripts/TournoisAccueil.gd")._l6_verify(_l6_io, _l6_record)
+		if valid.status != "OK":
+			_l6_error(valid);return
 	if round_actuel == 0:
 		demis.clear()
 		quarts_resultats.clear()
@@ -1555,6 +1500,11 @@ func _jouer_round() -> void:
 
 		vainqueur = str(r["winner"])
 		vainqueur_resultat = str(r["winner"]) + " (" + str(r["winner_score"]) + ")"
+		if _l6_preparing:
+			round_actuel = 3
+			return
+		if not _l6_commit(): return
+		round_actuel = 3
 		_bm_store_tournament_result("played")
 		_bm_send_generic_funnel_event("tournament-a-played", "funnel_tournament_a_played_sent", {"tournament_id": "tournoi_a"})
 		round_actuel = 3
@@ -1563,3 +1513,51 @@ func _jouer_round() -> void:
 	_maybe_show_tournament_finalist_popup()
 
 	_refresh_ui()
+
+
+func _jouer_match_avec_score(e1: String, e2: String) -> Dictionary:
+	if _l6_preparing:
+		var result := _l6_score_kernel(e1, e2)
+		_l6_scores.append({"e1":e1, "e2":e2, "result":result.duplicate(true)})
+		return result
+	if _l6_cursor >= _l6_scores.size(): return {}
+	var entry: Dictionary = _l6_scores[_l6_cursor]
+	if entry.e1 != e1 or entry.e2 != e2: return {}
+	_l6_cursor += 1
+	return entry.result.duplicate(true)
+
+func _l6_new_io():
+	return preload("res://scripts/LocalIO.gd").new("user://")
+
+func _l6_load() -> bool:
+	_l6_io = _l6_new_io()
+	var out: Dictionary = load("res://scripts/TournoisAccueil.gd")._l6_read_occurrence(_l6_io, _bm_get_tournament_tuning_id())
+	if out.status != "OK":
+		_l6_error(out);return false
+	_l6_record = out.record
+	_l6_info = _l6_record.info
+	_l6_scores = _l6_record.scores
+	return true
+
+func _l6_error(result: Dictionary) -> void:
+	_l6_failed = true
+	push_error("L6: " + str(result.get("status")))
+	if btn_simuler_tour != null: btn_simuler_tour.disabled = true
+	if is_inside_tree():
+		var dialog := AcceptDialog.new()
+		dialog.dialog_text = "Tournament unavailable: " + str(result.get("status")) + ". Return to tournaments."
+		add_child(dialog);dialog.popup_centered()
+
+func _l6_commit() -> bool:
+	var outcome := "played"
+	var finalists: Array = finale
+	if vainqueur.strip_edges() == str(_l6_info.team).strip_edges(): outcome = "winner"
+	elif finalists.has(_l6_info.team): outcome = "finalist"
+	var reward_kind := "victory" if outcome == "winner" else outcome
+	var reward := _get_tournament_reward(_get_current_tournament_key(), reward_kind)
+	var out: Dictionary = load("res://scripts/TournoisAccueil.gd")._l6_finish(_l6_io, _l6_record, outcome, reward)
+	if out.status not in ["COMMITTED", "ALREADY_COMMITTED"]:
+		_l6_error(out);return false
+	_l6_committed = true
+	_bm_refresh_tokens_hud_from_save(out.data)
+	return true

@@ -40,6 +40,10 @@ static func _read_json(path: String) -> Variant:
 	return json.data
 
 static func _write_json(path: String, data: Variant) -> void:
+	if not load("res://scripts/PlayerLife.gd")._l5_legacy_write_allowed(path, data):
+		push_error("L5: profile writer refused stale career")
+		return
+	if load("res://scripts/PlayerLife.gd")._l5_publish_existing(path, data): return
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
 		return

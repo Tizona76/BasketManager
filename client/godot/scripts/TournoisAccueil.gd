@@ -548,9 +548,15 @@ func _on_popup_ok() -> void:
 	if panel_tournoi_info != null:
 		panel_tournoi_info.visible = false
 
-	var data: Dictionary = TOURNOIS_INFOS.get(tournoi_selectionne_popup, {})
-	var prix := _bm_get_entry_fee_from_tuning(tournoi_selectionne_popup)
-	_bm_apply_tournament_fee_to_save(prix)
+	var io = preload("res://scripts/LocalIO.gd").new("user://")
+	var team := str(SeasonState.bm_get_my_team_name())
+	var rank := maxi(1,int(SeasonState.get_current_club_rank(team)))
+	var prepared := _l6_begin(io,tournoi_selectionne_popup,team,rank)
+	if prepared.status != "OK":
+		var dialog := AcceptDialog.new()
+		dialog.dialog_text = "Tournament unavailable: " + str(prepared.status)
+		add_child(dialog);dialog.popup_centered()
+		return
 
 	if tournoi_selectionne_popup == "tournoi_a":
 		SeasonState.bm_init_tournoi_a()
@@ -588,27 +594,158 @@ func _bm_position_popup_below_button(btn: Control) -> void:
 	popup_confirm.global_position = Vector2(x, y)
 
 
-func _bm_apply_tournament_fee_to_save(amount: int) -> void:
-	if amount <= 0:
-		return
 
-	var save: Dictionary = PlayerLife.load_savegame()
-	if typeof(save) != TYPE_DICTIONARY:
-		save = {}
+# Same protected metadata, revision and verified local publication as L5.
+static func _l6_hash(data: Variant) -> String:
+	return JSON.stringify(JSON.parse_string(JSON.stringify(data))).sha256_text()
 
-	var wallet: Dictionary = {}
-	if save.has("wallet") and typeof(save["wallet"]) == TYPE_DICTIONARY:
-		wallet = save["wallet"]
+static func _l6_identity(save: Dictionary) -> Array:
+	return [save.get("profile_id"), save.get("career_id")]
 
-	wallet["euros"] = int(wallet.get("euros", 0)) - amount
-	save["wallet"] = wallet
+static func _l6_rating(save: Dictionary) -> Dictionary:
+	var view := save.duplicate(true)
+	view.erase("mercato") # Tournament population remains selected_ids only.
+	var pool := PlayerLife._l3_licensed_pool(view)
+	if pool.status != "OK" or pool.ids.is_empty(): return {"status":"INVALID_PARTICIPANTS"}
+	var total := 0.0
+	var count := 0
+	for player in pool.players:
+		var rating := PlayerLife._l1_player_rating(player)
+		if rating.status != "OK": return rating
+		if float(rating.value) > 0.0:
+			total += float(rating.value);count += 1
+	if count == 0: return {"status":"NO_POSITIVE_RATING"}
+	return {"status":"OK", "value":total / count, "ids":pool.ids}
 
-	save["total_depenses"] = int(save.get("total_depenses", 0)) + amount
-	save["tournois_fees_total"] = int(save.get("tournois_fees_total", 0)) + amount
+static func _l6_records(save: Dictionary) -> Variant:
+	var meta: Variant = save.get("l5_match", {})
+	if not meta is Dictionary: return null
+	return meta.get("tournaments", {})
 
-	# sync compat éventuelle avec finance.euros
-	if not save.has("finance") or typeof(save["finance"]) != TYPE_DICTIONARY:
-		save["finance"] = {}
-	(save["finance"] as Dictionary)["euros"] = int(wallet.get("euros", 0))
+static func _l6_read_occurrence(io, tid: String) -> Dictionary:
+	var read: Dictionary = io.read_career(true)
+	if read.status != "OK": return read
+	var records: Variant = _l6_records(read.data)
+	if not records is Dictionary: return {"status":"INVALID_TOURNAMENT_STATE"}
+	var found: Array = []
+	for key in records:
+		var record: Variant = records[key]
+		if not record is Dictionary: return {"status":"INVALID_TOURNAMENT_STATE"}
+		if record.get("tid") == tid and record.get("status") == "prepared": found.append(record)
+	if found.size() != 1: return {"status":"NO_UNIQUE_PREPARATION"}
+	var verified := _l6_verify(io, found[0])
+	if verified.status != "OK": return verified
+	return {"status":"OK", "record":found[0], "data":read.data}
 
-	PlayerLife.write_savegame(save)
+static func _l6_verify(io, record: Dictionary) -> Dictionary:
+	var read: Dictionary = io.read_career(true)
+	if read.status != "OK": return read
+	var data: Dictionary = read.data
+	if _l6_identity(data) != record.get("identity"): return {"status":"CAREER_CONFLICT"}
+	if data.get("l5_match", {}).has("pending"): return {"status":"CHAMPIONSHIP_PENDING"}
+	var records: Variant = _l6_records(data)
+	if not records is Dictionary: return {"status":"INVALID_TOURNAMENT_STATE"}
+	var actual: Variant = records.get(record.get("key"))
+	if not actual is Dictionary: return {"status":"PREPARATION_MISSING"}
+	var a: Dictionary = actual.duplicate(true)
+	var b := record.duplicate(true)
+	a.erase("status");a.erase("receipt");b.erase("status");b.erase("receipt")
+	if _l6_hash(a) != _l6_hash(b): return {"status":"PREPARATION_CONFLICT"}
+	var seal: Variant = a.get("seal");a.erase("seal")
+	if seal != _l6_hash(a): return {"status":"INVALID_PREPARATION"}
+	return {"status":"OK", "data":data, "record":actual}
+
+static func _l6_begin(io, tid: String, team: String, rank: int) -> Dictionary:
+	if tid not in ["tournoi_a","intermediaire","elite"]: return {"status":"INVALID_TOURNAMENT"}
+	var read: Dictionary = io.read_career(true)
+	if read.status != "OK": return read
+	var data: Dictionary = read.data
+	var records: Variant = _l6_records(data)
+	if not records is Dictionary: return {"status":"INVALID_TOURNAMENT_STATE"}
+	if data.get("l5_match", {}).has("pending"): return {"status":"CHAMPIONSHIP_PENDING"}
+	for previous in records.values():
+		if not previous is Dictionary: return {"status":"INVALID_TOURNAMENT_STATE"}
+		if previous.get("tid") == tid and previous.get("status") == "prepared":
+			return _l6_read_occurrence(io, tid)
+	var season_key := str(data.get("season_id", "")).strip_edges()
+	if season_key == "": season_key = "season_1"
+	var results: Variant = data.get("tournament_results_by_season", {})
+	if not results is Dictionary or not results.get(season_key,{}) is Dictionary: return {"status":"INVALID_RESULTS"}
+	if str(results.get(season_key,{}).get(tid,"")) != "": return {"status":"HISTORICAL_OR_COMPLETED_RESULT"}
+	var season := maxi(1,int(data.get("season_number",data.get("progress",{}).get("season_number",1))))
+	var key := JSON.stringify([data.profile_id,data.career_id,season_key,season,"tournament",tid])
+	if records.has(key): return {"status":"OCCURRENCE_ALREADY_EXISTS"}
+	var rating := _l6_rating(data)
+	if rating.status != "OK": return rating
+	if team.strip_edges() == "": return {"status":"MISSING_TEAM"}
+	var script_path: String = {"tournoi_a":"TournoiA","intermediaire":"TournoiIntermediaire","elite":"TournoiElite"}[tid]
+	var scene = load("res://scripts/" + script_path + ".gd").new()
+	scene._l6_preparing = true
+	scene._l6_info = {"team":team,"rank":rank,"season":season,"rating":rating.value}
+	scene.call("_reset_tournament" if tid == "elite" else "_init_tournoi")
+	for i in range(4 if tid == "elite" else 3): scene._jouer_round()
+	var finalists: Array = scene.round4 if tid == "elite" else scene.finale
+	var outcome := "winner" if scene.vainqueur.strip_edges() == team.strip_edges() else ("finalist" if finalists.has(team) else "played")
+	var reward: Dictionary = scene._get_tournament_reward(scene._get_current_tournament_key(),"victory" if outcome == "winner" else outcome)
+	var fee := int(TuningData.TOURNAMENT_TUNING.get(tid,{}).get("entry_fee_euros",0))
+	var record := {"key":key,"identity":_l6_identity(data),"season_key":season_key,"tid":tid,"info":scene._l6_info.duplicate(true),"ids":rating.ids,"scores":scene._l6_scores.duplicate(true),"outcome":outcome,"reward":reward,"fee":fee}
+	scene.free()
+	record["seal"] = _l6_hash(record)
+	record["status"] = "prepared"
+	if not data.has("l5_match"): data["l5_match"] = {"receipts":{},"revision":0}
+	var meta: Dictionary = data.l5_match
+	records[key] = record
+	meta["tournaments"] = records
+	meta["revision"] = int(meta.get("revision",0)) + 1
+	# Exact existing fee arithmetic, now attached atomically to the preparation.
+	if fee > 0:
+		var wallet: Dictionary = data.get("wallet",{})
+		wallet["euros"] = int(wallet.get("euros",0)) - fee
+		data["wallet"] = wallet
+		data["total_depenses"] = int(data.get("total_depenses",0)) + fee
+		data["tournois_fees_total"] = int(data.get("tournois_fees_total",0)) + fee
+		if not data.get("finance") is Dictionary: data["finance"] = {}
+		data.finance["euros"] = int(wallet.euros)
+	var out: Dictionary = io.write_verified(data)
+	if out.status != "COMMITTED": return out
+	return {"status":"OK","record":record,"data":data}
+
+static func _l6_finish(io, record: Dictionary, outcome: String, reward: Dictionary) -> Dictionary:
+	var verified := _l6_verify(io,record)
+	if verified.status != "OK": return verified
+	var data: Dictionary = verified.data
+	var actual: Dictionary = verified.record
+	if outcome != actual.outcome or _l6_hash(reward) != _l6_hash(actual.reward): return {"status":"RESULT_CONFLICT"}
+	if actual.status == "committed":
+		if actual.get("receipt") != actual.seal: return {"status":"INVALID_RECEIPT"}
+		return {"status":"ALREADY_COMMITTED","data":data}
+	if actual.status != "prepared": return {"status":"INVALID_OCCURRENCE"}
+	var results: Variant = data.get("tournament_results_by_season",{})
+	if not results is Dictionary or not results.get(actual.season_key,{}) is Dictionary: return {"status":"INVALID_RESULTS"}
+	if str(results.get(actual.season_key,{}).get(actual.tid,"")) != "": return {"status":"RESULT_CONFLICT"}
+	# Preserve existing reward formulas; no championship effects.
+	var euros_gain := int(reward.get("euros",0))
+	var tokens_gain := int(reward.get("tokens",0))
+	var xp_gain := int(reward.get("xp",0))
+	if euros_gain > 0:
+		data["total_tournois"] = int(data.get("total_tournois",0)) + euros_gain
+		data["total_recettes"] = int(data.get("total_recettes",0)) + euros_gain
+	var reward_key: String = {"tournoi_a":"TOURNOI_A","intermediaire":"INTERMEDIATE","elite":"ELITE"}[actual.tid]
+	var reward_outcome := "victory" if outcome == "winner" else outcome
+	if tokens_gain > 0: PlayerLife.add_tokens(data,tokens_gain,"tournament_reward_%s_%s" % [reward_key,reward_outcome])
+	if xp_gain > 0: PlayerLife.add_club_xp(data,xp_gain,"tournament_reward_%s_%s" % [reward_key,reward_outcome])
+	if actual.tid == "tournoi_a" and outcome == "winner":
+		data["club_has_tournament_cup_crest"] = true
+	if actual.tid == "tournoi_a" and outcome in ["winner","finalist"]:
+		var missions: Dictionary = data.get("missions_state",{})
+		var counters: Dictionary = missions.get("counters",{})
+		counters["tournois_participations"] = int(counters.get("tournois_participations",0)) + 1
+		missions["counters"] = counters;data["missions_state"] = missions
+	var season_results: Dictionary = results.get(actual.season_key,{})
+	season_results[actual.tid] = outcome;results[actual.season_key] = season_results
+	data["tournament_results_by_season"] = results
+	actual["status"] = "committed";actual["receipt"] = actual.seal
+	data.l5_match["revision"] = int(data.l5_match.get("revision",0)) + 1
+	var out: Dictionary = io.write_verified(data)
+	if out.status == "COMMITTED": out["data"] = data
+	return out

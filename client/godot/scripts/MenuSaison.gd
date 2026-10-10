@@ -2868,6 +2868,11 @@ func _bm_play_management_music() -> void:
 		am.call("play_music", "res://audio/music/menu.mp3", true, false)
 
 func _ready() -> void:
+	var l5_io = preload("res://scripts/LocalIO.gd").new("user://")
+	var l5_read: Dictionary = l5_io.read_career()
+	if l5_read.status == "OK" and l5_read.data.get("l5_match", {}).has("pending"):
+		get_tree().call_deferred("change_scene_to_file", "res://scenes/MatchSim.tscn")
+		return
 	_bm_play_management_music()
 	PL._bm_debug_dump_active_save_path()
 	call_deferred("_bm_update_management_crest_header")
@@ -3220,11 +3225,21 @@ func _on_tournois_back_requested() -> void:
 	print("[SAISON] retour depuis TournoisAccueil -> MenuSaison")
 
 
-func _prepare_new_season() -> void:
-	var save := PL.load_savegame()
+func _prepare_new_season() -> bool:
+	var l5_io := _l5_new_io()
+	var opened: Dictionary = l5_io.read_career(true)
+	if opened.status != "OK":
+		push_error("L5: new season read refused: " + str(opened.status))
+		return false
+	var save: Dictionary = opened.data
+	if save.get("l5_match", {}).has("pending") or int(save.get("season_round",0)) != 22:
+		push_error("L5: new season refused; unresolved match")
+		return false
+	if not save.has("l5_match"): l5_io = null
+
 	if typeof(save) != TYPE_DICTIONARY:
 		print("[SAISON] Nouvelle saison annulée: save invalide")
-		return
+		return false
 
 	if not save.has("progress") or typeof(save["progress"]) != TYPE_DICTIONARY:
 		save["progress"] = {}
@@ -3321,8 +3336,7 @@ func _prepare_new_season() -> void:
 					print("[COACHS][SEASON_COST] coach=", active_coach_id, " euros=-", coach_season_cost, " season=", current_season)
 			save["coachs"] = coachs
 
-	# --- Vieillissement joueurs + recalcul perf/salaire ---
-	var selection_calc := Selection.new()
+	# --- Vieillissement et état sportif ; économie historique conservée ---
 	if save.has("players_by_id") and typeof(save["players_by_id"]) == TYPE_DICTIONARY:
 		var by_id: Dictionary = save["players_by_id"] as Dictionary
 		for pid in by_id.keys():
@@ -3335,26 +3349,11 @@ func _prepare_new_season() -> void:
 			p["fatigue"] = 0
 			p["matchs_consecutifs"] = 0
 			p["repos_consecutifs"] = 0
-			var ponderation: float = selection_calc._bm_calc_ponderation(p)
-			if p.has("pondération") or not p.has("ponderation"):
-				p["pondération"] = ponderation
-			if p.has("ponderation"):
-				p["ponderation"] = ponderation
+			PL._l2_refresh_rating(p)
 			# salaire annuel conservé : ne pas le réécrire ici
 			by_id[pid] = p
 		save["players_by_id"] = by_id
-		# sync players array used by MyTeam
-		if save.has("players") and typeof(save["players"]) == TYPE_ARRAY:
-			var arr: Array = save["players"] as Array
-			for i in range(arr.size()):
-				var pl2 = arr[i]
-				if typeof(pl2) != TYPE_DICTIONARY:
-					continue
-				var p2: Dictionary = pl2 as Dictionary
-				var k := str(int(p2.get("id", -1)))
-				if by_id.has(k) and typeof(by_id[k]) == TYPE_DICTIONARY:
-					arr[i] = (by_id[k] as Dictionary).duplicate(true)
-			save["players"] = arr
+		PL._l2_sync_sport_copies(save, true)
 
 	save["popularite"] = popularity_keep
 
@@ -3362,11 +3361,18 @@ func _prepare_new_season() -> void:
 	(save["progress"] as Dictionary)["wins"] = 0
 	(save["progress"] as Dictionary)["losses"] = 0
 
-	PL.write_savegame(save)
-	var legacy_save_file := FileAccess.open("user://savegame.json", FileAccess.WRITE)
-	if legacy_save_file != null:
-		legacy_save_file.store_string(JSON.stringify(save, "\t"))
-		legacy_save_file.close()
+	if l5_io != null:
+		save.l5_match["revision"] = int(save.l5_match.get("revision",0)) + 1
+		var published: Dictionary = l5_io.write_verified(save)
+		if published.status != "COMMITTED":
+			push_error("L5: new season not committed: " + str(published.status))
+			return false
+	else:
+		PL.write_savegame(save)
+		var legacy_save_file := FileAccess.open("user://savegame.json", FileAccess.WRITE)
+		if legacy_save_file != null:
+			legacy_save_file.store_string(JSON.stringify(save, "\t"))
+			legacy_save_file.close()
 
 	_end_season_summary = {}
 	SeasonState.matchs_joues = 0
@@ -3379,6 +3385,7 @@ func _prepare_new_season() -> void:
 	print("[SAISON] Nouvelle saison préparée : season_round=0, journee=1, standings vidés")
 
 	_ensure_season_day_label()
+	return true
 	
 static func _get_division_verdict(division: int, rank: int) -> Dictionary:
 	var current := clampi(division, 1, 3)
@@ -3800,9 +3807,11 @@ func _on_confirm_new_season_pressed() -> void:
 		"new_season_number": new_season_number
 	}
 
+	if not _prepare_new_season():
+		_pending_division_transition = {}
+		return
 	_close_end_season_popup()
 	_show_pending_season_reward_popup_after_end_season()
-	_prepare_new_season()
 
 	call_deferred("_bm_maybe_show_pending_intro_after_new_season")
 
@@ -4069,6 +4078,24 @@ func _on_match_pressed() -> void:
 	if round_guard >= SeasonState.total_matchs_saison:
 		print("[SAISON] Fin de saison détectée -> affichage popup fin de saison (round_guard=", round_guard, ")")
 		_open_end_season_popup()
+		return
+
+	var lineup_check := PL._l3_validate_lineup(save_guard)
+	if lineup_check.status != "OK":
+		if lineup_check.status == "INVALID_COMPOSITION":
+			_bm_show_match_compo_popup_on_play()
+		else:
+			var dialog := AcceptDialog.new()
+			dialog.title = "Lineup"
+			dialog.dialog_text = PL._l1_lineup_error_text(lineup_check)
+			add_child(dialog)
+			dialog.confirmed.connect(func():
+				dialog.queue_free()
+				Session.set_meta("bm_myteam_screen_identity", "lineup")
+				get_tree().call_deferred("change_scene_to_file", "res://scenes/MyTeam.tscn")
+			)
+			dialog.canceled.connect(dialog.queue_free)
+			dialog.popup_centered()
 		return
 
 	if _bm_should_open_match_compo_popup_on_play():
@@ -5252,7 +5279,7 @@ func _missions_add_route_segment(parent: Control, a: Vector2, b: Vector2, state:
 	parent.add_child(line)
 
 
-func _missions_auto_claim_reached(save: Dictionary, level_missions: Array, counters: Dictionary) -> int:
+func _missions_auto_claim_reached(save: Dictionary, level_missions: Array, counters: Dictionary, persist: bool = true) -> int:
 	if typeof(save) != TYPE_DICTIONARY:
 		return 0
 	if not save.has("missions_progress") or typeof(save["missions_progress"]) != TYPE_DICTIONARY:
@@ -5312,7 +5339,7 @@ func _missions_auto_claim_reached(save: Dictionary, level_missions: Array, count
 				pending_reward_labels.append(label_pending)
 			save["pending_mission_tokens_reward_popup"] = maxi(0, int(save.get("pending_mission_tokens_reward_popup", 0))) + tokens_gain
 			save["pending_mission_tokens_reward_labels"] = pending_reward_labels
-		PL.write_savegame(save)
+		if persist: PL.write_savegame(save)
 
 	return tokens_gain
 
@@ -5556,37 +5583,9 @@ func _bm_should_open_match_compo_popup_on_play() -> bool:
 
 
 func _bm_can_active_coach_autocompose_match(save: Dictionary) -> bool:
-	if not save.has("coachs") or typeof(save["coachs"]) != TYPE_DICTIONARY:
+	if not save.get("coachs") is Dictionary or str(save.coachs.get("active", "")).strip_edges() == "":
 		return false
-	var coachs: Dictionary = save["coachs"] as Dictionary
-	var active_coach_id: String = str(coachs.get("active", "")).strip_edges()
-	if active_coach_id == "":
-		return false
-	if not save.has("roster") or typeof(save["roster"]) != TYPE_DICTIONARY:
-		return false
-	var roster: Dictionary = save["roster"] as Dictionary
-	if not roster.has("selected_ids") or typeof(roster["selected_ids"]) != TYPE_ARRAY:
-		return false
-	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
-		return false
-	var by_id: Dictionary = save["players_by_id"] as Dictionary
-	var selected_ids: Array = roster["selected_ids"] as Array
-	var seen: Dictionary = {}
-	var valid_count: int = 0
-	for raw_id in selected_ids:
-		var sid: String = str(raw_id).strip_edges()
-		if sid == "":
-			continue
-		var key: String = str(int(round(float(sid))))
-		if seen.has(key):
-			continue
-		seen[key] = true
-		if by_id.has(key) and typeof(by_id[key]) == TYPE_DICTIONARY:
-			valid_count += 1
-			if valid_count >= 8:
-				return true
-	return false
-
+	return PL._l3_validate_lineup(save).status == "OK"
 
 func _bm_show_match_compo_popup_on_play() -> void:
 	var already := get_node_or_null("MatchCompoPlayPopup")
@@ -5969,3 +5968,10 @@ func _bm_saison_align_mobile_play_and_day() -> void:
 	lbl_season_day.pivot_offset = lbl_season_day.size * 0.5
 	_bm_refresh_league_badge()
 	btn_match.pivot_offset = btn_match.size * 0.5
+
+func _l5_claim_candidate(save: Dictionary) -> void:
+	var level := maxi(1, int(save.get("club", {}).get("level", 1)))
+	_missions_auto_claim_reached(save, _missions_get_level_data(level), _missions_get_counters(save), false)
+
+func _l5_new_io() -> RefCounted:
+	return preload("res://scripts/LocalIO.gd").new("user://")

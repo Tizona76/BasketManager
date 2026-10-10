@@ -235,11 +235,13 @@ static func load_savegame(path: String = "user://savegame.json") -> Dictionary:
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return {}
 	var save: Dictionary = parsed as Dictionary
+	if save.has("l5_match"):
+		return save # L5 reads must not repair or publish implicitly.
 	_bm_save_debug_player(save, 1006)
 	_bm_save_debug_player(save, 1007)
 	var had_legacy_wallet: bool = save.has("wallet") and typeof(save["wallet"]) != TYPE_DICTIONARY
 	ensure_progression_wallet_schema(save)
-	_repair_corrupted_salaries_on_load(save)
+	# Les réparations contractuelles restent explicites, jamais déclenchées par une lecture.
 	var repaired_identity: bool = _repair_duplicate_player_identities_on_load(save)
 	var repaired_incomplete_mercato_identity: bool = _repair_incomplete_mercato_identities_on_load(save)
 	var repaired_lineup_duration := ensure_paid_lineup_duration(save)
@@ -278,6 +280,10 @@ static func consume_paid_lineup_match(save: Dictionary) -> void:
 static func write_savegame(data: Dictionary, path: String = "user://savegame.json") -> void:
 	path = _resolve_save_path(path)
 	ensure_progression_wallet_schema(data)
+	if not _l5_legacy_write_allowed(path, data):
+		push_error("L5: stale or pending career write refused")
+		return
+	if _l5_publish_existing(path, data): return
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
 		return
@@ -285,66 +291,33 @@ static func write_savegame(data: Dictionary, path: String = "user://savegame.jso
 	f.close()
 
 static func _repair_corrupted_salaries_on_load(save: Dictionary) -> void:
-	if save == null:
+	# Compatibilité : récupération explicite depuis un contrat annuel déjà enregistré.
+	# Ne jamais remplacer un montant présent ni reconstruire depuis une note.
+	if not save.get("players_by_id") is Dictionary:
 		return
-	if not save.has("players_by_id") or typeof(save["players_by_id"]) != TYPE_DICTIONARY:
-		return
-
-	var by_id: Dictionary = save["players_by_id"] as Dictionary
-	var changed := false
-
-	for pid in by_id.keys():
-		var raw = by_id[pid]
-		if typeof(raw) != TYPE_DICTIONARY:
+	var index := _l2_sport_index(save.players_by_id)
+	var copies: Array = []
+	if save.get("players") is Array: copies.append_array(save.players)
+	if save.get("roster") is Dictionary and save.roster.get("players") is Array:
+		copies.append_array(save.roster.players)
+	for key in index:
+		var player: Dictionary = save.players_by_id[index[key]]
+		if player.has("salaire") or player.has("salary"):
 			continue
-		var p: Dictionary = raw as Dictionary
-		var current_salary := int(p.get("salaire", 0))
-		if current_salary >= 10000:
-			continue
-
-		var pond_value: float = float(p.get("pondération", p.get("ponderation", 0)))
-		var repaired_salary := int(70000 + pond_value * 500.0)
-		repaired_salary = clampi(repaired_salary, 70000, 130000)
-		p["salaire"] = repaired_salary
-		by_id[pid] = p
-		changed = true
-
-	if not changed:
-		return
-
-	save["players_by_id"] = by_id
-
-	if save.has("players") and typeof(save["players"]) == TYPE_ARRAY:
-		var arr: Array = save["players"] as Array
-		for i in range(arr.size()):
-			var raw_row = arr[i]
-			if typeof(raw_row) != TYPE_DICTIONARY:
+		var amount: Variant = null
+		var conflict := false
+		for row in copies:
+			if not row is Dictionary or _l3_license_id(row.get("id")) != key:
 				continue
-			var row: Dictionary = raw_row as Dictionary
-			var row_id := str(int(round(float(str(row.get("id", -1)).strip_edges()))))
-			if by_id.has(row_id) and typeof(by_id[row_id]) == TYPE_DICTIONARY:
-				arr[i] = (by_id[row_id] as Dictionary).duplicate(true)
-		save["players"] = arr
-
-	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
-		var roster: Dictionary = save["roster"] as Dictionary
-		if roster.has("players") and typeof(roster["players"]) == TYPE_ARRAY:
-			var rarr: Array = roster["players"] as Array
-			var sal_total := 0
-			for i in range(rarr.size()):
-				var raw_row = rarr[i]
-				if typeof(raw_row) != TYPE_DICTIONARY:
-					continue
-				var row: Dictionary = raw_row as Dictionary
-				var row_id := str(int(round(float(str(row.get("id", -1)).strip_edges()))))
-				if by_id.has(row_id) and typeof(by_id[row_id]) == TYPE_DICTIONARY:
-					var src: Dictionary = by_id[row_id] as Dictionary
-					row["salary"] = int(src.get("salaire", row.get("salary", 0)))
-					rarr[i] = row
-				sal_total += int(row.get("salary", 0))
-			roster["players"] = rarr
-			save["roster"] = roster
-			save["salary_total_per_match"] = int(round(float(sal_total) / 22.0))
+			var contract := _l4_annual_contract(row)
+			if contract.status != "OK":
+				conflict = true
+			elif amount != null and amount != contract.annual:
+				conflict = true
+			else:
+				amount = contract.annual
+		if amount != null and not conflict:
+			player["salaire"] = amount
 
 static func clampi(v: int, a: int, b: int) -> int:
 	return int(clamp(v, a, b))
@@ -1051,27 +1024,10 @@ static func ensure_finance_schema(save: Dictionary) -> void:
 	save["total_depenses"] = int(save["total_depenses"])
 	save["total_recettes"] = int(save["total_recettes"])
 
-	# ---- Salaires (par match) : stocké pour affichage Finance dès le boot ----
-
-
-	if not save.has("salary_total_per_match"):
-		save["salary_total_per_match"] = 0
-
-	var sal_total := 0
-	# 1) Priorité: roster.players
-	if save.has("roster") and typeof(save["roster"]) == TYPE_DICTIONARY:
-		var r := save["roster"] as Dictionary
-		if r.has("players") and typeof(r["players"]) == TYPE_ARRAY and not (r["players"] as Array).is_empty():
-			for row_raw in (r["players"] as Array):
-				if typeof(row_raw) != TYPE_DICTIONARY:
-					continue
-				var row := row_raw as Dictionary
-				sal_total += int(row.get("salary", 0))
-
-	# Fallback désactivé : on ne doit JAMAIS utiliser tout players_by_id
-
-
-	save["salary_total_per_match"] = int(round(float(sal_total) / 22.0))
+	# Prévision uniquement : ne jamais réécrire les cumuls déjà enregistrés.
+	var payroll := _l4_payroll(save)
+	if payroll.status == "OK":
+		save["salary_total_per_match"] = payroll.per_match
 
 static func popularity_coef(save: Dictionary) -> float:
 	# clone .py: coef = clamp(pop/100, 0.30..1.00)
@@ -1103,37 +1059,12 @@ static func _ensure_player_schema(p: Dictionary) -> void:
 	if not p.has("repos_consecutifs"): p["repos_consecutifs"] = 0
 
 	# calculés
-	if not p.has("ponderation"): p["ponderation"] = 0
 	if not p.has("pct_2pts"): p["pct_2pts"] = 0
 	if not p.has("pct_3pts"): p["pct_3pts"] = 0
-	if not p.has("salaire"): p["salaire"] = 0
 
 static func _recalc_derived(p: Dictionary) -> void:
-	# Base pondération: moyenne pondérée simple des attributs
-	var base := (
-		int(p["precision"]) * 0.20 +
-		int(p["tir"])       * 0.10 +
-		int(p["vitesse"])   * 0.20 +
-		int(p["force"])     * 0.15 +
-		int(p["defense"])   * 0.20 +
-		int(p["endurance"]) * 0.15
-	)
-
-	# Modifiers “vivants”
+	_l2_refresh_rating(p)
 	var fatigue := int(p["fatigue"])
-	var motiv := int(p["motivation"])
-	var injured := bool(p["blessure"])
-
-	var fatigue_penalty := (float(fatigue) / 100.0) * 0.30   # jusqu’à -30%
-	var motiv_bonus := ((float(motiv) - 50.0) / 50.0) * 0.10 # +/-10% autour de 50
-	var injury_penalty := 0.35 if injured else 0.0           # -35% si blessé
-
-	var mult := 1.0 - fatigue_penalty - injury_penalty + motiv_bonus
-	mult = clamp(mult, 0.25, 1.25)
-
-	var pond := int(round(float(base) * mult))
-	p["ponderation"] = pond
-	p["pondération"] = pond
 
 	# %2pts / %3pts: “type .py” simplifié basé sur precision + fatigue
 	# (valeurs en %)
@@ -1171,7 +1102,7 @@ static func _normalize_player_id(v) -> String:
 		return str(int(s))
 	return str(int(float(s)))
 
-static func apply_post_match_to_save(save: Dictionary, played_ids: Array, did_win: bool) -> Dictionary:
+static func apply_post_match_to_save(save: Dictionary, played_ids: Array, did_win: bool, injury_seed: Variant = null) -> Dictionary:
 	if save.is_empty():
 		return save
 	if not save.has("players_by_id"):
@@ -1181,20 +1112,21 @@ static func apply_post_match_to_save(save: Dictionary, played_ids: Array, did_wi
 
 	var players_by_id: Dictionary = save["players_by_id"]
 
-	# IDs réellement joués -> clés de players_by_id
-	var played_keys: Array[String] = []
+	# Résolution stricte : aucune conversion d'un ID fractionnaire ou ambigu.
+	var index := _l2_sport_index(players_by_id)
+	var played_keys: Array = []
 	for id in played_ids:
-		var sid := str(id).strip_edges()
-		if sid == "":
-			continue
-		var key := str(int(round(float(sid))))
-		if not played_keys.has(key):
-			played_keys.append(key)
+		var key := _l1_id_key(id)
+		if index.has(key) and not played_keys.has(index[key]):
+			played_keys.append(index[key])
 	print("[POST_MATCH][PLAYED_IDS_RAW] ", played_ids)
 	print("[POST_MATCH][PLAYED_KEYS] ", played_keys)
 
 	var rng := RandomNumberGenerator.new()
-	rng.randomize()
+	if injury_seed == null:
+		rng.randomize()
+	else:
+		rng.seed = int(str(injury_seed))
 
 	var touched := {}
 
@@ -1237,8 +1169,7 @@ static func apply_post_match_to_save(save: Dictionary, played_ids: Array, did_wi
 
 	# 2) Joueurs au repos
 	for pid in players_by_id.keys():
-		var key := str(pid).strip_edges()
-		if touched.has(key):
+		if touched.has(pid):
 			continue
 		var p = players_by_id[pid]
 		if typeof(p) != TYPE_DICTIONARY:
@@ -1264,18 +1195,7 @@ static func apply_post_match_to_save(save: Dictionary, played_ids: Array, did_wi
 
 	save["players_by_id"] = players_by_id
 
-	# Sync players array utilisé par certaines vues/UI (ex: MyTeam)
-	if save.has("players") and typeof(save["players"]) == TYPE_ARRAY:
-		var arr: Array = save["players"] as Array
-		for i in range(arr.size()):
-			var row_raw = arr[i]
-			if typeof(row_raw) != TYPE_DICTIONARY:
-				continue
-			var row: Dictionary = row_raw as Dictionary
-			var row_id := str(int(round(float(str(row.get("id", -1)).strip_edges()))))
-			if players_by_id.has(row_id) and typeof(players_by_id[row_id]) == TYPE_DICTIONARY:
-				arr[i] = (players_by_id[row_id] as Dictionary).duplicate(true)
-		save["players"] = arr
+	_l2_sync_sport_copies(save)
 
 	return save
 
@@ -2163,6 +2083,19 @@ static func _mercato_make_new_player(save: Dictionary, forced_tier: String = "",
 		print("[BM_MERCATO_ID_DEBUG] PLAYER_CREATED id=", pid, " nom=", str(j.get("nom", "")), " name=", str(j.get("name", "")), " avatar_key=", str(j.get("avatar_key", "")), " avatar_path=", str(j.get("avatar_path", "")), " gender=", str(j.get("gender", "")), " mercato_generated=", bool(j.get("mercato_generated", false)))
 		print("[BM_MERCATO_ID_DEBUG] PLAYER_IDENTITY_COMPLETE=", identity_complete)
 
+	# New prospects only: keep the historical salary base and RNG above.
+	# Resolve the sporting rating after motivation and contract are final.
+	j["rating_provenance"] = {
+		"kind": "canonical", "source": "PlayerLife._mercato_make_new_player",
+		"accuracy_unit": "fraction"
+	}
+	var sports_rating := _l1_player_rating(j)
+	if sports_rating.get("status") != "OK":
+		push_error("[MERCATO] Invalid new player rating: " + str(sports_rating))
+		return {}
+	j["pondération"] = sports_rating.value
+	j["ponderation"] = sports_rating.value
+
 	return j
 
 static func ensure_mercato_schema(save: Dictionary) -> void:
@@ -2443,3 +2376,465 @@ static func reset_finance_for_new_club(save: Dictionary) -> void:
 	# Shop
 	save["shop"] = {}
 	save["shop_total_forecast"] = 0
+
+# L1 étape A : helpers purs, volontairement sans appelant dans le jeu.
+# La provenance est une attestation explicite fournie par un futur appelant
+# de confiance, jamais déduite d'un nom d'alias ou de l'amplitude d'une valeur.
+# Aucun de ces helpers ne charge, répare ou modifie un dictionnaire/sauvegarde.
+static func _l1_is_number(value: Variant) -> bool:
+	return (typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT) and is_finite(float(value))
+
+static func _l1_accuracy_points(player: Dictionary, unit: String) -> Dictionary:
+	if not player.has("precision"):
+		return {"status": "MISSING", "field": "precision"}
+	if unit != "fraction" and unit != "points":
+		return {"status": "AMBIGUOUS", "field": "precision"}
+	var value: Variant = player["precision"]
+	var maximum := 1.0 if unit == "fraction" else 100.0
+	if not _l1_is_number(value) or float(value) < 0.0 or float(value) > maximum:
+		return {"status": "INVALID", "field": "precision"}
+	return {"status": "OK", "value": float(value) * (100.0 if unit == "fraction" else 1.0)}
+
+# Appel direct : entrées canoniques complètes, Accuracy fraction par défaut.
+# "points" est réservé à une unité legacy explicitement attestée.
+static func _l1_calc_c36(player: Dictionary, accuracy_unit: String = "fraction") -> Dictionary:
+	var accuracy := _l1_accuracy_points(player, accuracy_unit)
+	if accuracy.status != "OK":
+		return accuracy
+	for field in ["tir", "vitesse", "force", "defense", "endurance", "motivation", "age", "matchs_consecutifs", "repos_consecutifs", "matches_conval", "blessure", "poste"]:
+		if not player.has(field):
+			return {"status": "MISSING", "field": field}
+	for field in ["tir", "vitesse", "force", "defense", "endurance", "motivation"]:
+		if not _l1_is_number(player[field]) or float(player[field]) < 0.0 or float(player[field]) > 100.0:
+			return {"status": "INVALID", "field": field}
+	for field in ["age", "matchs_consecutifs", "repos_consecutifs", "matches_conval"]:
+		if not _l1_is_number(player[field]) or float(player[field]) < 0.0 or floor(float(player[field])) != float(player[field]):
+			return {"status": "INVALID", "field": field}
+	if float(player.age) == 0.0 or typeof(player.blessure) != TYPE_BOOL or typeof(player.poste) != TYPE_STRING:
+		return {"status": "INVALID", "field": "age/blessure/poste"}
+	var a: float = accuracy.value
+	var t: float = float(player.tir)
+	var v: float = float(player.vitesse)
+	var f: float = float(player.force)
+	var d: float = float(player.defense)
+	var e: float = float(player.endurance)
+	var quality: float
+	match player.poste:
+		"Meneur": quality = a * 0.20 + t * 0.10 + v * 0.30 + e * 0.20 + d * 0.10 + f * 0.10
+		"Ailier": quality = a * 0.18 + t * 0.12 + v * 0.22 + f * 0.20 + d * 0.13 + e * 0.15
+		"Pivot": quality = f * 0.30 + d * 0.25 + a * 0.10 + t * 0.05 + e * 0.15 + v * 0.15
+		"Arrière": quality = a * 0.18 + t * 0.10 + v * 0.28 + e * 0.20 + d * 0.14 + f * 0.10
+		_: quality = a * 0.18 + t * 0.10 + v * 0.22 + f * 0.20 + d * 0.15 + e * 0.15
+	var age: float = float(player.age)
+	var age_coef: float = 0.85
+	if age <= 20.0:
+		age_coef = 0.90
+	elif age <= 24.0:
+		age_coef = lerpf(0.90, 1.00, (age - 20.0) / 4.0)
+	elif age <= 28.0:
+		age_coef = lerpf(1.00, 1.05, (age - 24.0) / 4.0)
+	elif age <= 32.0:
+		age_coef = lerpf(1.05, 0.95, (age - 28.0) / 4.0)
+	elif age < 36.0:
+		age_coef = lerpf(0.95, 0.85, (age - 32.0) / 4.0)
+	var consecutive: float = float(player.matchs_consecutifs)
+	var match_coef := 0.92 if consecutive >= 8.0 else (0.95 if consecutive >= 6.0 else 1.0)
+	var rest: float = float(player.repos_consecutifs)
+	var rest_coef := 1.04 if rest >= 2.0 else (1.02 if rest == 1.0 else 1.0)
+	var injury_coef := 0.70 if player.blessure or float(player.matches_conval) > 0.0 else 1.0
+	var motivation_coef := 1.0 + (float(player.motivation) - 80.0) / 200.0
+	return {"status": "OK", "value": snapped(quality * age_coef * match_coef * rest_coef * injury_coef * motivation_coef, 0.01), "source": "C36_RP_M200"}
+
+# Contrat d'attestation en mémoire (aucun nouveau champ de sauvegarde) :
+# source non vide ; kind = canonical / derived_c36 / native / derived.
+# canonical : nouvelles données, fraction obligatoire ; derived_c36 : formule
+# C36 explicitement autorisée et accuracy_unit explicitement attestée.
+# native/derived : field + min/max + version attestent l'alias et son domaine.
+# invalid_zero_fields ne contient QUE des sentinelles prouvées ; un autre
+# champ faisant autorité doit être fourni. Le brut n'est jamais supprimé.
+static func _l1_resolve_rating(player: Dictionary, provenance: Dictionary = {}) -> Dictionary:
+	if provenance.is_empty():
+		for field in ["overall", "rating", "pondération", "ponderation", "note"]:
+			if player.has(field):
+				return {"status": "AMBIGUOUS", "field": field}
+		return {"status": "MISSING", "field": "rating_provenance"}
+	if typeof(provenance.get("source")) != TYPE_STRING or str(provenance.source).strip_edges() == "":
+		return {"status": "INVALID", "field": "provenance.source"}
+	var invalid_zeros: Variant = provenance.get("invalid_zero_fields", [])
+	if not invalid_zeros is Array:
+		return {"status": "INVALID", "field": "invalid_zero_fields"}
+	for field in invalid_zeros:
+		if typeof(field) != TYPE_STRING or field not in ["overall", "rating", "pondération", "ponderation", "note"]:
+			return {"status": "INVALID", "field": "invalid_zero_fields"}
+		if not player.has(field) or not _l1_is_number(player[field]) or float(player[field]) != 0.0:
+			return {"status": "CONFLICT", "field": field}
+	var kind: Variant = provenance.get("kind")
+	if typeof(kind) != TYPE_STRING:
+		return {"status": "INVALID", "field": "provenance.kind"}
+	if kind == "canonical" or kind == "derived_c36":
+		var unit: Variant = provenance.get("accuracy_unit")
+		if typeof(unit) != TYPE_STRING or unit not in ["fraction", "points"]:
+			return {"status": "AMBIGUOUS", "field": "precision"}
+		if kind == "canonical" and unit != "fraction":
+			return {"status": "CONFLICT", "field": "precision"}
+		return _l1_calc_c36(player, unit)
+	if kind != "native" and kind != "derived":
+		return {"status": "AMBIGUOUS", "field": "provenance.kind"}
+	var field: Variant = provenance.get("field")
+	if typeof(field) != TYPE_STRING or field not in ["overall", "rating", "pondération", "ponderation", "note"]:
+		return {"status": "INVALID", "field": "provenance.field"}
+	if field in invalid_zeros:
+		return {"status": "CONFLICT", "field": field}
+	if typeof(provenance.get("version")) != TYPE_STRING or str(provenance.version).strip_edges() == "":
+		return {"status": "INVALID", "field": "provenance.version"}
+	if not _l1_is_number(provenance.get("min")) or not _l1_is_number(provenance.get("max")) or float(provenance.min) > float(provenance.max):
+		return {"status": "INVALID", "field": "provenance.domain"}
+	if not player.has(field):
+		return {"status": "MISSING", "field": field}
+	var value: Variant = player[field]
+	if not _l1_is_number(value) or float(value) < float(provenance.min) or float(value) > float(provenance.max):
+		return {"status": "INVALID", "field": field}
+	return {"status": "OK", "value": float(value), "source": provenance.source, "field": field, "version": provenance.version}
+
+# L1C : provenance par joueur, sans migration ni lecture de sauvegarde.
+static func _l1_player_rating(player: Dictionary) -> Dictionary:
+	var provenance: Variant = player.get("rating_provenance", {})
+	if not provenance is Dictionary:
+		return {"status": "INVALID", "field": "rating_provenance"}
+	return _l1_resolve_rating(player, provenance)
+
+static func _l1_player_force(player: Dictionary) -> Dictionary:
+	var rating := _l1_player_rating(player)
+	if rating.status != "OK":
+		return rating
+	for field in ["motivation", "fatigue"]:
+		if not _l1_is_number(player.get(field)) or float(player[field]) < 0.0 or float(player[field]) > 100.0:
+			return {"status": "INVALID", "field": field}
+	var tir: float
+	if player.has("tir"):
+		if not _l1_is_number(player.tir) or float(player.tir) < 0.0 or float(player.tir) > 100.0:
+			return {"status": "INVALID", "field": "tir"}
+		tir = float(player.tir)
+		# Conserver le canal de tir effectif existant, coefficients inchangés.
+		if tir <= 1.5:
+			tir *= 100.0
+	else:
+		var provenance: Dictionary = player.get("rating_provenance", {})
+		var unit: Variant = provenance.get("accuracy_unit", "")
+		if not unit is String:
+			return {"status": "INVALID", "field": "precision"}
+		var accuracy := _l1_accuracy_points(player, unit)
+		if accuracy.status != "OK":
+			return accuracy
+		tir = accuracy.value
+	var effective := tir * (0.75 + float(player.motivation) / 200.0) * (1.0 - float(player.fatigue) / 200.0)
+	return {"status": "OK", "rating": rating.value, "value": float(rating.value) + (effective - 70.0) * 0.18}
+
+static func _l1_coach_score(player: Dictionary, coach: String) -> Dictionary:
+	var force := _l1_player_force(player)
+	if force.status != "OK":
+		return force
+	var motivation := float(player.motivation)
+	var fatigue := float(player.fatigue)
+	var value: float = force.value
+	match coach:
+		"coach_junior": value = value + motivation * 0.04 - fatigue * 0.06
+		"coach_confirme": value = value + motivation * 0.10 - fatigue * 0.18
+		"coach_elite": value = value + motivation * 0.14 - fatigue * 0.28
+		_: value = value + motivation * 0.08 - fatigue * 0.12
+	return {"status": "OK", "value": value, "rating": force.rating}
+
+static func _l1_id_key(value: Variant) -> String:
+	if value is String:
+		if not value.is_valid_int() or value != str(value.to_int()) or value.to_int() < 0:
+			return ""
+		return value
+	if _l1_is_number(value) and float(value) >= 0.0 and float(value) <= 9007199254740991.0 and floor(float(value)) == float(value):
+		return str(int(value))
+	return ""
+
+# Manuel explicite : exactement huit. Sinon conserver la priorité actuelle :
+# huit IDs enregistrés, puis coach, puis selected_ids avant déblocage seulement.
+static func _l1_validate_lineup(save: Dictionary, manual_ids: Variant = null) -> Dictionary:
+	if not save.get("roster") is Dictionary or not save.get("players_by_id") is Dictionary:
+		return {"status": "INVALID", "field": "roster/players_by_id"}
+	var roster: Dictionary = save.roster
+	var by_id: Dictionary = save.players_by_id
+	var ids: Variant = roster.get("match_selected_ids", [])
+	if not ids is Array:
+		return {"status": "INVALID", "field": "match_selected_ids"}
+	var coach := ""
+	if save.get("coachs") is Dictionary:
+		coach = str(save.coachs.get("active", "")).strip_edges()
+	var automatic := false
+	if manual_ids != null:
+		if not manual_ids is Array or manual_ids.size() != 8:
+			return {"status": "INVALID_COMPOSITION"}
+		ids = manual_ids
+	elif ids.size() != 8:
+		var round_now := int(save.get("season_round", 0))
+		var season := int(save.get("season_number", 1))
+		var unlocked := round_now >= 5 if season <= 1 else round_now >= 0
+		if coach == "" and unlocked:
+			return {"status": "INVALID_COMPOSITION"}
+		ids = roster.get("selected_ids", [])
+		automatic = coach != ""
+	if not ids is Array or ids.is_empty() or (automatic and ids.size() < 8):
+		return {"status": "INVALID_COMPOSITION"}
+	var seen: Dictionary = {}
+	var rows: Array = []
+	for id in ids:
+		var key := _l1_id_key(id)
+		if key == "" or seen.has(key) or not by_id.get(key) is Dictionary:
+			return {"status": "INVALID_ID", "id": str(id)}
+		seen[key] = true
+		var player: Dictionary = by_id[key]
+		if player.has("id") and _l1_id_key(player.id) != key:
+			return {"status": "CONFLICT", "id": key}
+		var force := _l1_player_force(player)
+		if force.status != "OK":
+			force["id"] = key
+			return force
+		var score := _l1_coach_score(player, coach) if automatic else force
+		if score.status != "OK":
+			score["id"] = key
+			return score
+		rows.append({"id": int(key), "player": player.duplicate(true), "force": force.value, "rating": force.rating, "score": score.value})
+	if automatic:
+		rows.sort_custom(func(a, b): return float((a as Dictionary).get("score", 0.0)) > float((b as Dictionary).get("score", 0.0)))
+		rows = rows.slice(0, 8)
+	var played: Array = []
+	var players: Array = []
+	var total := 0.0
+	for row in rows:
+		played.append(row.id)
+		players.append(row.player)
+		total += float(row.force)
+	return {"status": "OK", "ids": played, "players": players, "force": total / float(rows.size())}
+
+static func _l1_lineup_error_text(result: Dictionary) -> String:
+	if "SALARY" in str(result.get("status", "")):
+		return "Match not started: %s (player %s). An annual contract must be verified before a new salary charge." % [str(result.status), str(result.get("id", "?"))]
+	return "Match not started: %s (player %s). Choose a lineup with verified player ratings." % [str(result.get("status", "INVALID")), str(result.get("id", "?"))]
+
+# L2 : seuls les caches C36 explicitement attestés peuvent être actualisés.
+static func _l2_refresh_rating(p: Dictionary) -> void:
+	var proof: Variant = p.get("rating_provenance", {})
+	if not proof is Dictionary or proof.get("kind") not in ["canonical", "derived_c36"]:
+		return
+	var result := _l1_player_rating(p)
+	if result.status != "OK":
+		return
+	for field in ["pondération", "ponderation"]:
+		if field in proof.get("invalid_zero_fields", []):
+			continue
+		if field == "pondération" or p.has(field):
+			p[field] = result.value
+
+# Une collision de clés ou un conflit avec l'identité interdit la synchronisation.
+static func _l2_sport_index(by_id: Dictionary) -> Dictionary:
+	var index := {}
+	var rejected := {}
+	for raw in by_id:
+		var key := _l1_id_key(raw)
+		if key == "" or not by_id[raw] is Dictionary:
+			continue
+		var p: Dictionary = by_id[raw]
+		if index.has(key) or (p.has("id") and _l1_id_key(p.id) != key):
+			rejected[key] = true
+		index[key] = raw
+	for key in rejected:
+		index.erase(key)
+	return index
+
+static func _l2_sync_sport_copies(save: Dictionary, new_season: bool = false) -> void:
+	if not save.get("players") is Array or not save.get("players_by_id") is Dictionary:
+		return
+	var by_id: Dictionary = save.players_by_id
+	var index := _l2_sport_index(by_id)
+	var fields := ["fatigue", "motivation", "matchs_consecutifs", "repos_consecutifs"]
+	if new_season:
+		fields.append("age")
+	else:
+		fields.append_array(["blessure", "matches_conval", "pct_2pts", "pct_3pts"])
+	for row in save.players:
+		if not row is Dictionary:
+			continue
+		var key := _l1_id_key(row.get("id"))
+		if not index.has(key):
+			continue
+		var source: Dictionary = by_id[index[key]]
+		for field in fields:
+			if source.has(field):
+				row[field] = source[field]
+		# Ne jamais écraser une note native/ambiguë ni importer une provenance.
+		var proof: Variant = source.get("rating_provenance", {})
+		if proof is Dictionary and proof.get("kind") in ["canonical", "derived_c36"] and row.get("rating_provenance", {}) == proof:
+			var result := _l1_player_rating(source)
+			if result.status == "OK":
+				for field in ["pondération", "ponderation"]:
+					if field not in proof.get("invalid_zero_fields", []) and (field == "pondération" or row.has(field)):
+						row[field] = result.value
+
+# L3 : les listes de licences sont des preuves de propriété, jamais le catalogue.
+# Les chaînes entières et leur représentation historique exacte « n.0 » sont admises.
+static func _l3_license_id(value: Variant) -> String:
+	var key := _l1_id_key(value)
+	if key == "" and value is String and value.ends_with(".0"):
+		key = _l1_id_key(value.trim_suffix(".0"))
+	return key
+
+static func _l3_licensed_pool(save: Dictionary) -> Dictionary:
+	var result := {"status":"OK", "ids":[], "players":[], "by_id":{}, "errors":[]}
+	if not save.get("players_by_id") is Dictionary or not save.get("roster") is Dictionary:
+		result.status = "INVALID_LICENSE"
+		return result
+	var index := {}
+	var conflicts := {}
+	for raw in save.players_by_id:
+		var key := _l3_license_id(raw)
+		if key == "":
+			continue
+		var player: Variant = save.players_by_id[raw]
+		if index.has(key) or not player is Dictionary:
+			conflicts[key] = true
+		elif player.has("id") and _l3_license_id(player.id) != key:
+			conflicts[key] = true
+		index[key] = player
+	var sources: Array = [save.roster.get("selected_ids", [])]
+	if save.has("mercato"):
+		if not save.mercato is Dictionary:
+			result.status = "INVALID_LICENSE"
+			return result
+		sources.append(save.mercato.get("purchased_ids", []))
+	for ids in sources:
+		if not ids is Array:
+			result.errors.append({"status":"INVALID_LICENSE"})
+			continue
+		for raw in ids:
+			var key := _l3_license_id(raw)
+			if key == "" or conflicts.has(key) or not index.has(key):
+				result.errors.append({"status":"INVALID_LICENSE", "id":str(raw)})
+				continue
+			if result.by_id.has(key):
+				continue
+			var player: Dictionary = index[key].duplicate(true)
+			player["id"] = int(key) # vue locale uniquement ; catalogue inchangé
+			result.ids.append(int(key))
+			result.players.append(player)
+			result.by_id[key] = player
+	if not result.errors.is_empty():
+		result.status = "INVALID_LICENSE"
+	return result
+
+# Adapter uniquement une vue locale aux règles L1 ; ni formule ni sauvegarde modifiée.
+static func _l3_validate_lineup(save: Dictionary, manual_ids: Variant = null) -> Dictionary:
+	var payroll := _l4_payroll(save)
+	if payroll.status != "OK":
+		return payroll
+	var pool := _l3_licensed_pool(save)
+	if not save.get("roster") is Dictionary:
+		return {"status":"INVALID_LICENSE"}
+	var ids: Variant = manual_ids if manual_ids != null else save.roster.get("match_selected_ids", [])
+	if not ids is Array:
+		return {"status":"INVALID_COMPOSITION"}
+	var explicit: bool = manual_ids != null or ids.size() == 8
+	var normalized: Array = []
+	if explicit:
+		for raw in ids:
+			var key := _l3_license_id(raw)
+			if key == "" or not pool.by_id.has(key):
+				return {"status":"INVALID_LICENSE", "id":str(raw)}
+			normalized.append(int(key))
+	elif pool.status != "OK":
+		return pool.errors[0] if not pool.errors.is_empty() else {"status":"INVALID_LICENSE"}
+	elif bool(save.roster.get("auto_save_match_selection_paid", false)) and int(save.roster.get("auto_save_match_selection_matches_left", 5)) > 0:
+		# Un droit payé avec composition incomplète exige une reconfirmation gratuite.
+		return {"status":"INVALID_COMPOSITION"}
+	var view := save.duplicate(false)
+	view["players_by_id"] = pool.by_id
+	view["roster"] = save.roster.duplicate(true)
+	view.roster["selected_ids"] = pool.ids
+	view.roster["match_selected_ids"] = normalized if explicit else ids
+	return _l1_validate_lineup(view, normalized if manual_ids != null else null)
+
+# Contrat annuel enregistré : présence explicite, nombre fini non négatif,
+# et absence de contradiction entre les deux alias historiques.
+static func _l4_annual_contract(player: Dictionary) -> Dictionary:
+	var amount: Variant = null
+	for field in ["salaire", "salary"]:
+		if not player.has(field):
+			continue
+		var raw: Variant = player[field]
+		if not _l1_is_number(raw) or float(raw) < 0.0 or float(raw) > 9007199254740991.0:
+			return {"status":"INVALID_SALARY", "field":field}
+		if amount != null and float(raw) != float(amount):
+			return {"status":"AMBIGUOUS_SALARY"}
+		amount = raw
+	if amount == null:
+		return {"status":"MISSING_SALARY"}
+	return {"status":"OK", "annual":int(amount)}
+
+static func _l4_payroll(save: Dictionary) -> Dictionary:
+	var pool := _l3_licensed_pool(save)
+	if pool.status != "OK":
+		return {"status":"INVALID_SALARY_LICENSE", "details":pool.errors}
+	var contracts := {}
+	var total_season := 0
+	var annual_total := 0
+	var season_number := int(save.get("season_number", 1))
+	var inflation_coef := 1.0
+	if season_number >= 3:
+		inflation_coef = pow(1.04, float(season_number - 2))
+	for player in pool.players:
+		var contract := _l4_annual_contract(player)
+		if contract.status != "OK":
+			contract["id"] = str(player.id)
+			return contract
+		contracts[str(player.id)] = contract.annual
+		annual_total += int(contract.annual)
+		total_season += int(round(float(contract.annual) * inflation_coef))
+	var leagues = preload("res://scripts/LeagueData.gd")
+	var league_id := str(save.get("league_id", leagues.get_default_league_id())).strip_edges()
+	if league_id == "": league_id = leagues.get_default_league_id()
+	var salary_league_coef: float = leagues.get_coef(league_id, "salary")
+	var per_match := int(round(float(total_season) * salary_league_coef / 22.0))
+	return {"status":"OK", "contracts":contracts, "annual_total":annual_total, "per_match":maxi(0, per_match)}
+
+# Protect only opted-in championship careers; keep historical callers/signatures.
+static func _l5_legacy_write_allowed(path: String, data: Variant) -> bool:
+	if not FileAccess.file_exists(path): return true
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null: return false
+	var parser := JSON.new()
+	var error := parser.parse(file.get_as_text())
+	file.close()
+	if error != OK or not parser.data is Dictionary: return false
+	var old: Dictionary = parser.data
+	if not old.has("l5_match"): return true
+	if not data is Dictionary: return false
+	if old.get("profile_id") != data.get("profile_id") or old.get("career_id") != data.get("career_id"): return false
+	if not old.l5_match is Dictionary or not data.get("l5_match") is Dictionary: return false
+	if old.l5_match.has("pending"): return false
+	return JSON.stringify(JSON.parse_string(JSON.stringify(old.l5_match))) == JSON.stringify(JSON.parse_string(JSON.stringify(data.l5_match)))
+
+# Opted-in careers keep their receipt safe on subsequent historical writes too.
+# Returns whether the protected path was handled (success or explicit refusal).
+static func _l5_publish_existing(path: String, data: Variant) -> bool:
+	if not data is Dictionary or not data.has("l5_match"): return false
+	if not data.l5_match is Dictionary:
+		push_error("L5: invalid protected metadata")
+		return true
+	var io = load("res://scripts/LocalIO.gd").new(ProjectSettings.globalize_path(path).get_base_dir())
+	var current: Dictionary = io.read_career()
+	if current.status != "OK" or ProjectSettings.globalize_path(io._context.get("path", "")) != ProjectSettings.globalize_path(path) or not _l5_legacy_write_allowed(path, data):
+		push_error("L5: protected write refused; career or revision conflict")
+		return true
+	var next: Dictionary = data.duplicate(true)
+	next.l5_match["revision"] = maxi(int(current.data.get("l5_match", {}).get("revision", 0)), int(data.l5_match.get("revision", 0))) + 1
+	var result: Dictionary = io.write_verified(next)
+	if result.status != "COMMITTED":
+		push_error("L5: protected write failed: " + str(result.status))
+	else:
+		data["l5_match"] = next.l5_match.duplicate(true)
+	return true

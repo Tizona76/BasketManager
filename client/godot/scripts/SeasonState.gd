@@ -215,18 +215,17 @@ func register_match_result(dom_team: String, ext_team: String, score_dom: int, s
 	standings[dom_team]["DIFF"] = int(standings[dom_team]["PF"]) - int(standings[dom_team]["PA"])
 	standings[ext_team]["DIFF"] = int(standings[ext_team]["PF"]) - int(standings[ext_team]["PA"])
 
-func simulate_other_games_for_round(dom_team: String, ext_team: String, round_index: int, user_team_name: String) -> void:
+func simulate_other_games_for_round(dom_team: String, ext_team: String, round_index: int, user_team_name: String, prepared_save: Variant = null, ai_seed: Variant = null) -> void:
 	# Simule les autres matchs de la journée (calendrier fixe 22 rounds), sans historique.
 	_ensure_standings_initialized(user_team_name)
 
 	var r := int(round_index) % SEASON_TOTAL_ROUNDS
 	var games := _rr_games_for_round(user_team_name, r)
 	var league_id: String = LeagueDataScript.get_default_league_id()
-	var PL = load("res://scripts/PlayerLife.gd")
-	if PL != null and PL.has_method("load_savegame"):
-		var save: Dictionary = PL.load_savegame()
-		if typeof(save) == TYPE_DICTIONARY:
-			league_id = str(save.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+	var source: Dictionary = prepared_save if prepared_save is Dictionary else preload("res://scripts/PlayerLife.gd").load_savegame()
+	league_id = str(source.get("league_id", LeagueDataScript.get_default_league_id())).strip_edges()
+	var seeded := RandomNumberGenerator.new()
+	if ai_seed != null: seeded.seed = int(str(ai_seed))
 	if league_id == "":
 		league_id = LeagueDataScript.get_default_league_id()
 	var ai_variance_coef: float = LeagueDataScript.get_coef(league_id, "ai_variance")
@@ -243,9 +242,9 @@ func simulate_other_games_for_round(dom_team: String, ext_team: String, round_in
 			continue
 
 		# Score cohérent (simple). On raffinera plus tard avec pondérations.
-		var base_score: int = randi_range(70, 90)
-		var score_dom_sim := clampi(base_score + randi_range(-variance_range, variance_range), 55, 125)
-		var score_ext_sim := clampi(base_score + randi_range(-variance_range, variance_range), 55, 125)
+		var base_score: int = (seeded.randi_range(70, 90) if ai_seed != null else randi_range(70, 90))
+		var score_dom_sim := clampi(base_score + (seeded.randi_range(-variance_range, variance_range) if ai_seed != null else randi_range(-variance_range, variance_range)), 55, 125)
+		var score_ext_sim := clampi(base_score + (seeded.randi_range(-variance_range, variance_range) if ai_seed != null else randi_range(-variance_range, variance_range)), 55, 125)
 
 		register_match_result(d, e, score_dom_sim, score_ext_sim, user_team_name)
 

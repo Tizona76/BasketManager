@@ -22,6 +22,7 @@ var current_sort: String = "poste"
 var sort_ascending: bool = true
 var pending_sell_ids: Array[int] = []
 var pending_match_ids: Array[int] = []
+var _l1_pending_ids_error: Dictionary = {}
 var lbl_avg_age: Label
 var lbl_avg_perf: Label
 var lbl_avg_salary: Label
@@ -509,13 +510,18 @@ func _is_match_selection_unlocked() -> bool:
 
 func _load_pending_match_ids() -> void:
 	pending_match_ids.clear()
+	_l1_pending_ids_error.clear()
 	Save.ensure_exists(str(Session.profile_uuid))
 	var d: Dictionary = Save.read_dict()
 	if d.has("roster") and typeof(d["roster"]) == TYPE_DICTIONARY:
 		var roster: Dictionary = d["roster"]
 		if roster.has("match_selected_ids") and roster["match_selected_ids"] is Array:
 			for raw_id in (roster["match_selected_ids"] as Array):
-				pending_match_ids.append(int(raw_id))
+				var key := PlayerLife._l3_license_id(raw_id)
+				if key == "":
+					_l1_pending_ids_error = {"status": "INVALID_ID", "id": str(raw_id)}
+					continue
+				pending_match_ids.append(int(key))
 
 func _ensure_match_selection_footer() -> void:
 	if lbl_selected_to_play != null and not is_instance_valid(lbl_selected_to_play):
@@ -1073,6 +1079,8 @@ func _save_pending_match_ids() -> void:
 	Save.write_dict(d)
 
 func _toggle_pending_match(pid: int) -> void:
+	# Une action explicite permet de recomposer le brouillon invalide.
+	_l1_pending_ids_error.clear()
 	if pid in pending_match_ids:
 		pending_match_ids.erase(pid)
 	else:
@@ -1088,91 +1096,11 @@ func _on_confirm_sell_pressed() -> void:
 	Save.ensure_exists(str(Session.profile_uuid))
 	var d: Dictionary = Save.read_dict()
 
-	if d.has("roster") and typeof(d["roster"]) == TYPE_DICTIONARY:
-		var roster: Dictionary = d["roster"]
-
-		if roster.has("selected_ids") and roster["selected_ids"] is Array:
-			var selected_ids_src: Array = (roster["selected_ids"] as Array).duplicate()
-			var selected_ids: Array = []
-			for raw_id in selected_ids_src:
-				var keep := true
-				for pid in pending_sell_ids:
-					if str(raw_id) == str(pid) or str(raw_id) == str(float(pid)):
-						keep = false
-						break
-				if keep:
-					selected_ids.append(raw_id)
-			roster["selected_ids"] = selected_ids
-
-		if roster.has("match_selected_ids") and roster["match_selected_ids"] is Array:
-			var match_ids_src: Array = (roster["match_selected_ids"] as Array).duplicate()
-			var match_ids: Array = []
-			for raw_mid in match_ids_src:
-				var keep_match := true
-				for pid in pending_sell_ids:
-					if str(raw_mid) == str(pid) or str(raw_mid) == str(float(pid)):
-						keep_match = false
-						break
-				if keep_match:
-					match_ids.append(raw_mid)
-			roster["match_selected_ids"] = match_ids
-
-		if roster.has("players") and roster["players"] is Array:
-			var new_roster_players: Array = []
-			for row_raw in (roster["players"] as Array):
-				if typeof(row_raw) != TYPE_DICTIONARY:
-					continue
-				var row: Dictionary = row_raw
-				var row_id_str := str(row.get("id", ""))
-				var drop := false
-				for pid in pending_sell_ids:
-					if row_id_str == str(pid):
-						drop = true
-						break
-				if drop:
-					continue
-				new_roster_players.append(row)
-			roster["players"] = new_roster_players
-
-		d["roster"] = roster
-
-	if d.has("mercato") and typeof(d["mercato"]) == TYPE_DICTIONARY:
-		var m: Dictionary = d["mercato"]
-		if m.has("purchased_ids") and m["purchased_ids"] is Array:
-			var purchased_ids_src: Array = (m["purchased_ids"] as Array).duplicate()
-			var purchased_ids: Array = []
-			for raw_id in purchased_ids_src:
-				var keep := true
-				for pid in pending_sell_ids:
-					if str(raw_id) == str(pid) or str(raw_id) == str(float(pid)):
-						keep = false
-						break
-				if keep:
-					purchased_ids.append(raw_id)
-			m["purchased_ids"] = purchased_ids
-		d["mercato"] = m
-
-	if d.has("players") and d["players"] is Array:
-		var new_players: Array = []
-		for jv in (d["players"] as Array):
-			if typeof(jv) != TYPE_DICTIONARY:
-				continue
-			var j: Dictionary = jv
-			if int(j.get("id", -1)) in pending_sell_ids:
-				continue
-			new_players.append(j)
-		d["players"] = new_players
-
-	var sal_total := 0
-	if d.has("roster") and typeof(d["roster"]) == TYPE_DICTIONARY:
-		var roster_after: Dictionary = d["roster"]
-		if roster_after.has("players") and roster_after["players"] is Array:
-			for row_raw in (roster_after["players"] as Array):
-				if typeof(row_raw) != TYPE_DICTIONARY:
-					continue
-				var row: Dictionary = row_raw
-				sal_total += int(row.get("salary", 0))
-	d["salary_total_per_match"] = int(round(float(sal_total) / 22.0))
+	var pool: Dictionary = PlayerLife._l3_licensed_pool(d)
+	for raw in pending_sell_ids:
+		if not pool.by_id.has(PlayerLife._l3_license_id(raw)):
+			return
+	_l3_remove_current_references(d, pending_sell_ids)
 
 	PlayerLife.ensure_finance_schema(d)
 	Save.write_dict(d)
@@ -1223,6 +1151,8 @@ func _ensure_avg_labels() -> void:
 	lbl_avg_salary.size = Vector2(480.0, 24.0)
 
 func _on_confirm_match_selection_pressed() -> void:
+	if not _l1_check_composition(Save.read_dict(), pending_match_ids):
+		return
 	if pending_match_ids.size() != 8:
 		return
 	_save_pending_match_ids()
@@ -1230,8 +1160,9 @@ func _on_confirm_match_selection_pressed() -> void:
 	var d_confirm: Dictionary = Save.read_dict()
 	if d_confirm.has("roster") and typeof(d_confirm["roster"]) == TYPE_DICTIONARY:
 		var roster_confirm: Dictionary = d_confirm["roster"] as Dictionary
-		roster_confirm["auto_save_match_selection_paid"] = false
-		roster_confirm["auto_save_match_selection_matches_left"] = 0
+		if not _l3_has_paid_matches(roster_confirm):
+			roster_confirm["auto_save_match_selection_paid"] = false
+			roster_confirm["auto_save_match_selection_matches_left"] = 0
 		d_confirm["roster"] = roster_confirm
 		Save.write_dict(d_confirm)
 	_bm_close_lineup_summary_popup()
@@ -1241,6 +1172,8 @@ func _on_confirm_match_selection_pressed() -> void:
 
 
 func _on_auto_save_match_selection_pressed() -> void:
+	if not _l1_check_composition(Save.read_dict(), pending_match_ids):
+		return
 	if pending_match_ids.size() != 8:
 		return
 	Save.ensure_exists(str(Session.profile_uuid))
@@ -1248,11 +1181,12 @@ func _on_auto_save_match_selection_pressed() -> void:
 	if not d_confirm.has("roster") or typeof(d_confirm["roster"]) != TYPE_DICTIONARY:
 		d_confirm["roster"] = {}
 	var roster_confirm: Dictionary = d_confirm["roster"]
-	if not PlayerLife.spend_tokens(d_confirm, SAVE_LINEUP_TOKEN_COST, "auto_save_match_selection_season"):
-		_refresh_match_selection_footer()
-		return
-	roster_confirm["auto_save_match_selection_paid"] = true
-	roster_confirm["auto_save_match_selection_matches_left"] = SAVE_LINEUP_MATCH_COUNT
+	if not _l3_has_paid_matches(roster_confirm):
+		if not PlayerLife.spend_tokens(d_confirm, SAVE_LINEUP_TOKEN_COST, "auto_save_match_selection_season"):
+			_refresh_match_selection_footer()
+			return
+		roster_confirm["auto_save_match_selection_paid"] = true
+		roster_confirm["auto_save_match_selection_matches_left"] = SAVE_LINEUP_MATCH_COUNT
 	roster_confirm["match_selected_ids"] = pending_match_ids.duplicate()
 	d_confirm["roster"] = roster_confirm
 	Save.write_dict(d_confirm)
@@ -1275,13 +1209,8 @@ func _show_auto_save_match_selection_popup() -> void:
 		d["roster"] = {}
 	var roster: Dictionary = d["roster"]
 
-	if bool(roster.get("auto_save_match_selection_paid", false)):
-		_bm_close_lineup_summary_popup()
-		var tree_paid := get_tree()
-		if tree_paid != null and ResourceLoader.exists("res://scenes/MatchSim.tscn"):
-			tree_paid.change_scene_to_file("res://scenes/MatchSim.tscn")
-		else:
-			_refresh_match_selection_footer()
+	if _l3_has_paid_matches(roster):
+		_on_auto_save_match_selection_pressed()
 		return
 
 	var tokens_balance: int = PlayerLife.get_tokens(d)
@@ -1419,22 +1348,25 @@ func _show_auto_save_match_selection_popup() -> void:
 	btn_confirm.pressed.connect(func():
 		Save.ensure_exists(str(Session.profile_uuid))
 		var d_confirm: Dictionary = Save.read_dict()
+		if not _l1_check_composition(d_confirm, pending_match_ids):
+			return
 		if not d_confirm.has("roster") or typeof(d_confirm["roster"]) != TYPE_DICTIONARY:
 			d_confirm["roster"] = {}
 		var roster_confirm: Dictionary = d_confirm["roster"]
 
-		if not PlayerLife.can_spend_tokens(d_confirm, SAVE_LINEUP_TOKEN_COST):
-			popup.queue_free()
-			_refresh_match_selection_footer()
-			return
+		if not _l3_has_paid_matches(roster_confirm):
+			if not PlayerLife.can_spend_tokens(d_confirm, SAVE_LINEUP_TOKEN_COST):
+				popup.queue_free()
+				_refresh_match_selection_footer()
+				return
 
-		if not PlayerLife.spend_tokens(d_confirm, SAVE_LINEUP_TOKEN_COST, "auto_save_match_selection_season"):
-			popup.queue_free()
-			_refresh_match_selection_footer()
-			return
+			if not PlayerLife.spend_tokens(d_confirm, SAVE_LINEUP_TOKEN_COST, "auto_save_match_selection_season"):
+				popup.queue_free()
+				_refresh_match_selection_footer()
+				return
 
-		roster_confirm["auto_save_match_selection_paid"] = true
-		roster_confirm["auto_save_match_selection_matches_left"] = SAVE_LINEUP_MATCH_COUNT
+			roster_confirm["auto_save_match_selection_paid"] = true
+			roster_confirm["auto_save_match_selection_matches_left"] = SAVE_LINEUP_MATCH_COUNT
 		roster_confirm["match_selected_ids"] = pending_match_ids.duplicate()
 		d_confirm["roster"] = roster_confirm
 		Save.write_dict(d_confirm)
@@ -1522,22 +1454,31 @@ func _build_team() -> void:
 	var total_salary: int = 0
 	var sum_age: float = 0.0
 	var sum_perf: float = 0.0
+	var all_ratings_valid := true
 	var sum_salary: int = 0
+	var salaries_valid := true
 	var count: int = 0
 
 	for p in players:
 		var pd := p as Dictionary
 		print("[MYTEAM][ROW] id=", str(pd.get("id", "")), " nom=", str(pd.get("nom", pd.get("name", ""))))
 		var sal := _myteam_display_salary_annual_from_player(pd)
-		total_salary += sal
+		if sal < 0:
+			salaries_valid = false
+		else:
+			total_salary += sal
 		sum_age += float(pd.get("age", 0))
-		sum_perf += float(pd.get("pondération", 0.0))
-		sum_salary += sal
+		var resolved := PlayerLife._l1_player_rating(pd)
+		if resolved.status == "OK":
+			sum_perf += float(resolved.value)
+		else:
+			all_ratings_valid = false
+		if sal >= 0: sum_salary += sal
 		count += 1
 		rows.add_child(_create_player_row(p))
 
 	if lbl_total_salary != null:
-		lbl_total_salary.text = "Total = " + _fmt_salary(total_salary)
+		lbl_total_salary.text = "Total = " + _fmt_salary(total_salary if salaries_valid else -1)
 
 	if btn_confirm_sell != null:
 		btn_confirm_sell.visible = not _bm_is_lineup_screen()
@@ -1547,9 +1488,9 @@ func _build_team() -> void:
 		if lbl_avg_age != null:
 			lbl_avg_age.text = tr("selection.avg_age") + " = " + ("%.1f" % (sum_age / float(count)))
 		if lbl_avg_perf != null:
-			lbl_avg_perf.text = tr("selection.avg_perf") + " = " + ("%.1f" % (sum_perf / float(count)))
+			lbl_avg_perf.text = tr("selection.avg_perf") + " = " + (("%.1f" % (sum_perf / float(count))) if all_ratings_valid else "—")
 		if lbl_avg_salary != null:
-			lbl_avg_salary.text = tr("selection.avg_salary") + " = " + _fmt_salary(int(round(float(sum_salary) / float(count))))
+			lbl_avg_salary.text = tr("selection.avg_salary") + " = " + _fmt_salary(int(round(float(sum_salary) / float(count))) if salaries_valid else -1)
 	else:
 		if lbl_avg_age != null:
 			lbl_avg_age.text = tr("selection.avg_age") + " = -"
@@ -1726,8 +1667,12 @@ func _sort_players(players: Array) -> void:
 			)
 		"perf":
 			players.sort_custom(func(a, b):
-				var av := float((a as Dictionary).get("pondération", 0.0))
-				var bv := float((b as Dictionary).get("pondération", 0.0))
+				var ar := PlayerLife._l1_player_rating(a)
+				var br := PlayerLife._l1_player_rating(b)
+				if ar.status != "OK" or br.status != "OK":
+					return ar.status == "OK" and br.status != "OK"
+				var av := float(ar.value)
+				var bv := float(br.value)
 				return av < bv if sort_ascending else av > bv
 			)
 		"motivation":
@@ -1748,38 +1693,10 @@ func _sell_player(p: Dictionary) -> void:
 	Save.ensure_exists(str(Session.profile_uuid))
 	var d: Dictionary = Save.read_dict()
 
-	var pid := int(p.get("id", -1))
-	if pid < 0:
+	var key := PlayerLife._l3_license_id(p.get("id"))
+	if key == "" or not PlayerLife._l3_licensed_pool(d).by_id.has(key):
 		return
-
-	if d.has("roster") and typeof(d["roster"]) == TYPE_DICTIONARY:
-		var roster: Dictionary = d["roster"]
-
-		if roster.has("selected_ids") and roster["selected_ids"] is Array:
-			var selected_ids: Array = (roster["selected_ids"] as Array).duplicate()
-			selected_ids.erase(pid)
-			roster["selected_ids"] = selected_ids
-
-		if roster.has("players") and roster["players"] is Array:
-			var new_roster_players: Array = []
-			for row_raw in (roster["players"] as Array):
-				if typeof(row_raw) != TYPE_DICTIONARY:
-					continue
-				var row: Dictionary = row_raw
-				if str(row.get("id", "")) == str(pid):
-					continue
-				new_roster_players.append(row)
-			roster["players"] = new_roster_players
-
-		d["roster"] = roster
-
-	if d.has("mercato") and typeof(d["mercato"]) == TYPE_DICTIONARY:
-		var m: Dictionary = d["mercato"]
-		if m.has("purchased_ids") and m["purchased_ids"] is Array:
-			var purchased_ids: Array = (m["purchased_ids"] as Array).duplicate()
-			purchased_ids.erase(pid)
-			m["purchased_ids"] = purchased_ids
-		d["mercato"] = m
+	_l3_remove_current_references(d, [key])
 
 	PlayerLife.ensure_finance_schema(d)
 	PlayerLife.write_savegame(d)
@@ -1788,71 +1705,7 @@ func _sell_player(p: Dictionary) -> void:
 func _get_selected_players_real() -> Array:
 	Save.ensure_exists(str(Session.profile_uuid))
 	var d: Dictionary = Save.read_dict()
-
-	var selected_ids: Array = []
-	if d.has("roster") and typeof(d["roster"]) == TYPE_DICTIONARY:
-		selected_ids = (d["roster"] as Dictionary).get("selected_ids", [])
-
-	var purchased_ids: Array = []
-	if d.has("mercato") and typeof(d["mercato"]) == TYPE_DICTIONARY:
-		purchased_ids = ((d["mercato"] as Dictionary).get("purchased_ids", []) as Array).duplicate()
-	if purchased_ids.size() > 4:
-		purchased_ids = purchased_ids.slice(0, 4)
-
-	var all_players: Array = _avatar_players()
-	var by_avatar_id: Dictionary = {}
-	for p in all_players:
-		by_avatar_id[int(p.get("id", -1))] = p
-
-	var by_saved_id: Dictionary = {}
-	if d.has("players_by_id") and typeof(d["players_by_id"]) == TYPE_DICTIONARY:
-		by_saved_id = d["players_by_id"] as Dictionary
-
-	var out: Array = []
-	var saved_players: Array = []
-	if d.has("players") and typeof(d["players"]) == TYPE_ARRAY:
-		saved_players = d["players"] as Array
-
-	for pid_v in selected_ids:
-		var pid: int = int(pid_v)
-		var skey := str(pid)
-
-		if by_saved_id.has(skey) and (by_saved_id[skey] is Dictionary):
-			out.append((by_saved_id[skey] as Dictionary).duplicate(true))
-			continue
-
-		var found_saved := false
-		for jv in saved_players:
-			if typeof(jv) == TYPE_DICTIONARY and int((jv as Dictionary).get("id", -1)) == pid:
-				out.append((jv as Dictionary).duplicate(true))
-				found_saved = true
-				break
-
-		if found_saved:
-			continue
-
-		if not by_avatar_id.has(pid):
-			continue
-		var avatar_p: Dictionary = by_avatar_id[pid]
-		var j: Dictionary = _bm_init_player_from_avatar(avatar_p)
-		out.append(j)
-
-	for pid_v in purchased_ids:
-		var pid_txt := str(pid_v).strip_edges()
-		if pid_txt == "":
-			continue
-		var skey := str(int(float(pid_txt)))
-		if not by_saved_id.has(skey):
-			continue
-		if not (by_saved_id[skey] is Dictionary):
-			continue
-		out.append((by_saved_id[skey] as Dictionary).duplicate(true))
-
-	return out
-
-# ------------------------------------------------------------
-# UI
-# ------------------------------------------------------------
+	return PlayerLife._l3_licensed_pool(d).players
 
 func _myteam_stat_color(v: int) -> Color:
 	if v < 50:
@@ -2301,7 +2154,8 @@ func _bm_show_player_card_popup(data: Dictionary) -> void:
 	_bm_player_card_add_label(card, _bm_myteam_tr_or_fallback("player.card.age", "Age") + " : " + str(int(float(data.get("age", 0)))), Vector2(254, 130), Vector2(210, 28), 20, Color(0.92, 0.95, 1.0, 1.0))
 	_bm_player_card_add_label(card, _bm_myteam_tr_or_fallback("player.card.salary", "Salary") + " : " + _fmt_salary(_myteam_display_salary_annual_from_player(data)), Vector2(254, 160), Vector2(300, 28), 20, Color(0.92, 0.95, 1.0, 1.0))
 	if data.has("pondération") or data.has("ponderation") or data.has("stars"):
-		var rating := str(data.get("pondération", data.get("ponderation", data.get("stars", ""))))
+		var resolved := PlayerLife._l1_player_rating(data)
+		var rating := str(resolved.value) if resolved.status == "OK" else "—"
 		_bm_player_card_add_label(card, _bm_myteam_tr_or_fallback("player.card.rating", "Rating") + " : " + rating, Vector2(254, 100), Vector2(260, 30), 22, Color(1.0, 0.78, 0.22, 1.0))
 
 	var stats := VBoxContainer.new()
@@ -2356,15 +2210,11 @@ func _cell(value: String, min_w: float = 82.0, font_color: Color = Color(0.94, 0
 	return box
 
 func _myteam_display_salary_annual_from_player(p: Dictionary) -> int:
-	var sal := int(p.get("salaire", p.get("salary", 0)))
-	if sal >= 50000:
-		return sal
-	var perf := float(p.get("pondération", p.get("ponderation", p.get("overall", p.get("rating", 0)))))
-	if perf > 0.0:
-		return clampi(int(round(70000.0 + perf * 500.0)), 70000, 130000)
-	return maxi(0, sal)
+	var contract := PlayerLife._l4_annual_contract(p)
+	return int(contract.annual) if contract.status == "OK" else -1
 
 func _fmt_salary(n: int) -> String:
+	if n < 0: return "—"
 	var s := str(n)
 	var out := ""
 	var count := 0
@@ -2752,3 +2602,38 @@ func _bm_myteam_lock_mobile_layout_positions() -> void:
 		lbl_avg_salary.anchor_right = 1.0
 		lbl_avg_salary.position = Vector2(vp.x - 410.0, 76.0)
 		lbl_avg_salary.size = Vector2(380.0, 24.0)
+
+# L1C : refus local, brouillon et droits payés conservés.
+func _l1_check_composition(save: Dictionary, ids: Variant) -> bool:
+	var result: Dictionary = _l1_pending_ids_error if ids == pending_match_ids and not _l1_pending_ids_error.is_empty() else PlayerLife._l3_validate_lineup(save, ids)
+	if result.status == "OK":
+		return true
+	var dialog := AcceptDialog.new()
+	dialog.title = "Lineup"
+	dialog.dialog_text = PlayerLife._l1_lineup_error_text(result)
+	add_child(dialog)
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.popup_centered()
+	return false
+
+func _l3_remove_current_references(d: Dictionary, ids: Array) -> void:
+	var sold := {}
+	for raw in ids:
+		var key := PlayerLife._l3_license_id(raw)
+		if key != "": sold[key] = true
+	var roster: Dictionary = d.get("roster", {})
+	var mercato: Dictionary = d.get("mercato", {})
+	for pair in [[roster, "selected_ids"], [roster, "match_selected_ids"], [mercato, "purchased_ids"]]:
+		var owner: Dictionary = pair[0]
+		var field: String = pair[1]
+		if owner.get(field) is Array:
+			owner[field] = owner[field].filter(func(raw): return not sold.has(PlayerLife._l3_license_id(raw)))
+	for owner in [d, roster]:
+		if owner.get("players") is Array:
+			owner["players"] = owner.players.filter(func(row): return not (row is Dictionary and sold.has(PlayerLife._l3_license_id(row.get("id")))))
+	# Brouillon non confirmé conservé, sauf les joueurs désormais vendus.
+	pending_match_ids = pending_match_ids.filter(func(raw): return not sold.has(PlayerLife._l3_license_id(raw)))
+
+func _l3_has_paid_matches(roster: Dictionary) -> bool:
+	return bool(roster.get("auto_save_match_selection_paid", false)) and int(roster.get("auto_save_match_selection_matches_left", 5)) > 0
