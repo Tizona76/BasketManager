@@ -1328,6 +1328,7 @@ func _cloud_response_matches_request(response: Dictionary, requested_career_id: 
 # CLOUD LOAD
 # ------------------------------------------------------------
 func _try_cloud_load() -> void:
+	if _steam_cloud_route(false): return
 	var access: String = str(Session.access_token).strip_edges()
 	if access == "":
 		if _is_web_guest_auth_pending():
@@ -1426,6 +1427,7 @@ func _cloud_save_retry_after(headers: PackedStringArray, fallback: float) -> flo
 
 
 func _try_cloud_save_from_local(origin: CloudSaveOrigin = CloudSaveOrigin.AUTOMATIC) -> void:
+	if _steam_cloud_route(true): return
 	var key := JSON.stringify([str(Session.profile_uuid).strip_edges(), _cloud_active_career_id()])
 	var locks: Dictionary = get_tree().get_meta(CLOUD_CONFLICT_LOCKS, {})
 	if origin == CloudSaveOrigin.AUTOMATIC and locks.has(key):
@@ -1586,6 +1588,10 @@ func _on_save_token_refreshed(result: int, code: int, _headers: PackedStringArra
 
 
 func _on_http_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	if _inflight in ["load", "save"] and SteamCloudAdapter.cloud_enrolled(_steam_cloud_document()):
+		_inflight = ""
+		_cloud_save_attempt.clear()
+		return
 	var txt: String = body.get_string_from_utf8()
 
 	if result == HTTPRequest.RESULT_TIMEOUT:
@@ -4867,3 +4873,106 @@ func _upgrade_club_crest_lv2() -> void:
 		return
 	PL.write_savegame(save)
 	_update_club_name_label_from_save()
+
+# A5 cloud is opt-in at build time AND configuration time. No legacy fallback.
+const SteamCloudAdapter = preload("res://scripts/SteamWallet.gd")
+const SteamCloudIO = preload("res://scripts/LocalIO.gd")
+var _steam_cloud_adapters: Dictionary = {}
+var _steam_cloud_refresh_attempt: Dictionary = {}
+var _steam_cloud_refresh_tried: Dictionary = {}
+
+func _steam_cloud_binding() -> Dictionary:
+	var subject := ""
+	var parts := str(Session.access_token).split(".")
+	if parts.size() == 3:
+		var encoded := parts[1].replace("-", "+").replace("_", "/")
+		while encoded.length() % 4 != 0: encoded += "="
+		var payload: Variant = JSON.parse_string(Marshalls.base64_to_utf8(encoded))
+		if payload is Dictionary: subject = str(payload.get("sub", ""))
+	# Routing identity only; backend remains the authority validating this JWT.
+	return {"user_id":subject,"profile_uuid":str(Session.profile_uuid),"career_id":_cloud_active_career_id()}
+
+func _steam_cloud_route(upload: bool) -> bool:
+	var document: Variant = _steam_cloud_document()
+	if not SteamCloudAdapter.cloud_enrolled(document): return false
+	if not _steam_cloud_enabled():
+		return true
+	if _auth_inflight or _inflight != "" or not _steam_cloud_refresh_attempt.is_empty(): return true
+	var binding := _steam_cloud_binding()
+	var key := JSON.stringify(binding)
+	if not _steam_cloud_adapters.has(key):
+		var adapter := SteamCloudAdapter.new()
+		adapter.enable_cloud(_steam_cloud_send.bind(key))
+		_steam_cloud_adapters[key] = adapter
+	var io := _steam_cloud_io()
+	var outcome: Dictionary = _steam_cloud_adapters[key].cloud_request(io,binding,str(Session.access_token),upload)
+	_cloud_save_feedback("Steam cloud: " + str(outcome.status))
+	return true
+
+func _steam_cloud_send(message: Dictionary, key: String) -> void:
+	var request := HTTPRequest.new()
+	request.timeout = 15.0
+	add_child(request)
+	request.request_completed.connect(_steam_cloud_completed.bind(request,key,str(message.request_id)),CONNECT_ONE_SHOT)
+	var headers := PackedStringArray(["Content-Type: application/json","Accept: application/json"])
+	for name in message.headers:
+		if str(message.headers[name]) != "": headers.append(str(name)+": "+str(message.headers[name]))
+	var method := HTTPClient.METHOD_PUT if message.method == "PUT" else HTTPClient.METHOD_GET
+	var error := request.request(API_BASE+str(message.path),headers,method,JSON.stringify(message.body) if method==HTTPClient.METHOD_PUT else "")
+	if error != OK: _steam_cloud_completed(HTTPRequest.RESULT_CANT_CONNECT,0,PackedStringArray(),PackedByteArray(),request,key,str(message.request_id))
+
+func _steam_cloud_completed(result: int, code: int, _headers: PackedStringArray, bytes: PackedByteArray, request: HTTPRequest, key: String, request_id: String) -> void:
+	request.queue_free()
+	var parsed: Variant = JSON.parse_string(bytes.get_string_from_utf8()) if not bytes.is_empty() else {}
+	var reply: Dictionary = parsed if parsed is Dictionary else {}
+	var io := _steam_cloud_io()
+	var outcome: Dictionary = _steam_cloud_adapters[key].cloud_receive(io,_steam_cloud_binding(),str(Session.access_token),request_id,code if result==HTTPRequest.RESULT_SUCCESS else 0,reply)
+	_cloud_save_feedback("Steam cloud: "+str(outcome.status))
+	if outcome.status in ["COMMITTED","CHECKPOINT_VERIFIED"]:
+		_steam_cloud_refresh_tried.erase(key)
+		if outcome.get("local_matches_checkpoint",false): _dirty_local = false
+		_set_network_state("ONLINE")
+	if outcome.status == "AUTH_REQUIRED": _steam_cloud_refresh(key)
+
+func _steam_cloud_enabled() -> bool:
+	return bool(ProjectSettings.get_setting("basketcorp/steam_wallet_cloud_enabled",false)) and OS.get_name()=="Windows" and OS.has_feature("steam")
+
+func _steam_cloud_io() -> RefCounted:
+	return SteamCloudIO.new("user://")
+
+func _steam_cloud_refresh(key: String) -> void:
+	var refresh := str(Session.refresh_token).strip_edges()
+	var fingerprint := str(Session.access_token).sha256_text()
+	if _auth_inflight or not _steam_cloud_refresh_attempt.is_empty() or refresh.length()<10 or _steam_cloud_refresh_tried.get(key)==fingerprint: return
+	if key != JSON.stringify(_steam_cloud_binding()): return
+	_steam_cloud_refresh_tried[key] = fingerprint
+	_steam_cloud_refresh_attempt = {"key":key,"access":str(Session.access_token),"refresh":refresh}
+	_steam_cloud_send_refresh(refresh)
+
+func _steam_cloud_send_refresh(refresh: String) -> void:
+	var request := HTTPRequest.new()
+	request.timeout = CLOUD_TIMEOUT_SECONDS
+	add_child(request)
+	request.request_completed.connect(_steam_cloud_refreshed.bind(request),CONNECT_ONE_SHOT)
+	var error := request.request(API_BASE+PATH_AUTH_REFRESH,PackedStringArray(["Content-Type: application/json"]),HTTPClient.METHOD_POST,JSON.stringify({"refresh_token":refresh}))
+	if error != OK:
+		request.queue_free()
+		_steam_cloud_refresh_attempt.clear()
+
+func _steam_cloud_refreshed(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray, request: HTTPRequest) -> void:
+	request.queue_free()
+	var attempt := _steam_cloud_refresh_attempt
+	_steam_cloud_refresh_attempt = {}
+	if attempt.is_empty() or attempt.key != JSON.stringify(_steam_cloud_binding()) or attempt.access != str(Session.access_token) or attempt.refresh != str(Session.refresh_token): return
+	if result != HTTPRequest.RESULT_SUCCESS or code<200 or code>=300: return
+	var tokens: Variant = JSON.parse_string(body.get_string_from_utf8())
+	if not tokens is Dictionary or not tokens.get("access_token") is String or str(tokens.access_token).length()<20: return
+	# Existing refresh endpoint and Session persistence; no new login mechanism.
+	Session.set_tokens(tokens.access_token,str(tokens.get("refresh_token",attempt.refresh)),"Bearer")
+	_steam_cloud_refresh_tried[attempt.key] = str(Session.access_token).sha256_text()
+	if not _save_session_local_from_menu(): return
+	# GET resumes a durable PUT if present, with its original idempotency key.
+	_steam_cloud_route(false)
+
+func _steam_cloud_document() -> Variant:
+	return _read_json_file(PL._resolve_save_path(FILE_SAVEGAME))

@@ -235,7 +235,7 @@ static func load_savegame(path: String = "user://savegame.json") -> Dictionary:
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return {}
 	var save: Dictionary = parsed as Dictionary
-	if save.has("l5_match"):
+	if save.has("l5_match") or save.has("_steam_local"):
 		return save # L5 reads must not repair or publish implicitly.
 	_bm_save_debug_player(save, 1006)
 	_bm_save_debug_player(save, 1007)
@@ -279,6 +279,7 @@ static func consume_paid_lineup_match(save: Dictionary) -> void:
 
 static func write_savegame(data: Dictionary, path: String = "user://savegame.json") -> void:
 	path = _resolve_save_path(path)
+	if _steam_publish_existing(path, data): return
 	ensure_progression_wallet_schema(data)
 	if not _l5_legacy_write_allowed(path, data):
 		push_error("L5: stale or pending career write refused")
@@ -2821,6 +2822,8 @@ static func _l5_legacy_write_allowed(path: String, data: Variant) -> bool:
 # Opted-in careers keep their receipt safe on subsequent historical writes too.
 # Returns whether the protected path was handled (success or explicit refusal).
 static func _l5_publish_existing(path: String, data: Variant) -> bool:
+	# Enrolled careers cannot fall back to legacy cloud/copy publication.
+	if _steam_publish_existing(path, data, false): return true
 	if not data is Dictionary or not data.has("l5_match"): return false
 	if not data.l5_match is Dictionary:
 		push_error("L5: invalid protected metadata")
@@ -2837,4 +2840,34 @@ static func _l5_publish_existing(path: String, data: Variant) -> bool:
 		push_error("L5: protected write failed: " + str(result.status))
 	else:
 		data["l5_match"] = next.l5_match.duplicate(true)
+	return true
+
+
+# A5: no enrollment here. Only already protected career documents take this path.
+# Boolean means handled, including explicit refusal; never fall back to raw write.
+static func _steam_publish_existing(path: String, data: Variant, allow_write: bool = true) -> bool:
+	var io = load("res://scripts/LocalIO.gd").new(ProjectSettings.globalize_path(path).get_base_dir())
+	var disk: Dictionary = io._read(path)
+	var incoming: bool = data is Dictionary and data.has("_steam_local")
+	var existing: bool = disk.status == "OK" and disk.data is Dictionary and disk.data.has("_steam_local")
+	if not incoming and not existing: return false
+	if not allow_write:
+		push_error("Steam: legacy publication refused; protected writer required")
+		return true
+	if not data is Dictionary or not existing or not _l5_legacy_write_allowed(path,data):
+		push_error("Steam: protected career write refused")
+		return true
+	var current: Dictionary = io.read_career()
+	if current.status != "OK" or ProjectSettings.globalize_path(io._context.get("path","")) != ProjectSettings.globalize_path(path):
+		push_error("Steam: inactive career write refused")
+		return true
+	var next: Dictionary = data.duplicate(true)
+	if next.has("l5_match"):
+		next.l5_match.revision = int(current.data.l5_match.get("revision",0)) + 1
+	var result: Dictionary = io.write_verified(next)
+	if result.status == "COMMITTED":
+		data["_steam_local"] = next._steam_local.duplicate(true)
+		if next.has("l5_match"): data["l5_match"] = next.l5_match.duplicate(true)
+	else:
+		push_error("Steam: protected write refused: " + str(result.status))
 	return true

@@ -375,6 +375,8 @@ func _restore_confirm_button_layout() -> void:
 		return
 	var popup_width := PopupConfirm.offset_right - PopupConfirm.offset_left
 	var left := maxf(0.0, (popup_width - PURCHASE_CONFIRM_BUTTON_WIDTH) * 0.5)
+	if _steam_platform() and BtnCancel != null:
+		left = maxf(left, BtnCancel.offset_right + 16.0)
 	BtnConfirm.custom_minimum_size = Vector2(PURCHASE_CONFIRM_BUTTON_WIDTH, 56)
 	BtnConfirm.offset_left = left
 	BtnConfirm.offset_right = left + PURCHASE_CONFIRM_BUTTON_WIDTH
@@ -2220,7 +2222,8 @@ func _build_club_tokens_info_screen() -> void:
 
 
 func _add_buy_club_tokens_access(root: VBoxContainer) -> void:
-	return
+	if not _steam_platform():
+		return
 	_btn_buy_club_tokens = Button.new()
 	_btn_buy_club_tokens.name = "BtnBuyClubTokens"
 	var buy_text := _club_tokens_tr("club_tokens.buy", "BUY CLUB TOKENS")
@@ -2345,6 +2348,9 @@ func _on_pkg_300() -> void:
 	_open_purchase_confirm(75)
 
 func _on_confirm_purchase() -> void:
+	if _steam_platform() and not _payment_confirmation_shown:
+		_steam_buy()
+		return
 	if _payment_confirmation_shown:
 		_pending_tokens_amount = 0
 		_restore_purchase_popup_layout()
@@ -2717,6 +2723,7 @@ func _on_payment_cloud_load_completed(http: HTTPRequest, result: int, response_c
 
 
 func _on_cancel_purchase() -> void:
+	if _steam_platform(): _steam_pack="" # Stop preparation before any new order.
 	_pending_tokens_amount = 0
 	_pending_checkout_career_id = ""
 	_reset_payment_attempt_state()
@@ -2732,3 +2739,248 @@ func _on_cancel_purchase() -> void:
 
 func _on_pkg_800() -> void:
 	_open_purchase_confirm(150)
+
+# Optional Steam path; every Windows purchase is intercepted before Stripe.
+const SteamPurchaseWallet = preload("res://scripts/SteamWallet.gd")
+const SteamPurchaseIO = preload("res://scripts/LocalIO.gd")
+const SteamPurchaseRuntime = preload("res://scripts/SteamPurchases.gd")
+var _steam_purchase: RefCounted
+var _steam_runtime: Node
+var _steam_http_pending := false
+var _steam_link_pending := false
+var _steam_registration_pending := false
+var _steam_local_context := {}
+var _steam_binding := {}
+var _steam_jwt := ""
+var _steam_pack := ""
+var _steam_link_request: HTTPRequest
+var _steam_deferred_authorizations := {}
+var _steam_renewals := 0
+var _steam_registration: ConfirmationDialog
+
+func _steam_local_identity() -> Dictionary:
+	var io := SteamPurchaseIO.new("user://")
+	var read: Dictionary = io.read_career()
+	if read.status != "OK": return {}
+	return {"profile_id":read.data.profile_id,"career_id":read.data.career_id}
+
+func _steam_purchase_binding() -> Dictionary:
+	if _steam_local_identity() != _steam_local_context: return {}
+	return _steam_binding.duplicate(true)
+
+func _steam_buy() -> void:
+	if _steam_http_pending or _steam_link_pending or _steam_registration_pending: return
+	if not OS.has_feature("steam") or not bool(ProjectSettings.get_setting("basketcorp/steam_payments_enabled",false)):
+		_set_status("Steam purchases are currently unavailable.")
+		return
+	var local := _steam_local_identity()
+	if local.is_empty():
+		_set_status("Steam: active career unavailable")
+		return
+	var packs := {25:"tokens25",75:"tokens75",150:"tokens150"}
+	_steam_pack=str(packs.get(_pending_tokens_amount,""))
+	if _steam_pack.is_empty(): return
+	if local != _steam_local_context:
+		_steam_binding.clear(); _steam_jwt=""; _steam_deferred_authorizations.clear()
+	_steam_local_context=local
+	_steam_renewals=0
+	_steam_runtime=get_tree().root.get_node_or_null("BasketCorpSteamPurchases")
+	if _steam_runtime==null:
+		_steam_runtime=SteamPurchaseRuntime.new()
+		_steam_runtime.name="BasketCorpSteamPurchases"
+		get_tree().root.add_child(_steam_runtime)
+	var initialized: String = _steam_runtime.initialize(true)
+	if initialized!="READY":
+		_set_status(initialized)
+		return
+	if not _steam_runtime.authorization.is_connected(_steam_authorized): _steam_runtime.authorization.connect(_steam_authorized)
+	if not _steam_runtime.web_ticket_ready.is_connected(_steam_ticket_ready): _steam_runtime.web_ticket_ready.connect(_steam_ticket_ready)
+	if not _steam_runtime.web_ticket_failed.is_connected(_steam_ticket_failed): _steam_runtime.web_ticket_failed.connect(_steam_ticket_failed)
+	_steam_request_session()
+
+func _steam_request_session() -> void:
+	if _steam_local_identity() != _steam_local_context:
+		_set_status("Steam: career changed")
+		return
+	_steam_link_pending=true
+	_set_status("Steam: verifying purchase session")
+	if not _steam_runtime.request_web_ticket(): _steam_ticket_failed()
+
+func _steam_ticket_ready(ticket_hex: String) -> void:
+	if not _steam_link_pending: return
+	if _steam_local_identity() != _steam_local_context or ticket_hex.is_empty():
+		_steam_ticket_failed()
+		return
+	_steam_link_request=HTTPRequest.new()
+	_steam_link_request.timeout=15.0
+	add_child(_steam_link_request)
+	_steam_link_request.request_completed.connect(_steam_link_completed,CONNECT_ONE_SHOT)
+	var err := _steam_link_request.request(API_BASE+"/v1/steam/purchase-session",PackedStringArray(["Content-Type: application/json","Accept: application/json"]),HTTPClient.METHOD_POST,JSON.stringify({"ticket":ticket_hex}))
+	if err!=OK: _steam_ticket_failed()
+
+func _steam_ticket_failed() -> void:
+	_steam_link_pending=false
+	if _steam_runtime!=null: _steam_runtime.cancel_web_ticket()
+	if is_instance_valid(_steam_link_request): _steam_link_request.queue_free()
+	_steam_link_request=null
+	_set_status("Steam: identity verification failed. Retry to resume your purchase.")
+
+func _steam_link_completed(result: int, code: int, _headers: PackedStringArray, bytes: PackedByteArray) -> void:
+	if is_instance_valid(_steam_link_request): _steam_link_request.queue_free()
+	_steam_link_request=null
+	_steam_runtime.cancel_web_ticket()
+	_steam_link_pending=false
+	if _steam_pack.is_empty(): return
+	if _steam_local_identity()!=_steam_local_context:
+		_set_status("Steam: career changed")
+		return
+	if result==HTTPRequest.RESULT_SUCCESS and code==401 and _steam_renewals<1:
+		_steam_renewals+=1
+		_steam_request_session()
+		return
+	var value: Variant = JSON.parse_string(bytes.get_string_from_utf8())
+	if result!=HTTPRequest.RESULT_SUCCESS or code!=200 or not value is Dictionary:
+		_set_status("Steam: purchase session unavailable")
+		return
+	var candidate_jwt := str(value.get("access_token",""))
+	var subject := str(value.get("user_id",""))
+	if not _steam_binding.is_empty() and subject!=_steam_binding.get("user_id"):
+		_set_status("Steam: account changed; original purchase preserved")
+		return
+	var io := SteamPurchaseIO.new("user://")
+	var read: Dictionary = io.read_career()
+	if read.status!="OK":
+		_set_status("Steam: career unavailable")
+		return
+	var registered: bool = read.data.has("steam_wallet") or read.data.has("_steam_local")
+	var binding: Dictionary
+	if registered:
+		var saved: Variant = read.data.get("steam_wallet",{}).get("binding")
+		if not saved is Dictionary or saved.get("user_id")!=subject or saved.get("career_id")!=_steam_local_context.career_id:
+			_set_status("Steam: career belongs to another account or is incompatible")
+			return
+		binding=saved.duplicate(true)
+	else:
+		# Stable per Steam identity/local profile; never overwrite the general session.
+		binding={"user_id":subject,"profile_uuid":("steam:"+subject+":"+str(_steam_local_context.profile_id)).sha256_text(),"career_id":_steam_local_context.career_id}
+	if not SteamPurchaseWallet.purchase_session_valid(candidate_jwt,binding):
+		_set_status("Steam: invalid purchase session")
+		return
+	_steam_binding=binding; _steam_jwt=candidate_jwt
+	if registered:
+		_steam_prepare_current()
+	else:
+		_steam_registration_pending=true
+		if is_instance_valid(_steam_registration): _steam_registration.queue_free()
+		_steam_registration=ConfirmationDialog.new()
+		_steam_registration.title="Steam purchases"
+		_steam_registration.dialog_text="Register this local career with the current Steam account for purchases? Your progress and token balance will be preserved. This does not verify historical ownership."
+		_steam_registration.confirmed.connect(_steam_prepare_current,CONNECT_ONE_SHOT)
+		_steam_registration.canceled.connect(func(): _steam_registration_pending=false,CONNECT_ONE_SHOT)
+		add_child(_steam_registration)
+		_steam_registration.popup_centered(Vector2i(580,200))
+
+func _steam_prepare_current() -> void:
+	_steam_registration_pending=false
+	if _steam_pack.is_empty(): return
+	if _steam_purchase_binding().is_empty():
+		_set_status("Steam: career changed")
+		return
+	_steam_purchase=SteamPurchaseWallet.new()
+	var outcome: Dictionary = _steam_purchase.purchase_prepare(SteamPurchaseIO.new("user://"),_steam_send,_steam_binding,_steam_jwt)
+	_steam_show_outcome(outcome)
+
+func _steam_start_after_link() -> void:
+	if _steam_purchase==null or _steam_pack.is_empty() or _steam_purchase_binding().is_empty(): return
+	_steam_show_outcome(_steam_purchase.purchase_start(_steam_pack))
+
+func _steam_send(message: Dictionary) -> void:
+	if _steam_purchase_binding().is_empty():
+		_set_status("Steam: career changed; purchase preserved")
+		return
+	var request := HTTPRequest.new()
+	request.timeout=25.0
+	add_child(request)
+	_steam_http_pending=true
+	var headers := _steam_headers(message,_steam_jwt)
+	request.request_completed.connect(_steam_completed.bind(request,str(message.request_id),_steam_purchase),CONNECT_ONE_SHOT)
+	var method := HTTPClient.METHOD_GET if message.method=="GET" else (HTTPClient.METHOD_PUT if message.method=="PUT" else HTTPClient.METHOD_POST)
+	var body: Dictionary = message.body.duplicate(true)
+	if (message.method == "PUT" and message.path == "/v1/steam/wallet/checkpoint") or (message.method == "POST" and message.path == "/v1/steam/wallet/deliveries"):
+		var rev: Variant = body.get("expected_revision")
+		if not (rev is int or rev is float) or not is_finite(float(rev)) or rev != floor(float(rev)) or rev < 0 or rev > 9007199254740991:
+			_steam_completed(HTTPRequest.RESULT_SUCCESS,400,PackedStringArray(),'{"detail":"INVALID_REVISION"}'.to_utf8_buffer(),request,str(message.request_id),_steam_purchase)
+			return
+		# Normalize only the wire copy, including requests restored from JSON.
+		body["expected_revision"] = int(rev)
+	var error := request.request(API_BASE+str(message.path),headers,method,"" if method==HTTPClient.METHOD_GET else JSON.stringify(body))
+	if error!=OK: _steam_completed(HTTPRequest.RESULT_CANT_CONNECT,0,PackedStringArray(),PackedByteArray(),request,str(message.request_id),_steam_purchase)
+
+func _steam_completed(result: int, code: int, _headers: PackedStringArray, bytes: PackedByteArray, request: HTTPRequest, request_id: String, coordinator: RefCounted) -> void:
+	request.queue_free()
+	if coordinator!=_steam_purchase: return
+	_steam_http_pending=false
+	var decoded: Variant = JSON.parse_string(bytes.get_string_from_utf8())
+	var reply: Dictionary = decoded if decoded is Dictionary else {}
+	var delivery: RefCounted = coordinator._purchase_delivery
+	var fresh_credit: bool = delivery != null and delivery._durable_intent_confirmed and not delivery._proof.is_empty() and not delivery._acknowledged and coordinator._purchase_request.get("request_id") == request_id and coordinator._purchase_request.get("kind") == "delivery"
+	var outcome: Dictionary = coordinator.purchase_receive(request_id,code if result==HTTPRequest.RESULT_SUCCESS else 0,reply,_steam_purchase_binding(),_steam_jwt)
+	_steam_show_outcome(outcome)
+	if fresh_credit and outcome.status == "PURCHASE_COMPLETE":
+		var balance: int = int(delivery._proof.snapshot.wallet.tokens)
+		var added: int = balance - int(delivery._origin.snapshot.wallet.tokens)
+		_payment_confirmation_shown = true
+		_set_payment_confirmed_content(added, balance)
+		_set_close_payment_button()
+		if PopupConfirm != null:
+			PopupConfirm.visible = true
+			PopupConfirm.z_index = 500
+			PopupConfirm.move_to_front()
+	_steam_drain_authorizations()
+
+func _steam_show_outcome(outcome: Dictionary) -> void:
+	if outcome.status in ["READY", "REQUESTED", "PURCHASE_COMPLETE"]:
+		_set_status("")
+	else:
+		_set_status("Steam: "+str(outcome.status))
+	if outcome.status=="READY":
+		_steam_binding=_steam_purchase._purchase_binding.duplicate(true)
+		_steam_start_after_link()
+	elif outcome.status=="AUTH_REQUIRED" and _steam_renewals<1 and _steam_runtime!=null:
+		_steam_renewals+=1
+		_steam_request_session()
+	elif outcome.status in ["PURCHASE_COMPLETE","PURCHASE_CANCELLED"]:
+		_pending_tokens_amount=0
+		_steam_pack=""
+		_steam_deferred_authorizations.clear()
+		if PopupConfirm!=null: PopupConfirm.visible=false
+		_build_club_tokens_info_screen()
+
+func _steam_authorized(app_id: int, order_id: String, authorized: bool) -> void:
+	if app_id!=5069970 or _steam_purchase==null: return
+	if _steam_purchase_binding()!=_steam_purchase._purchase_binding: return
+	# Keep early callbacks until the order response has persisted its ID.
+	if not _steam_deferred_authorizations.has(order_id) and _steam_deferred_authorizations.size()<8:
+		_steam_deferred_authorizations[order_id]=authorized
+	_steam_drain_authorizations()
+
+func _steam_drain_authorizations() -> void:
+	if _steam_purchase==null or _steam_http_pending or _steam_link_pending: return
+	if _steam_purchase_binding()!=_steam_purchase._purchase_binding: return
+	for order_id in _steam_deferred_authorizations.keys():
+		var outcome: Dictionary = _steam_purchase.purchase_authorization(5069970,str(order_id),bool(_steam_deferred_authorizations[order_id]))
+		if outcome.status=="REQUESTED":
+			_steam_deferred_authorizations.erase(order_id)
+			return
+		if outcome.status=="AUTH_REQUIRED":
+			_steam_show_outcome(outcome)
+			return
+
+func _steam_platform() -> bool:
+	return OS.get_name()=="Windows" and OS.has_feature("steam")
+
+func _steam_headers(message: Dictionary, jwt: String) -> PackedStringArray:
+	var headers := PackedStringArray(["Authorization: Bearer "+jwt,"Content-Type: application/json","Accept: application/json"])
+	for key in message.headers:
+		if str(key).to_lower() not in ["authorization","content-type","accept"]: headers.append(str(key)+": "+str(message.headers[key]))
+	return headers

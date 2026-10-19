@@ -1,0 +1,8 @@
+[configuration]
+
+entry_symbol = "godotsteam_init"
+compatibility_minimum = "4.4"
+
+[libraries]
+
+windows.release.x86_64 = "upstream/addons/godotsteam/win64/libgodotsteam.windows.template_release.x86_64.dll"

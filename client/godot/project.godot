@@ -37,3 +37,8 @@ window/stretch/scale=1.15
 [internationalization]
 
 locale/translations=PackedStringArray("res://i18n/translations.fr.translation", "res://i18n/translations.en.translation", "res://i18n/translations.es.translation", "res://i18n/translations.it.translation", "res://i18n/translations.pt.translation")
+
+[basketcorp]
+
+steam_wallet_cloud_enabled=true
+steam_payments_enabled=true

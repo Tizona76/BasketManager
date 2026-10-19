@@ -40,6 +40,7 @@ static func _read_json(path: String) -> Variant:
 	return json.data
 
 static func _write_json(path: String, data: Variant) -> void:
+	if load("res://scripts/PlayerLife.gd")._steam_publish_existing(path, data): return
 	if not load("res://scripts/PlayerLife.gd")._l5_legacy_write_allowed(path, data):
 		push_error("L5: profile writer refused stale career")
 		return
@@ -51,6 +52,8 @@ static func _write_json(path: String, data: Variant) -> void:
 	f.close()
 
 static func _copy_file(src: String, dst: String) -> bool:
+	# Never move/rebind a protected career through legacy byte copying.
+	if not _steam_copy_allowed(_read_json(src), _read_json(dst)): return false
 	if not FileAccess.file_exists(src):
 		return false
 
@@ -214,6 +217,9 @@ static func _write_careers_index(profile_id: String, index: Dictionary) -> void:
 	_write_json(_careers_index_path(profile_id), _normalize_careers_index(index))
 
 static func _write_career_save(profile_id: String, career_id: String, save: Dictionary) -> void:
+	if save.has("_steam_local") and (save.get("profile_id") != _sanitize_path_id(profile_id) or save.get("career_id") != career_id):
+		push_error("Steam: career rebinding refused")
+		return
 	var career_save: Dictionary = save.duplicate(true)
 	career_save["profile_id"] = _sanitize_path_id(profile_id)
 	career_save["career_id"] = career_id
@@ -319,6 +325,8 @@ static func _ensure_careers_for_profile(profile_id: String) -> void:
 	if source_save.is_empty() or not _save_represents_real_career(source_save):
 		_write_careers_index(pid, _empty_careers_index())
 		return
+	if source_save.has("_steam_local") or source_save.has("steam_wallet"):
+		return
 	source_save["career_created_by_user"] = true
 
 	var career_id: String = _generate_career_id(pid)
@@ -408,6 +416,9 @@ static func set_active_career_id(career_id: String) -> bool:
 	return true
 
 static func create_career(initial_save: Dictionary) -> String:
+	if initial_save.has("_steam_local") or initial_save.has("steam_wallet"):
+		push_error("Steam: receipt-bearing career cannot be cloned")
+		return ""
 	var pid: String = get_active_profile_id()
 	_ensure_careers_for_profile(pid)
 	var index_any: Variant = _read_careers_index(pid)
@@ -672,3 +683,10 @@ static func _default_save_dict(profile_id: String) -> Dictionary:
 		"progress": {"journee": 1, "wins": 0, "losses": 0},
 		"meta": {"created_at_unix": Time.get_unix_time_from_system()}
 	}
+
+
+static func _steam_copy_allowed(source: Variant, destination: Variant) -> bool:
+	for document in [source, destination]:
+		if document is Dictionary and (document.has("_steam_local") or document.has("steam_wallet")):
+			return false
+	return true
