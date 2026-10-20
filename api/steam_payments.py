@@ -186,7 +186,8 @@ class Payments:
                 self.wallet.authenticate(conn,user); row=self.order(conn,user,oid)
             if row['state']!='NEW': return
             info=self.rpc('GetUserInfo',{'steamid':row['steam_id']})
-            if info.get('currency')!='EUR' or info.get('status') not in ('Active','Trusted'):
+            # Valve converts the EUR order price to the user's wallet currency.
+            if info.get('status') not in ('Active','Trusted'):
                 self.mark(user,oid,'FAILED',expected=('NEW',)); sw.reject(409,'STEAM_PURCHASE_UNAVAILABLE')
             if not self.mark(user,oid,'INIT_UNKNOWN',expected=('NEW',)): return  # atomic claim BEFORE Valve
             try:
@@ -305,9 +306,11 @@ class Payments:
             except (KeyError,TypeError,ValueError): sw.reject(502,'REPORT_INVALID')
             if not isinstance(event,dict) or not uint64(event.get('orderid')): sw.reject(502,'REPORT_INVALID')
             with self.wallet.transaction() as conn:
-                found=conn.execute(text('SELECT user_id FROM steam_orders WHERE order_id=:id AND environment=:e'),{'id':int(event['orderid']),'e':self.env}).first()
+                found=conn.execute(text('SELECT user_id,steam_id FROM steam_orders WHERE order_id=:id AND environment=:e'),{'id':int(event['orderid']),'e':self.env}).first()
             if found:
-                code,_=self.reconcile(found[0],event['orderid'])
+                # Revalidate the stored Steam identity through the existing A3/A5 checks.
+                service=Payments(self.wallet.identity.engine_provider,self.valve,self.env,steam_id=found[1])
+                code,_=service.reconcile(found[0],event['orderid'])
                 if code!=200: sw.reject(503,'REPORT_PENDING')
         with self.wallet.transaction() as conn:
             conn.execute(text('''INSERT INTO steam_reconciliation(environment,window_start,event_count,complete,next_window)

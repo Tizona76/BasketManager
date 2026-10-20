@@ -367,7 +367,8 @@ func _set_payment_ready_popup_layout() -> void:
 	PopupConfirm.offset_bottom = 450.0
 	var content := PopupConfirm.get_node_or_null("PurchaseConfirmContent") as Control
 	if content != null:
-		content.position.x = maxf(28.0, (PAYMENT_READY_POPUP_WIDTH - PURCHASE_CONFIRM_CONTENT_WIDTH) * 0.5)
+		var content_width := content.size.x if _steam_platform() and _payment_confirmation_shown else PURCHASE_CONFIRM_CONTENT_WIDTH
+		content.position.x = maxf(28.0, (PAYMENT_READY_POPUP_WIDTH - content_width) * 0.5)
 
 
 func _restore_confirm_button_layout() -> void:
@@ -462,7 +463,7 @@ func _set_payment_opened_content() -> void:
 	box.add_child(msg)
 
 
-func _set_payment_confirmed_content(tokens_added: int, new_balance: int) -> void:
+func _set_payment_confirmed_content(tokens_added: int, new_balance: int, localized: bool = false) -> void:
 	if PopupConfirm == null:
 		return
 	_clear_purchase_confirm_content()
@@ -478,6 +479,9 @@ func _set_payment_confirmed_content(tokens_added: int, new_balance: int) -> void
 	var added_line := str(tokens_added) + " Club Tokens have been added to your wallet."
 	var balance_line := "New balance: " + str(new_balance) + " Club Tokens"
 	var txt := "🎉 Congratulations!\n" + added_line + "\n" + balance_line
+	if localized:
+		txt = _club_tokens_tr("club_tokens.stripe.payment_confirmed", "Payment confirmed\n{tokens_added} Club Tokens added\nNew balance: {new_balance} Club Tokens")
+		txt = txt.replace("{tokens_added}", str(tokens_added)).replace("{new_balance}", str(new_balance))
 	var msg := _make_info_label(txt, 24, Color(0.80, 1.0, 0.82, 1.0), 3)
 	msg.custom_minimum_size = Vector2(604, 118)
 	box.add_child(msg)
@@ -2358,7 +2362,8 @@ func _on_confirm_purchase() -> void:
 			PopupConfirm.visible = false
 		if LblStatus != null:
 			LblStatus.visible = false
-		_build_club_tokens_info_screen()
+		if not _steam_platform():
+			_build_club_tokens_info_screen()
 		_reset_payment_attempt_state()
 		return
 
@@ -2930,7 +2935,7 @@ func _steam_completed(result: int, code: int, _headers: PackedStringArray, bytes
 		var balance: int = int(delivery._proof.snapshot.wallet.tokens)
 		var added: int = balance - int(delivery._origin.snapshot.wallet.tokens)
 		_payment_confirmation_shown = true
-		_set_payment_confirmed_content(added, balance)
+		_set_payment_confirmed_content(added, balance, true)
 		_set_close_payment_button()
 		if PopupConfirm != null:
 			PopupConfirm.visible = true
@@ -2954,6 +2959,10 @@ func _steam_show_outcome(outcome: Dictionary) -> void:
 		_steam_pack=""
 		_steam_deferred_authorizations.clear()
 		if PopupConfirm!=null: PopupConfirm.visible=false
+		if outcome.status == "PURCHASE_COMPLETE":
+			_is_token_purchase_screen = false
+			if Packages != null: Packages.visible = false
+			if LblStatus != null: LblStatus.visible = false
 		_build_club_tokens_info_screen()
 
 func _steam_authorized(app_id: int, order_id: String, authorized: bool) -> void:
