@@ -1,0 +1,9 @@
+.DS_Store
+/client/**/.godot/
+/client/**/.godot_cache_backup_20260312/
+/client/**/.godot_bak_20260316_181314/
+/client/**/.godot_bak_cache_20260316_162251/
+/client/**/.godot.BAK_20260128_103405/
+/build/windows*/BasketManager.exe
+/build/windows*/BasketManager.pck
+/tools/steamworks_probe/*.log
