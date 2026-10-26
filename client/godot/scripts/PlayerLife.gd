@@ -1064,8 +1064,53 @@ static func _ensure_player_schema(p: Dictionary) -> void:
 	if not p.has("pct_3pts"): p["pct_3pts"] = 0
 
 static func _recalc_derived(p: Dictionary) -> void:
+	var resolved := _l1_player_rating(p)
+	if resolved.status == "OK" and resolved.get("regime") == "historical":
+		_h1_recalc_legacy(p)
+		return
 	_l2_refresh_rating(p)
 	var fatigue := int(p["fatigue"])
+
+	# %2pts / %3pts: “type .py” simplifié basé sur precision + fatigue
+	# (valeurs en %)
+	var prec := int(p["precision"])
+	var tir := int(p["tir"])
+	var pct2 := prec * 0.60 + tir * 0.30 + 10 - float(fatigue) * 0.15
+	var pct3 := prec * 0.30 + tir * 0.50 + float(p["vitesse"]) * 0.10 - float(fatigue) * 0.12
+
+	p["pct_2pts"] = clampi(int(round(pct2)), 25, 85)
+	p["pct_3pts"] = clampi(int(round(pct3)), 15, 65)
+
+	# Salaire: index simple basé sur pondération (à aligner plus tard sur ton .py)
+	# salaire annuel conservé : ne pas écraser ici
+
+# Exact historical implementation from ac1862d^; conversions and rounding preserved.
+static func _h1_recalc_legacy(p: Dictionary) -> void:
+	# Base pondération: moyenne pondérée simple des attributs
+	var base := (
+		int(p["precision"]) * 0.20 +
+		int(p["tir"])       * 0.10 +
+		int(p["vitesse"])   * 0.20 +
+		int(p["force"])     * 0.15 +
+		int(p["defense"])   * 0.20 +
+		int(p["endurance"]) * 0.15
+	)
+
+	# Modifiers “vivants”
+	var fatigue := int(p["fatigue"])
+	var motiv := int(p["motivation"])
+	var injured := bool(p["blessure"])
+
+	var fatigue_penalty := (float(fatigue) / 100.0) * 0.30   # jusqu’à -30%
+	var motiv_bonus := ((float(motiv) - 50.0) / 50.0) * 0.10 # +/-10% autour de 50
+	var injury_penalty := 0.35 if injured else 0.0           # -35% si blessé
+
+	var mult := 1.0 - fatigue_penalty - injury_penalty + motiv_bonus
+	mult = clamp(mult, 0.25, 1.25)
+
+	var pond := int(round(float(base) * mult))
+	p["ponderation"] = pond
+	p["pondération"] = pond
 
 	# %2pts / %3pts: “type .py” simplifié basé sur precision + fatigue
 	# (valeurs en %)
@@ -1141,6 +1186,9 @@ static func apply_post_match_to_save(save: Dictionary, played_ids: Array, did_wi
 		if typeof(p) != TYPE_DICTIONARY:
 			continue
 
+		# Never turn incomplete legacy data into eligibility through schema defaults.
+		if not p.has("rating_provenance") and _l1_player_rating(p).status != "OK":
+			continue
 		_ensure_player_schema(p)
 
 		# Blessure / convalescence
@@ -1176,6 +1224,9 @@ static func apply_post_match_to_save(save: Dictionary, played_ids: Array, did_wi
 		if typeof(p) != TYPE_DICTIONARY:
 			continue
 
+		# Never turn incomplete legacy data into eligibility through schema defaults.
+		if not p.has("rating_provenance") and _l1_player_rating(p).status != "OK":
+			continue
 		_ensure_player_schema(p)
 
 		# Blessure / convalescence
@@ -2497,9 +2548,31 @@ static func _l1_resolve_rating(player: Dictionary, provenance: Dictionary = {}) 
 		return {"status": "INVALID", "field": field}
 	return {"status": "OK", "value": float(value), "source": provenance.source, "field": field, "version": provenance.version}
 
-# L1C : provenance par joueur, sans migration ni lecture de sauvegarde.
+# Compatibility contract for the complete legacy fractional-precision format.
+# This recognizes a format, not authenticated provenance. Never infer from a
+# numerical match with the formula, and never repair incomplete data here.
+static func _h1_historical_rating(player: Dictionary) -> Dictionary:
+	for field in ["overall", "rating", "note"]:
+		if player.has(field):
+			return {"status": "CONFLICT", "field": field}
+	for field in ["precision", "tir", "vitesse", "force", "defense", "endurance", "fatigue", "motivation", "pondération", "ponderation"]:
+		var maximum := 1.0 if field == "precision" else 100.0
+		if not _l1_is_number(player.get(field)) or float(player[field]) < 0.0 or float(player[field]) > maximum:
+			return {"status": "INVALID", "field": field}
+	if float(player.ponderation) != float(player["pondération"]):
+		return {"status": "CONFLICT", "field": "ponderation"}
+	for field in ["age", "matchs_consecutifs", "repos_consecutifs", "matches_conval"]:
+		if not _l1_is_number(player.get(field)) or float(player[field]) < 0.0 or floor(float(player[field])) != float(player[field]):
+			return {"status": "INVALID", "field": field}
+	if float(player.age) <= 0.0 or not player.get("blessure") is bool or player.get("poste") not in ["Meneur", "Arrière", "Ailier", "Pivot"]:
+		return {"status": "INVALID", "field": "age/blessure/poste"}
+	return {"status": "OK", "value": float(player["pondération"]), "regime": "historical"}
+
+# Explicit provenance always owns resolution, including malformed/empty values.
 static func _l1_player_rating(player: Dictionary) -> Dictionary:
-	var provenance: Variant = player.get("rating_provenance", {})
+	if not player.has("rating_provenance"):
+		return _h1_historical_rating(player)
+	var provenance: Variant = player.rating_provenance
 	if not provenance is Dictionary:
 		return {"status": "INVALID", "field": "rating_provenance"}
 	return _l1_resolve_rating(player, provenance)
@@ -2665,9 +2738,22 @@ static func _l2_sync_sport_copies(save: Dictionary, new_season: bool = false) ->
 		if not index.has(key):
 			continue
 		var source: Dictionary = by_id[index[key]]
+		# Resolve before copying state: synchronization must not repair invalid ratings.
+		var historical := _l1_player_rating(source)
+		var copy_rating := _l1_player_rating(row)
+		var same_identity := true
+		for field in ["name", "nom", "avatar_key"]:
+			if source.get(field) != row.get(field):
+				same_identity = false
+		if not source.has("rating_provenance") or not row.has("rating_provenance"):
+			if historical.status != "OK" or copy_rating.status != "OK" or not same_identity or historical.get("regime") != "historical" or copy_rating.get("regime") != "historical":
+				continue # Never repair incomplete copies or mix historical/modern regimes.
 		for field in fields:
 			if source.has(field):
 				row[field] = source[field]
+		if same_identity and historical.status == "OK" and historical.get("regime") == "historical" and copy_rating.status == "OK" and copy_rating.get("regime") == "historical":
+			row["pondération"] = source["pondération"]
+			row["ponderation"] = source["ponderation"]
 		# Ne jamais écraser une note native/ambiguë ni importer une provenance.
 		var proof: Variant = source.get("rating_provenance", {})
 		if proof is Dictionary and proof.get("kind") in ["canonical", "derived_c36"] and row.get("rating_provenance", {}) == proof:
