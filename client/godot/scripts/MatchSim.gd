@@ -21,6 +21,8 @@ const BM_COACH_INSIGHTS_DEBUG := true
 @onready var timer: Timer = $Timer
 @onready var btn_retour: Button = $BtnRetour
 
+var _bm_live_dot_tween: Tween = null
+
 var lbl_match_result: Label = null
 var btn_current_lineup: Button = null
 var current_lineup_popup: Control = null
@@ -602,6 +604,7 @@ func _bm_matchsim_is_mobile_layout() -> bool:
 
 
 func _bm_matchsim_apply_mobile_layout() -> void:
+	_bm_layout_scoreboard_names()
 	if not _bm_matchsim_is_mobile_layout():
 		return
 
@@ -1556,6 +1559,7 @@ func _ready() -> void:
 		return
 	print("[DBG READY] before timer.start")
 	timer.start()
+	_bm_update_live_indicator()
 	call_deferred("_bm_show_match_progress_info_after_start")
 	_bm_track_first_match_started()
 	if _bm_should_show_skip_final_result_button():
@@ -1751,23 +1755,45 @@ func _bm_apply_scoreboard_crest_to_label(icon_name: String, team_name: String, t
 
 	icon.texture = load(crest_path)
 	icon.visible = true
-	if _bm_matchsim_is_mobile_layout():
-		icon.size = Vector2(42.6, 42.6)
-		var mobile_x: float = target_lbl.position.x + 2.0
-		var mobile_y: float = target_lbl.position.y + (target_lbl.size.y - icon.size.y) * 0.5
-		icon.position = Vector2(mobile_x, mobile_y)
-		return
+	_bm_position_scoreboard_crest(icon, target_lbl, is_right_aligned)
 
-	icon.size = Vector2(58.8, 58.8)
-	var x: float = target_lbl.position.x - icon.size.x - 6.0
+
+func _bm_position_scoreboard_crest(icon: TextureRect, target_lbl: Label, is_right_aligned: bool) -> void:
+	var side: float = 42.6 if _bm_matchsim_is_mobile_layout() else 58.8
+	icon.size = Vector2(side, side)
+	var x: float = target_lbl.position.x - side - 6.0
 	if is_right_aligned:
 		var font := target_lbl.get_theme_font("font")
 		var font_size := target_lbl.get_theme_font_size("font_size")
-		var text_width := font.get_string_size(target_lbl.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-		var label_right := target_lbl.position.x + target_lbl.size.x
-		x = label_right - text_width - icon.size.x - 6.0
-	var y: float = (scoreboard_panel.size.y - icon.size.y) * 0.5
-	icon.position = Vector2(x, y)
+		var text_width := minf(target_lbl.size.x, font.get_string_size(target_lbl.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x)
+		x = target_lbl.position.x + target_lbl.size.x - text_width - side - 6.0
+	icon.position = Vector2(x, target_lbl.position.y + (target_lbl.size.y - side) * 0.5)
+
+
+func _bm_layout_scoreboard_names() -> void:
+	if scoreboard_panel == null:
+		return
+	var mobile := _bm_matchsim_is_mobile_layout()
+	var font_size: int = 32 if mobile else 28
+	var crest_side: float = 42.6 if mobile else 58.8
+	# Equal lateral budgets; keep the central score, clock and LIVE clear.
+	var name_width: float = 208.0 - crest_side - 6.0
+	for i in range(2):
+		var label: Label = lbl_team_dom if i == 0 else lbl_team_ext
+		if label == null:
+			continue
+		label.add_theme_font_size_override("font_size", font_size)
+		label.clip_text = true
+		label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if i == 0 else HORIZONTAL_ALIGNMENT_RIGHT
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		var height := label.get_theme_font("font").get_height(font_size)
+		label.size = Vector2(name_width, height)
+		var x: float = 18.0 + crest_side + 6.0 if i == 0 else scoreboard_panel.size.x - 20.0 - name_width
+		label.position = Vector2(x, 10.0 if mobile else (scoreboard_panel.size.y - height) * 0.5)
+		var icon := scoreboard_panel.get_node_or_null("ScoreboardDomCrestIcon" if i == 0 else "ScoreboardExtCrestIcon") as TextureRect
+		if icon != null:
+			_bm_position_scoreboard_crest(icon, label, i == 1)
 
 
 func _bm_update_scoreboard_club_crest(save_override: Dictionary = {}) -> void:
@@ -2076,31 +2102,13 @@ func _init_team_names() -> void:
 	_team_ext_name = ext_name
 
 	print("[DBG NAMES] dom_name=", dom_name, " ext_name=", ext_name, " lbl_team_dom=", lbl_team_dom, " lbl_team_ext=", lbl_team_ext)
-	var mobile_scoreboard := _bm_matchsim_is_mobile_layout()
 	if lbl_team_dom != null:
-		lbl_team_dom.text = ("       " + dom_name) if mobile_scoreboard else dom_name
-		lbl_team_dom.add_theme_font_size_override("font_size", int(lbl_team_dom.get_theme_font_size("font_size")) + 8)
-		if not mobile_scoreboard and scoreboard_panel != null:
-			lbl_team_dom.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			var dom_label_height := lbl_team_dom.get_theme_font("font").get_height(lbl_team_dom.get_theme_font_size("font_size"))
-			lbl_team_dom.size = Vector2(147.2, dom_label_height)
-			lbl_team_dom.position = Vector2(82.8, (scoreboard_panel.size.y - dom_label_height) * 0.5)
+		lbl_team_dom.text = dom_name
 	if lbl_team_ext != null:
-		lbl_team_ext.text = ("       " + ext_name) if mobile_scoreboard else ext_name
-		lbl_team_ext.add_theme_font_size_override("font_size", int(lbl_team_ext.get_theme_font_size("font_size")) + 8)
-		if scoreboard_panel != null:
-			var right_margin := 20.0
-			if mobile_scoreboard:
-				var ext_text_w: float = lbl_team_ext.get_combined_minimum_size().x
-				lbl_team_ext.position.x = scoreboard_panel.size.x - right_margin - ext_text_w
-				lbl_team_ext.size.x = ext_text_w
-			else:
-				lbl_team_ext.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-				lbl_team_ext.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-				var ext_label_height := lbl_team_ext.get_theme_font("font").get_height(lbl_team_ext.get_theme_font_size("font_size"))
-				lbl_team_ext.size = Vector2(scoreboard_panel.size.x - right_margin - 610.0, ext_label_height)
-				lbl_team_ext.position = Vector2(610.0, (scoreboard_panel.size.y - ext_label_height) * 0.5)
+		lbl_team_ext.text = ext_name
+	_bm_layout_scoreboard_names()
 	_bm_update_scoreboard_club_crest(save)
+
 func _fade_in_scoreboard() -> void:
 	# Fade-in doux (0.35s) du scoreboard + info panel
 	if scoreboard_panel == null or info_panel == null:
@@ -2136,12 +2144,57 @@ func _on_timer_timeout() -> void:
 	if minute >= MATCH_DUREE_MINUTES:
 		_fin_match()
 
+func _bm_update_live_indicator() -> void:
+	var live := get_node_or_null("LabelTemps/LiveIndicator") as Label
+	if live == null or lbl_temps == null:
+		return
+	live.position.y = (lbl_temps.size.y - live.size.y) * 0.5
+	live.visible = _l1_match_authorized and not match_fini and timer != null and not timer.is_stopped()
+	if not live.visible:
+		_bm_update_live_dot_blink(live)
+		return
+	# Existing long names can cross the clock area; keep decoration out of them.
+	var live_rect := live.get_global_rect()
+	live_rect.position.x -= 15.0
+	live_rect.size.x += 15.0
+	for label in [lbl_team_dom, lbl_team_ext]:
+		if label == null:
+			continue
+		var name_rect: Rect2 = label.get_global_rect()
+		name_rect.size = name_rect.size.max(label.get_combined_minimum_size())
+		if live_rect.intersects(name_rect.grow(4.0)):
+			live.hide()
+			_bm_update_live_dot_blink(live)
+			return
+	_bm_update_live_dot_blink(live)
+
+func _bm_update_live_dot_blink(live: Label) -> void:
+	var dot := live.get_node_or_null("Dot") as Label
+	if dot == null:
+		return
+	if not live.is_visible_in_tree():
+		if _bm_live_dot_tween != null:
+			_bm_live_dot_tween.kill()
+			_bm_live_dot_tween = null
+		dot.hide()
+		return
+	if _bm_live_dot_tween != null and _bm_live_dot_tween.is_valid():
+		return
+	dot.show()
+	# Bound to the dot: pauses with the scene and is freed with its node.
+	_bm_live_dot_tween = dot.create_tween().set_loops()
+	_bm_live_dot_tween.tween_interval(1.25)
+	_bm_live_dot_tween.tween_callback(dot.hide)
+	_bm_live_dot_tween.tween_interval(1.25)
+	_bm_live_dot_tween.tween_callback(dot.show)
+
 func _update_ui() -> void:
 	print("[DBG UI] lbl_temps=", lbl_temps, " lbl_score=", lbl_score, " minute=", minute, " dom=", score_dom, " ext=", score_ext)
 	if lbl_temps != null:
 		lbl_temps.text = str(minute) + "'"
 	if lbl_score != null:
 		lbl_score.text = str(score_dom) + " - " + str(score_ext)
+	_bm_update_live_indicator.call_deferred()
 
 func _bm_clear_live_spotlight() -> void:
 	if _spotlight_fallback == "":
@@ -3859,6 +3912,7 @@ func _fin_match() -> void:
 		return
 	_bm_clear_live_spotlight()
 	match_fini = true
+	_bm_update_live_indicator()
 	_live_comment_token += 1
 	_live_comment_clear_minute = -1
 	if lbl_info != null:
@@ -4733,9 +4787,11 @@ func _notification(what: int) -> void:
 		_bm_clear_live_spotlight()
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
 		call_deferred("_bm_matchsim_apply_mobile_layout")
+		_bm_update_live_indicator.call_deferred()
 
 func _l1_refuse_match(result: Dictionary) -> void:
 	_l1_match_authorized = false
+	_bm_update_live_indicator()
 	if timer != null:
 		timer.stop()
 	if btn_skip != null:
@@ -4853,6 +4909,7 @@ func _l5_finish() -> Dictionary:
 
 func _l5_refuse(result: Dictionary) -> void:
 	_l1_match_authorized = false
+	_bm_update_live_indicator()
 	if timer != null: timer.stop()
 	if btn_skip != null: btn_skip.disabled = true
 	if btn_retour != null: btn_retour.disabled = true
