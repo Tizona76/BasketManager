@@ -351,6 +351,9 @@ func commit_steam_delivery(delivery: Dictionary, expected: Dictionary) -> Dictio
 	if not _steam_intent(pending,data): return _error("STALE")
 	if not load("res://scripts/SteamWallet.gd").verify_delivery(delivery,pending.origin,pending.receipt_id): return _error("RECEIPT_CONFLICT")
 	var next: Dictionary = delivery.candidate.duplicate(true)
+	# Record History atomically with the first local credit, never during receipt recovery.
+	# Keep the server candidate/proof unchanged; History is local progress like gains/spends.
+	load("res://scripts/PlayerLife.gd")._append_token_history(next, int(next.steam_wallet.applied_receipts[pending.receipt_id].quantity), "club_tokens.history.reason.token_pack")
 	next._steam_local = data._steam_local.duplicate(true)
 	next._steam_local.pending.phase = "committed"
 	next._steam_local.pending.delivery = delivery.duplicate(true)

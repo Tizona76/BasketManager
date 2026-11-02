@@ -4843,9 +4843,16 @@ func _l5_store_preparation() -> bool:
 	if not data.has("l5_match"): data["l5_match"] = {"receipts":{},"revision":0}
 	if not data.l5_match.get("receipts") is Dictionary:
 		_l5_refuse({"status":"INVALID_RECEIPTS"});return false
+	# LocalIO publishes enrolled careers at generation + 1. Seal that exact state,
+	# while still passing the current generation to its compare-and-write checks.
+	var published_base := data.duplicate(true)
+	if data.has("_steam_local"):
+		if not _l5_io._steam_valid(data):
+			_l5_refuse({"status":"INVALID_STEAM_STATE"});return false
+		published_base._steam_local.generation = int(data._steam_local.generation) + 1
 	var random_source := RandomNumberGenerator.new()
 	random_source.randomize()
-	var pending := {"key":_l5_key(data),"ids":_l1_match_plan.ids.duplicate(),"dom":_team_dom_name,"ext":_team_ext_name,"user":_user_team_name,"home":_user_is_home,"score_dom":_score_final_dom,"score_ext":_score_final_ext,"timeline_dom":Array(_timeline_dom),"timeline_ext":Array(_timeline_ext),"injury_seed":str(random_source.randi()),"ai_seed":str(random_source.randi()),"base_hash":_l5_digest(data)}
+	var pending := {"key":_l5_key(data),"ids":_l1_match_plan.ids.duplicate(),"dom":_team_dom_name,"ext":_team_ext_name,"user":_user_team_name,"home":_user_is_home,"score_dom":_score_final_dom,"score_ext":_score_final_ext,"timeline_dom":Array(_timeline_dom),"timeline_ext":Array(_timeline_ext),"injury_seed":str(random_source.randi()),"ai_seed":str(random_source.randi()),"base_hash":_l5_digest(published_base),"base_hash_version":2}
 	pending["seal"] = _l5_digest(pending)
 	data.l5_match["pending"] = pending
 	var result: Dictionary = _l5_io.write_verified(data)
@@ -4854,6 +4861,21 @@ func _l5_store_preparation() -> bool:
 	_l1_start_save = data
 	return _l5_resume(pending)
 
+func _l5_preparation_hash_matches(base: Dictionary, pending: Dictionary) -> bool:
+	var version: Variant = pending.get("base_hash_version", 1)
+	if (not version is int and not version is float) or (float(version) != 1.0 and float(version) != 2.0):
+		return false
+	if pending.get("base_hash") == _l5_digest(base):
+		return true
+	# Version 1 sealed the pre-publication generation. Recover only that exact
+	# predecessor: every other field, plus the pending seal/key/IDs, stays checked.
+	# Never use this compatibility path for a newly sealed version 2 preparation.
+	if version != 1 or not _l5_io._steam_valid(base) or base._steam_local.generation < 1:
+		return false
+	var predecessor := base.duplicate(true)
+	predecessor._steam_local.generation = int(base._steam_local.generation) - 1
+	return pending.get("base_hash") == _l5_digest(predecessor)
+
 func _l5_resume(pending: Dictionary) -> bool:
 	var sealed := pending.duplicate(true)
 	sealed.erase("seal")
@@ -4861,7 +4883,7 @@ func _l5_resume(pending: Dictionary) -> bool:
 		_l5_refuse({"status":"INVALID_PREPARATION"});return false
 	var base := _l1_start_save.duplicate(true)
 	base.l5_match.erase("pending")
-	if pending.get("key") != _l5_key(base) or pending.get("base_hash") != _l5_digest(base) or _l5_digest({"ids":pending.get("ids")}) != _l5_digest({"ids":_l1_match_plan.ids}):
+	if pending.get("key") != _l5_key(base) or not _l5_preparation_hash_matches(base, pending) or _l5_digest({"ids":pending.get("ids")}) != _l5_digest({"ids":_l1_match_plan.ids}):
 		_l5_refuse({"status":"PREPARATION_CONFLICT"});return false
 	for field in ["dom","ext","user","home","score_dom","score_ext","timeline_dom","timeline_ext","injury_seed","ai_seed"]:
 		if not pending.has(field):
